@@ -199,18 +199,42 @@ def _slices(png: bytes, step: int = 4200) -> list[bytes]:
     return out[:5]
 
 
-async def _show(matcher, sh: dict, kind: str) -> None:
+def _render_one(sh: dict, kind: str) -> bytes:
+    import time as _t
     from core.render import sheet_image
     imgs = [b for b in (sheets.image_bytes(n) for n in sh["images"]) if b]
     label = sheets.KINDS[kind]
+    return sheet_image.render(f"{sh['name']} 的{label}", f"更新于 {_t.strftime('%m-%d %H:%M', _t.localtime(sh['updated_ts']))}",
+                              sh["text"], [b[0] for b in imgs])
+
+
+def _stack(pngs: list[bytes]) -> bytes:
+    """把几张长图上下拼成一张。"""
+    import io
+    from PIL import Image
+    ims = [Image.open(io.BytesIO(b)).convert("RGB") for b in pngs]
+    w = max(i.width for i in ims)
+    out = Image.new("RGB", (w, sum(i.height for i in ims)), "white")
+    y = 0
+    for i in ims:
+        out.paste(i, ((w - i.width) // 2, y))
+        y += i.height
+    buf = io.BytesIO()
+    out.save(buf, "PNG")
+    return buf.getvalue()
+
+
+async def _show(matcher, sh: dict | list, kind: str) -> None:
+    """sh 是一个人的一份，或者一串（全员，拼成一张长图）。"""
+    label = sheets.KINDS[kind]
+    many = sh if isinstance(sh, list) else [sh]
     try:
-        png = sheet_image.render(f"{sh['name']} 的{label}", f"更新于 {__import__('time').strftime('%m-%d %H:%M', __import__('time').localtime(sh['updated_ts']))}",
-                                 sh["text"], [b[0] for b in imgs])
+        png = _render_one(many[0], kind) if len(many) == 1 else _stack([_render_one(x, kind) for x in many])
         for part in _slices(png):
             await matcher.send(MessageSegment.file_image(part))
     except Exception as e:  # noqa: BLE001
         logger.warning(f"[{label}] 画图或发图失败，改发文字：{e}")
-        await matcher.send(f"【{sh['name']} 的{label}】\n{sh['text'] or '（只有图片，图片没发出来）'}")
+        await matcher.send("\n\n".join(f"【{x['name']} 的{label}】\n{x['text'] or '（只有图片，图片没发出来）'}" for x in many))
 
 
 def _make_submit(kind: str):
@@ -241,6 +265,12 @@ def _make_view(kind: str):
         me = _me(event)
         name = args.extract_plain_text().strip()
         is_admin = admins.is_admin(_bid(), _sender(event)) if hasattr(admins, "is_admin") else False
+        if kind == "gongzhi" and not name and (is_admin or sheets.public()):
+            everyone = sheets.all_of(kind)       # 不带名字：看所有人的；带名字：只看这一个人
+            if not everyone:
+                await cmd.finish("还没有人提交公知。发「提交公知 内容」就能提交。")
+            await _show(cmd, everyone, kind)
+            await cmd.finish()
         target = roles.get_role_by_name(name) if name else me
         if name and not target:
             await cmd.finish(f"❌ 找不到角色「{name}」。")
@@ -249,7 +279,7 @@ def _make_view(kind: str):
         mine = bool(me) and target["id"] == me["id"]
         allowed = mine or is_admin or (kind == "gongzhi" and sheets.public())
         if not allowed:
-            await cmd.finish("🔒 公知暂未开放展示。" if kind == "gongzhi" else "🔒 二表只有本人和管理员能看。")
+            await cmd.finish("🔒 公知暂未开放展示，只能看自己的（发「查看公知」）。" if kind == "gongzhi" else "🔒 二表只有本人和管理员能看。")
         sh = sheets.get(target["id"], kind)
         if not sh:
             await cmd.finish(f"「{target['name']}」还没有提交{label}。" + (f"发「提交{label} 内容」就能提交。" if mine else ""))

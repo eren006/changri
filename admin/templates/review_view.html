@@ -5,7 +5,7 @@
 .ln .t{color:var(--mute);font-size:12.5px} .ln .w{font-weight:600} .ln.chat .x{color:var(--mute)} .ln .x{white-space:pre-wrap;word-break:break-word}
 @media (max-width:560px){.ln{grid-template-columns:44px 1fr}.ln .x{grid-column:1 / -1}}
 </style>
-<p><a href="{{ url_for('reviews_page') }}">← 私约复盘</a></p>
+<p><a href="{{ url_for('reviews_page') }}">← 复盘</a></p>
 <h1>R{{ room.id }} {{ room.kind }}</h1>
 <p class="lede">{{ slot }}　·　参与者：{{ who|join('、') }}　·　{{ status_text }}　<a class="btn sm ghost" href="{{ url_for('review_export', rid=room.id) }}">导出文本</a></p>
 

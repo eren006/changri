@@ -38,6 +38,8 @@ OFFICIAL = [
      "description": "群里发帖、回复、点赞点踩、查看帖子，管理员删帖删楼层；开放时段在「约会房间」设置里。属于「额外」，关掉后指令不再响应、侧边栏自动折叠。"},
     {"id": "rpg", "name": "物品与商城", "module": "plugins.rpg", "settings_group": None, "nav": ["rpg_page"],
      "links": [("rpg_page", "打开管理页")], "description": "物品库、角色背包、货币商城、属性效果；背包、商城、购买、使用、赠送道具指令。属于「额外」，平时可以不开。"},
+    {"id": "wishes", "name": "心愿", "module": "plugins.wishes", "settings_group": "心愿", "nav": [], "default_on": False,
+     "description": "挂心愿、悬赏心愿、看心愿、摘心愿、撤心愿；被摘走后自动开一个心愿约会房间。开放时段、每人每天上限、公开播报在「心愿」设置里。属于「额外」，默认关闭，要用再打开。"},
     {"id": "places", "name": "地点", "module": "plugins.places", "settings_group": "地点", "nav": ["rpg_places_page"],
      "links": [("rpg_places_page", "打开管理页")], "description": "地点列表、带钥匙的地点、「地点」指令；可以再开「只能使用预设地点约会」。属于「额外」，平时可以不开。"},
 ]
@@ -51,8 +53,8 @@ CORE_CARDS = [
      "description": "短信、署名、竖着写、撤回、拉群引导。冷却、每日次数、字数上限、开放时段都在这里设置。"},
     {"id": "gift", "name": "礼物", "settings_group": "礼物", "links": [("reviews_page", "礼物复盘")],
      "description": "送礼、礼品店与图鉴、礼物公开播报。送礼冷却、每日次数在这里设置。"},
-    {"id": "play", "name": "约会与心愿", "settings_group": "约会房间", "links": [("pool_page", "群池与房间"), ("reviews_page", "私约复盘")],
-     "description": "私约、电话、微信、官约、群池分配房间、时间线、我的待回、心愿。"},
+    {"id": "play", "name": "约会", "settings_group": "约会房间", "links": [("pool_page", "房间"), ("reviews_page", "复盘")],
+     "description": "私约、电话、微信、官约、群池分配房间、时间线、我的待回。心愿是单独的可开关扩展。"},
 ]
 for _e in CORE_CARDS:
     _e.update(kind="core", version="随主程序", author="长日将尽", homepage="", license="随主程序", enabled=True, error="", settings=[])
@@ -65,7 +67,9 @@ SETTING_TYPES = {"int", "string", "text", "bool", "choice"}
 
 
 def is_enabled(ext_id: str) -> bool:
-    return get_config(f"ext:{ext_id}", "1") != "0"
+    """没手动开关过的，按官方扩展自己的默认（大多数默认开；心愿默认关）。"""
+    default = "1" if next((e.get("default_on", True) for e in OFFICIAL if e["id"] == ext_id), True) else "0"
+    return get_config(f"ext:{ext_id}", default) != "0"
 
 
 def set_enabled(ext_id: str, on: bool) -> None:

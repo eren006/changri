@@ -51,18 +51,20 @@ SECTIONS = [
     }),
     ("约会房间", {
         "window_date": ("私约/电话/微信开放时段（写成 10-23 或 20:00-02:00，留空 = 全天开放）", ""),
-        "window_wish": ("心愿开放时段（写成 10-23 或 20:00-02:00，留空 = 全天开放）", ""),
         "window_forum": ("论坛开放时段（写成 10-23 或 20:00-02:00，留空 = 全天开放）", ""),
         "limit_私约": ("每人每天最多发起几次私约（0 = 不限）", "0"),
         "limit_电话": ("每人每天最多发起几次电话（0 = 不限）", "0"),
         "limit_微信": ("每人每天最多发起几次微信（0 = 不限）", "0"),
         "phone_open_cap": ("每人最多同时有几个没结束的电话（0 = 不限）", "5"),
-        "wish_max_concurrent": ("每人同时最多挂几条没被摘走的心愿（0 = 不限）", "0"),
-        "wish_public_send": ("挂心愿时同步发到公告群（1 开 / 0 关）", "0"),
-        "limit_挂心愿": ("每人每天最多挂几条心愿（0 = 不限）", "0"),
-        "limit_摘心愿": ("每人每天最多摘几条心愿（0 = 不限）", "0"),
         "room_expire_hours": ("房间开了多久自动结束（小时，0 = 不自动结束）", "24"),
         "pool_auto_free": ("房间结束后群自动放回池（1 是 / 0 否，否 = 要管理员确认群里的人清空了才放回；开着时，下次分配前会查一遍群里有没有玩家）", "1"),
+    }),
+    ("心愿", {
+        "window_wish": ("心愿开放时段（写成 10-23 或 20:00-02:00，留空 = 全天开放）", ""),
+        "wish_max_concurrent": ("每人同时最多挂几条没被摘走的心愿（0 = 不限）", "0"),
+        "limit_挂心愿": ("每人每天最多挂几条心愿（0 = 不限）", "0"),
+        "limit_摘心愿": ("每人每天最多摘几条心愿（0 = 不限）", "0"),
+        "wish_public_send": ("挂心愿时同步发到公告群（1 开 / 0 关）", "0"),
     }),
     ("心动信", {
         "lovemail_enabled": ("心动信开关（1 开 / 0 关）", "1"),
@@ -196,7 +198,7 @@ def _dashboard() -> dict:
     if not n_admins:
         todo.append(("warn", "还没有 QQ 管理员", url_for("admins_page"), "没有人能在群里用管理指令"))
     if n_slots:
-        todo.append(("warn", f"有 {n_slots} 个群位等着认群", url_for("roles_page"), "登记了群号，但还没人在群里发认群码"))
+        todo.append(("warn", f"有 {n_slots} 个群位等着认群", url_for("dashboard") + "#roles", "登记了群号，但还没人在群里发认群码"))
     if n_undelivered:
         todo.append(("warn", f"最近 24 小时有 {n_undelivered} 条消息没送达", url_for("reviews_page", tab="sms"), "收件人的群可能没授权机器人发言"))
     late = relations_core.overdue()
@@ -415,7 +417,11 @@ def create_app() -> Flask:
             if cards:
                 return render_template("picker.html", cards=cards)
         from core import errlog
-        return render_template("dashboard.html", d=_dashboard(), errors=errlog.recent(30), err_url=errlog.report_url())
+        with get_conn() as conn:
+            rrows = conn.execute("SELECT * FROM roles ORDER BY id").fetchall()
+        role_items = [{"role": r, "groups": roles_core.list_groups(r["id"])} for r in rrows]
+        return render_template("dashboard.html", d=_dashboard(), errors=errlog.recent(30), err_url=errlog.report_url(), role_items=role_items,
+                               code=request.args.get("code", ""), code_role=request.args.get("role", ""), code_kind=request.args.get("kind", ""))
 
     @app.post("/errors/clear")
     @login_required
@@ -631,10 +637,7 @@ def create_app() -> Flask:
     @app.route("/roles")
     @login_required
     def roles_page():
-        with get_conn() as conn:
-            rows = conn.execute("SELECT * FROM roles ORDER BY id").fetchall()
-        items = [{"role": r, "groups": roles_core.list_groups(r["id"])} for r in rows]
-        return render_template("roles.html", items=items, code=request.args.get("code", ""), code_role=request.args.get("role", ""), code_kind=request.args.get("kind", ""))
+        return redirect(url_for("dashboard") + "#roles")           # 角色与群并进总览（折叠）
 
     @app.post("/roles/<int:role_id>/slot")
     @login_required
@@ -642,25 +645,25 @@ def create_app() -> Flask:
         ok, res = roles_core.add_slot(role_id, request.form.get("real_gid", "").strip(), request.form.get("kind", "backup"))
         if not ok:
             flash(res)
-            return redirect(url_for("roles_page"))
+            return redirect(url_for("dashboard") + "#roles")
         with get_conn() as conn:
             name = conn.execute("SELECT name FROM roles WHERE id=?", (role_id,)).fetchone()["name"]
         flash("群位已登记，请到那个群里发认群码")
-        return redirect(url_for("roles_page", code=res, role=name, kind=request.form.get("kind", "backup")))
+        return redirect(url_for("dashboard", code=res, role=name, kind=request.form.get("kind", "backup")) + "#roles")
 
     @app.post("/roles/<int:role_id>/slot/<int:slot_id>/delete")
     @login_required
     def delete_slot(role_id, slot_id):
         with get_conn() as conn:
             conn.execute("DELETE FROM role_groups WHERE id=? AND role_id=? AND kind='backup'", (slot_id, role_id))
-        return redirect(url_for("roles_page"))
+        return redirect(url_for("dashboard") + "#roles")
 
     @app.post("/roles/<int:role_id>/delete")
     @login_required
     def delete_role(role_id):
         roles_core.delete_role(role_id)
         flash("角色已删除")
-        return redirect(url_for("roles_page"))
+        return redirect(url_for("dashboard") + "#roles")
 
     @app.template_filter("ts")
     def _ts_filter(v):
@@ -1258,7 +1261,7 @@ def create_app() -> Flask:
     def sheets_public():
         on = request.form.get("on") == "1"
         set_config("gongzhi_public", "1" if on else "0")
-        flash("已开启展示公知：玩家可以用「查看公知 角色名」看别人的公知" if on else "已关闭展示公知：玩家只能看自己的")
+        flash("已开启展示公知：玩家发「查看公知」看到所有人的，发「查看公知 角色名」只看这一个人" if on else "已关闭展示公知：玩家只能看自己的")
         return redirect(url_for("relations_page"))
 
     @app.post("/relations/alert")

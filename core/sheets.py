@@ -28,7 +28,7 @@ def folder() -> Path:
 
 
 def public() -> bool:
-    """展示公知：开着，玩家才能用「查看公知 角色名」看别人的公知。默认关。"""
+    """展示公知：开着，玩家才能看别人的公知：「查看公知」是所有人的，「查看公知 角色名」只看这一个人。默认关。"""
     return get_config("gongzhi_public", "0") == "1"
 
 
@@ -106,6 +106,13 @@ def get(role_id: int, kind: str) -> dict | None:
             return None
         imgs = [x["filename"] for x in c.execute("SELECT filename FROM sheet_images WHERE role_id=? AND kind=? ORDER BY ord", (role_id, kind))]
     return {"role_id": role_id, "name": r["name"], "kind": kind, "text": r["text"], "images": imgs, "updated_ts": r["updated_ts"]}
+
+
+def all_of(kind: str) -> list[dict]:
+    """所有交过这种表的角色（按角色顺序）。"""
+    with get_conn() as c:
+        ids = [r["role_id"] for r in c.execute("SELECT s.role_id FROM sheets s JOIN roles ro ON ro.id=s.role_id WHERE s.kind=? ORDER BY ro.id", (kind,))]
+    return [x for x in (get(i, kind) for i in ids) if x]
 
 
 def image_bytes(name: str) -> tuple[bytes, str] | None:

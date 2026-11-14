@@ -1,8 +1,8 @@
-{% extends "base.html" %}{% block title %}QQ 号监听{% endblock %}
+{% extends "base.html" %}{% block title %}连接群号组{% endblock %}
 {% block body %}
 {% import "_rpg_icons.html" as ic %}
 {% macro cancel() %}<button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button>{% endmacro %}
-<h1>QQ 号监听</h1>
+<h1>连接群号组</h1>
 <p class="lede">给这个机器人绑一个或多个 QQ 号（连到本机或别处的 NapCat / LLBot），只用来听群里的消息和改群名，不会发任何消息。官方机器人只能收到 @ 它的话，绑上之后群号池里的群就能听到全部发言。池子里没有的群，一律不处理。</p>
 
 <section>

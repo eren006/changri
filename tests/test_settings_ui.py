@@ -54,7 +54,8 @@ class SettingsPage(unittest.TestCase):
         self.assertIn('type="number"', html)
         t = tok("/extensions")
         # 浏览器行为：勾选的开关同时提交 1 和 0（1 在前），没勾的只提交 0
-        c.post("/settings/约会房间", data={"_csrf": t, "wish_public_send": ["1", "0"], "pool_auto_free": ["0"], "room_expire_hours": "12"})
+        c.post("/settings/心愿", data={"_csrf": t, "wish_public_send": ["1", "0"]})
+        c.post("/settings/约会房间", data={"_csrf": t, "pool_auto_free": ["0"], "room_expire_hours": "12"})
         self.assertEqual(get_config("wish_public_send"), "1")
         self.assertEqual(get_config("pool_auto_free"), "0")
         self.assertEqual(get_config("room_expire_hours"), "12")

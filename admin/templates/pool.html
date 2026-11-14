@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}群池与房间{% endblock %}
+{% block title %}房间{% endblock %}
 {% block body %}
 {% import "_rpg_icons.html" as ic %}
 <style>
@@ -14,9 +14,24 @@
 form.i{display:inline}
 @media(max-width:720px){.pg input[type=text],.pg textarea{font-size:16px;padding:10px 11px}.pg .row>div{flex:1 1 100%}.pg .meta{gap:6px 12px}}
 </style>
-<h1>群池与房间</h1>
-<p class="lede">私约、电话、官约、心愿约会都要一个群。官方机器人建不了群，所以这里放一批你提前建好、把机器人拉进去的空群：机器人被拉进群、或在群里有人说话后，群会自动出现在下面；你给它填上群号（玩家要靠群号申请入群）、放进池子就行。房间结束后群会「等人退群」，等你确认群里的人都退光了再放回池。</p>
+<h1>房间</h1>
+<p class="lede">私约、电话、官约、微信、心愿约会开起来的房间。房间用的群，在「连接群号组」的群号组里管理（机器人会自动分配空群、改群名）。</p>
 
+<section>
+  <h2>进行中的房间<span class="n">{{ live|length }} 个</span></h2>
+  <div class="tablewrap"><table class="rt">
+    <tr><th>房间</th><th>类型</th><th>时间</th><th>参与者</th><th>群</th><th></th></tr>
+    {% for r in live %}
+    <tr><td><a href="{{ url_for('review_view', rid=r.id) }}">R{{ r.id }}</a></td><td>{{ r.kind }}</td><td>{{ r.slot }}{% if r.place %} @{{ r.place }}{% endif %}</td><td>{{ r.who }}</td>
+      <td>{% if r.grp %}{{ r.grp.real_gid or '未填群号' }} {{ r.grp.label }}{% else %}<span style="color:var(--bad)">排队等群</span>{% endif %}</td>
+      <td><form class="i" method="post" action="{{ url_for('room_end', rid=r.id) }}" onsubmit="return confirm('结束这个房间？网页上结束不会通知玩家。')">{{ csrf() }}<button class="linkbtn">结束</button></form></td></tr>
+    {% else %}<tr><td colspan="6" class="empty">现在没有进行中的房间。</td></tr>{% endfor %}
+  </table></div>
+  <p class="note">玩家在房间群里发「结束私约」、管理员发「强结私约 R号」可以结束并通知大家；这里的「结束」只改状态，不通知。</p>
+</section>
+<section>
+  <details class="errlog"><summary class="muted" style="cursor:pointer">官方机器人的群池（旧方式，用了「连接群号组」的群号组就不用管）{% if counts.waiting %} · {{ counts.waiting }} 个房间在排队等群{% endif %}</summary>
+    <p class="note">私约、电话、官约、心愿约会都要一个群。官方机器人建不了群，所以这里放一批你提前建好、把机器人拉进去的空群：机器人被拉进群、或在群里有人说话后，群会自动出现在下面；你给它填上群号（玩家要靠群号申请入群）、放进池子就行。房间结束后群会「等人退群」，等你确认群里的人都退光了再放回池。</p>
 <section>
   <h2>现在的情况</h2>
   <p>空闲 <b>{{ counts.free }}</b> · 占用 <b>{{ counts.occupied }}</b> · 等人退群 <b>{{ counts.cleaning }}</b> · 排队等群的房间 <b>{{ counts.waiting }}</b>
@@ -75,16 +90,6 @@ form.i{display:inline}
 </details>
 {% endif %}
 
-<section>
-  <h2>进行中的房间</h2>
-  <div class="tablewrap"><table class="rt">
-    <tr><th>房间</th><th>类型</th><th>时间</th><th>参与者</th><th>群</th><th></th></tr>
-    {% for r in live %}
-    <tr><td><a href="{{ url_for('review_view', rid=r.id) }}">R{{ r.id }}</a></td><td>{{ r.kind }}</td><td>{{ r.slot }}{% if r.place %} @{{ r.place }}{% endif %}</td><td>{{ r.who }}</td>
-      <td>{% if r.grp %}{{ r.grp.real_gid or '未填群号' }} {{ r.grp.label }}{% else %}<span style="color:var(--bad)">排队等群</span>{% endif %}</td>
-      <td><form class="i" method="post" action="{{ url_for('room_end', rid=r.id) }}" onsubmit="return confirm('结束这个房间？网页上结束不会通知玩家。')">{{ csrf() }}<button class="linkbtn">结束</button></form></td></tr>
-    {% else %}<tr><td colspan="6" class="empty">现在没有进行中的房间。</td></tr>{% endfor %}
-  </table></div>
-  <p class="note">玩家在房间群里发「结束私约」、管理员发「强结私约 R号」可以结束并通知大家；这里的「结束」只改状态，不通知。</p>
+  </details>
 </section>
 {% endblock %}

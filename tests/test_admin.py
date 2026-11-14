@@ -148,8 +148,8 @@ class AdminTests(unittest.TestCase):
         a, b = (roles.get_role_by_name(n)["id"] for n in "甲乙")
         lovemail.add_mail(a, b, "匿名", "你好")
         self.login()
-        for p in ["/", "/extensions", "/pool", "/forum", "/rpg", "/roles", "/lovemail", "/relations", "/admins", "/bots", "/accounts"]:
-            self.assertEqual(self.c.get(p).status_code, 200, p)
+        for p in ["/", "/extensions", "/pool", "/forum", "/rpg", "/lovemail", "/relations", "/admins", "/bots", "/accounts"]:
+            self.assertEqual(self.c.get(p, follow_redirects=True).status_code, 200, p)
         html = self.c.get("/").get_data(as_text=True)
         self.assertIn("今日通告", html); self.assertIn("22:00", html); self.assertIn("信池里 1 封", html)
 
@@ -172,7 +172,7 @@ class AdminTests(unittest.TestCase):
         # 管理员登录：能用日常页面，不能管账号，也看不到账号列表
         c2 = self.app.test_client()
         self.assertEqual(c2.post("/login", data={"username": cred.group(1), "password": cred.group(2), "_csrf": token(c2)}).status_code, 302)
-        self.assertEqual(c2.get("/roles").status_code, 200)
+        self.assertEqual(c2.get("/").status_code, 200)
         page = c2.get("/accounts").get_data(as_text=True)
         self.assertIn("你是管理员账号", page); self.assertNotIn("生成管理员账号", page)
         t = token(c2, "/accounts")
@@ -206,7 +206,7 @@ class AdminTests(unittest.TestCase):
         webusers.create_user("second", "longenough2")      # 普通管理员
         c2 = self.app.test_client()
         c2.post("/login", data={"username": "second", "password": "longenough2", "_csrf": token(c2)})
-        self.assertEqual(c2.get("/roles").status_code, 200)
+        self.assertEqual(c2.get("/").status_code, 200)
         sid = [u for u in webusers.list_users() if u["username"] == "second"][0]["id"]
         webusers.delete_user(sid, 0)
         self.assertEqual(c2.get("/roles").status_code, 302)                       # 账号被删，已登录的会话也立刻失效

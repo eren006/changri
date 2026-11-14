@@ -29,6 +29,7 @@ except ValueError:
     from core import extensions
     extensions.load_all()
 
+nonebot.load_plugin("plugins.wishes")          # 心愿默认关，不在 load_all 里；测试里直接加载
 from nonebot.message import handle_event  # noqa: E402
 
 SENT: list = []
@@ -123,6 +124,25 @@ class PlayE2E(unittest.TestCase):
         self.assertIn("暂未开放", self.say("查看公知 甲", member="M1", group="P1")[0])
         set_config("gongzhi_public", "1")
         self.assertEqual(self.say("查看公知 甲", member="M1", group="P1"), ["<图>"])
+        # 不带名字 = 所有人的；带名字 = 只看这一个人
+        self.assertIn("已提交", self.say("提交公知 我是乙", member="M1", group="P1")[0])
+        from unittest import mock
+        from plugins import relations as rel
+        seen = []
+
+        async def spy(matcher, sh, kind):
+            seen.append(sh)
+            await matcher.send("<图>")
+        with mock.patch.object(rel, "_show", spy):
+            self.say("查看公知", member="M1", group="P1")
+            self.say("查看公知 甲", member="M1", group="P1")
+        self.assertIsInstance(seen[0], list); self.assertEqual({x["name"] for x in seen[0]}, {"甲", "乙"})
+        self.assertIsInstance(seen[1], dict); self.assertEqual(seen[1]["name"], "甲")
+        set_config("gongzhi_public", "0")
+        with mock.patch.object(rel, "_show", spy):
+            self.say("查看公知", member="M1", group="P1")                 # 没开放：只看自己的
+        self.assertEqual(seen[2]["name"], "乙")
+        set_config("gongzhi_public", "1")
         self.say("提交二表 二表内容")
         self.assertIn("只有本人", self.say("查看二表 甲", member="M1", group="P1")[0])
         self.assertEqual(self.say("查看二表"), ["<图>"])

@@ -2,13 +2,15 @@
 {% block title %}总览{% endblock %}
 {% block head %}
 <style>
-.sheet{list-style:none;margin:0;padding:0;max-width:640px}
-.sheet li{display:grid;grid-template-columns:5.2rem 22px minmax(0,1fr);align-items:start;padding:0 0 26px;position:relative}
+.dgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:0 36px;align-items:start}
+.dgrid>section{margin:0 0 8px;padding:14px 0 12px}
+.sheet{list-style:none;margin:0;padding:0}
+.sheet li{display:grid;grid-template-columns:3.8rem 22px minmax(0,1fr);align-items:start;padding:0 0 14px;position:relative}
 .sheet li:last-child{padding-bottom:0}
-.sheet .t{font:700 34px/1 var(--serif);font-variant-numeric:tabular-nums;color:var(--mute)}
+.sheet .t{font:700 24px/1.1 var(--serif);font-variant-numeric:tabular-nums;color:var(--mute)}
 .sheet .m{position:relative;height:100%}
 .sheet .m::before{content:"";position:absolute;left:10px;top:7px;width:9px;height:9px;border-radius:50%;background:var(--line);border:2px solid var(--paper);box-sizing:content-box;margin-left:-2px}
-.sheet .m::after{content:"";position:absolute;left:12px;top:24px;bottom:-26px;width:1px;background:var(--line)}
+.sheet .m::after{content:"";position:absolute;left:12px;top:20px;bottom:-14px;width:1px;background:var(--line)}
 .sheet li:last-child .m::after{display:none}
 .sheet .what b{display:block;font-weight:600}
 .sheet .what span{color:var(--mute);font-size:14px}
@@ -16,13 +18,13 @@
 .sheet li.next .t{color:var(--dusk)}
 .sheet li.next .m::before{background:var(--dusk);width:11px;height:11px;margin-left:-3px;top:6px}
 .sheet .nowtag{margin-left:8px;font-size:12.5px;color:var(--dusk);font-weight:600}
-.todo{list-style:none;margin:0;padding:0;max-width:640px}
-.todo li{padding:10px 0;border-bottom:1px solid var(--line)}
+.todo{list-style:none;margin:0;padding:0}
+.todo li{padding:7px 0;border-bottom:1px solid var(--line)}
 .todo li:last-child{border-bottom:0}
 .todo a{text-decoration:none}
 .todo a:hover b{text-decoration:underline;text-underline-offset:3px}
 .todo span{display:block;margin-left:16px;color:var(--mute);font-size:13.5px}
-dl.facts{display:grid;grid-template-columns:max-content 1fr;gap:8px 28px;margin:0;max-width:420px}
+dl.facts{display:grid;grid-template-columns:max-content 1fr;gap:4px 24px;margin:0}
 dl.facts dt{color:var(--mute)}
 dl.facts dd{margin:0;font-variant-numeric:tabular-nums;font-weight:600}
 </style>
@@ -31,6 +33,7 @@ dl.facts dd{margin:0;font-variant-numeric:tabular-nums;font-weight:600}
 <h1>{{ d.date }}</h1>
 <p class="lede">现在 <span class="tabular">{{ d.now }}</span>。下面是今天要发生的事，以及需要你处理的。</p>
 
+<div class="dgrid">
 <section>
   <h2>今日通告</h2>
   <ol class="sheet">
@@ -62,6 +65,13 @@ dl.facts dd{margin:0;font-variant-numeric:tabular-nums;font-weight:600}
   <dl class="facts">
     {% for k, v in d.facts %}<dt>{{ k }}</dt><dd>{{ v }}</dd>{% endfor %}
   </dl>
+</section>
+</div>
+<section>
+  <details class="errlog" id="roles"{% if code %} open{% endif %}><summary class="muted" style="cursor:pointer">角色与群（{{ role_items|length }} 个角色）</summary>
+    <p class="note">玩家在自己的个人群里发「创建新角色 名字」就会出现在这里。每个角色有一个主群，还可以有备用群，消息先发主群，发不出去再试备用群。</p>
+    {% with items=role_items %}{% include "_roles_block.html" %}{% endwith %}
+  </details>
 </section>
 <section>
   <details class="errlog"><summary class="muted" style="cursor:pointer">报错日志{% if errors %}（{{ errors|length }} 条）{% endif %}</summary>

@@ -97,7 +97,7 @@ class AdminMultiBot(unittest.TestCase):
             hp = [x for x in rpg.attr_defs() if x["name"] == "HP"][0]
         self.assertEqual((hp["min_value"], hp["max_value"], hp["default_value"]), (0, 100, 100))
         self.assertEqual(self.c.get(base + "/messages").status_code, 404)
-        for path in ("/qqlink", "/season", "/relations", "/roles", "/pool"):
+        for path in ("/qqlink", "/season", "/relations", "/pool"):
             self.assertEqual(self.c.get(base + path).status_code, 200, path)
         for path in ("/accounts", "/bots"):
             self.assertEqual(self.c.get(path).status_code, 200, path)
@@ -117,7 +117,7 @@ class AdminMultiBot(unittest.TestCase):
         """页面里自带「正在重启」提示：轮询 /healthz，不需要登录；带机器人前缀的页面轮询带前缀的地址。"""
         r = self.c.get("/healthz", follow_redirects=True)                    # 没带机器人前缀的老网址会先补前缀
         self.assertEqual((r.status_code, r.get_data(as_text=True)), (200, "ok"))
-        page = self.c.get("/b/111111/roles").get_data(as_text=True)
+        page = self.c.get("/b/111111/").get_data(as_text=True)
         self.assertIn("正在重启", page); self.assertIn("/b/111111", page.split("/healthz")[0][-40:])
         self.assertEqual(self.c.get("/b/111111/healthz").status_code, 200)
 
@@ -151,8 +151,8 @@ class AdminMultiBot(unittest.TestCase):
         self.assertEqual((r.status_code, r.headers["Location"]), (302, "/b/111111/"))
         r = self.c.get("/roles")
         self.assertEqual(r.headers["Location"], "/b/111111/roles")
-        self.assertEqual(self.c.get("/b/111111/roles").status_code, 200)
-        self.assertEqual(self.c.get("/b/999999/roles").status_code, 404)
+        self.assertEqual(self.c.get("/b/111111/roles").headers["Location"], "/b/111111/#roles")       # 角色与群并进总览
+        self.assertEqual(self.c.get("/b/999999/").status_code, 404)
 
     def test_picker_with_two_bots_and_isolation(self):
         botconf.add_account("222222", "b" * 20, "乙号")
@@ -162,9 +162,9 @@ class AdminMultiBot(unittest.TestCase):
         self.assertIn("乙号", html)
         with db.use_bot("111111"):
             roles.create_role("只在甲号", "111111", "G1", "M1")
-        self.assertIn("只在甲号", self.c.get("/b/111111/roles").get_data(as_text=True))
-        self.assertNotIn("只在甲号", self.c.get("/b/222222/roles").get_data(as_text=True))
-        self.assertIn('href="/b/222222/roles"', self.c.get("/b/222222/").get_data(as_text=True))   # 页面链接自带前缀
+        self.assertIn("只在甲号", self.c.get("/b/111111/").get_data(as_text=True))
+        self.assertNotIn("只在甲号", self.c.get("/b/222222/").get_data(as_text=True))
+        self.assertIn('id="roles"', self.c.get("/b/222222/").get_data(as_text=True))   # 页面链接自带前缀
         self.assertIn("/b/111111/", self.c.get("/b/222222/").get_data(as_text=True))                # 切换下拉
         self.assertEqual(self.c.get("/accounts").status_code, 200)                                   # 全局页面不带前缀
 
@@ -197,7 +197,7 @@ class Erase(AdminMultiBot):
 class NoGuess(AdminMultiBot):
     def test_write_without_bot_prefix_is_refused(self):
         botconf.add_account("222222", "b" * 20, "乙号")
-        t = self._csrf("/b/111111/roles")
+        t = self._csrf("/b/111111/")
         r = self.c.post("/roles/1/delete", data={"_csrf": t})              # 没前缀的写操作
         self.assertEqual((r.status_code, r.headers["Location"]), (302, "/?pick=1"))
         r = self.c.post("/b/111111/roles/1/delete", data={"_csrf": t})     # 带前缀照常

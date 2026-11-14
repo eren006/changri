@@ -132,10 +132,11 @@ class ExtensionCoreTests(_PatchedDir):
 
     def test_nav_and_groups_follow_switches(self):
         self.assertEqual(E.disabled_nav(), set())
+        self.assertEqual(E.disabled_groups(), {"心愿"})                          # 心愿默认关
         E.set_enabled("lovemail", False)
         E.set_enabled("dice", False)
         self.assertIn("lovemail_page", E.disabled_nav())
-        self.assertEqual(E.disabled_groups(), {"心动信", "跑团骰子"})
+        self.assertEqual(E.disabled_groups(), {"心动信", "跑团骰子", "心愿"})
         E.set_enabled("entrance", False)
         self.assertNotIn("season_page", E.disabled_nav())                      # 季度是核心，页面一直在
         self.assertNotIn("season", [e["id"] for e in E.OFFICIAL])

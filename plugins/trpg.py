@@ -82,7 +82,7 @@ bindqq_cmd = _cmd("绑定qq", {"绑定QQ", "绑QQ"}, rule=_group_rule)
 async def _(event: GroupMessageCreateEvent, args=CommandArg()):
     text = args.extract_plain_text().strip()
     if not text:
-        await bindqq_cmd.finish("格式：/绑定QQ 你的QQ号。绑定后，后台的 QQ 号监听听到你的发言，会算在你自己名下（跑团 log 记在你的名字下，房间群里说话算到场）。")
+        await bindqq_cmd.finish("格式：/绑定QQ 你的QQ号。绑定后，后台的 连接群号组听到你的发言，会算在你自己名下（跑团 log 记在你的名字下，房间群里说话算到场）。")
     done = []
     role = roles.find_role_for_sender(current_bot.get().self_id, event.group_openid, event.author.member_openid)
     if role:
