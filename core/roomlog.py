@@ -125,7 +125,7 @@ def _day_of(key: str) -> tuple[int, str]:
 
 
 def events(role: str = "", kind: str = "", q: str = "") -> list[dict]:
-    """所有房间、短信、礼物，按发生的先后排好，每条带第几天。role：只要这个人参与的；kind：room / sms / gift；q：内容里有这个词。"""
+    """所有房间、短信、礼物，按发生的先后排好，每条带第几天。role：只要这个人参与的；kind：room / sms / gift / msg（短信和礼物，不含房间）；q：内容里有这个词。"""
     out: list[dict] = []
     with get_conn() as c:
         if kind in ("", "room"):
@@ -142,7 +142,7 @@ def events(role: str = "", kind: str = "", q: str = "") -> list[dict]:
                 out.append({"type": "room", "ts": r["created_ts"], "day": num, "day_label": label, "id": r["id"], "kind": r["kind"],
                             "who": who, "slot": ("" if r["kind"] == "微信" else f"{r['start_hm']}-{r['end_hm']}" + (f" @{r['place']}" if r["place"] else "")),
                             "status": r["status"], "lines": ls, "n": len(ls), "chars": sum(x["chars"] for x in ls)})
-        if kind in ("", "sms", "gift"):
+        if kind in ("", "sms", "gift", "msg"):
             sql = ("SELECT m.*, f.name AS fn, t.name AS tn FROM messages m JOIN roles f ON f.id=m.from_role_id JOIN roles t ON t.id=m.to_role_id "
                    "WHERE m.error!='已撤回'")
             args: list = []

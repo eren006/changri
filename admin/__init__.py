@@ -76,8 +76,9 @@ SECTIONS = [
     ("跑团骰子", {
         "dice_enabled": ("跑团骰子开关（1 开 / 0 关）", "1"),
         "dice_default_rule": ("群里默认规则（coc 或 dnd，群里可以用「切换规则」单独改）", "coc"),
+        "dice_card": ("检定结果发 Markdown 小卡片（1 开 / 0 关；QQ 没开 Markdown 权限时会自动退回文字，一小时后再试）", "1"),
     }),
-    ("RPG 物品与地点", {
+    ("地点", {
         "place_system_enabled": ("启用严格地点检查（1 开 / 0 关）", "0"),
         "allow_private_rooms": ("允许使用「某某的房间」（1 开 / 0 关）", "1"),
     }),
@@ -295,7 +296,7 @@ def create_app() -> Flask:
 
     @app.before_request
     def guard():
-        for prefix, ext_id in (("/lovemail", "lovemail"), ("/relations", "relations"), ("/rpg", "rpg")):      # 扩展关了，页面网址也一并关掉
+        for prefix, ext_id in (("/lovemail", "lovemail"), ("/relations", "relations"), ("/rpg", "rpg"), ("/places", "places"), ("/forum", "forum")):      # 扩展关了，页面网址也一并关掉
             if request.path.startswith(prefix) and not ext_core.is_enabled(ext_id):
                 abort(404)
         if request.method == "POST" and not secrets.compare_digest(request.form.get("_csrf", ""), session.get("csrf", "-")):
@@ -877,7 +878,16 @@ def create_app() -> Flask:
 
     # ---------- 房间复盘：所有人的房间记录 ----------
     def _review_filters():
-        return {k: request.args.get(k, "").strip() for k in ("role", "kind", "q")}
+        """tab：room = 私约/房间，msg = 短信和礼物，两边分开看；kind 只在 msg 页签里用来再分短信/礼物。"""
+        f = {k: request.args.get(k, "").strip() for k in ("role", "kind", "q", "tab")}
+        f["tab"] = "msg" if f["tab"] == "msg" else "room"
+        f["kind"] = f["kind"] if f["tab"] == "msg" and f["kind"] in ("sms", "gift") else ""
+        return f
+
+    def _review_events(f):
+        from core import roomlog
+        kind = "room" if f["tab"] == "room" else (f["kind"] or "msg")
+        return roomlog.events(role=f["role"], kind=kind, q=f["q"])
 
     @app.route("/reviews")
     @login_required
@@ -886,17 +896,16 @@ def create_app() -> Flask:
         f = _review_filters()
         with get_conn() as conn:
             names = [r["name"] for r in conn.execute("SELECT name FROM roles ORDER BY name")]
-        evts = roomlog.events(**f)
+        evts = _review_events(f)
         return render_template("reviews.html", f=f, names=names, days=roomlog.day_summary(evts), total=len(evts))
 
     @app.route("/reviews/day/<label>")
     @login_required
     def review_day(label):
-        from core import roomlog
         f = _review_filters()
         with get_conn() as conn:
             names = [r["name"] for r in conn.execute("SELECT name FROM roles ORDER BY name")]
-        evts = roomlog.events(**f)
+        evts = _review_events(f)
         if label != "all":
             evts = [e for e in evts if e["day_label"] == label]
         return render_template("review_day.html", f=f, names=names, label=label, evts=evts,
@@ -1045,23 +1054,50 @@ def create_app() -> Flask:
         flash("已删除" if trpg_core.delete_attr(card_id, name, source="后台手改") else "没有这个属性")
         return redirect(url_for("trpg_card_page", card_id=card_id))
 
-    # ---------- 物品、属性、地点与商城 ----------
+    # ---------- 物品与商城 / 属性 / 地点：三个界面，同属「物品、属性、地点与商城」扩展 ----------
+    def _role_rows():
+        with get_conn() as conn:
+            return [dict(x) for x in conn.execute("SELECT id,name FROM roles ORDER BY name")]
+
     @app.route("/rpg")
     @login_required
     def rpg_page():
-        with get_conn() as conn:
-            role_rows = [dict(x) for x in conn.execute("SELECT id,name FROM roles ORDER BY name")]
-            key_rows = {(x["role_id"], x["place_id"]) for x in conn.execute("SELECT * FROM rpg_place_keys")}
-        return render_template("rpg.html", defs=rpg_core.attr_defs(), items=rpg_core.items(), shop=rpg_core.listings(),
-                               places=rpg_core.places(), roles=role_rows, keys=key_rows)
+        import json as _json
+        items = rpg_core.items()
+        for x in items:                                              # 「体力 +2」这样的小标签，和编辑框里的「体力+2」写法
+            try:
+                eff = _json.loads(x.get("attr_effects") or "{}")
+            except ValueError:
+                eff = {}
+            x["chips"] = [{"text": f"{k} {v:+d}" if isinstance(v, int) else f"{k} {v}", "dir": "up" if isinstance(v, int) and v > 0 else "down" if isinstance(v, int) and v < 0 else ""} for k, v in eff.items()]
+            x["eff_text"] = " ".join(f"{k}{v:+d}" if isinstance(v, int) else f"{k}{v}" for k, v in eff.items())
+        return render_template("rpg.html", items=items, plain_items=[x for x in items if x["kind"] != "currency"],
+                               currencies=[x for x in items if x["kind"] == "currency"], shop=rpg_core.listings(), roles=_role_rows())
 
-    @app.post("/rpg/attr")
+    @app.route("/attrs")
+    @login_required
+    def rpg_attrs_page():
+        return render_template("rpg_attrs.html", defs=rpg_core.attr_defs())
+
+    @app.route("/places")
+    @login_required
+    def rpg_places_page():
+        places = rpg_core.places()
+        with get_conn() as conn:
+            holders: dict[int, list[str]] = {}
+            for r in conn.execute("SELECT k.place_id, r.name FROM rpg_place_keys k JOIN roles r ON r.id=k.role_id ORDER BY r.name"):
+                holders.setdefault(r["place_id"], []).append(r["name"])
+        for p in places:
+            p["holders"] = holders.get(p["id"], [])
+        return render_template("rpg_places.html", places=places, roles=_role_rows())
+
+    @app.post("/attrs/save")
     @login_required
     def rpg_attr_save():
         ok, msg = rpg_core.save_attr_def(request.form.get("name", ""), request.form.get("min"), request.form.get("max"),
                                          request.form.get("default", 0), request.form.get("description", ""))
         flash("属性已保存" if ok else msg)
-        return redirect(url_for("rpg_page"))
+        return redirect(url_for("rpg_attrs_page"))
 
     @app.post("/rpg/item")
     @login_required
@@ -1070,6 +1106,12 @@ def create_app() -> Flask:
                                      request.form.get("description", ""), request.form.get("effects", ""), request.form.get("max_uses", -1),
                                      bool(request.form.get("can_give")))
         flash("物品已保存" if ok else msg)
+        return redirect(url_for("rpg_page"))
+
+    @app.post("/rpg/items/bulk")
+    @login_required
+    def rpg_items_bulk():
+        flash(rpg_core.bulk_summary(*rpg_core.bulk_items(request.form.get("text", ""))))
         return redirect(url_for("rpg_page"))
 
     @app.post("/rpg/inventory")
@@ -1093,18 +1135,24 @@ def create_app() -> Flask:
             conn.execute("DELETE FROM rpg_shop WHERE item_code=?", (code,))
         return redirect(url_for("rpg_page"))
 
-    @app.post("/rpg/place")
+    @app.post("/places/save")
     @login_required
     def rpg_place_save():
         ok, msg = rpg_core.save_place(request.form.get("name", ""), request.form.get("description", ""), bool(request.form.get("locked")))
         flash("地点已保存" if ok else msg)
-        return redirect(url_for("rpg_page"))
+        return redirect(url_for("rpg_places_page"))
 
-    @app.post("/rpg/key")
+    @app.post("/places/bulk")
+    @login_required
+    def rpg_places_bulk():
+        flash(rpg_core.bulk_summary(*rpg_core.bulk_places(request.form.get("text", ""))))
+        return redirect(url_for("rpg_places_page"))
+
+    @app.post("/places/key")
     @login_required
     def rpg_key_save():
         rpg_core.set_key(int(request.form.get("role_id", 0)), int(request.form.get("place_id", 0)), bool(request.form.get("on")))
-        return redirect(url_for("rpg_page"))
+        return redirect(url_for("rpg_places_page"))
 
     @app.route("/lovemail")
     @login_required
@@ -1314,14 +1362,17 @@ def create_app() -> Flask:
     def pool_page():
         groups = pool_core.all_groups()
         sets: dict[str, list] = {}
+        blocked = [g for g in groups if g["conflict"]]                 # 个人群/戏群/公告群不能当房间，单独收起来，别和能用的混在一起
         for g in groups:
-            sets.setdefault(g["set_name"] or "（未分组）", []).append(g)
+            if not g["conflict"]:
+                sets.setdefault(g["set_name"] or "（未分组）", []).append(g)
         with get_conn() as conn:
             live = conn.execute("SELECT * FROM rooms WHERE status='open' ORDER BY id").fetchall()
         live_rows = [{**dict(r), "slot": ("不占时间线" if r["kind"] == "微信" else f"D{r['day']} {r['start_hm']}-{r['end_hm']}"),
                       "who": "、".join(m["name"] for m in rooms_core.members(r["id"])),
                       "grp": (pool_core.get(r["pool_id"]) if r["pool_id"] else None)} for r in live]
-        return render_template("pool.html", sets=sets, counts=pool_core.counts(), live=live_rows, unfilled=sum(1 for g in groups if not g["real_gid"]))
+        return render_template("pool.html", sets=sets, blocked=blocked, counts=pool_core.counts(), live=live_rows,
+                               unfilled=sum(1 for g in groups if not g["real_gid"] and not g["conflict"]))
 
     @app.post("/pool/<int:pid>/save")
     @login_required

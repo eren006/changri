@@ -1,4 +1,4 @@
-"""QQ 端物品、商城与地点指令。部分规则改编自「长日将尽」CC BY-NC-SA 作品（联系 3052553938）。"""
+"""QQ 端物品与商城指令（官方扩展「物品与商城」；地点在 plugins/places.py，属性定义是常规功能）。部分规则改编自「长日将尽」CC BY-NC-SA 作品（联系 3052553938）。"""
 from nonebot import on_command
 from nonebot.adapters.qq import Bot, GroupMessageCreateEvent
 from nonebot.params import CommandArg
@@ -22,7 +22,6 @@ shop = _cmd("商城", {"道具商城"})
 buy = _cmd("购买")
 use = _cmd("使用")
 give = _cmd("赠送道具", {"赠送物品"})
-place = _cmd("地点")
 
 
 @bag.handle()
@@ -99,23 +98,3 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     if ok:
         await messaging.push_to_role(target["id"], f"📦 「{me['name']}」给你赠送了{item}×{count}，已放入背包。", make_send())
     await give.finish(("✅ " if ok else "❌ ") + text)
-
-
-@place.handle()
-async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
-    me = _me(bot, event)
-    sub = args.extract_plain_text().strip() or "查看"
-    if sub in ("钥匙", "我的钥匙"):
-        if not me:
-            await place.finish(NEED_ROLE)
-        rows = rpg.keys(me["id"])
-        await place.finish("🔑 你的地点钥匙：\n" + ("、".join(x["name"] for x in rows) if rows else "（没有）"))
-    rows = rpg.places()
-    lines = ["🏢 地点列表"]
-    owned = {x["id"] for x in rpg.keys(me["id"])} if me else set()
-    for x in rows:
-        mark = "📍" if not x["locked"] else ("🔑" if x["id"] in owned else "🔒")
-        lines.append(f"{mark} {x['name']}" + (f"（{x['description']}）" if x["description"] else ""))
-    if not rows:
-        lines.append("（暂无公共地点）")
-    await reply_long(place, "\n".join(lines))

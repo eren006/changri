@@ -61,7 +61,7 @@
         <button class="btn ghost sm" {{ 'disabled title="还有群被占用，不能关"' if x.enabled and x.busy }}>{{ '关闭使用' if x.enabled else '开启使用' }}</button></form>
     </div>
   </div>
-  <div style="overflow-x:auto"><table>
+  <div class="tablewrap"><table class="rt">
     <tr><th>群号</th><th>群名</th><th>状态</th><th></th></tr>
     {% for g in x.groups %}<tr><td class="tabular">{{ g.real_gid }}</td>
       <td>{{ names.get(g.real_gid) or ('（这个号不在这个群里了）' if live and g.real_gid not in names else '') }}</td>
@@ -121,7 +121,7 @@
 <section>
   <h2>监听的群</h2>
   <p class="note">跑团的群在这里加：「只监听」的群只听消息；「卡拉也在」的群卡拉也在里面说话，两边收到的消息记 log 时会按时间去重。要对上卡拉那边的群，填「关联群编号」。约会房间用的群在上面的群号组里。</p>
-  {% if pool %}<div style="overflow-x:auto"><table>
+  {% if pool %}<div class="tablewrap"><table class="rt">
     <tr><th>群号</th><th>备注</th><th>类型</th><th>关联群编号</th><th></th><th>改群名</th></tr>
     {% for g in pool %}<tr>
       <form method="post" action="{{ url_for('qqlink_group_edit', gid=g.gid) }}">{{ csrf() }}
@@ -151,7 +151,7 @@
     <button class="btn">手动绑定</button>
   </form>
   <p class="note">人齐回执、房间群里的发言记录都要靠这个绑定才认得出谁是谁：参与房间的每个人都得绑过。玩家自己绑就在群里发 /绑定QQ，你也可以在这里替他绑。</p>
-  {% if binds or trpg_binds %}<div style="overflow-x:auto;margin-top:10px"><table>
+  {% if binds or trpg_binds %}<div class="tablewrap" style="margin-top:10px"><table class="rt">
     <tr><th>QQ 号</th><th>恋综角色</th><th>跑团身份</th><th></th></tr>
     {% set seen = [] %}
     {% for b in binds %}{% set _ = seen.append(b.qq) %}<tr><td class="tabular">{{ b.qq }}</td><td>{{ b.roles|join('、') or '（还没有角色）' }}</td>

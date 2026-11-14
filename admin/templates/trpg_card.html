@@ -7,7 +7,7 @@
 <section>
   <h2>当前数值</h2>
   {% if attrs %}
-  <div style="overflow-x:auto"><table>
+  <div class="tablewrap"><table class="rt">
     <tr><th>属性</th><th>数值</th>{% if card.rule == 'coc' %}<th>半值</th><th>五分之一</th>{% else %}<th>调整值</th>{% endif %}<th></th></tr>
     {% for n, v in attrs %}
     <tr><td>{{ n }}</td><td class="tabular">{{ v }}</td>
@@ -22,7 +22,7 @@
 
 <section>
   <h2>历史战役</h2>
-  {% if battles %}<table><tr><th>战役</th><th>状态</th><th>开始</th><th></th></tr>
+  {% if battles %}<table class="rt"><tr><th>战役</th><th>状态</th><th>开始</th><th></th></tr>
   {% for b in battles %}<tr><td>{{ b.name }}</td><td>{{ {'on':'进行中','off':'暂停','ended':'已结束','halted':'强制停止'}[b.status] }}</td><td class="tabular">{{ b.started_ts|ts }}</td><td><a href="{{ url_for('trpglog_view', log_id=b.id) }}">查看</a></td></tr>{% endfor %}</table>
   {% else %}<p class="empty">这张卡还没参加过战役。群里开了 /log 记录、这个人发过言，就会出现在这里。</p>{% endif %}
 </section>
@@ -30,7 +30,7 @@
 <section>
   <h2>属性变动</h2>
   {% if history %}
-  <div style="overflow-x:auto"><table>
+  <div class="tablewrap"><table class="rt">
     <tr><th>时间</th><th>属性</th><th>变化</th><th>原因</th></tr>
     {% for h in history %}
     <tr><td class="tabular">{{ h.ts|ts }}</td><td>{{ h.name }}</td>

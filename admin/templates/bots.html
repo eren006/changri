@@ -18,7 +18,7 @@
 <section>
   <h2>已接入</h2>
   {% if accounts %}
-  <table>
+  <table class="rt">
     <tr><th>AppID</th><th>状态</th><th>已绑定的群</th><th>QQ 管理员</th>{% if owner %}<th>密钥</th><th></th>{% endif %}</tr>
     {% for b in accounts %}
     <tr>

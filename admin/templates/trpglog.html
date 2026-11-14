@@ -16,7 +16,7 @@
 
 <section>
   <h2>所有 log</h2>
-  {% if logs %}<div style="overflow-x:auto"><table>
+  {% if logs %}<div class="tablewrap"><table class="rt">
     <tr><th>名字</th><th>编号</th><th>状态</th><th>条数</th><th>开始</th><th></th></tr>
     {% for l in logs %}<tr><td>{{ l.name }}</td><td class="tabular">{{ l.token[:4] }}</td><td>{{ status[l.status] }}</td><td class="tabular">{{ l.n }}</td><td class="tabular">{{ l.started_ts|ts }}</td>
       <td><a class="btn" href="{{ url_for('trpglog_view', log_id=l.id) }}">查看</a></td></tr>{% endfor %}

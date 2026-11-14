@@ -24,7 +24,7 @@
 
 <section>
   <h2>信池（{{ pool|length }} 封）</h2>
-  <table>
+  <table class="rt">
     <tr><th>日期</th><th>谁 → 谁</th><th>署名</th><th>内容</th><th></th></tr>
     {% for m in pool %}
     <tr><td class="tabular">{{ m.day }}</td><td>{{ m.from_name }} → {{ m.to_name }}</td><td>{{ m.signature }}</td><td>{{ m.content }}</td>

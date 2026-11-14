@@ -10,7 +10,7 @@
     <div class="note">从对方最后一段细节发出的时间算起；已确认完成的不算。提醒会出现在这里和「总览」的待办里。</div>
   </form>
   {% if late %}<p style="margin-top:14px"><b style="color:var(--bad)">{{ late|length }} 条超时没回复</b></p>
-  <table>
+  <table class="rt">
     <tr><th>关系线</th><th>在等谁回</th><th>已等</th><th>最后一段</th></tr>
     {% for w in late %}<tr><td>{{ w.a_name }} ⇄ {{ w.b_name }}</td><td>{{ w.waiting_on }}</td><td class="tabular" style="color:var(--bad)">{{ '%.0f' % w.hours }} 小时</td><td class="tabular">{{ w.last_ts|ts }}（{{ w.last_from }} 发）</td></tr>{% endfor %}
   </table>
@@ -22,7 +22,7 @@
 </section>
 <section>
   <h2>全部关系线</h2>
-  <table>
+  <table class="rt">
     <tr><th>双方</th><th>发起人</th><th>状态</th><th>段数 / 字数</th><th>等谁回 · 已等</th><th>平均回复间隔</th><th></th></tr>
     {% for r in rels %}
     <tr><td>{{ r.a_name }} ⇄ {{ r.b_name }}</td><td>{{ r.init_name }}</td><td>{{ '已确认' if r.confirmed else '进行中' }}</td><td class="tabular">{{ r.n }} / {{ r.chars }}</td>

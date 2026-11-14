@@ -1,8 +1,13 @@
+<nav class="tabs" style="display:flex;gap:8px;margin:0 0 14px">
+  <a class="btn {{ '' if f.tab == 'room' else 'ghost' }}" href="{{ url_for(request.endpoint, **dict(request.view_args or {}, tab='room', role=f.role, q=f.q)) }}">私约 / 房间</a>
+  <a class="btn {{ '' if f.tab == 'msg' else 'ghost' }}" href="{{ url_for(request.endpoint, **dict(request.view_args or {}, tab='msg', role=f.role, q=f.q)) }}">短信 / 礼物</a>
+</nav>
 <form method="get" class="inline" style="margin:0 0 14px">
+  <input type="hidden" name="tab" value="{{ f.tab }}">
   <label>这个人参与的 <input type="text" name="role" value="{{ f.role }}" list="rn" size="10" placeholder="全部人"></label>
   <datalist id="rn">{% for n in names %}<option value="{{ n }}">{% endfor %}</datalist>
-  <label>类型 <select name="kind"><option value="">全部</option>{% for k, v in [('room','房间（私约/电话…）'),('sms','短信'),('gift','礼物')] %}<option value="{{ k }}" {{ 'selected' if f.kind == k }}>{{ v }}</option>{% endfor %}</select></label>
+  {% if f.tab == 'msg' %}<label>类型 <select name="kind"><option value="">短信和礼物</option>{% for k, v in [('sms','只看短信'),('gift','只看礼物')] %}<option value="{{ k }}" {{ 'selected' if f.kind == k }}>{{ v }}</option>{% endfor %}</select></label>{% endif %}
   <label>内容里有 <input type="text" name="q" value="{{ f.q }}" size="12" placeholder="关键词"></label>
   <button class="btn">筛选</button>
-  {% if f.role or f.kind or f.q %}<a class="btn ghost" href="{{ request.path }}">清除</a>{% endif %}
+  {% if f.role or f.kind or f.q %}<a class="btn ghost" href="{{ request.path }}?tab={{ f.tab }}">清除</a>{% endif %}
 </form>

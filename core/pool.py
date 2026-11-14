@@ -49,12 +49,14 @@ def all_groups() -> list:
     """带上「已绑成个人群/戏群/公告群」的标记，避免把玩家的个人群当成房间用。"""
     with get_conn() as c:
         rows = c.execute("SELECT * FROM pool_groups ORDER BY set_name, id").fetchall()
-        bound = {(r["bot_id"], r["group_openid"]) for r in c.execute("SELECT bot_id, group_openid FROM role_groups WHERE group_openid IS NOT NULL")}
+        bound = {(r["bot_id"], r["group_openid"]): r["name"] for r in c.execute(
+            "SELECT g.bot_id, g.group_openid, r.name FROM role_groups g JOIN roles r ON r.id=g.role_id WHERE g.group_openid IS NOT NULL")}
     stage, ann = get_config("stage_group", ""), get_config("announce_group", "")
     out = []
     for r in rows:
         d = dict(r)
         key = f"{r['bot_id']}|{r['group_openid']}"
+        d["owner"] = bound.get((r["bot_id"], r["group_openid"]), "")
         d["conflict"] = "个人群" if (r["bot_id"], r["group_openid"]) in bound else "戏群" if key == stage else "公告群" if key == ann else ""
         out.append(d)
     return out

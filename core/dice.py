@@ -10,6 +10,8 @@ import random
 import re
 from typing import Callable
 
+from . import dicecard
+
 MAX_COUNT = 100
 MAX_SIDES = 1000
 MAX_TIMES = 10
@@ -21,6 +23,19 @@ MAX_TOKENS = 60
 MAX_EXPLODE = 10
 
 Lookup = Callable[[str], "tuple[str, int] | str"]
+
+
+class Rolled(str):
+    """回给玩家的文字。本身就是纯文字（str），另带 .card（Markdown 小卡片，发不了卡片时用文字）和一些结果字段
+    （理智检定的 san_left、成长检定的 gain 等，插件拿来写回角色属性）。"""
+    card: str | None = None
+
+    def __new__(cls, text: str, card: str | None = None, **extra):
+        self = super().__new__(cls, text)
+        self.card = card
+        for k, v in extra.items():
+            setattr(self, k, v)
+        return self
 
 # ======================== 表达式解析 ========================
 
@@ -300,19 +315,32 @@ def _rd_remark(node, total: int) -> str:
 
 # ======================== rd：通用掷骰 ========================
 
+def _rd_token(tok: str):
+    """一个词能不能当 rd 表达式：能就返回 (轮数, 语法树)，不能返回 None。"""
+    tok = tok.translate(FULLWIDTH)
+    m = _EXPR_CHARS_RE.match(tok) if tok else None
+    if not (m and (tok[0].isdigit() or tok[0] in "dD(")):
+        return None
+    parsed = parse_expr(m.group(2))
+    if parsed is None:
+        return None
+    if tok.isdigit():                    # 裸数字按面数处理：/rd 100 = D100
+        parsed = ("dice", 1, int(tok), None, 0, False)
+    return (int(m.group(1)) if m.group(1) else 1), parsed
+
+
 def rd(text: str) -> str:
     text = text.strip()
-    first, _, rest = text.partition(" ")
-    first = first.translate(FULLWIDTH)
     times, terms, reason = 1, None, text
-    m = _EXPR_CHARS_RE.match(first) if first else None
-    if m and (first[0].isdigit() or first[0] in "dD("):
-        parsed = parse_expr(m.group(2))
-        if parsed is not None:
-            if first.isdigit():          # 裸数字按面数处理：/rd 100 = D100
-                parsed = ("dice", 1, int(first), None, 0, False)
-            terms, reason = parsed, rest.strip()
-            times = int(m.group(1)) if m.group(1) else 1
+    first, _, rest = text.partition(" ")
+    got = _rd_token(first)
+    if got:
+        (times, terms), reason = got, rest.strip()
+    else:
+        # 原因写在前面：/rd 伤害 2d6+3。末尾那个词要带 d 才算表达式，免得「/rd 第 3 轮」被当成 D3
+        head, _, last = text.rpartition(" ")
+        if head and re.search(r"[dDｄＤ]", last) and (got := _rd_token(last)):
+            (times, terms), reason = got, head.strip()
     if terms is None:
         terms = ("dice", 1, 100, None, 0, False)
     if not terms_valid(terms):
@@ -326,16 +354,18 @@ def rd(text: str) -> str:
         simple = terms[0] == "dice" and terms[1] == 1 and not terms[3] and not terms[5]
         body = f"D{terms[2]} = {total}" if simple else f"{et} = {detail} = {total}"
         remark = _rd_remark(terms, total)
-        return f"{head}{body}" + (f"。{remark}" if remark else "")
-    lines, totals = [f"{head}{et} 掷 {times} 轮："], []
+        card = dicecard.rd_card(reason, f"D{terms[2]}" if simple else et, detail, total, remark, simple)
+        return Rolled(f"{head}{body}" + (f"。{remark}" if remark else ""), card)
+    lines, totals, rounds = [f"{head}{et} 掷 {times} 轮："], [], []
     for i in range(1, times + 1):
         detail, total = roll_terms(terms)
         totals.append(total)
+        rounds.append((detail, total))
         lines.append(f"  第{i}轮 {total}" if detail == str(total) else f"  第{i}轮 {detail} = {total}")
     tail = (_pick(MULTI_ROLL, "all_same") if len(set(totals)) == 1
             else _pick(MULTI_ROLL, "spread_big") if max(totals) - min(totals) >= 15 else _pick(MULTI_ROLL, "spread_small"))
     lines.append(f"最高 {max(totals)}，最低 {min(totals)}，合计 {sum(totals)}。{tail}")
-    return "\n".join(lines)
+    return Rolled("\n".join(lines), dicecard.rd_multi_card(reason, et, rounds, tail))
 
 
 # ======================== COC7 ========================
@@ -343,6 +373,7 @@ def rd(text: str) -> str:
 LEVEL_RANK = {"大失败": 0, "失败": 1, "成功": 2, "困难成功": 3, "极难成功": 4, "大成功": 5}
 _DIFFICULTY = {"困难": ("困难成功", 2), "极难": ("极难成功", 5)}
 _BP_TOKEN_RE = re.compile(r"^([bBpP])(\d?)$")
+_COC_MOD_RE = re.compile(r"\s*([+-]\s*\d{1,3})$")
 
 
 # 房规（.setcoc）：大成功 / 大失败的范围。键是房规编号，值说明在 HOUSE_RULES；默认 1（和以前一致）。
@@ -417,7 +448,8 @@ COC_USAGE = ("格式：/ra [b奖励/p惩罚] [困难|极难] [技能名] 数值\
              "也可以直接写角色属性名，例如 /ra 力量（先 /录属性 力量60）")
 
 
-def coc_check(raw: str, extra: int, lookup: Lookup, proxy: bool = False, house: str = DEFAULT_HOUSE) -> str:
+def _coc_parse(raw: str, extra: int, lookup: Lookup, proxy: bool):
+    """解析 /ra 的参数。看不懂返回要回给玩家的文字（str），解析好了返回字段 dict。"""
     tokens = raw.strip().split()
     difficulty = None
     while tokens:
@@ -433,10 +465,23 @@ def coc_check(raw: str, extra: int, lookup: Lookup, proxy: bool = False, house: 
         else:
             break
     rest = " ".join(tokens)
+    # 临时修正：侦查+10、侦查 -20、侦查70+10（可以连写几个）
+    mod = 0
+    while (mm := _COC_MOD_RE.search(rest)) and mm.start() > 0:
+        mod += int(mm.group(1).replace(" ", ""))
+        rest = rest[:mm.start()].rstrip()
+    if abs(mod) > MAX_TARGET:
+        return "修正值太大了，请再核对一下。"
+    if re.fullmatch(r"[+-]\s*\d*", rest):          # 只剩一个修正、没有技能名也没有数值
+        return COC_USAGE
+    mod_text = f"{mod:+d}" if mod else ""
     m = re.match(r"^(.*?)\s*(\d{1,3})$", rest)
     note_cap = ""
     if m:
-        label, target = m.group(1).strip(), int(m.group(2))
+        label, base = m.group(1).strip(), int(m.group(2))
+        target = base + mod
+        if mod:
+            note_cap = f"（{base}{mod_text}）"
     else:
         if not rest:
             return COC_USAGE
@@ -444,20 +489,33 @@ def coc_check(raw: str, extra: int, lookup: Lookup, proxy: bool = False, house: 
         if isinstance(got, str):
             return got
         role, val = got
-        label, target = rest, min(val, 100)
+        label, target = rest, min(val + mod, 100)
+        if val + mod > 100:
+            note_cap = f"（{role}的{label}{val}{mod_text}，按100算）"
+        elif proxy:
+            note_cap = f"（代{role}投，{label}{val}{mod_text}）"
+        else:
+            note_cap = f"（{role}的{label}{val}{mod_text}）"
         if target < 1:
-            return f"「{role}」的{label}是 {val}，掷不出成功。"
-        note_cap = f"（{role}的{label}{val}，按100算）" if val > 100 else (f"（代{role}投，{label}{val}）" if proxy else f"（{role}的{label}{val}）")
+            return f"「{role}」的{label}是 {val}{mod_text}，掷不出成功。"
+    if mod and target < 1:
+        return f"{label}加上修正只剩 {target}，掷不出成功。"
     if not 1 <= target <= MAX_TARGET:
         return "数值有误，请再核对一下。"
     if abs(extra) > MAX_EXTRA_DICE:
         return f"奖励/惩罚骰最多 {MAX_EXTRA_DICE} 颗。"
-    roll, note = roll_d100(extra)
+    return {"label": label, "target": target, "extra": extra, "difficulty": difficulty, "note_cap": note_cap}
+
+
+def _coc_roll(spec: dict, house: str) -> Rolled:
+    label, target, difficulty, note_cap = spec["label"], spec["target"], spec["difficulty"], spec["note_cap"]
+    roll, note = roll_d100(spec["extra"])
     level = judge_success(roll, target, house)
-    shown, verdict, key = str(target), level, level
+    shown, verdict, key, need = str(target), level, level, ""
     if difficulty:
         need_level, div = _DIFFICULTY[difficulty]
-        shown = f"{target}（{difficulty}要求≤{target // div}）"
+        need = f"{difficulty}要求≤{target // div}"
+        shown = f"{target}（{need}）"
         if level not in ("大成功", "大失败"):
             met = LEVEL_RANK[level] >= LEVEL_RANK[need_level]
             verdict, key = f"{difficulty}{'成功' if met else '失败'}", "成功" if met else "失败"
@@ -468,7 +526,58 @@ def coc_check(raw: str, extra: int, lookup: Lookup, proxy: bool = False, house: 
     elif (ok and target <= 30) and random.random() < 0.6:
         remark = _pick(UPSET, "low_success")
     prefix = f"{label} " if label else ""
-    return f"{prefix}检定：D100={roll}/{shown}{note_cap}{note} —— {verdict}。{remark}"
+    plain = f"{prefix}检定：D100={roll}/{shown}{note_cap}{note} —— {verdict}。{remark}"
+    card = dicecard.check_card(label, roll, target, verdict, remark, need=need, dice_note=note.strip("（）"), cap_note=note_cap.strip("（）"))
+    return Rolled(plain, card, roll=roll, level=level, target=target, verdict=verdict)
+
+
+def coc_check(raw: str, extra: int, lookup: Lookup, proxy: bool = False, house: str = DEFAULT_HOUSE) -> str:
+    """/ra。前面写「3#」连掷几次（/ra 3#侦查 60），一次最多 MAX_TIMES 次。"""
+    raw = raw.strip()
+    times = 1
+    m = re.match(r"^(\d{1,3})#\s*(.*)$", raw)
+    if m:
+        times, raw = int(m.group(1)), m.group(2)
+        if not 1 <= times <= MAX_TIMES:
+            return f"一次最多连掷 {MAX_TIMES} 次。"
+    spec = _coc_parse(raw, extra, lookup, proxy)
+    if isinstance(spec, str):
+        return spec
+    if times == 1:
+        return _coc_roll(spec, house)
+    results = [_coc_roll(spec, house) for _ in range(times)]
+    lines = [f"第{i}次 " + str(r).split("检定：", 1)[1] for i, r in enumerate(results, 1)]
+    wins = sum(1 for r in results if r.verdict.endswith("成功"))
+    head = f"{spec['label'] + ' ' if spec['label'] else ''}连续检定 ×{times}（{spec['target']}）："
+    return Rolled(head + "\n" + "\n".join(lines) + f"\n成功 {wins} 次，失败 {times - wins} 次。")
+
+
+def coc_oppose(raw: str, lookup: Lookup, house: str = DEFAULT_HOUSE) -> str:
+    """/rav 甲 vs 乙：各掷一次，比成功等级，等级一样比数值，数值也一样算平局。
+    每一边的写法和 /ra 一样（侦查 70、b 力量 60、困难 …），例：/rav 力量 60 vs 力量 50。"""
+    parts = re.split(r"\s+(?:vs|VS|Vs|对|对抗)\s+|\s*(?:vs|VS)\s*", raw.strip(), maxsplit=1)
+    if len(parts) != 2 or not all(p.strip() for p in parts):
+        return "格式：/rav 甲方检定 vs 乙方检定\n例：/rav 力量 60 vs 力量 50、/rav b 侦查 70 vs 潜行 55\n每边的写法和 /ra 一样。"
+    sides = []
+    for tag, part in zip(("甲", "乙"), parts):
+        spec = _coc_parse(part, 0, lookup, False)
+        if isinstance(spec, str):
+            return f"{tag}方：{spec}"
+        sides.append(spec)
+    rs = [_coc_roll(sp, house) for sp in sides]
+    lv = [LEVEL_RANK[r.level] for r in rs]
+    lines = []
+    for tag, sp, r in zip(("甲", "乙"), sides, rs):
+        lines.append(f"{tag}方 {sp['label'] + ' ' if sp['label'] else ''}D100={r.roll}/{sp['target']} —— {r.level}")
+    if lv[0] != lv[1]:
+        win = "甲" if lv[0] > lv[1] else "乙"
+        verdict = f"{win}方胜出（成功等级更高）"
+    elif rs[0].target != rs[1].target and rs[0].level not in ("失败", "大失败"):
+        win = "甲" if rs[0].target > rs[1].target else "乙"
+        verdict = f"{win}方胜出（等级相同，数值更高）"
+    else:
+        verdict = "平局，双方都没占到便宜" if rs[0].level in ("失败", "大失败") else "平局，数值也一样，重掷或由 KP 裁定"
+    return Rolled("对抗检定\n" + "\n".join(lines) + f"\n{verdict}")
 
 
 def _roll_loss(expr: str):
@@ -483,15 +592,15 @@ def coc_sanity(raw: str, lookup: Lookup, house: str = DEFAULT_HOUSE) -> str:
     m = re.match(r"^(\S+?)/(\S+?)(?:\s+(\d{1,3}))?$", raw.strip())
     if not m:
         return "格式：/sc 成功损失/失败损失 [当前理智]\n例：/sc 1/1d6 60；不写理智就取你角色的 SAN（先 /录属性 SAN60）"
-    note = ""
+    note, from_card, who = "", False, ""
     if m.group(3):
         san = int(m.group(3))
     else:
         got = lookup("SAN")
         if isinstance(got, str):
             return got
-        san = got[1]
-        note = f"（取自{got[0]}的 SAN，扣完不会自动写回，请自己 /录属性 SAN{{新值}}）"
+        san, from_card, who = got[1], True, got[0]
+        note = f"（取自{who}的 SAN）"
     ok_loss, bad_loss = _roll_loss(m.group(1)), _roll_loss(m.group(2))
     if ok_loss is None or bad_loss is None:
         return "损失的写法看不懂，数字或 1d6 这类即可。"
@@ -506,20 +615,45 @@ def coc_sanity(raw: str, lookup: Lookup, house: str = DEFAULT_HOUSE) -> str:
         loss, process, verdict = bad_loss[0], bad_loss[2], "失败"
     left = max(san - loss, 0)
     tail = "……请先坐下。" if verdict == "大失败" else ("还撑得住。" if passed else "失去的总得想办法找回来。")
-    return f"理智检定：D100={roll}/{san} —— {verdict}\n损失 {loss}（{process}），理智 {san} → {left}。{tail}{note}"
+    hints = []
+    if left == 0:
+        hints.append("理智归零，角色陷入永久疯狂。")
+    elif loss >= 5:
+        hints.append(f"单次损失 {loss} 点（≥5），需要做一次智力检定（/ra 智力），通过则陷入临时疯狂（/ti 看症状）。")
+    plain = f"理智检定：D100={roll}/{san} —— {verdict}\n损失 {loss}（{process}），理智 {san} → {left}。{tail}{note}"
+    if hints:
+        plain += "\n" + "\n".join(hints)
+    card = dicecard.sc_card(roll, san, verdict, loss, process, left, tail, "　".join(x for x in [note.strip("（）")] + hints if x))
+    return Rolled(plain, card, san_left=left, san_before=san, loss=loss, from_lookup=from_card, who=who)
 
 
-def coc_growth(raw: str) -> str:
-    m = re.match(r"^(.*?)\s*(\d{1,3})$", raw.strip())
-    if not m:
-        return "格式：/en [技能名] 当前数值\n例：/en 侦查 55"
-    label, value = m.group(1).strip(), int(m.group(2))
+def coc_growth(raw: str, lookup: Lookup | None = None) -> str:
+    """/en 技能 数值：数值可以不写，有 lookup 就取角色的同名技能（成长后由插件写回）。"""
+    text = raw.strip()
+    m = re.match(r"^(.*?)\s*(\d{1,3})$", text)
+    from_card, who = False, ""
+    if m:
+        label, value = m.group(1).strip(), int(m.group(2))
+    elif text and lookup is not None:
+        got = lookup(text)
+        if isinstance(got, str):
+            return got
+        who, value = got
+        label, from_card = text, True
+        value = min(value, 100)
+    else:
+        return "格式：/en [技能名] 当前数值\n例：/en 侦查 55；也可以只写技能名 /en 侦查，取你角色的数值，成长后自动记上"
     roll = random.randint(1, 100)
     prefix = f"{label} " if label else ""
     if roll > value or roll > 95:
         gain = random.randint(1, 10)
-        return f"{prefix}成长检定：D100={roll}/{value} —— 成长！+{gain}（1D10），{value} → {value + gain}。"
-    return f"{prefix}成长检定：D100={roll}/{value} —— 没有成长。经验急不得。"
+        remark = "经验积累，终于开窍了。"
+        plain = f"{prefix}成长检定：D100={roll}/{value} —— 成长！+{gain}（1D10），{value} → {value + gain}。"
+    else:
+        gain, remark = 0, "经验急不得。"
+        plain = f"{prefix}成长检定：D100={roll}/{value} —— 没有成长。{remark}"
+    return Rolled(plain, dicecard.en_card(label, roll, value, gain, remark), gain=gain, value=value,
+                  label=label, from_lookup=from_card, who=who)
 
 
 # ---------- 疯狂症状（COC7 第 8 章，文字是概括的）----------
@@ -533,8 +667,8 @@ TEMP_MADNESS = [
     "昏厥：当场昏倒，被唤醒后能正常行动",
     "逃避行为：不择手段地逃离所在的地方，哪怕抛下同伴",
     "歇斯底里：大笑、哭泣、嘶吼、恐惧等极端情绪爆发",
-    "恐惧：患上一种恐惧症，持续时间内对恐惧源有反应（恐惧症状表请掷 1D100 或由 KP 选）",
-    "狂躁：出现一种狂躁，持续时间内沉浸其中（狂躁症状表请掷 1D100 或由 KP 选）",
+    "恐惧：患上一种恐惧症，持续时间内对恐惧源有反应",
+    "狂躁：出现一种狂躁，持续时间内沉浸其中",
 ]
 SUMMARY_MADNESS = [
     "失忆：回过神来身处陌生的地方，忘了自己是谁，记忆会随时间恢复",
@@ -545,9 +679,28 @@ SUMMARY_MADNESS = [
     "重要之人：不顾一切接近背景里的重要之人，并为这段关系做出行动",
     "被收容：在精神病院病房或警察局牢房里醒来，会慢慢想起原因",
     "逃避行为：醒来发现自己在很远的地方，也许迷失在荒野，或是在远行的车上",
-    "恐惧：患上一种新的恐惧症（恐惧症状表请掷 1D100 或由 KP 选），会设法避开恐惧源",
-    "狂躁：患上一种新的狂躁（狂躁症状表请掷 1D100 或由 KP 选），沉浸其中",
+    "恐惧：患上一种新的恐惧症，会设法避开恐惧源",
+    "狂躁：患上一种新的狂躁，沉浸其中",
 ]
+
+
+def _sub_table(kind: str) -> str:
+    """恐惧 / 狂躁的子表：掷 1D100，返回一行文字。"""
+    from .madness_tables import MANIAS, PHOBIAS
+    n = random.randint(1, 100)
+    if kind == "恐惧":
+        name, desc = PHOBIAS[n - 1]
+        return f"恐惧症状：1D100={n} {name}（害怕：{desc}）"
+    name, desc = MANIAS[n - 1]
+    return f"狂躁症状：1D100={n} {name}（{desc}）"
+
+
+def phobia() -> str:
+    return _sub_table("恐惧")
+
+
+def mania() -> str:
+    return _sub_table("狂躁")
 
 
 def madness(raw: str, summary: bool) -> str:
@@ -559,10 +712,28 @@ def madness(raw: str, summary: bool) -> str:
     unit = "小时" if summary else "轮"
     kind = "总结疯狂（li）" if summary else "临时疯狂（ti）"
     head = f"{who} 的{kind}" if who else kind
-    return f"{head}：1D10={idx}\n{table[idx - 1]}\n持续 1D10={last} {unit}。"
+    out = f"{head}：1D10={idx}\n{table[idx - 1]}\n持续 1D10={last} {unit}。"
+    if idx in (9, 10):                      # 抽到恐惧 / 狂躁：自动再掷一次具体症状
+        out += "\n" + _sub_table("恐惧" if idx == 9 else "狂躁")
+    return out
 
 
 # ======================== DND5e ========================
+
+def _split_glued_mods(raw: str) -> list[str]:
+    """「侦察+3」这种名字和修正连写的，拆成「侦察」「+3」；伤害式（1d8+3）不拆。"""
+    out = []
+    for t in raw.split():
+        m = re.match(r"^(.*?[^\d+\-])([+-]\d{1,2})$", t)
+        if m and not re.search(r"\d[dD]|^[dD]\d", t):
+            out += [m.group(1), m.group(2)]
+        else:
+            out.append(t)
+    return out
+
+
+DND_ABILITIES = {"力量", "STR", "敏捷", "DEX", "体质", "CON", "智力", "INT", "感知", "WIS", "魅力", "CHA"}
+
 
 def ability_mod(score: int) -> int:
     return (score - 10) // 2
@@ -570,11 +741,12 @@ def ability_mod(score: int) -> int:
 
 def dnd_check(raw: str, adv: int, lookup: Lookup) -> str:
     mod, dc, labels = 0, None, []
-    for t in raw.split():
+    has_adv, has_dis = adv > 0, adv < 0
+    for t in _split_glued_mods(raw):
         if t.lower() in ("优势", "adv"):
-            adv = 1
+            has_adv = True
         elif t.lower() in ("劣势", "dis"):
-            adv = -1
+            has_dis = True
         elif MOD_RE.match(t):
             mod += int(t)
         elif t.isdigit() and dc is None:
@@ -583,15 +755,22 @@ def dnd_check(raw: str, adv: int, lookup: Lookup) -> str:
             labels.append(t)
     if abs(mod) > 30 or (dc is not None and dc > 60):
         return "修正最多 ±30，DC 最多 60，再核对一下。"
+    adv = int(has_adv) - int(has_dis)          # 优势和劣势同时有就互相抵消
     label = " ".join(labels)
     card_note = ""
     if label:
         got = lookup(label)
         if not isinstance(got, str):       # 没有这个属性就当普通检定名，不报错
             role, val = got
-            cm = ability_mod(val)
+            if label.upper() in DND_ABILITIES:       # 属性值（力量16）换算成调整值
+                cm = ability_mod(val)
+                card_note = f"（{role}的{label}{val}→{cm:+d}）"
+            else:                                      # 技能（运动、侦察）存的就是加值，不再换算
+                cm = val
+                card_note = f"（{role}的{label}加值{cm:+d}）"
             mod += cm
-            card_note = f"（{role}的{label}{val}→{cm:+d}）"
+            if abs(mod) > 30:
+                return "修正最多 ±30，再核对一下角色卡里这个数。"
     rolls = [random.randint(1, 20) for _ in range(2 if adv else 1)]
     chosen = max(rolls) if adv >= 0 else min(rolls)
     total = chosen + mod
@@ -599,7 +778,7 @@ def dnd_check(raw: str, adv: int, lookup: Lookup) -> str:
     prefix = f"{label} " if label else ""
     mod_text = f"{mod:+d}" if mod else ""
     line = f"{prefix}检定：D20={chosen}{mod_text}{'=' + str(total) if mod else ''}{card_note}{note}"
-    key = ""
+    key, passed = "", None
     if dc is not None:
         passed = total >= dc
         line += f" vs DC{dc} —— {'通过' if passed else '未通过'}"
@@ -608,7 +787,9 @@ def dnd_check(raw: str, adv: int, lookup: Lookup) -> str:
         line += "（自然20）"; key = "nat20"
     elif chosen == 1:
         line += "（自然1）"; key = "nat1"
-    return line + (f"。{_pick(DND_REMARKS, key)}" if key else "")
+    remark = _pick(DND_REMARKS, key) if key else ""
+    card = dicecard.dnd_check_card(label, chosen, mod, total, dc, passed, [card_note.strip("（）"), note.strip("（）")], remark)
+    return Rolled(line + (f"。{remark}" if remark else ""), card)
 
 
 def dnd_stats(raw: str) -> str:
@@ -646,12 +827,13 @@ def initiative(table: dict, raw: str) -> str:
 
 def dnd_attack(raw: str) -> str:
     usage = "格式：/at [名字] +命中 AC 伤害 [优势|劣势]\n例：/at 长剑 +5 15 1d8+3"
-    mod, ac, dmg, adv, labels = 0, None, None, 0, []
-    for t in raw.split():
+    mod, ac, dmg, labels = 0, None, None, []
+    has_adv = has_dis = False
+    for t in _split_glued_mods(raw):
         if t.lower() in ("优势", "adv"):
-            adv = 1
+            has_adv = True
         elif t.lower() in ("劣势", "dis"):
-            adv = -1
+            has_dis = True
         elif MOD_RE.match(t):
             mod += int(t)
         elif t.isdigit() and ac is None:
@@ -662,6 +844,7 @@ def dnd_attack(raw: str) -> str:
             labels.append(t)
     if ac is None or dmg is None or ac > 60 or abs(mod) > 30 or not terms_valid(dmg):
         return usage
+    adv = int(has_adv) - int(has_dis)
     rolls = [random.randint(1, 20) for _ in range(2 if adv else 1)]
     chosen = max(rolls) if adv >= 0 else min(rolls)
     total = chosen + mod
@@ -669,16 +852,20 @@ def dnd_attack(raw: str) -> str:
     label = " ".join(labels)
     line = f"{label + ' ' if label else ''}攻击：D20={chosen}{f'{mod:+d}' if mod else ''}={total}{note} vs AC{ac}"
     crit = chosen == 20
+    notes = [note.strip("（）")]
     if chosen == 1:
-        return f"{line} —— 自然1，必定失手。"
+        return Rolled(f"{line} —— 自然1，必定失手。", dicecard.at_card(label, chosen, mod, total, ac, "fumble", None, notes, ""))
     if not crit and total < ac:
-        return f"{line} —— 未命中。{_pick(DND_REMARKS, 'fail')}"
+        remark = _pick(DND_REMARKS, "fail")
+        return Rolled(f"{line} —— 未命中。{remark}", dicecard.at_card(label, chosen, mod, total, ac, "miss", None, notes, remark))
     hit = double_dice(dmg) if crit else dmg
     if not terms_valid(hit):
         hit, crit = dmg, False
     detail, value = roll_terms(hit)
     value = max(value, 0)
-    return f"{line} —— {'自然20，暴击！骰子翻倍' if crit else '命中'}。\n伤害：{expr_text(hit)} = {detail} = {value}"
+    plain = f"{line} —— {'自然20，暴击！骰子翻倍' if crit else '命中'}。\n伤害：{expr_text(hit)} = {detail} = {value}"
+    card = dicecard.at_card(label, chosen, mod, total, ac, "crit" if crit else "hit", (expr_text(hit), detail, value), notes, "")
+    return Rolled(plain, card)
 
 
 # ======================== 帮助 ========================
@@ -691,7 +878,7 @@ HELP_RD = (
     "/rd 4d6k3　取最高3颗(k=kh)；/rd 2d20kl1　取最低1颗\n"
     "/rd 3d6!　爆骰：掷到最大面再掷，每颗最多连爆10次\n"
     "/rd 5#2d6　连掷5轮(最多10轮)；/rd 100　等于D100\n"
-    "/rd 伤害 2d6+3　末尾空格后可写原因；不写表达式默认D100\n"
+    "/rd 伤害 2d6+3、/rd 2d6+3 伤害　原因写在前后都行；不写表达式默认D100\n"
     f"上限：骰子1~{MAX_COUNT}颗、面数1~{MAX_SIDES}、最多{MAX_TERMS}项、括号{MAX_DEPTH}层。"
 )
 HELP_COC = (
@@ -699,24 +886,30 @@ HELP_COC = (
     "/ra [技能名] 数值　D100检定，如 /ra 侦查 70\n"
     "/ra b2 困难 射击 60　b=奖励骰、p=惩罚骰(可带数字，最多5颗)，困难/极难要求更高\n"
     "/rb 70　奖励骰检定；/rp 45　惩罚骰检定\n"
+    "/ra 3#侦查 60　连掷3次(最多10次)；/rav 力量 60 vs 力量 50　对抗检定，比成功等级\n"
+    "/ra 侦查+10、/ra 侦查 70-20　临时修正，加在技能值上\n"
     "/sc 成功损失/失败损失 当前理智　如 /sc 1/1d6 60\n"
-    "/en [技能名] 当前数值　技能成长，如 /en 侦查 55\n"
+    "/en [技能名] [当前数值]　技能成长，如 /en 侦查 55；只写技能名就取你角色的数值，成长后自动记上\n"
     "不写数值就取你角色的同名属性：/ra 力量（要先 /录属性 力量60，超过100按100算）\n"
     "代骰：/ra 力量 @某人，取被 @ 者角色的数值替 TA 投\n"
-    "/sc 1/1d6 不写理智就取你的 SAN\n"
-    "/ti　临时疯狂症状；/li　总结疯狂症状（后面可以写人名）\n"
+    "/sc 1/1d6 不写理智就取你的 SAN，扣完自动写回；单次损失≥5会提醒做智力检定\n"
+    "/ti　临时疯狂症状；/li　总结疯狂症状（后面可以写人名）；抽到恐惧/狂躁会自动再掷具体症状\n"
+    "/恐惧症状、/狂躁症状　单独掷一次具体症状（各100项，是自己整理的表，和规则书的编号不同）\n"
     "/setcoc [0-5]　房规：改大成功/大失败的范围，不带数字看说明；每个群各记各的\n"
-    "/rh [表达式]　暗骰，结果私下发给你，群里只说一声；/rah 技能 数值　暗检定"
+    "/rh [表达式]　暗骰，结果私下发给执行的人，群里只说一声；/rah 技能 数值　暗检定\n"
+    "　收不到的话：请把你（KP）加进机器人白名单，就能收到私聊"
 )
 HELP_DND = (
     "【DND5e 规则】/切换规则 DND\n"
     "/ra [名字] [+修正] [DC]　D20+修正对难度，如 /ra 侦察 +3 15；DC可不写\n"
-    "/rb 优势、/rp 劣势　掷2颗D20取高/取低；/ra 后面直接写 优势/劣势 也行\n"
+    "/rb 优势、/rp 劣势　掷2颗D20取高/取低；/ra 后面直接写 优势/劣势 也行；两样都有就抵消\n"
     "/dnd [组数]　属性生成：6项各4D6取高3，一次最多5组\n"
     "/ri 名字 +修正　先攻；/ri 看顺序；/ri 清空 重置(程序重启也会清空)\n"
     "/at [名字] +命中 AC 伤害 [优势|劣势]　如 /at 长剑 +5 15 1d8+3\n"
     "　自然20必中且伤害骰翻倍，自然1必失手\n"
     "不写修正：/ra 力量 会取你角色的力量，自动换算成调整值（(力量-10)÷2，向下取整）\n"
+    "六项属性（力量/敏捷/体质/智力/感知/魅力，或 STR DEX CON INT WIS CHA）存属性值；其他技能（运动、侦察……）存的是加值，不换算：/st 运动5，/ra 运动\n"
+    "临时修正可以连写：/ra 运动+2 15\n"
     "/sc 和 /en 是 COC 的指令，DND 规则下用不了"
 )
 HELP_ATTR = (

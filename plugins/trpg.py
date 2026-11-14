@@ -19,7 +19,7 @@ from plugins._logtap import tap_reply
 from plugins._long import reply_long
 
 # 跑团模式的群里不响应的插件（恋综玩法）
-ROMANCE_PLUGINS = {"play", "lovemail", "relations", "rpg", "entrance", "social", "phone"}
+ROMANCE_PLUGINS = {"play", "lovemail", "relations", "rpg", "places", "forum", "entrance", "social", "phone"}
 
 
 def _in_trpg_group(event) -> bool:

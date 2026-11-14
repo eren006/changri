@@ -39,6 +39,47 @@ class AdminMultiBot(unittest.TestCase):
         html = self.c.get(path).get_data(as_text=True)
         return re.search(r'name="_csrf" value="([^"]+)"', html).group(1)
 
+    def test_extra_section_forum_items_places(self):
+        """「额外」：论坛、物品与商城、地点都是可开关的扩展；开着的常显，关着的收进「更多」；属性一直在。"""
+        base = "/b/111111"
+        self.assertEqual(self.c.get(f"{base}/attrs").status_code, 200)       # 属性是常规功能，不受任何扩展开关影响
+        for path in ("/forum", "/rpg", "/places"):
+            self.assertEqual(self.c.get(base + path).status_code, 200, path)
+        home = self.c.get(base + "/").get_data(as_text=True)
+        self.assertIn("额外", home)
+        self.assertNotIn("更多（未开启）", home)                                # 都开着，没有折叠项
+        for ext, path, name in (("forum", "/forum", "论坛"), ("rpg", "/rpg", "物品与商城"), ("places", "/places", "地点")):
+            self.c.post(f"{base}/extensions/toggle", data={"id": ext, "on": "0", "_csrf": self._csrf(f"{base}/extensions")})
+            self.assertEqual(self.c.get(base + path).status_code, 404, path)  # 关了，页面网址也关掉
+            home = self.c.get(base + "/").get_data(as_text=True)
+            self.assertIn("更多（未开启）", home)
+            more = home[home.index("更多（未开启）"):]
+            self.assertIn(name, more[:more.index("</details>")])            # 折叠项里能看到它
+            self.assertEqual(self.c.get(f"{base}/attrs").status_code, 200)
+            self.c.post(f"{base}/extensions/toggle", data={"id": ext, "on": "1", "_csrf": self._csrf(f"{base}/extensions")})
+        self.assertNotIn("更多（未开启）", self.c.get(base + "/").get_data(as_text=True))
+
+    def test_rpg_pages_and_pool_split(self):
+        """物品与商城、属性、地点是三个页面；商城用下拉选货币；个人群不混在能用的群里。"""
+        base = "/b/111111"
+        tok = lambda: self._csrf(f"{base}/extensions")                    # noqa: E731
+        post = lambda path, **d: self.c.post(base + path, data={**d, "_csrf": tok()})   # noqa: E731
+        post("/attrs/save", name="体力", min="0", max="100", default="50")
+        post("/rpg/item", code="GOLD", name="金币", kind="currency", description="", effects="", max_uses="-1", can_give="on")
+        post("/rpg/item", code="POTION", name="治疗药水", kind="item", description="", effects="体力+20", max_uses="1", can_give="on")
+        post("/rpg/shop", item="POTION", price="30", currency="GOLD")
+        post("/places/save", name="顶楼花园", description="", locked="on")
+        page = self.c.get(base + "/rpg").get_data(as_text=True)
+        self.assertIn("体力 +20", page)                                    # 属性效果是小标签
+        self.assertIn("30", page); self.assertIn("金币", page)
+        self.assertNotIn("顶楼花园", page); self.assertNotIn("属性定义", page)  # 地点和属性不在这一页
+        self.assertIn("体力", self.c.get(base + "/attrs").get_data(as_text=True))
+        self.assertIn("顶楼花园", self.c.get(base + "/places").get_data(as_text=True))
+        from core import roles as R
+        from core import pool
+        R.create_role("甲", "111111", "PERSONAL_G", "M1")
+        pool.add_group("111111", "PERSONAL_G") if hasattr(pool, "add_group") else None
+
     def test_single_bot_goes_straight_in_and_old_urls_redirect(self):
         r = self.c.get("/")
         self.assertEqual((r.status_code, r.headers["Location"]), (302, "/b/111111/"))

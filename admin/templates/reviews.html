@@ -1,15 +1,16 @@
 {% extends "base.html" %}{% block title %}复盘{% endblock %}
 {% block body %}
 <h1>复盘</h1>
-<p class="lede">房间、短信、礼物都按「第几天」整理。点进某一天，里面的事按发生的先后从上往下排；上面的筛选可以只看某个人参与的。房间的聊天是房间群里监听的 QQ 号听到的，发言人靠绑定的 QQ 认出来。季度「收尾」会清空这些记录，要留的先导出。</p>
+<p class="lede">私约/房间和短信/礼物分开看，都按「第几天」整理。点进某一天，里面的事按发生的先后从上往下排；每个私约点编号可以单独打开，看里面的全部发言。上面的筛选可以只看某个人参与的。房间的聊天是房间群里监听的 QQ 号听到的，发言人靠绑定的 QQ 认出来。季度「收尾」会清空这些记录，要留的先导出。</p>
 <section>
   {% include "_review_filter.html" %}
   {% if days %}
-  <p class="note">{{ f.role or '所有人' }}　共 {{ total }} 件事，分在 {{ days|length }} 天。<a href="{{ url_for('review_day', label='all', role=f.role, kind=f.kind, q=f.q) }}">不分天，全部列出来</a></p>
-  <div style="overflow-x:auto"><table>
-    <tr><th>天数</th><th>房间</th><th>短信</th><th>礼物</th><th></th></tr>
-    {% for d in days %}<tr><td><b>{{ d.label }}</b></td><td class="tabular">{{ d.room }}</td><td class="tabular">{{ d.sms }}</td><td class="tabular">{{ d.gift }}</td>
-      <td><a class="btn sm" href="{{ url_for('review_day', label=d.label, role=f.role, kind=f.kind, q=f.q) }}">看这一天</a></td></tr>{% endfor %}
+  <p class="note">{{ f.role or '所有人' }}　共 {{ total }} {{ '个私约/房间' if f.tab == 'room' else '条短信和礼物' }}，分在 {{ days|length }} 天。<a href="{{ url_for('review_day', label='all', role=f.role, kind=f.kind, q=f.q, tab=f.tab) }}">不分天，全部列出来</a></p>
+  <div class="tablewrap"><table class="rt">
+    {% if f.tab == 'room' %}<tr><th>天数</th><th>私约/房间</th><th></th></tr>{% else %}<tr><th>天数</th><th>短信</th><th>礼物</th><th></th></tr>{% endif %}
+    {% for d in days %}<tr><td><b>{{ d.label }}</b></td>
+      {% if f.tab == 'room' %}<td class="tabular">{{ d.room }}</td>{% else %}<td class="tabular">{{ d.sms }}</td><td class="tabular">{{ d.gift }}</td>{% endif %}
+      <td><a class="btn sm" href="{{ url_for('review_day', label=d.label, role=f.role, kind=f.kind, q=f.q, tab=f.tab) }}">看这一天</a></td></tr>{% endfor %}
   </table></div>
   {% else %}<p class="empty">没有符合的记录。</p>{% endif %}
 </section>

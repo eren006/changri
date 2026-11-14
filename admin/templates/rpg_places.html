@@ -1,0 +1,68 @@
+{% extends "base.html" %}{% block title %}地点{% endblock %}
+{% block body %}
+{% import "_rpg_icons.html" as ic %}
+<div class="rpg">
+<h1>地点</h1>
+<p class="lede">地点列表和钥匙。需要钥匙的地点，只有持有钥匙的角色能进；严格地点检查在「功能与设置」的「地点」里开启。</p>
+
+<section>
+  <div class="sec-head"><h2>地点<span class="n">{{ places|length }} 处</span></h2>
+    <span class="btns">
+    <details class="panel" id="placePanel"><summary class="btn">{{ ic.plus() }}新建地点</summary>
+      <form class="form" method="post" action="{{ url_for('rpg_place_save') }}">{{ csrf() }}
+        <div class="fields">
+          <div><label for="p-name">地点名</label><input type="text" id="p-name" name="name" required></div>
+          <div><label for="p-desc">描述</label><input type="text" id="p-desc" name="description"></div>
+          <div><label class="check"><span class="sw"><input type="checkbox" name="locked" id="p-lock"><i></i></span>需要钥匙才能进</label></div>
+        </div>
+        <p class="note">地点名相同就是修改这一处。</p>
+        <div class="actions"><button class="btn" type="submit">保存地点</button><button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
+      </form>
+    </details>
+    <details class="panel" id="placeBulk"><summary class="btn ghost">{{ ic.tray() }}批量导入</summary>
+      <form class="form" method="post" action="{{ url_for('rpg_places_bulk') }}">{{ csrf() }}
+        <label for="bulk-places">一行一个地点，地点名和描述用冒号、逗号、竖线或空格隔开</label>
+        <textarea id="bulk-places" name="text" rows="7" required placeholder="图书馆：安静的阅读空间&#10;天台|风很大，适合谈心&#10;顶楼花园：只有住户能上去【钥匙】&#10;只写地点名也行"></textarea>
+        <p class="note">行里带【钥匙】就是需要钥匙才能进。已经有的地点会跳过。</p>
+        <div class="actions"><button class="btn" type="submit">导入</button><button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
+      </form>
+    </details>
+    </span>
+  </div>
+  {% if places %}
+  <div class="tablewrap"><table class="cards">
+    <thead><tr><th>地点</th><th>进入</th><th>持有钥匙的角色</th><th></th></tr></thead>
+    <tbody>{% for p in places %}
+    <tr><td class="nm"><b>{{ p.name }}<span class="kind m-only {{ 'lock' if p.locked }}">{{ '需要钥匙' if p.locked else '开放' }}</span></b>{% if p.description %}<div class="muted">{{ p.description }}</div>{% endif %}</td>
+      <td class="kc">{% if p.locked %}<span class="kind lock">需要钥匙</span>{% else %}<span class="kind">开放</span>{% endif %}</td>
+      <td class="{{ '' if (p.locked and p.holders) else 'none' }}">{% if p.locked %}{% for n in p.holders %}<span class="chip">{{ n }}</span>{% else %}<span class="muted">还没有人</span>{% endfor %}{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td class="act"><button class="btn sm ghost" type="button" data-edit='{{ {"name": p.name, "desc": p.description or "", "locked": (p.locked|int) > 0}|tojson|forceescape }}'>编辑</button></td></tr>
+    {% endfor %}</tbody></table></div>
+  {% else %}<p class="empty">还没有地点。</p>{% endif %}
+</section>
+
+<section>
+  <div class="sec-head"><h2>发放或收回钥匙</h2>
+    {% if places and roles %}
+    <details class="panel"><summary class="btn ghost">{{ ic.sliders() }}发放或收回</summary>
+      <form class="form" method="post" action="{{ url_for('rpg_key_save') }}">{{ csrf() }}
+        <div class="fields">
+          <div><label for="k-role">角色</label><select id="k-role" name="role_id">{% for r in roles %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}</select></div>
+          <div><label for="k-place">地点</label><select id="k-place" name="place_id">{% for p in places %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select></div>
+          <div><label class="check"><span class="sw"><input type="checkbox" name="on" checked><i></i></span>持有钥匙（取消勾选 = 收回）</label></div>
+        </div>
+        <div class="actions"><button class="btn" type="submit">保存</button><button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
+      </form>
+    </details>
+    {% endif %}
+  </div>
+  {% if not places %}<p class="empty">先新建一个需要钥匙的地点。</p>{% elif not roles %}<p class="empty">还没有角色，没法发钥匙。</p>{% endif %}
+</section>
+<script>
+document.querySelectorAll('[data-edit]').forEach(function(b){b.addEventListener('click',function(){
+  var d=JSON.parse(b.dataset.edit),p=document.getElementById('placePanel');p.open=true;
+  document.getElementById('p-name').value=d.name;document.getElementById('p-desc').value=d.desc;document.getElementById('p-lock').checked=d.locked;
+  p.scrollIntoView({behavior:'smooth',block:'center'});document.getElementById('p-name').focus();});});
+</script>
+</div>
+{% endblock %}

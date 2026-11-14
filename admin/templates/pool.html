@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}群池与房间{% endblock %}
 {% block body %}
+{% import "_rpg_icons.html" as ic %}
 <style>
 .pg{border:1px solid var(--line);border-radius:8px;background:var(--surface);padding:12px 16px;margin:0 0 10px}
 .pg .row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
@@ -11,6 +12,7 @@
 .st.free{color:var(--ok);border-color:var(--ok)} .st.occupied{color:var(--warn);border-color:var(--warn)} .st.cleaning{color:var(--bad);border-color:var(--bad)}
 .setbar{display:flex;gap:10px;align-items:center;margin:20px 0 8px}.setbar h3{margin:0}
 form.i{display:inline}
+@media(max-width:720px){.pg input[type=text],.pg textarea{font-size:16px;padding:10px 11px}.pg .row>div{flex:1 1 100%}.pg .meta{gap:6px 12px}}
 </style>
 <h1>群池与房间</h1>
 <p class="lede">私约、电话、官约、心愿约会都要一个群。官方机器人建不了群，所以这里放一批你提前建好、把机器人拉进去的空群：机器人被拉进群、或在群里有人说话后，群会自动出现在下面；你给它填上群号（玩家要靠群号申请入群）、放进池子就行。房间结束后群会「待清场」，等你确认群里的人都退光了再放回池。</p>
@@ -20,13 +22,14 @@ form.i{display:inline}
   <p>空闲 <b>{{ counts.free }}</b> · 占用 <b>{{ counts.occupied }}</b> · 待清场 <b>{{ counts.cleaning }}</b> · 排队等群的房间 <b>{{ counts.waiting }}</b>
   {% if counts.waiting and not counts.free %}<span style="color:var(--bad)">　群池不够用了，多拉几个空群进来，或把待清场的放回池。</span>{% endif %}</p>
   {% if unfilled %}<p class="note">有 {{ unfilled }} 个群还没填群号。</p>{% endif %}
-  <form method="post" action="{{ url_for('pool_bulk') }}" class="pg">{{ csrf() }}
-    <b>批量填群号</b>
-    <p class="note" style="margin:4px 0 8px">一行一个（或用逗号隔开），按「机器人先看到哪个群」的顺序依次填给还没有群号的群；填完再逐个核对。</p>
-    <div class="row"><div style="flex:3 1 260px"><textarea name="nums" rows="3" style="width:100%;padding:6px 9px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink);font:inherit" placeholder="123456789&#10;987654321"></textarea></div>
-      <div><label>归入组（可选）</label><input type="text" name="set_name" placeholder="例如 A组"></div>
-      <div style="flex:0 0 auto"><button class="btn" type="submit">填入</button></div></div>
-  </form>
+  <span class="btns"><details class="panel"><summary class="btn ghost">{{ ic.tray() }}批量填群号</summary>
+    <form class="form" method="post" action="{{ url_for('pool_bulk') }}">{{ csrf() }}
+      <label for="pb-nums">一行一个（或用逗号隔开）</label>
+      <textarea id="pb-nums" name="nums" rows="4" required placeholder="123456789&#10;987654321"></textarea>
+      <div class="fields"><div><label for="pb-set">归入组（可选）</label><input type="text" id="pb-set" name="set_name" placeholder="例如 A组"></div></div>
+      <p class="note">按「机器人先看到哪个群」的顺序，依次填给还没有群号的群；填完再逐个核对。</p>
+      <div class="actions"><button class="btn" type="submit">填入</button><button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
+    </form></details></span>
 </section>
 
 {% for set_name, gs in sets.items() %}
@@ -39,23 +42,21 @@ form.i{display:inline}
   <div class="pg">
     <form method="post" action="{{ url_for('pool_save', pid=g.id) }}">{{ csrf() }}
       <div class="row">
-        <div><label>群号</label><input type="text" name="real_gid" value="{{ g.real_gid }}" placeholder="玩家申请入群用"></div>
-        <div><label>备注名</label><input type="text" name="label" value="{{ g.label }}"></div>
-        <div><label>组</label><input type="text" name="set_name" value="{{ g.set_name }}"></div>
+        <div><label>群号（玩家靠它申请入群）</label><input type="text" name="real_gid" value="{{ g.real_gid }}" placeholder="还没填"></div>
+        <div><label>备注名（自己认得就行）</label><input type="text" name="label" value="{{ g.label }}"></div>
+        <div><label>归入组（可选）</label><input type="text" name="set_name" value="{{ g.set_name }}"></div>
         <div style="flex:0 0 auto"><button class="btn sm" type="submit">保存</button></div>
       </div>
     </form>
     <div class="meta">
-      {% if g.conflict %}<span class="st">已是{{ g.conflict }}，不能当房间</span>
-      {% else %}
+      <b style="color:var(--ink)">群 {{ g.group_openid[:8] }}…</b>
         <span class="st {{ g.state }}">{{ {'free':'空闲','occupied':'占用中','cleaning':'待清场'}[g.state] }}</span>
         <span>{{ '在池里' if g.in_pool else '不在池里' }}</span>
         <form class="i" method="post" action="{{ url_for('pool_toggle', pid=g.id) }}">{{ csrf() }}<input type="hidden" name="on" value="{{ 0 if g.in_pool else 1 }}"><button class="linkbtn" style="color:var(--ink)">{{ '移出池' if g.in_pool else '放进池' }}</button></form>
         {% if g.state == 'cleaning' %}<form class="i" method="post" action="{{ url_for('pool_clean', pid=g.id) }}">{{ csrf() }}<button class="btn sm">群里已清空，放回池</button></form>{% endif %}
-        {% if g.room_id %}<span>房间 R{{ g.room_id }}</span>{% endif %}
-      {% endif %}
+        {% if g.room_id %}<span>房间 <a href="{{ url_for('review_view', rid=g.room_id) }}">R{{ g.room_id }}</a></span>{% endif %}
       <form class="i" method="post" action="{{ url_for('pool_delete', pid=g.id) }}" onsubmit="return confirm('从列表里删掉这个群？机器人下次在群里被看到还会再出现。')">{{ csrf() }}<button class="linkbtn">删除</button></form>
-      <span style="color:var(--mute);font-size:12px">{{ g.group_openid[:10] }}…</span>
+
     </div>
   </div>
   {% endfor %}
@@ -63,16 +64,27 @@ form.i{display:inline}
 <p class="empty">还没有群。把机器人拉进一个空群，或在群里说句话，它就会出现在这里。也可以在群里发「设为群池 组名 群号」直接放进来。</p>
 {% endfor %}
 
+{% if blocked %}
+<details class="pg" style="margin-top:20px">
+  <summary style="cursor:pointer;font-weight:600">不能当房间的群（{{ blocked|length }} 个）</summary>
+  <p class="note" style="margin:8px 0">这些群已经是玩家的个人群、戏群或公告群，不会被分给私约，也不用填群号。点「删除」只是不再在这里列出，机器人下次在群里被看到还会再出现。</p>
+  <table class="rt">
+    {% for g in blocked %}<tr><td>群 {{ g.group_openid[:8] }}…</td><td>{{ g.conflict }}{% if g.owner %}：{{ g.owner }}{% endif %}</td>
+      <td><form class="i" method="post" action="{{ url_for('pool_delete', pid=g.id) }}" onsubmit="return confirm('从列表里删掉这个群？机器人下次在群里被看到还会再出现。')">{{ csrf() }}<button class="linkbtn">删除</button></form></td></tr>{% endfor %}
+  </table>
+</details>
+{% endif %}
+
 <section>
   <h2>进行中的房间</h2>
-  <table>
+  <div class="tablewrap"><table class="rt">
     <tr><th>房间</th><th>类型</th><th>时间</th><th>参与者</th><th>群</th><th></th></tr>
     {% for r in live %}
-    <tr><td>R{{ r.id }}</td><td>{{ r.kind }}</td><td>{{ r.slot }}{% if r.place %} @{{ r.place }}{% endif %}</td><td>{{ r.who }}</td>
+    <tr><td><a href="{{ url_for('review_view', rid=r.id) }}">R{{ r.id }}</a></td><td>{{ r.kind }}</td><td>{{ r.slot }}{% if r.place %} @{{ r.place }}{% endif %}</td><td>{{ r.who }}</td>
       <td>{% if r.grp %}{{ r.grp.real_gid or '未填群号' }} {{ r.grp.label }}{% else %}<span style="color:var(--bad)">排队等群</span>{% endif %}</td>
       <td><form class="i" method="post" action="{{ url_for('room_end', rid=r.id) }}" onsubmit="return confirm('结束这个房间？网页上结束不会通知玩家。')">{{ csrf() }}<button class="linkbtn">结束</button></form></td></tr>
     {% else %}<tr><td colspan="6" class="empty">现在没有进行中的房间。</td></tr>{% endfor %}
-  </table>
+  </table></div>
   <p class="note">玩家在房间群里发「结束私约」、管理员发「强结私约 R号」可以结束并通知大家；这里的「结束」只改状态，不通知。</p>
 </section>
 {% endblock %}

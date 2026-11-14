@@ -29,7 +29,7 @@
 
 <section>
   <h2>预订的季度</h2>
-  <table>
+  <table class="rt">
     <tr><th>名字</th><th>档期</th><th>补戏到</th><th>NPC</th><th></th></tr>
     {% for b in booked %}
     <tr><td>{{ b.name }}</td><td class="tabular">{{ b.start_date }} ~ {{ b.end_date }}</td><td class="tabular">{{ b.supp_end or '—' }}</td><td>{{ b.npcs or '—' }}</td>
@@ -54,7 +54,7 @@
   <p>戏群：{% if stage %}已设置（机器人 {{ stage[0] }}）{% else %}<span class="dot warn"></span>还没设置，管理员在戏群里发「设为戏群」{% endif %}。
      状态：{% if not queue %}还没抽顺序（群里发「抽取出场顺序」）{% elif entrance_on %}进行中{% else %}已抽好顺序，未开始或已完成{% endif %}。</p>
   {% if queue %}
-  <table><tr><th>顺序</th><th>角色</th><th>状态</th></tr>
+  <table class="rt"><tr><th>顺序</th><th>角色</th><th>状态</th></tr>
     {% for q in queue %}<tr><td class="tabular">{{ loop.index }}</td><td>{{ q.name }}</td><td>{{ '已出场' if q.done else ('已提交' if q.text else '未提交') }}</td></tr>{% endfor %}
   </table>{% endif %}
   <p class="note">出场用的指令都在群里发：抽取出场顺序、开始出场、跳过出场、查看出场状态；玩家发「提交出场 角色名 内容」。</p>
@@ -63,7 +63,7 @@
 {% if past %}
 <section>
   <h2>历史季度</h2>
-  <table><tr><th>名字</th><th>档期</th></tr>
+  <table class="rt"><tr><th>名字</th><th>档期</th></tr>
     {% for p in past %}<tr><td>{{ p.name }}</td><td class="tabular">{{ p.start_date }} ~ {{ p.end_date }}</td></tr>{% endfor %}
   </table>
 </section>{% endif %}

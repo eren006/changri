@@ -9,7 +9,7 @@
 <section>
   <h2>{{ p.display }} <span class="tag">{{ p.cards|length }} 张卡{% if p.openids %} · 标识 {{ p.openids|length }} 个{% endif %}</span></h2>
   {% if p.cards %}
-  <div style="overflow-x:auto"><table>
+  <div class="tablewrap"><table class="rt">
     <tr><th>卡名</th><th>规则</th><th>属性</th><th>变动</th><th>最近变动</th><th></th></tr>
     {% for c in p.cards %}
     <tr><td>{{ c.name }}</td><td>{{ 'DND5e' if c.rule == 'dnd' else 'COC7' }}</td><td class="tabular">{{ c.n_attrs }}</td><td class="tabular">{{ c.n_changes }}</td><td class="tabular">{{ c.last_ts|ts }}</td>

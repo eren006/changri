@@ -34,8 +34,12 @@ OFFICIAL = [
      "description": "拉线、确认、撤回、查看、统计。"},
     {"id": "dice", "name": "跑团骰子", "module": "plugins.dice", "settings_group": "跑团骰子", "nav": [],
      "description": "COC7 和 DND5e：检定、理智、成长、先攻、攻击，属性随角色保存。"},
-    {"id": "rpg", "name": "物品、属性、地点与商城", "module": "plugins.rpg", "settings_group": "RPG 物品与地点", "nav": ["rpg_page"],
-     "links": [("rpg_page", "打开管理页")], "description": "物品库、角色背包、货币商城、属性效果和带钥匙的地点。"},
+    {"id": "forum", "name": "论坛", "module": "plugins.forum", "settings_group": None, "nav": ["forum_page"], "links": [("forum_page", "打开管理页")],
+     "description": "群里发帖、回复、点赞点踩、查看帖子，管理员删帖删楼层；开放时段在「约会房间」设置里。属于「额外」，关掉后指令不再响应、侧边栏自动折叠。"},
+    {"id": "rpg", "name": "物品与商城", "module": "plugins.rpg", "settings_group": None, "nav": ["rpg_page"],
+     "links": [("rpg_page", "打开管理页")], "description": "物品库、角色背包、货币商城、属性效果；背包、商城、购买、使用、赠送道具指令。属于「额外」，平时可以不开。"},
+    {"id": "places", "name": "地点", "module": "plugins.places", "settings_group": "地点", "nav": ["rpg_places_page"],
+     "links": [("rpg_places_page", "打开管理页")], "description": "地点列表、带钥匙的地点、「地点」指令；可以再开严格地点检查。属于「额外」，平时可以不开。"},
 ]
 # 核心功能：永远开着，没有开关；设置和管理页入口跟官方扩展一样放在自己的卡片里
 CORE_CARDS = [
@@ -45,8 +49,8 @@ CORE_CARDS = [
      "description": "预订季度、开始和结束、筹备期、游戏天数（自动天数）、收尾清空。短信礼物、心动信的每日次数都按它算「今天」。"},
     {"id": "social", "name": "短信与礼物", "settings_group": "短信与礼物", "links": [("messages_page", "消息记录")],
      "description": "短信、送礼、署名、竖着写、撤回、礼品店与图鉴、拉群引导和欢迎语。"},
-    {"id": "play", "name": "约会、心愿与论坛", "settings_group": "约会房间", "links": [("pool_page", "群池与房间"), ("forum_page", "论坛")],
-     "description": "私约、电话、微信、官约、群池分配房间、时间线、我的待回、心愿、论坛。"},
+    {"id": "play", "name": "约会与心愿", "settings_group": "约会房间", "links": [("pool_page", "群池与房间"), ("reviews_page", "私约复盘")],
+     "description": "私约、电话、微信、官约、群池分配房间、时间线、我的待回、心愿。"},
 ]
 for _e in CORE_CARDS:
     _e.update(kind="core", version="随主程序", author="长日将尽", homepage="", license="随主程序", enabled=True, error="", settings=[])

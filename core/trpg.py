@@ -24,6 +24,7 @@ ALIAS_GROUPS = [
     ("力量", "STR"), ("敏捷", "DEX"), ("体质", "CON"), ("体型", "SIZ"), ("外貌", "APP"),
     ("智力", "INT", "灵感"), ("意志", "POW"), ("教育", "EDU"), ("幸运", "LUCK", "运气"),
     ("理智", "SAN"), ("生命", "HP", "体力"), ("魔法", "MP"), ("移动", "MOV"),
+    ("感知", "WIS"), ("魅力", "CHA"),                      # DND 的另两项属性
 ]
 _ALIAS = {n.upper(): g[0] for g in ALIAS_GROUPS for n in g}
 _GROUP_OF = {g[0]: g for g in ALIAS_GROUPS}

@@ -69,9 +69,22 @@ def clamp_attr(name: str, value: int, conn=None) -> int:
             c.close()
 
 
+def next_code(kind: str = "item") -> str:
+    """没写物品码时自动生成：普通物品 ITEM_001、货币 CUR_001……取第一个没被占用的编号。"""
+    prefix = "CUR" if kind == "currency" else "ITEM"
+    with get_conn() as c:
+        used = {r["code"] for r in c.execute("SELECT code FROM rpg_items WHERE code LIKE ?", (prefix + "_%",))}
+    n = 1
+    while f"{prefix}_{n:03d}" in used:
+        n += 1
+    return f"{prefix}_{n:03d}"
+
+
 def save_item(code: str, name: str, kind="item", description="", effects=None, max_uses=-1, can_give=True) -> tuple[bool, str]:
     code = code.strip().upper()
     name = name.strip()
+    if not code and kind in ("item", "currency"):
+        code = next_code(kind)
     if not CODE_RE.fullmatch(code):
         return False, "物品码要用 2–32 位大写字母、数字或下划线，且字母开头。"
     if not name or len(name) > 40:
@@ -371,3 +384,106 @@ def check_place(role_id: int, name: str) -> tuple[bool, str]:
         if m and get_config("allow_private_rooms", "1") == "1" and c.execute("SELECT 1 FROM roles WHERE name=? COLLATE NOCASE", (m[1],)).fetchone():
             return True, ""
     return False, f"地点「{name}」不可用，发「地点 查看」看列表。"
+
+
+# ---------- 批量导入（和 RP 端的写法一致）----------
+
+_TAG_RE = re.compile(r"【([^】]*)】")
+_USES_RE = re.compile(r"^(\d+)\s*次$")
+_EFFECT_RE = re.compile(r"^[^\s,，+\-]+[+\-]\d+(?:[,，\s]+[^\s,，+\-]+[+\-]\d+)*$")
+
+
+def parse_item_line(line: str) -> dict | str:
+    """一行一件：物品名后接若干【标签】。【描述】【N次】/【无限】【体力+10,理智-1】【货币】【不可赠送】。解析失败返回原因。"""
+    name = _TAG_RE.sub("", line).strip()
+    if not name:
+        return "没写物品名"
+    kind, uses, effects, desc, give = "item", None, "", "", True
+    for tag in (t.strip() for t in _TAG_RE.findall(line)):
+        if not tag:
+            continue
+        if tag == "货币":
+            kind = "currency"
+        elif tag == "无限":
+            uses = -1
+        elif tag in ("不可赠送", "不能赠送"):
+            give = False
+        elif _USES_RE.match(tag):
+            uses = int(_USES_RE.match(tag).group(1))
+        elif _EFFECT_RE.match(tag):
+            effects = re.sub(r"[,，]+", " ", tag)
+        elif not desc:
+            desc = tag
+    if uses is None:
+        uses = -1 if (kind == "currency" or not effects) else 1      # 有属性效果的默认用 1 次，货币和纯摆设默认不限
+    return {"name": name, "kind": kind, "uses": uses, "effects": effects, "desc": desc, "give": give}
+
+
+def bulk_items(text: str) -> tuple[list[str], list[str], list[str]]:
+    """批量录入物品。返回 (新建的, 已存在跳过的, 出错的说明)；物品码自动生成，重名跳过。"""
+    created, skipped, errors = [], [], []
+    seen: set[str] = set()
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        p = parse_item_line(line)
+        if isinstance(p, str):
+            errors.append(f"「{line[:16]}」{p}")
+            continue
+        if p["name"] in seen or find_item(p["name"]):
+            skipped.append(p["name"])
+            continue
+        seen.add(p["name"])
+        ok, msg = save_item("", p["name"], p["kind"], p["desc"], p["effects"], p["uses"], p["give"])
+        (created if ok else errors).append(f"{p['name']}" if ok else f"「{p['name']}」{msg}")
+    return created, skipped, errors
+
+
+def parse_place_line(line: str) -> dict | str:
+    """一行一处：地点名和描述用冒号、逗号、竖线或空格隔开；带【钥匙】或【锁】就是需要钥匙才能进。"""
+    locked = bool(re.search(r"【\s*(需要钥匙|钥匙|锁)\s*】", line))
+    line = re.sub(r"【\s*(需要钥匙|钥匙|锁)\s*】", "", line).strip()
+    if not line:
+        return "没写地点名"
+    name, desc = line, ""
+    m = re.search(r"[：:，,|｜\t]", line)
+    if m:
+        name, desc = line[:m.start()], line[m.end():]
+    else:
+        m = re.search(r"\s", line)
+        if m:
+            name, desc = line[:m.start()], line[m.end():]
+    name, desc = name.strip()[:30], desc.strip()[:100]
+    return {"name": name, "desc": desc, "locked": locked} if name else "没写地点名"
+
+
+def bulk_places(text: str) -> tuple[list[str], list[str], list[str]]:
+    created, skipped, errors = [], [], []
+    have = {p["name"].lower() for p in places()}
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        p = parse_place_line(line)
+        if isinstance(p, str):
+            errors.append(f"「{line[:16]}」{p}")
+            continue
+        if p["name"].lower() in have:
+            skipped.append(p["name"])
+            continue
+        have.add(p["name"].lower())
+        ok, msg = save_place(p["name"], p["desc"], p["locked"])
+        (created if ok else errors).append(p["name"] if ok else f"「{p['name']}」{msg}")
+    return created, skipped, errors
+
+
+def bulk_summary(created: list[str], skipped: list[str], errors: list[str]) -> str:
+    parts = []
+    if created:
+        parts.append(f"已添加 {len(created)} 个：{'、'.join(created[:12])}{'…' if len(created) > 12 else ''}")
+    if skipped:
+        parts.append(f"已存在，跳过 {len(skipped)} 个：{'、'.join(skipped[:8])}{'…' if len(skipped) > 8 else ''}")
+    if errors:
+        parts.append(f"没能录入 {len(errors)} 行：{'；'.join(errors[:4])}{'…' if len(errors) > 4 else ''}")
+    return "　".join(parts) or "没有识别到内容，一行写一个。"

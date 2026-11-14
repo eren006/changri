@@ -43,9 +43,14 @@ def set_attrs(role_id: int, pairs: list[tuple[str, int]]) -> tuple[bool, str]:
 
 
 def get_attr(role_id: int, name: str) -> int | None:
+    """先按原名找，找不到再试别名（力量 = STR、理智 = SAN……，和跑团角色卡认的是同一组）。"""
+    from .trpg import alias_names          # 放函数里：trpg 反过来要用 dice，免得循环引用
     with get_conn() as conn:
-        row = conn.execute("SELECT value FROM role_attrs WHERE role_id=? AND name=?", (role_id, norm(name))).fetchone()
-    return row["value"] if row else None
+        for n in dict.fromkeys([norm(name), *alias_names(name)]):
+            row = conn.execute("SELECT value FROM role_attrs WHERE role_id=? AND name=?", (role_id, n)).fetchone()
+            if row:
+                return row["value"]
+    return None
 
 
 def list_attrs(role_id: int) -> list[tuple[str, int]]:

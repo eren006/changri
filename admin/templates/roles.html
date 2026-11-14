@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}角色与群{% endblock %}
 {% block body %}
+{% import "_rpg_icons.html" as ic %}
 <h1>角色与群</h1>
 <p class="lede">玩家在自己的个人群里发「创建新角色 名字」就会出现在这里。每个角色有一个主群，还可以有备用群，消息先发主群，发不出去再试备用群。</p>
 
@@ -14,28 +15,27 @@
 
 {% for it in items %}
 <section>
-  <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px">
-    <h2>{{ it.role.name }}</h2>
+  <div class="sec-head keep"><h2>{{ it.role.name }}<span class="n">{{ it.groups|length }} 个群</span></h2>
     <form method="post" action="{{ url_for('delete_role', role_id=it.role.id) }}" onsubmit="return confirm('删除角色「{{ it.role.name }}」及其群、消息和关系线？这不能撤销。')">{{ csrf() }}<button class="linkbtn">删除角色</button></form>
   </div>
-  <table>
-    <tr><th>类型</th><th>群号（给你看的标签）</th><th>机器人</th><th>状态</th><th></th></tr>
+  <div class="rowlist">
     {% for g in it.groups %}
-    <tr>
-      <td>{{ '主群' if g.kind == 'main' else '备用群' }}</td>
-      <td class="tabular">{{ g.real_gid or '—' }}</td>
-      <td class="tabular tag">{{ g.bot_id or '—' }}</td>
-      <td>{% if g.group_openid %}<span class="dot ok"></span>已认群{% else %}<span class="dot warn"></span>等待认群{% endif %}</td>
-      <td>{% if g.kind == 'backup' %}<form method="post" action="{{ url_for('delete_slot', role_id=it.role.id, slot_id=g.id) }}">{{ csrf() }}<button class="linkbtn">移除</button></form>{% endif %}</td>
-    </tr>
+    <div class="row">
+      <div class="nm"><span class="kind {{ 'ok' if g.kind == 'main' else '' }}">{{ '主群' if g.kind == 'main' else '备用群' }}</span>
+        <b class="tabular">{{ g.real_gid or '未填群号' }}</b>{% if g.bot_id %} <span class="muted tabular">机器人 {{ g.bot_id }}</span>{% endif %}</div>
+      <div>{% if g.group_openid %}<span class="dot ok"></span>已认群{% else %}<span class="dot warn"></span>等待认群{% endif %}</div>
+      {% if g.kind == 'backup' %}<form method="post" action="{{ url_for('delete_slot', role_id=it.role.id, slot_id=g.id) }}" onsubmit="return confirm('移除这个备用群？')">{{ csrf() }}<button class="linkbtn">移除</button></form>{% endif %}
+    </div>
     {% endfor %}
-  </table>
-  <form class="inline" method="post" action="{{ url_for('add_slot', role_id=it.role.id) }}">
-    {{ csrf() }}
-    <div><label for="g{{ it.role.id }}">登记群号</label><input id="g{{ it.role.id }}" type="text" name="real_gid" required pattern="\d{5,12}" inputmode="numeric"></div>
-    <div><label for="k{{ it.role.id }}">用途</label><select id="k{{ it.role.id }}" name="kind"><option value="backup">备用群</option><option value="main">换主群</option></select></div>
-    <button class="btn ghost sm" type="submit">生成认群码</button>
-  </form>
+  </div>
+  <span class="btns"><details class="panel"><summary class="btn ghost">{{ ic.plus() }}登记群</summary>
+    <form class="form" method="post" action="{{ url_for('add_slot', role_id=it.role.id) }}">{{ csrf() }}
+      <div class="fields">
+        <div><label for="g{{ it.role.id }}">群号</label><input id="g{{ it.role.id }}" type="text" name="real_gid" required pattern="\d{5,12}" inputmode="numeric"></div>
+        <div><label for="k{{ it.role.id }}">用途</label><select id="k{{ it.role.id }}" name="kind"><option value="backup">备用群</option><option value="main">换主群</option></select></div>
+      </div>
+      <div class="actions"><button class="btn" type="submit">生成认群码</button><button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
+    </form></details></span>
 </section>
 {% else %}
 <section><p class="empty">还没有角色。</p></section>

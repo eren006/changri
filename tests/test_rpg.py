@@ -23,6 +23,40 @@ class RPGTests(unittest.TestCase):
         self.a = roles.get_role_by_name("甲")["id"]
         self.b = roles.get_role_by_name("乙")["id"]
 
+    def test_item_code_auto_generated(self):
+        ok, code = rpg.save_item("", "药水")
+        self.assertEqual((ok, code), (True, "ITEM_001"))
+        self.assertEqual(rpg.save_item("  ", "绷带"), (True, "ITEM_002"))
+        self.assertEqual(rpg.save_item("", "金币", kind="currency"), (True, "CUR_001"))
+        rpg.save_item("ITEM_003", "手写码")
+        self.assertEqual(rpg.save_item("", "新物品"), (True, "ITEM_004"))            # 跳过已被占用的
+        self.assertEqual(rpg.save_item("potion", "药水2")[1], "POTION")              # 手写的照旧（转大写）
+        self.assertFalse(rpg.save_item("1bad", "x")[0])                              # 手写不合法的照旧拒绝
+
+    def test_bulk_items_and_places(self):
+        rpg.save_attr_def("体力", 0, 100, 50, "")
+        rpg.save_attr_def("理智", 0, 99, 60, "")
+        text = ("金苹果【恢复体力】【5次】【体力+10】\n一封旧信【无限】\n银币【货币】\n毒药【体力-30,理智-5】【不可赠送】\n"
+                "金苹果【重复】\n【只有标签】\n坏效果【缺属性+5】\n")
+        created, skipped, errors = rpg.bulk_items(text)
+        self.assertEqual(created, ["金苹果", "一封旧信", "银币", "毒药"])
+        self.assertEqual(skipped, ["金苹果"])                                       # 重名跳过
+        self.assertEqual(len(errors), 2)                                            # 只有标签、没注册的属性
+        apple = rpg.find_item("金苹果")
+        self.assertEqual((apple["max_uses"], apple["description"]), (5, "恢复体力"))
+        self.assertIn("体力", apple["attr_effects"])
+        self.assertEqual(rpg.find_item("银币")["kind"], "currency")
+        self.assertEqual(rpg.find_item("一封旧信")["max_uses"], -1)
+        self.assertEqual(rpg.find_item("毒药")["can_give"], 0)
+        self.assertTrue(rpg.find_item("金苹果")["code"].startswith("ITEM_"))
+        pc, ps, pe = rpg.bulk_places("图书馆：安静的阅读空间\n天台|风很大\n顶楼花园：只有住户能上去【钥匙】\n花园 种满蔷薇\n只写名字\n图书馆：重复\n")
+        self.assertEqual(pc, ["图书馆", "天台", "顶楼花园", "花园", "只写名字"])
+        self.assertEqual(ps, ["图书馆"]); self.assertEqual(pe, [])
+        by = {p["name"]: p for p in rpg.places()}
+        self.assertEqual(by["顶楼花园"]["locked"], 1); self.assertEqual(by["顶楼花园"]["description"], "只有住户能上去")
+        self.assertEqual(by["花园"]["description"], "种满蔷薇"); self.assertEqual(by["图书馆"]["locked"], 0)
+        self.assertIn("已添加", rpg.bulk_summary(pc, ps, pe))
+
     def test_attrs_clamp_and_item_use_charges(self):
         self.assertTrue(rpg.save_attr_def("体力", 0, 10, 5, "")[0])
         attrs.set_attrs(self.a, [("体力", 99)])

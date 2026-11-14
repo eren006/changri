@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}QQ 管理员{% endblock %}
 {% block body %}
+{% import "_rpg_icons.html" as ic %}
 <h1>QQ 管理员</h1>
 <p class="lede">能在群里使用管理指令的人（设为公告群、统一送心动信等）。不需要有角色。这和登录控制台的账号是两回事。</p>
 
@@ -13,17 +14,14 @@
 {% endif %}
 
 <section>
-  <h2>添加管理员</h2>
-  <form class="inline" method="post" action="{{ url_for('admins_code') }}">
-    {{ csrf() }}
-    <div><label for="note">备注（选填）</label><input id="note" type="text" name="note" maxlength="30"></div>
-    <button class="btn ghost" type="submit">生成管理员码</button>
-  </form>
-</section>
-
-<section>
-  <h2>已登记</h2>
-  <table>
+  <div class="sec-head"><h2>已登记<span class="n">{{ admins|length }} 人</span></h2>
+    <span class="btns"><details class="panel"><summary class="btn">{{ ic.plus() }}添加管理员</summary>
+      <form class="form" method="post" action="{{ url_for('admins_code') }}">{{ csrf() }}
+        <div class="fields"><div><label for="note">备注（选填）</label><input id="note" type="text" name="note" maxlength="30"></div></div>
+        <p class="note">生成一次性管理员码，让对方在群里发「认管理员 码」。</p>
+        <div class="actions"><button class="btn" type="submit">生成管理员码</button><button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
+      </form></details></span></div>
+  <table class="rt">
     <tr><th>备注</th><th>机器人</th><th>标识</th><th></th></tr>
     {% for a in admins %}
     <tr><td>{{ a.note or '—' }}</td><td class="tabular tag">{{ a.bot_id or '—' }}</td><td class="tag">{{ a.member_openid[:8] }}…</td>
