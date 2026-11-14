@@ -50,7 +50,7 @@ class SettingsPage(unittest.TestCase):
         tok = lambda p: re.search(r'name="_csrf" value="([^"]+)"', c.get(p).get_data(as_text=True)).group(1)
         c.post("/login", data={"username": "boss", "password": "longenough1", "_csrf": tok("/login")})
         html = c.get("/extensions").get_data(as_text=True)
-        self.assertIn('class="wide setrow"', html)
+        self.assertIn('class="srow"', html)
         self.assertIn('type="number"', html)
         t = tok("/extensions")
         # 浏览器行为：勾选的开关同时提交 1 和 0（1 在前），没勾的只提交 0
@@ -73,7 +73,7 @@ class NoDuplicateSwitches(unittest.TestCase):
         c = create_app().test_client()
         tok = lambda p: re.search(r'name="_csrf" value="([^"]+)"', c.get(p).get_data(as_text=True)).group(1)
         c.post("/login", data={"username": "boss", "password": "longenough1", "_csrf": tok("/login")})
-        html = c.get("/extensions").get_data(as_text=True)
+        html = c.get("/extensions?tab=aux").get_data(as_text=True)
         for key in ("lovemail_enabled", "rel_enabled", "dice_enabled"):
             self.assertNotIn(f'name="{key}"', html, key)
         self.assertIn('name="lovemail_delivery_time"', html)               # 其他心动信设置还在

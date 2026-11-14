@@ -1,164 +1,195 @@
 {% extends "base.html" %}{% block title %}QQ 号监听{% endblock %}
 {% block body %}
+{% import "_rpg_icons.html" as ic %}
+{% macro cancel() %}<button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button>{% endmacro %}
 <h1>QQ 号监听</h1>
 <p class="lede">给这个机器人绑一个或多个 QQ 号（连到本机或别处的 NapCat / LLBot），只用来听群里的消息和改群名，不会发任何消息。官方机器人只能收到 @ 它的话，绑上之后群号池里的群就能听到全部发言。池子里没有的群，一律不处理。</p>
 
 <section>
-  <h2>QQ 号连接</h2>
-  <p class="note">一个机器人可以连多个 QQ 号（每个号一条连接）。它们所在的群放进同一个群号池，房间领群时不分是哪个号的。哪个号的群不够了，随时再连一个号进来。某个号名下的群正被房间占用（或待清场）时，这个号不能删，要等房间结束、清场后才能删。</p>
-  {% for r in link_rows %}
-  <div style="border:1px solid var(--line);border-radius:6px;padding:10px 12px;margin:10px 0;max-width:560px">
-    <p style="margin:0 0 6px"><b>{{ r.name }}</b>
-      {% if not r.enabled %}<span class="tag">未启用</span>
-      {% elif not r.st.running %}<span class="tag">没有启动</span>
-      {% elif r.st.connected and r.st.online == false %}<span class="tag" style="color:var(--bad)">QQ 号已掉线，要重新扫码登录</span>
-      {% elif r.st.connected %}<span class="tag">已连上{% if r.st.self_id %} · QQ {{ r.st.self_id }}{% endif %}</span>
-      {% else %}<span class="tag" style="color:var(--bad)">连不上：{{ r.st.error or '等待重连' }}</span>{% endif %}
-      <span class="note">名下 {{ r.groups }} 个群，收到池里的群消息 {{ r.st.count }} 条{% if r.st.last %}，最近一条 {{ r.st.last|ts }}{% endif %}</span></p>
-    <form method="post" action="{{ url_for('qqlink_link_save', lid=r.id) }}">{{ csrf() }}
-      <label style="display:block">名字 <input name="name" value="{{ r.name }}" size="14"></label>
-      <label style="display:block;margin-top:6px">地址 <input name="url" value="{{ r.url }}" style="width:100%;max-width:340px"></label>
-      <label style="display:block;margin-top:6px">口令 <input name="token" type="password" placeholder="{{ '已设置，留空不改' if r.token else '没有口令可留空' }}" style="width:100%;max-width:340px" autocomplete="off"></label>
-      <label style="display:block;margin-top:6px"><input type="checkbox" name="on" value="1" {{ 'checked' if r.enabled }}> 启用</label>
-      <p style="margin:8px 0 0"><button class="btn">保存并重连</button></p>
-    </form>
-    <form method="post" action="{{ url_for('qqlink_link_delete', lid=r.id) }}" onsubmit="return confirm('删除这个 QQ 号连接？它名下的 {{ r.groups }} 个群会一起移出群号池。')" style="margin-top:6px">{{ csrf() }}
-      <button class="linkbtn" {{ 'disabled title="名下有群正被房间使用或待清场，不能删"' if r.used }}>删除这个 QQ 号</button>{% if r.used %} <span class="note">名下有 {{ r.used }} 个群正被使用或待清场，暂时不能删</span>{% endif %}</form>
+  <div class="sec-head keep"><h2>QQ 号连接<span class="n">{{ link_rows|length }} 个</span></h2>
+    <span class="btns"><details class="panel" {{ 'open' if not link_rows }}><summary class="btn">{{ ic.plus() }}连一个 QQ 号</summary>
+      <form class="form" method="post" action="{{ url_for('qqlink_link_add') }}">{{ csrf() }}
+        <div class="fields">
+          <div><label>名字</label><input name="name" placeholder="比如 备用号"></div>
+          <div><label>地址</label><input name="url" value="ws://127.0.0.1:3001"></div>
+          <div><label>口令</label><input name="token" type="password" placeholder="没有口令可留空" autocomplete="off"></div>
+          <div><label class="check"><span class="sw"><input type="checkbox" name="on" value="1" checked><i></i></span>启用</label></div>
+        </div>
+        <p class="note">SnowLuma / NapCat 里要先开「正向 WebSocket」服务，地址和口令填在这里。同一台服务器上再装一个，端口要不一样。</p>
+        <div class="actions"><button class="btn" type="submit">添加</button>{{ cancel() }}</div>
+      </form></details></span></div>
+  <p class="note">一个机器人可以连多个 QQ 号（每个号一条连接）。它们所在的群放进同一个群号池，房间领群时不分是哪个号的。某个号名下的群正被房间占用（或等人退群）时，这个号不能删，要等房间结束、清场后才能删。</p>
+  <div class="rowlist">
+    {% for r in link_rows %}
+    <div class="row">
+      <div class="nm"><b>{{ r.name }}</b>
+        {% if not r.enabled %}<span class="kind">未启用</span>
+        {% elif not r.st.running %}<span class="kind warn">没有启动</span>
+        {% elif r.st.connected and r.st.online == false %}<span class="kind bad">QQ 号已掉线，要重新扫码登录</span>
+        {% elif r.st.connected %}<span class="kind ok">已连上{% if r.st.self_id %} · QQ {{ r.st.self_id }}{% endif %}</span>
+        {% else %}<span class="kind bad">连不上：{{ r.st.error or '等待重连' }}</span>{% endif %}
+        <div class="muted">名下 {{ r.groups }} 个群，收到池里的群消息 {{ r.st.count }} 条{% if r.st.last %}，最近一条 {{ r.st.last|ts }}{% endif %}{% if r.used %}；{{ r.used }} 个群正被使用或等人退群，暂时不能删{% endif %}</div></div>
+      <div class="acts">
+        <details class="panel"><summary class="btn sm ghost">编辑</summary>
+          <form class="form" method="post" action="{{ url_for('qqlink_link_save', lid=r.id) }}">{{ csrf() }}
+            <div class="fields">
+              <div><label>名字</label><input name="name" value="{{ r.name }}"></div>
+              <div><label>地址</label><input name="url" value="{{ r.url }}"></div>
+              <div><label>口令</label><input name="token" type="password" placeholder="{{ '已设置，留空不改' if r.token else '没有口令可留空' }}" autocomplete="off"></div>
+              <div><label class="check"><span class="sw"><input type="checkbox" name="on" value="1" {{ 'checked' if r.enabled }}><i></i></span>启用</label></div>
+            </div>
+            <div class="actions"><button class="btn" type="submit">保存并重连</button>{{ cancel() }}</div>
+          </form></details>
+        <form method="post" action="{{ url_for('qqlink_link_delete', lid=r.id) }}" onsubmit="return confirm('删除这个 QQ 号连接？它名下的 {{ r.groups }} 个群会一起移出群号池。')">{{ csrf() }}
+          <button class="linkbtn" {{ 'disabled title="名下有群正被房间使用或等人退群，不能删"' if r.used }}>删除</button></form>
+      </div>
+    </div>
+    {% else %}<p class="empty">还没有连 QQ 号。点上面的「连一个 QQ 号」。</p>{% endfor %}
   </div>
-  {% else %}<p class="empty">还没有连 QQ 号。在下面添加。</p>{% endfor %}
-  <details {{ 'open' if not link_rows }} style="margin:10px 0"><summary class="btn" style="display:inline-block;cursor:pointer">＋ 再连一个 QQ 号</summary>
-    <form method="post" action="{{ url_for('qqlink_link_add') }}" style="margin-top:8px">{{ csrf() }}
-      <label style="display:block">名字 <input name="name" placeholder="比如 备用号" size="14"></label>
-      <label style="display:block;margin-top:6px">地址 <input name="url" value="ws://127.0.0.1:3001" style="width:100%;max-width:340px"></label>
-      <label style="display:block;margin-top:6px">口令 <input name="token" type="password" placeholder="没有口令可留空" style="width:100%;max-width:340px" autocomplete="off"></label>
-      <label style="display:block;margin-top:6px"><input type="checkbox" name="on" value="1" checked> 启用</label>
-      <div class="note">SnowLuma / NapCat 里要先开「正向 WebSocket」服务，地址和口令填在这里。同一台服务器上再装一个，端口要不一样。</div>
-      <p><button class="btn">添加</button></p>
-    </form>
-  </details>
-  <form method="post" action="{{ url_for('qqlink_skip') }}" style="margin-top:14px">{{ csrf() }}
-    <label style="display:block">这些发言人不记进 log（QQ 号或昵称，一行一个）<textarea name="skip" rows="2" style="width:100%;max-width:340px">{{ skip }}</textarea></label>
-    <div class="note">填官方机器人自己在群里的 QQ 号或昵称（比如「卡拉」）。它的骰子回复已经另外记了，不填会记两遍。</div>
-    <p><button class="btn">保存</button></p>
-  </form>
+  <div class="btns" style="margin-top:10px"><details class="panel"><summary class="btn ghost">{{ ic.sliders() }}不记进 log 的发言人</summary>
+    <form class="form" method="post" action="{{ url_for('qqlink_skip') }}">{{ csrf() }}
+      <label for="skip">QQ 号或昵称，一行一个</label><textarea id="skip" name="skip" rows="3">{{ skip }}</textarea>
+      <p class="note">填官方机器人自己在群里的 QQ 号或昵称（比如「卡拉」）。它的骰子回复已经另外记了，不填会记两遍。</p>
+      <div class="actions"><button class="btn" type="submit">保存</button>{{ cancel() }}</div>
+    </form></details></div>
 </section>
 
 <section>
-  <h2>群号组</h2>
-  <p class="note">约会房间开起来时，会从群号组里随机领一个空群，这个 QQ 号把群名改成房间名；房间结束后改回空闲群名。每个组有「开启使用」开关：开着，组里的群才会被分配；关着就不分配。组里有群被占用时关不掉，都空闲时随时能关。机器人不在这些群里，也一言不发，玩家按房间消息里给的群号自己进群。这个 QQ 号要是群主或管理员才能改群名。每个机器人（每个 QQ 号）有自己的一套群号组。</p>
+  <div class="sec-head keep"><h2>群号组<span class="n">{{ sets|length }} 组</span></h2></div>
+  <p class="note">约会房间开起来时，会从群号组里随机领一个空群，这个 QQ 号把群名改成房间名；房间结束后改回空闲群名。每个组有「开启使用」开关：开着，组里的群才会被分配；关着就不分配。组里有群被占用时关不掉。机器人不在这些群里，也一言不发，玩家按房间消息里给的群号自己进群。这个 QQ 号要是群主或管理员才能改群名。</p>
   {% for x in sets %}
-  <div style="margin:22px 0 8px;display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;justify-content:space-between">
-    <div>
-      <div style="font:600 17px var(--sans)">{{ x.name }}
-        <span class="tag" style="vertical-align:2px;margin-left:6px;{{ '' if x.enabled else 'opacity:.6' }}">{{ '使用中' if x.enabled else '已关闭' }}</span></div>
-      <div class="note" style="margin:2px 0 0">{{ x.groups|length }} 个群{% if x.busy %}，其中 {{ x.busy }} 个占用中{% endif %}{% if x.enabled and x.busy %}，占用结束前关不了{% endif %}</div>
-    </div>
-    <div style="display:flex;gap:8px;align-items:center">
-      <details style="position:relative"><summary class="btn ghost sm" style="list-style:none">改名</summary>
-        <form method="post" action="{{ url_for('qqlink_sets_rename') }}" style="position:absolute;right:0;top:34px;z-index:5;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px;display:flex;gap:6px;white-space:nowrap">{{ csrf() }}
-          <input type="hidden" name="old" value="{{ x.name }}"><input type="text" name="new" value="{{ x.name }}" size="12" maxlength="20"><button class="btn sm">保存</button></form></details>
-      <form method="post" action="{{ url_for('qqlink_sets_toggle') }}" style="margin:0">{{ csrf() }}<input type="hidden" name="name" value="{{ x.name }}"><input type="hidden" name="on" value="{{ 0 if x.enabled else 1 }}">
-        <button class="btn ghost sm" {{ 'disabled title="还有群被占用，不能关"' if x.enabled and x.busy }}>{{ '关闭使用' if x.enabled else '开启使用' }}</button></form>
+  <div class="sec-head keep" style="margin-top:20px"><h3 style="margin:0;font:600 17px var(--sans)">{{ x.name }} <span class="kind {{ 'ok' if x.enabled }}">{{ '使用中' if x.enabled else '已关闭' }}</span>
+      <span class="n">{{ x.groups|length }} 个群{% if x.busy %}，{{ x.busy }} 个占用中{% endif %}</span></h3>
+    <div class="acts">
+      <details class="panel"><summary class="btn sm ghost">改名</summary>
+        <form class="form" method="post" action="{{ url_for('qqlink_sets_rename') }}">{{ csrf() }}<input type="hidden" name="old" value="{{ x.name }}">
+          <div class="fields"><div><label>新名字</label><input type="text" name="new" value="{{ x.name }}" maxlength="20"></div></div>
+          <div class="actions"><button class="btn" type="submit">保存</button>{{ cancel() }}</div></form></details>
+      <form method="post" action="{{ url_for('qqlink_sets_toggle') }}">{{ csrf() }}<input type="hidden" name="name" value="{{ x.name }}"><input type="hidden" name="on" value="{{ 0 if x.enabled else 1 }}">
+        <button class="btn sm ghost" {{ 'disabled title="还有群被占用，不能关"' if x.enabled and x.busy }}>{{ '关闭使用' if x.enabled else '开启使用' }}</button></form>
     </div>
   </div>
-  <div class="tablewrap"><table class="rt">
-    <tr><th>群号</th><th>群名</th><th>状态</th><th></th></tr>
-    {% for g in x.groups %}<tr><td class="tabular">{{ g.real_gid }}</td>
-      <td>{{ names.get(g.real_gid) or ('（这个号不在这个群里了）' if live and g.real_gid not in names else '') }}</td>
-      <td>{{ {'free': '空闲', 'occupied': '占用中', 'cleaning': '待清场'}.get(g.state, g.state) }}</td>
-      <td><form method="post" action="{{ url_for('qqlink_sets_remove', gid=g.real_gid) }}" onsubmit="return confirm('把这个群移出群号组？')">{{ csrf() }}<button class="linkbtn">移出</button></form></td></tr>{% endfor %}
-  </table></div>
-  {% else %}<p class="empty">还没有群号组。在下面选几个群，给它起个名字。</p>{% endfor %}
+  <div class="rowlist">
+    {% for g in x.groups %}
+    <div class="row"><div class="nm"><b class="tabular">{{ g.real_gid }}</b> <span class="muted">{{ names.get(g.real_gid) or ('（这个号不在这个群里了）' if live and g.real_gid not in names else '') }}</span></div>
+      <div><span class="kind {{ {'free': 'ok', 'cleaning': 'warn'}.get(g.state, '') }}">{{ {'free': '空闲', 'occupied': '占用中', 'cleaning': '等人退群'}.get(g.state, g.state) }}</span></div>
+      <form method="post" action="{{ url_for('qqlink_sets_remove', gid=g.real_gid) }}" onsubmit="return confirm('把这个群移出群号组？')">{{ csrf() }}<button class="linkbtn">移出</button></form></div>
+    {% endfor %}
+  </div>
+  {% else %}<p class="empty">还没有群号组。点下面的「从群列表加群」，选几个群，给它起个名字。</p>{% endfor %}
 
-  <h3 style="margin:24px 0 6px;font:600 16px var(--sans)">加群</h3>
-  {% if live %}
-  <form method="post" action="{{ url_for('qqlink_sets_add') }}">{{ csrf() }}
-    <input type="search" id="gfilter" placeholder="搜群名或群号" style="width:100%;max-width:340px;margin-bottom:8px">
-    <div style="max-height:280px;overflow:auto;border:1px solid var(--line);border-radius:6px;padding:6px 10px;max-width:520px">
-      {% for g in live %}<label class="grow" style="display:flex;gap:8px;align-items:center;margin:0;padding:4px 0;color:var(--ink)" data-t="{{ g.group_name }} {{ g.group_id }}">
-        <input type="checkbox" name="gid" value="{{ g.link_id }}:{{ g.group_id }}" {{ 'disabled' if in_sets.get(g.group_id|string) }}>
-        <span>{{ g.group_name or '（没有群名）' }}</span><span class="tag tabular">{{ g.group_id }}{% if g.member_count %} · {{ g.member_count }} 人{% endif %}</span>{% if multi %}<span class="tag">{{ g.link_name }}</span>{% endif %}
-        {% if in_sets.get(g.group_id|string) %}<span class="tag">已在「{{ in_sets[g.group_id|string] }}」</span>{% endif %}</label>{% endfor %}
-    </div>
-    <div class="inline">
-      {% if sets %}<label>加到已有的组 <select name="pick_set"><option value="">（不选）</option>{% for x in sets %}<option>{{ x.name }}</option>{% endfor %}</select></label>{% endif %}
-      <label>或者新建一个组 <input type="text" name="new_set" placeholder="比如 A组" size="12"></label>
-      <button class="btn">加进群号组</button>
-    </div>
-  </form>
-  <script>document.getElementById('gfilter').addEventListener('input',function(){var q=this.value.trim().toLowerCase();document.querySelectorAll('label.grow').forEach(function(l){l.style.display=(!q||l.dataset.t.toLowerCase().indexOf(q)>-1)?'flex':'none'})})</script>
-  {% elif live_err %}<p class="note">取不到这个号的群列表：{{ live_err }}</p>
-  {% else %}<p class="note">QQ 号连上之后，这里会列出它所在的全部群，勾选就能加。</p>{% endif %}
-
-  <details style="margin-top:14px"><summary class="note" style="cursor:pointer">在群里用指令加群</summary>
-    <p class="note">在这个 QQ 号所在的群里，由下面「授权的 QQ 号」发「<b>加入群号组 A组</b>」，这个群就加进 A 组；发「<b>退出群号组</b>」就移出。群里不会有任何回应，结果会发到公告群（要先设公告群）。</p>
-    <form method="post" action="{{ url_for('qqlink_auth') }}">{{ csrf() }}
-      <label style="display:block">授权的 QQ 号（一行一个，比如你自己的大号）<textarea name="auth" rows="2" style="width:100%;max-width:340px">{{ auth }}</textarea></label>
-      <p><button class="btn">保存</button></p>
-    </form>
-  </details>
-
-  <details style="margin-top:6px"><summary class="note" style="cursor:pointer">手动贴群号</summary>
-    <form method="post" action="{{ url_for('qqlink_rooms_add') }}" style="margin-top:8px">{{ csrf() }}
-      <textarea name="gids" rows="3" style="width:100%;max-width:340px" placeholder="一行一个群号" required></textarea>
-      <div style="margin-top:6px"><input name="set_name" placeholder="群号组名" size="16" required> <button class="btn">加进群号组</button></div>
-    </form>
-  </details>
-
-  <h3 style="margin:24px 0 6px;font:600 16px var(--sans)">群名怎么起</h3>
-  <form method="post" action="{{ url_for('qqlink_roomname') }}">{{ csrf() }}
-    <p class="note" style="margin-bottom:6px">房间占用时的群名（右边是例子：小明和小红的私约，房间号 12）</p>
-    {% for t, ex in presets %}<label style="display:flex;gap:8px;align-items:center;color:var(--ink);margin:2px 0"><input type="radio" name="preset" value="{{ t }}" {{ 'checked' if t == tpl }}> <span>{{ ex }}</span></label>{% endfor %}
-    <label style="display:flex;gap:8px;align-items:center;color:var(--ink);margin:2px 0"><input type="radio" name="preset" value="custom" {{ 'checked' if not is_preset }}> <span>自己写</span>
-      <input type="text" name="custom" value="{{ '' if is_preset else tpl }}" size="22" placeholder="{kind} {day} {time} {place} {names}"></label>
-    <div class="note">默认跟长日系统一样：类型、D几、时间段、地点、人名；超过 30 字会依次缩短地点、人名、时间。自己写时可以用 {kind}、{day}、{time}、{place}、{names}（三人以内用「×」连）、{id}。现在的效果：<b>{{ preview }}</b></div>
-    <label style="display:block;margin-top:10px">空闲时的群名 <input name="free_name" value="{{ free_name }}" size="22"></label>
-    <div class="note">可以用 {set} 代表群号组的名字，比如「{set}·空房间」。</div>
-    <p><button class="btn">保存</button></p>
-  </form>
+  <div class="btns" style="margin-top:14px">
+    <details class="panel"><summary class="btn">{{ ic.plus() }}从群列表加群</summary>
+      {% if live %}
+      <form class="form" method="post" action="{{ url_for('qqlink_sets_add') }}">{{ csrf() }}
+        <input type="search" id="gfilter" placeholder="搜群名或群号" style="margin-bottom:8px">
+        <div style="max-height:280px;overflow:auto;border:1px solid var(--line);border-radius:6px;padding:6px 10px">
+          {% for g in live %}<label class="grow" style="display:flex;gap:8px;align-items:center;margin:0;padding:8px 0;color:var(--ink);flex-wrap:wrap" data-t="{{ g.group_name }} {{ g.group_id }}">
+            <input type="checkbox" name="gid" value="{{ g.link_id }}:{{ g.group_id }}" {{ 'disabled' if in_sets.get(g.group_id|string) }}>
+            <span>{{ g.group_name or '（没有群名）' }}</span><span class="muted tabular">{{ g.group_id }}{% if g.member_count %} · {{ g.member_count }} 人{% endif %}</span>{% if multi %}<span class="kind">{{ g.link_name }}</span>{% endif %}
+            {% if in_sets.get(g.group_id|string) %}<span class="kind">已在「{{ in_sets[g.group_id|string] }}」</span>{% endif %}</label>{% endfor %}
+        </div>
+        <div class="fields" style="margin-top:12px">
+          {% if sets %}<div><label>加到已有的组</label><select name="pick_set"><option value="">（不选）</option>{% for x in sets %}<option>{{ x.name }}</option>{% endfor %}</select></div>{% endif %}
+          <div><label>或者新建一个组</label><input type="text" name="new_set" placeholder="比如 A组"></div>
+        </div>
+        <div class="actions"><button class="btn" type="submit">加进群号组</button>{{ cancel() }}</div>
+      </form>
+      <script>document.getElementById('gfilter').addEventListener('input',function(){var q=this.value.trim().toLowerCase();document.querySelectorAll('label.grow').forEach(function(l){l.style.display=(!q||l.dataset.t.toLowerCase().indexOf(q)>-1)?'flex':'none'})})</script>
+      {% elif live_err %}<div class="form"><p class="note">取不到这个号的群列表：{{ live_err }}</p></div>
+      {% else %}<div class="form"><p class="note">QQ 号连上之后，这里会列出它所在的全部群，勾选就能加。</p></div>{% endif %}
+    </details>
+    <details class="panel"><summary class="btn ghost">{{ ic.tray() }}手动贴群号</summary>
+      <form class="form" method="post" action="{{ url_for('qqlink_rooms_add') }}">{{ csrf() }}
+        <label for="gids">一行一个群号</label><textarea id="gids" name="gids" rows="4" required></textarea>
+        <div class="fields"><div><label>群号组名</label><input name="set_name" required></div></div>
+        <div class="actions"><button class="btn" type="submit">加进群号组</button>{{ cancel() }}</div>
+      </form></details>
+    <details class="panel"><summary class="btn ghost">{{ ic.sliders() }}在群里用指令加群</summary>
+      <form class="form" method="post" action="{{ url_for('qqlink_auth') }}">{{ csrf() }}
+        <p class="note">在这个 QQ 号所在的群里，由下面「授权的 QQ 号」发「<b>加入群号组 A组</b>」，这个群就加进 A 组；发「<b>退出群号组</b>」就移出。群里不会有任何回应，结果会发到公告群（要先设公告群）。</p>
+        <label for="auth">授权的 QQ 号（一行一个，比如你自己的大号）</label><textarea id="auth" name="auth" rows="3">{{ auth }}</textarea>
+        <div class="actions"><button class="btn" type="submit">保存</button>{{ cancel() }}</div>
+      </form></details>
+    <details class="panel"><summary class="btn ghost">{{ ic.sliders() }}群名怎么起</summary>
+      <form class="form" method="post" action="{{ url_for('qqlink_roomname') }}">{{ csrf() }}
+        <p class="note">房间占用时的群名（例子：小明和小红的私约，房间号 12）</p>
+        {% for t, ex in presets %}<label class="check" style="display:flex;gap:8px;align-items:center;color:var(--ink);margin:6px 0"><input type="radio" name="preset" value="{{ t }}" {{ 'checked' if t == tpl }}> <span>{{ ex }}</span></label>{% endfor %}
+        <label class="check" style="display:flex;gap:8px;align-items:center;color:var(--ink);margin:6px 0;flex-wrap:wrap"><input type="radio" name="preset" value="custom" {{ 'checked' if not is_preset }}> <span>自己写</span>
+          <input type="text" name="custom" value="{{ '' if is_preset else tpl }}" placeholder="{kind} {day} {time} {place} {names}" style="flex:1 1 200px"></label>
+        <p class="note">默认跟长日系统一样：类型、D几、时间段、地点、人名；超过 30 字会依次缩短地点、人名、时间。自己写时可以用 {kind}、{day}、{time}、{place}、{names}（三人以内用「×」连）、{id}。现在的效果：<b>{{ preview }}</b></p>
+        <div class="fields"><div><label>空闲时的群名</label><input name="free_name" value="{{ free_name }}"></div></div>
+        <p class="note">可以用 {set} 代表群号组的名字，比如「{set}·空房间」。</p>
+        <div class="actions"><button class="btn" type="submit">保存</button>{{ cancel() }}</div>
+      </form></details>
+  </div>
 </section>
 
 <section>
-  <h2>监听的群</h2>
+  <div class="sec-head keep"><h2>监听的群<span class="n">{{ pool|length }} 个</span></h2>
+    <span class="btns"><details class="panel"><summary class="btn">{{ ic.plus() }}加监听的群</summary>
+      <form class="form" method="post" action="{{ url_for('qqlink_group_add') }}">{{ csrf() }}
+        <div class="fields">
+          <div><label>群号</label><input name="gid" required inputmode="numeric"></div>
+          <div><label>备注（可选）</label><input name="note"></div>
+          <div><label>类型</label><select name="kind">{% for k, t in kinds.items() %}<option value="{{ k }}">{{ t }}</option>{% endfor %}</select></div>
+        </div>
+        <div class="actions"><button class="btn" type="submit">加进群号池</button>{{ cancel() }}</div>
+      </form></details></span></div>
   <p class="note">跑团的群在这里加：「只监听」的群只听消息；「卡拉也在」的群卡拉也在里面说话，两边收到的消息记 log 时会按时间去重。要对上卡拉那边的群，填「关联群编号」。约会房间用的群在上面的群号组里。</p>
-  {% if pool %}<div class="tablewrap"><table class="rt">
-    <tr><th>群号</th><th>备注</th><th>类型</th><th>关联群编号</th><th></th><th>改群名</th></tr>
-    {% for g in pool %}<tr>
-      <form method="post" action="{{ url_for('qqlink_group_edit', gid=g.gid) }}">{{ csrf() }}
-      <td class="tabular">{{ g.gid }}</td>
-      <td><input name="note" value="{{ g.note }}" size="12"></td>
-      <td><select name="kind">{% for k, t in kinds.items() %}<option value="{{ k }}" {{ 'selected' if g.kind == k }}>{{ t }}</option>{% endfor %}</select></td>
-      <td><input name="group_openid" value="{{ g.group_openid }}" size="14" placeholder="可留空"></td>
-      <td><button class="btn">保存</button></td></form>
-      <td><form method="post" action="{{ url_for('qqlink_group_rename', gid=g.gid) }}" style="display:inline">{{ csrf() }}<input name="name" size="14" placeholder="新群名" required> <button class="btn">改名</button></form>
-        <form method="post" action="{{ url_for('qqlink_group_delete', gid=g.gid) }}" style="display:inline" onsubmit="return confirm('从群号池移除这个群？')">{{ csrf() }}<button class="btn">移除</button></form></td>
-    </tr>{% endfor %}
-  </table></div>{% else %}<p class="empty">还没有监听的群。在下面填一个群号。</p>{% endif %}
-  <form method="post" action="{{ url_for('qqlink_group_add') }}" style="margin-top:12px">{{ csrf() }}
-    <input name="gid" placeholder="群号" required size="12"> <input name="note" placeholder="备注（可选）" size="14">
-    <select name="kind">{% for k, t in kinds.items() %}<option value="{{ k }}">{{ t }}</option>{% endfor %}</select>
-    <button class="btn">加进群号池</button>
-  </form>
+  <div class="rowlist">
+    {% for g in pool %}
+    <div class="row">
+      <div class="nm"><b class="tabular">{{ g.gid }}</b> <span class="kind">{{ kinds.get(g.kind, g.kind) }}</span>
+        <div class="muted">{{ g.note or '没有备注' }}{% if g.group_openid %} · 关联 {{ g.group_openid }}{% endif %}</div></div>
+      <div class="acts">
+        <details class="panel"><summary class="btn sm ghost">编辑</summary>
+          <form class="form" method="post" action="{{ url_for('qqlink_group_edit', gid=g.gid) }}">{{ csrf() }}
+            <div class="fields">
+              <div><label>备注</label><input name="note" value="{{ g.note }}"></div>
+              <div><label>类型</label><select name="kind">{% for k, t in kinds.items() %}<option value="{{ k }}" {{ 'selected' if g.kind == k }}>{{ t }}</option>{% endfor %}</select></div>
+              <div><label>关联群编号</label><input name="group_openid" value="{{ g.group_openid }}" placeholder="可留空"></div>
+            </div>
+            <div class="actions"><button class="btn" type="submit">保存</button>{{ cancel() }}</div>
+          </form></details>
+        <details class="panel"><summary class="btn sm ghost">改群名</summary>
+          <form class="form" method="post" action="{{ url_for('qqlink_group_rename', gid=g.gid) }}">{{ csrf() }}
+            <div class="fields"><div><label>新群名</label><input name="name" required></div></div>
+            <div class="actions"><button class="btn" type="submit">改名</button>{{ cancel() }}</div>
+          </form></details>
+        <form method="post" action="{{ url_for('qqlink_group_delete', gid=g.gid) }}" onsubmit="return confirm('从群号池移除这个群？')">{{ csrf() }}<button class="linkbtn">移除</button></form>
+      </div>
+    </div>
+    {% else %}<p class="empty">还没有监听的群。点上面的「加监听的群」。</p>{% endfor %}
+  </div>
 </section>
 
 <section>
-  <h2>已绑定的 QQ 号</h2>
-  <p class="note">玩家在群里发 /绑定QQ 自己的QQ号 就会出现在这里。绑定是永久的，按「人」认：这个人以后再建的新角色、新的跑团卡，也自动算他的。上面群号池里的「关联群编号」同样是永久保存的，改一次一直有效。</p>
-  <form method="post" action="{{ url_for('qqlink_bind') }}" class="inline">{{ csrf() }}
-    <label>角色 <input type="text" name="role" list="rolenames" placeholder="角色名" size="12"></label>
-    <datalist id="rolenames">{% for n in role_names %}<option value="{{ n }}">{% endfor %}</datalist>
-    <label>QQ 号 <input type="text" name="qq" placeholder="5 到 12 位数字" size="14"></label>
-    <button class="btn">手动绑定</button>
-  </form>
-  <p class="note">人齐回执、房间群里的发言记录都要靠这个绑定才认得出谁是谁：参与房间的每个人都得绑过。玩家自己绑就在群里发 /绑定QQ，你也可以在这里替他绑。</p>
-  {% if binds or trpg_binds %}<div class="tablewrap" style="margin-top:10px"><table class="rt">
-    <tr><th>QQ 号</th><th>恋综角色</th><th>跑团身份</th><th></th></tr>
+  <div class="sec-head keep"><h2>已绑定的 QQ 号<span class="n">{{ (binds|length) }} 个</span></h2>
+    <span class="btns"><details class="panel"><summary class="btn">{{ ic.plus() }}手动绑定</summary>
+      <form class="form" method="post" action="{{ url_for('qqlink_bind') }}">{{ csrf() }}
+        <div class="fields">
+          <div><label>角色</label><input type="text" name="role" list="rolenames" placeholder="角色名"></div>
+          <div><label>QQ 号</label><input type="text" name="qq" placeholder="5 到 12 位数字" inputmode="numeric"></div>
+        </div>
+        <datalist id="rolenames">{% for n in role_names %}<option value="{{ n }}">{% endfor %}</datalist>
+        <p class="note">人齐回执、房间群里的发言记录都要靠这个绑定才认得出谁是谁：参与房间的每个人都得绑过。玩家自己绑就在群里发 /绑定QQ，你也可以在这里替他绑。</p>
+        <div class="actions"><button class="btn" type="submit">绑定</button>{{ cancel() }}</div>
+      </form></details></span></div>
+  <p class="note">玩家在群里发 /绑定QQ 自己的QQ号 就会出现在这里。绑定是永久的，按「人」认：这个人以后再建的新角色、新的跑团卡，也自动算他的。上面「关联群编号」同样是永久保存的，改一次一直有效。</p>
+  <div class="rowlist">
     {% set seen = [] %}
-    {% for b in binds %}{% set _ = seen.append(b.qq) %}<tr><td class="tabular">{{ b.qq }}</td><td>{{ b.roles|join('、') or '（还没有角色）' }}</td>
-      <td>{% for t in trpg_binds if t.qq == b.qq %}{{ t.player }}{% if t.cards %}（{{ t.cards|join('、') }}）{% endif %}{% else %}—{% endfor %}</td>
-      <td><form method="post" action="{{ url_for('qqlink_unbind', qq=b.qq) }}" onsubmit="return confirm('解除这个 QQ 号的绑定？')">{{ csrf() }}<button class="btn">解除</button></form></td></tr>{% endfor %}
-    {% for t in trpg_binds if t.qq not in seen %}<tr><td class="tabular">{{ t.qq }}</td><td>—</td><td>{{ t.player }}{% if t.cards %}（{{ t.cards|join('、') }}）{% endif %}</td>
-      <td><form method="post" action="{{ url_for('qqlink_unbind', qq=t.qq) }}" onsubmit="return confirm('解除这个 QQ 号的绑定？')">{{ csrf() }}<button class="btn">解除</button></form></td></tr>{% endfor %}
-  </table></div>{% else %}<p class="empty">还没有人绑定。</p>{% endif %}
+    {% for b in binds %}{% set _ = seen.append(b.qq) %}
+    <div class="row"><div class="nm"><b class="tabular">{{ b.qq }}</b>
+        <div class="muted">恋综：{{ b.roles|join('、') or '还没有角色' }} · 跑团：{% for t in trpg_binds if t.qq == b.qq %}{{ t.player }}{% if t.cards %}（{{ t.cards|join('、') }}）{% endif %}{% else %}—{% endfor %}</div></div>
+      <form method="post" action="{{ url_for('qqlink_unbind', qq=b.qq) }}" onsubmit="return confirm('解除这个 QQ 号的绑定？')">{{ csrf() }}<button class="linkbtn">解除</button></form></div>
+    {% endfor %}
+    {% for t in trpg_binds if t.qq not in seen %}
+    <div class="row"><div class="nm"><b class="tabular">{{ t.qq }}</b>
+        <div class="muted">恋综：— · 跑团：{{ t.player }}{% if t.cards %}（{{ t.cards|join('、') }}）{% endif %}</div></div>
+      <form method="post" action="{{ url_for('qqlink_unbind', qq=t.qq) }}" onsubmit="return confirm('解除这个 QQ 号的绑定？')">{{ csrf() }}<button class="linkbtn">解除</button></form></div>
+    {% endfor %}
+    {% if not binds and not trpg_binds %}<p class="empty">还没有人绑定。</p>{% endif %}
+  </div>
 </section>
 {% endblock %}

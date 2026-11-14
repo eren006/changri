@@ -19,7 +19,35 @@ def _rowdict(row):
     return dict(row) if row else None
 
 
+DEFAULT_ATTRS = [("HP", 0, 100, 100, "生命值")]
+DEFAULT_CURRENCY = ("GOLD", "金币")
+
+
+def seed_defaults(force: bool = False) -> list[str]:
+    """恋综里一直有的基础内容：HP（0–100）和金币。只在第一次自动补，之后你改、你删都算数；
+    force=True（一键初始化）才会把缺的补回来，已有的不动。返回补了什么。"""
+    from .db import get_config, set_config
+    if not force and get_config("rpg_seeded", "") == "1":
+        return []
+    made = []
+    with get_conn() as c:
+        have_attr = {r["name"] for r in c.execute("SELECT name FROM rpg_attr_defs")}
+        have_item = {r["code"] for r in c.execute("SELECT code FROM rpg_items")}
+        have_name = {r["name"] for r in c.execute("SELECT name FROM rpg_items")}
+    for name, lo, hi, dv, desc in DEFAULT_ATTRS:
+        if name not in have_attr:
+            save_attr_def(name, lo, hi, dv, desc)
+            made.append(f"属性 {name}")
+    code, nm = DEFAULT_CURRENCY
+    if code not in have_item and nm not in have_name:
+        if save_item(code, nm, "currency", "通用货币", None, -1, True)[0]:
+            made.append(f"货币 {nm}")
+    set_config("rpg_seeded", "1")
+    return made
+
+
 def attr_defs() -> list[dict]:
+    seed_defaults()
     with get_conn() as c:
         return [dict(r) for r in c.execute("SELECT * FROM rpg_attr_defs ORDER BY rowid")]
 
@@ -121,12 +149,15 @@ def save_item(code: str, name: str, kind="item", description="", effects=None, m
 
 
 def items() -> list[dict]:
+    seed_defaults()
     with get_conn() as c:
         return [dict(r) for r in c.execute("SELECT * FROM rpg_items ORDER BY kind, code")]
 
 
 def find_item(value: str, conn=None):
     own = conn is None
+    if own:
+        seed_defaults()
     c = conn or get_conn()
     try:
         row = c.execute("SELECT * FROM rpg_items WHERE code=? COLLATE NOCASE OR name=? COLLATE NOCASE", (value.strip(), value.strip())).fetchone()
@@ -183,6 +214,7 @@ def adjust(role_id: int, item_value: str, delta: int, detail=""):
 
 
 def inventory(role_id: int) -> list[dict]:
+    seed_defaults()
     with get_conn() as c:
         now = int(time.time())
         c.execute("DELETE FROM rpg_inventory WHERE expires_ts IS NOT NULL AND expires_ts<=?", (now,))

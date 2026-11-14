@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}心动信{% endblock %}
 {% block body %}
+{% import "_rpg_icons.html" as ic %}
 <h1>心动信</h1>
 <p class="lede">玩家投的信先放在信池里，到了派送时间统一发给收信人。</p>
 
@@ -13,13 +14,16 @@
 </section>
 
 <section>
-  <h2>派送</h2>
-  <p>每天 <b class="tabular">{{ at }}</b> 自动派送。上次派送日：{{ last }}。公告群：{% if announce %}已设置（机器人 {{ announce[0] }}）{% else %}<span class="dot warn"></span>还没设置，管理员在目标群里发「设为公告群」{% endif %}</p>
-  <form method="post" action="{{ url_for('lovemail_deliver') }}" onsubmit="return confirm('现在就把信池里所有的信派送出去？')">
-    {{ csrf() }}
-    <button class="btn" type="submit" {% if pending_now %}disabled{% endif %}>{{ '等待机器人处理…' if pending_now else '立即派送' }}</button>
-  </form>
-  <p class="note">点击后机器人会在 30 秒内处理。</p>
+  <div class="sec-head keep"><h2>派送</h2>
+    <span class="btns"><details class="panel"><summary class="btn ghost">{{ ic.sliders() }}每天 {{ at }} 自动派送</summary>
+      <form class="form" method="post" action="{{ url_for('lovemail_time') }}">{{ csrf() }}
+        <div class="fields"><div><label for="lt">每天几点派送</label><input id="lt" type="time" name="at" value="{{ at }}" required></div></div>
+        <p class="note">到点前 10 分钟会先在个人群里提醒；改完立刻生效。</p>
+        <div class="actions"><button class="btn" type="submit">保存</button><button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
+      </form></details>
+      <form method="post" action="{{ url_for('lovemail_deliver') }}" onsubmit="return confirm('现在就把信池里所有的信派送出去？')">{{ csrf() }}
+        <button class="btn" type="submit" {% if pending_now %}disabled{% endif %}>{{ '等待机器人处理…' if pending_now else '立即派送' }}</button></form></span></div>
+  <p class="muted" style="margin:6px 0 0">上次派送日：{{ last }}。公告群：{% if announce %}已设置（机器人 {{ announce[0] }}）{% else %}<span class="dot warn"></span>还没设置，管理员在目标群里发「设为公告群」{% endif %}。点「立即派送」后机器人会在 30 秒内处理。</p>
 </section>
 
 <section>

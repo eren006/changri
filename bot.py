@@ -66,6 +66,12 @@ async def _start_qq_links() -> None:
     await qqmanager.start_all()
 
 
+def _start_errlog() -> None:
+    from core import errlog
+    errlog.install()                                     # 记报错、查上次是不是崩溃退出；有接收地址就发出去
+
+
+driver.on_startup(_start_errlog)
 driver.on_startup(_remember_loop)
 driver.on_startup(_start_qq_links)
 driver.on_startup(_start_phone_server)

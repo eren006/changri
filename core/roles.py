@@ -243,5 +243,7 @@ def unbind_backup(role_id: int, index: int) -> tuple[bool, str]:
 
 
 def delete_role(role_id: int) -> None:
+    from . import sheets
+    sheets.remove_files(role_id)                       # 公知/二表的图片文件跟着删
     with get_conn() as conn:
         conn.execute("DELETE FROM roles WHERE id=?", (role_id,))

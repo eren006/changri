@@ -1,4 +1,4 @@
-"""QQ 端地点指令（官方扩展「地点」，可在「功能与设置」里开关，改了要重启）。严格地点检查用设置里的 place_system_enabled。"""
+"""QQ 端地点指令（官方扩展「地点」，可在「功能与设置」里开关，改了要重启）。「只能使用预设地点约会」用设置里的 place_system_enabled。"""
 from nonebot import on_command
 from nonebot.adapters.qq import Bot, GroupMessageCreateEvent
 from nonebot.params import CommandArg

@@ -102,10 +102,32 @@ def delete(pool_id: int) -> tuple[bool, str]:
     return True, ""
 
 
+def link_ready(g) -> bool:
+    """QQ 号监听那条线上的群，只有它归属的那个 QQ 号现在连着、登录着才能分给房间。
+    群没有归属的号（还没人认领）时，这个机器人有任何一个号连着就行。官方群（卡拉在里面的）不看这个。"""
+    if not is_qq_only(g):
+        return True
+    from . import qqmanager, qqpool
+    from .db import use_bot
+    bot = g["bot_id"]
+    with use_bot(bot):
+        owner = qqpool.owner_of(g["real_gid"])
+        links = [x["id"] for x in qqpool.links()]
+    if not links:
+        return True                                  # 一个 QQ 号连接都没登记过（老用法）：不限制
+    ids = [owner] if owner and owner in links else ([] if owner else links)
+    for lid in ids:
+        st = qqmanager.link_status(bot, lid)
+        if st["connected"] and st["online"] is not False:
+            return True
+    return False
+
+
 def allocate(room_id: int):
-    """领一个空群给房间。池里没有空群返回 None（房间排队）。"""
+    """领一个空群给房间。池里没有空群返回 None（房间排队）。
+    QQ 号没登录（没连上）的群不分：登记在哪个 QQ 号名下，就跟着那个号走。"""
     with get_conn() as c:
-        g = c.execute("SELECT * FROM pool_groups WHERE in_pool=1 AND state='free' ORDER BY RANDOM() LIMIT 1").fetchone()
+        g = next((x for x in c.execute("SELECT * FROM pool_groups WHERE in_pool=1 AND state='free' ORDER BY RANDOM()") if link_ready(x)), None)
         if not g:
             return None
         c.execute("UPDATE pool_groups SET state='occupied', room_id=? WHERE id=?", (room_id, g["id"]))
@@ -125,3 +147,25 @@ def counts() -> dict:
             r[row["state"]] = row["n"]
         r["waiting"] = c.execute("SELECT COUNT(*) FROM rooms WHERE status='open' AND pool_id IS NULL").fetchone()[0]
         return r
+
+
+def player_qqs() -> set[str]:
+    """所有登记过的玩家 QQ 号（恋综绑定 + 跑团身份）。靠它判断一个群里有没有玩家。"""
+    with get_conn() as c:
+        out = {r["qq"] for r in c.execute("SELECT qq FROM person_qq")}
+        out |= {r["member_openid"][3:] for r in c.execute("SELECT member_openid FROM trpg_identities WHERE member_openid LIKE 'qq:%'")}
+    return out
+
+
+def room_qqs(room_id: int) -> set[str]:
+    """这个房间自己的参与者的 QQ 号（他们进群是应该的）。"""
+    with get_conn() as c:
+        return {r["qq"] for r in c.execute(
+            "SELECT q.qq FROM room_members m JOIN roles r ON r.id=m.role_id JOIN person_qq q ON q.member_openid=r.member_openid WHERE m.room_id=?", (room_id,))}
+
+
+def reject(pool_id: int, room_id: int, to: str = "cleaning") -> None:
+    """分到的群里还有别的玩家：群先放一边（等人退群），房间退回排队，再领一个。"""
+    with get_conn() as c:
+        c.execute("UPDATE pool_groups SET state=?, room_id=NULL WHERE id=?", (to, pool_id))
+        c.execute("UPDATE rooms SET pool_id=NULL WHERE id=?", (room_id,))

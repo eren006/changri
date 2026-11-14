@@ -189,6 +189,8 @@ async def _start_room(matcher, bot: Bot, event: GroupMessageCreateEvent, kind: s
     if missing:
         await matcher.finish(f"❌ 找不到角色：{missing}。")
     ok, info, room_id = rooms.create(kind, me["id"], [t["id"] for t in targets], time_text, place)
+    if room_id:
+        await _ensure_clean(room_id)
     if not ok:
         await matcher.finish(f"❌ {info}")
     room = rooms.get(room_id)
@@ -247,6 +249,8 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     if len(targets) < 2:
         await official.finish("官约至少要两位角色。")
     ok, info, room_id = rooms.create("官约", targets[0]["id"], [t["id"] for t in targets[1:]], p[0], p[1], official=True)
+    if room_id:
+        await _ensure_clean(room_id)
     if not ok:
         await official.finish(f"❌ {info}")
     room = rooms.get(room_id)
@@ -272,6 +276,8 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     if len(targets) < 2:
         await official_phone.finish("官电至少要两位角色。")
     ok, info, room_id = rooms.create("电话", targets[0]["id"], [t["id"] for t in targets[1:]], p[0], "", official=True, note="官电")
+    if room_id:
+        await _ensure_clean(room_id)
     if not ok:
         await official_phone.finish(f"❌ {info}")
     room = rooms.get(room_id)
@@ -324,6 +330,8 @@ async def _(bot: Bot, event: GroupMessageCreateEvent):
     for p in ps:
         targets, _ = _resolve(_names(p["names"]))
         ok, info, rid = rooms.create("官约", targets[0]["id"], [t["id"] for t in targets[1:]], p["time"], p["place"], official=True) if len(targets) >= 2 else (False, "角色已不存在", 0)
+        if rid:
+            await _ensure_clean(rid)
         if ok:
             room = rooms.get(rid)
             for t in targets:
@@ -361,7 +369,37 @@ async def _finish_room(room_id: int, status: str, why: str) -> None:
         await qqmanager.room_rename(gi[0], pool.get(room["pool_id"]), qqpool.free_name(pool.get(room["pool_id"])["set_name"]))
     if gi:
         await _to_group(gi[0], gi[1], f"{room['kind']}{verb}{why}，请退群！")
-        await _tell_announce(f"🧹 R{room_id} {room['kind']}{verb[1:]}，群 {gi[2]} 等待清场（设置平台「群池」页确认清空后放回池）。")
+        await _tell_announce(f"🧹 R{room_id} {room['kind']}{verb[1:]}，群 {gi[2]} 已放回群池（下次分配前会查群里有没有玩家）。")
+
+
+async def _ensure_clean(room_id: int) -> None:
+    """分到的群如果是 QQ 号监听那条线的群，就查一遍群成员：还有别的玩家在里面，
+    这个群先放一边（等人退群），给房间换一个。问不到群成员就当没人。"""
+    for _ in range(8):
+        room = rooms.get(room_id)
+        if not room or room["status"] != "open" or not room["pool_id"]:
+            return
+        g = pool.get(room["pool_id"])
+        if not g or not pool.is_qq_only(g):
+            return
+        members = await qqmanager.group_members(g["bot_id"], g["real_gid"])
+        if members is None:
+            return
+        if not (members & pool.player_qqs()) - pool.room_qqs(room_id):
+            return
+        pool.reject(g["id"], room_id)
+        if not pool.allocate(room_id):
+            return
+
+
+async def _sweep_cleaning() -> None:
+    """等人退群的群：群里已经没有玩家了就自动放回池。"""
+    for g in pool.all_groups():
+        if g["state"] != "cleaning" or not g["in_pool"] or not pool.is_qq_only(g):
+            continue
+        members = await qqmanager.group_members(g["bot_id"], g["real_gid"])
+        if members is not None and not members & pool.player_qqs():
+            pool.release(g["id"], "free")
 
 
 review_cmd = _cmd("复盘")
@@ -733,8 +771,12 @@ async def _tick():
     try:
         for r in rooms.expired():
             await _finish_room(r["id"], "ended", "（超过存活时间自动结束）")
+        await _sweep_cleaning()
         for rid in rooms.assign_waiting():
+            await _ensure_clean(rid)
             room = rooms.get(rid)
+            if not room or not room["pool_id"]:
+                continue
             for m in rooms.members(rid):
                 await _push(m["role_id"], f"🔔 R{rid} {room['kind']}有空群了。\n{_slot(room)}")
                 await _push_group(m["role_id"], room)

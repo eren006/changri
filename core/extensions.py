@@ -30,7 +30,7 @@ OFFICIAL = [
      "description": "抽出场顺序，在戏群里依次出场，支持提前预存和带图片。"},
     {"id": "lovemail", "name": "心动信", "module": "plugins.lovemail", "settings_group": "心动信", "nav": ["lovemail_page"], "links": [("lovemail_page", "打开管理页")],
      "description": "匿名投递、定时统一派送、撤回、曝光、信箱统计。"},
-    {"id": "relations", "name": "关系线", "module": "plugins.relations", "settings_group": "关系线", "nav": ["relations_page"], "links": [("relations_page", "打开管理页")],
+    {"id": "relations", "name": "公知、二表与关系线", "module": "plugins.relations", "settings_group": "关系线", "nav": ["relations_page"], "links": [("relations_page", "打开管理页")],
      "description": "拉线、确认、撤回、查看、统计。"},
     {"id": "dice", "name": "跑团骰子", "module": "plugins.dice", "settings_group": "跑团骰子", "nav": [],
      "description": "COC7 和 DND5e：检定、理智、成长、先攻、攻击，属性随角色保存。"},
@@ -39,16 +39,18 @@ OFFICIAL = [
     {"id": "rpg", "name": "物品与商城", "module": "plugins.rpg", "settings_group": None, "nav": ["rpg_page"],
      "links": [("rpg_page", "打开管理页")], "description": "物品库、角色背包、货币商城、属性效果；背包、商城、购买、使用、赠送道具指令。属于「额外」，平时可以不开。"},
     {"id": "places", "name": "地点", "module": "plugins.places", "settings_group": "地点", "nav": ["rpg_places_page"],
-     "links": [("rpg_places_page", "打开管理页")], "description": "地点列表、带钥匙的地点、「地点」指令；可以再开严格地点检查。属于「额外」，平时可以不开。"},
+     "links": [("rpg_places_page", "打开管理页")], "description": "地点列表、带钥匙的地点、「地点」指令；可以再开「只能使用预设地点约会」。属于「额外」，平时可以不开。"},
 ]
 # 核心功能：永远开着，没有开关；设置和管理页入口跟官方扩展一样放在自己的卡片里
 CORE_CARDS = [
     {"id": "base", "name": "基础", "settings_group": "基础", "links": [("dashboard", "总览")],
-     "description": "角色与群绑定、/ping、冷却与字数上限、拉黑、长内容发图、系统名称。"},
+     "description": "角色与群绑定、/ping、欢迎语、拉黑、长内容发图、系统名称、报错接收。"},
     {"id": "season", "name": "季度与游戏天数", "settings_group": None, "links": [("season_page", "打开管理页")],
      "description": "预订季度、开始和结束、筹备期、游戏天数（自动天数）、收尾清空。短信礼物、心动信的每日次数都按它算「今天」。"},
-    {"id": "social", "name": "短信与礼物", "settings_group": "短信与礼物", "links": [("messages_page", "消息记录")],
-     "description": "短信、送礼、署名、竖着写、撤回、礼品店与图鉴、拉群引导和欢迎语。"},
+    {"id": "social", "name": "短信", "settings_group": "短信", "links": [("reviews_page", "短信复盘")],
+     "description": "短信、署名、竖着写、撤回、拉群引导。冷却、每日次数、字数上限、开放时段都在这里设置。"},
+    {"id": "gift", "name": "礼物", "settings_group": "礼物", "links": [("reviews_page", "礼物复盘")],
+     "description": "送礼、礼品店与图鉴、礼物公开播报。送礼冷却、每日次数在这里设置。"},
     {"id": "play", "name": "约会与心愿", "settings_group": "约会房间", "links": [("pool_page", "群池与房间"), ("reviews_page", "私约复盘")],
      "description": "私约、电话、微信、官约、群池分配房间、时间线、我的待回、心愿。"},
 ]
@@ -464,15 +466,18 @@ def ai_prompt() -> str:
         "- 扩展叫什么、一句话介绍：\n"
         "- 玩家发什么指令触发（写出完整的例子）：\n"
         "- 发了之后机器人怎么回（成功、失败、参数不对时各回什么）：\n"
-        "- 需要在设置平台里调的选项（名字、类型、默认值）：\n"
-        "- 需要用到的角色信息、属性、天数、定时任务等：\n\n"
+        "- 需要在设置平台里调的选项（每项写：人话名字、类型 string/text/int/bool/choice、默认值、一句说明；数字可以写单位）：\n"
+        "- 需要用到的角色信息、属性、天数、定时任务等（只能用 changri_api 里有的：玩家清单 all_roles、属性 get_attr/set_attr、天数等；物品栏/商城/地点目前没有接口，不要自己读数据库）：\n\n"
         "========== 输出要求 ==========\n"
-        "1. 只输出两个代码块，分别标明文件名 manifest.json 和 __init__.py，不要多余的解释。\n"
+        "1. 只输出两个代码块，分别标明文件名 manifest.json 和 __init__.py，不要多余的解释（第 8 条的提醒除外）。\n"
         "2. manifest.json 的 id 用小写字母、数字、下划线，字母开头。\n"
         "3. 只从 changri_api 导入，不要 import core / plugins / admin。\n"
         "4. 不能用 sys.exit / os._exit / time.sleep / requests；等待用 await asyncio.sleep，联网用 httpx 异步。\n"
         "5. 指令名不要和主程序已有的重名（私约、电话、时间线、心愿、发帖、短信、送礼 等）。\n"
         "6. 每条指令都要有回复，出错时回一句人话。\n"
+        "7. 凡是玩家/管理员可能想调的数字、开关、文字（次数上限、冷却、开关、回复内容……），不要写死在代码里：写进 manifest.json 的 settings，"
+        "每项带 label（人话）、desc（一句说明，数字注明 0 代表什么）、default，数字可加 unit；代码里用 setting(EXT_ID, key) 读。\n"
+        "8. 扩展没有沙盒，写错会改坏全体玩家数据或让机器人卡死：改数据要限定范围、检查 set_attr 的返回值，不要写一条指令改全员的东西；不要读 .env、不要碰数据库文件；回答最后用一两句话提醒我「装之前先备份、先在测试群试」。\n"
     )
 
 

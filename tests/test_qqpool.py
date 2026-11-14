@@ -17,6 +17,7 @@ import websockets  # noqa: E402
 from admin import create_app  # noqa: E402
 from core import qqmanager, qqpool, webusers  # noqa: E402
 from core.db import get_conn, init_db, set_config  # noqa: E402
+from tests._linkup import links_up  # noqa: E402
 
 
 def clear():
@@ -179,6 +180,7 @@ class Listen(unittest.TestCase):
         self.assertEqual(self.trpg.player_for("qq:777777", "", create=False), pid)
 
 
+@links_up
 class RoomGroups(unittest.TestCase):
     def setUp(self):
         clear()
@@ -337,6 +339,7 @@ class Watch(unittest.TestCase):
         self.assertEqual(qqmanager.down_reason("b"), "")
 
 
+@links_up
 class GroupSets(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         clear()
@@ -437,6 +440,7 @@ class GroupSetsPage(unittest.TestCase):
         self.assertEqual([g["real_gid"] for g in qqpool.sets("")[0]["groups"]], ["100002"])
 
 
+@links_up
 class MultiLink(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         clear()

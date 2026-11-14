@@ -63,4 +63,18 @@ dl.facts dd{margin:0;font-variant-numeric:tabular-nums;font-weight:600}
     {% for k, v in d.facts %}<dt>{{ k }}</dt><dd>{{ v }}</dd>{% endfor %}
   </dl>
 </section>
+<section>
+  <details class="errlog"><summary class="muted" style="cursor:pointer">报错日志{% if errors %}（{{ errors|length }} 条）{% endif %}</summary>
+    <p class="note">程序出错、或上次没有正常退出（崩溃）时自动记在这里，不用你做什么。{% if err_url %}恢复后会自动发到你填的报错接收地址。{% else %}没有填报错接收地址，只存在本机（在「功能与设置」的基础设置里填）。{% endif %}</p>
+    {% for e in errors %}
+    <div class="row" style="padding:8px 0;border-bottom:1px solid var(--line)">
+      <div><span class="kind {{ 'bad' if e.kind == 'crash' else 'warn' }}">{{ '崩溃' if e.kind == 'crash' else '出错' }}</span>
+        <span class="tabular muted">{{ e.ts|ts }}</span>{% if e.reported %} <span class="muted">· 已发送</span>{% endif %}
+        <div>{{ e.message }}</div><div class="muted">{{ e.source }}</div>
+        {% if e.trace %}<details><summary class="muted" style="cursor:pointer">详情</summary><pre style="white-space:pre-wrap;font-size:12px;overflow-wrap:anywhere">{{ e.trace }}</pre></details>{% endif %}</div>
+    </div>
+    {% else %}<p class="empty">没有报错。</p>{% endfor %}
+    {% if errors %}<form method="post" action="{{ url_for('errors_clear') }}" style="margin-top:10px">{{ csrf() }}<button class="btn sm ghost">清空</button></form>{% endif %}
+  </details>
+</section>
 {% endblock %}

@@ -188,14 +188,14 @@ def group_info(room) -> tuple[str, str, str] | None:
 
 
 def end(room_id: int, status: str = "ended") -> dict | None:
-    """结束房间：群进入待清场（成功给占用的群返回信息，没群返回 None）。"""
+    """结束房间：群直接放回池里（下次分配时再查群里有没有玩家）。成功给占用的群返回信息，没群返回 None。"""
     r = get(room_id)
     if not r or r["status"] != "open":
         return None
     with get_conn() as c:
         c.execute("UPDATE rooms SET status=?, ended_ts=?, pending_change='' WHERE id=?", (status, int(time.time()), room_id))
     if r["pool_id"]:
-        pool.release(r["pool_id"], "free" if get_config("pool_auto_free", "0") == "1" else "cleaning")
+        pool.release(r["pool_id"], "free" if get_config("pool_auto_free", "1") == "1" else "cleaning")
         return dict(pool.get(r["pool_id"]))
     return None
 

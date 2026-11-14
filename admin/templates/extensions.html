@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}功能与设置{% endblock %}
 {% block body %}
+{% import "_rpg_icons.html" as ic %}
 <style>
 .sw{position:relative;display:inline-block;width:44px;height:24px;flex:none}
 .sw button{all:unset;display:block;width:100%;height:100%;cursor:pointer;border-radius:12px;background:var(--bad);transition:background .15s}
@@ -17,6 +18,22 @@
 .ext dt{color:var(--mute)} .ext dd{margin:0}
 .acts{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 0}
 .setdlg{border:1px solid var(--line);border-radius:12px;background:var(--paper);color:var(--ink);padding:22px 24px;width:min(680px,calc(100vw - 32px));max-height:86vh;overflow:auto}
+.setlist{display:block}
+.srow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 18px;align-items:center;padding:13px 0;border-top:1px solid var(--line)}
+.srow:first-child{border-top:0}
+.srow .sl{display:block;margin:0;color:var(--ink);cursor:pointer}
+.srow .sl b{display:block;font-weight:600;font-size:14.5px;line-height:1.45}
+.srow .sl .d{display:block;margin-top:3px;font-size:12.5px;color:var(--mute);font-weight:400;line-height:1.5}
+.srow .sc{display:flex;align-items:center;gap:8px}
+.srow .sc input[type=number]{width:110px;text-align:right}
+.srow .sc select{min-width:140px}
+.srow .sc textarea{width:100%}
+.srow.stack .sc{display:block}
+.srow.stack{grid-template-columns:1fr}
+.srow.stack .sc input{width:100%}
+.srow .sw{justify-self:end}
+.setdlg .actions.stick{position:sticky;bottom:-22px;margin:8px -24px -22px;padding:12px 24px;background:var(--paper);border-top:1px solid var(--line)}
+@media(max-width:720px){.setdlg{width:calc(100vw - 16px);max-height:90vh;padding:16px 16px}.setdlg .actions.stick{bottom:-16px;margin:8px -16px -16px;padding:12px 16px}.srow .sc input[type=number]{width:96px}}
 .setdlg::backdrop{background:rgba(20,20,40,.45)}
 .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:0 0 16px}
 .tabs a{padding:8px 18px;text-decoration:none;color:var(--ink);border-bottom:2px solid transparent;margin-bottom:-1px}
@@ -30,6 +47,19 @@
 
 <h1>功能与设置</h1>
 <p class="lede">每个功能一张卡片：核心功能一直开着，官方扩展和你自己的扩展有开关。点「进入设置」改这个功能的设置，点「打开管理页」看这个功能的数据。你自己的扩展放进 <code>extensions/</code> 文件夹，或在这里上传。</p>
+
+<div class="ui"><div class="btns" style="margin:0 0 16px">
+  <details class="panel"><summary class="btn ghost">{{ ic.sliders() }}一键初始化</summary>
+    <div class="form">
+      <p class="note" style="margin-top:0">基础内容：每个机器人一直有 <b>HP</b>（0–100，可以改）和 <b>金币</b> 货币。下面两个按钮都会把缺的基础内容补上。</p>
+      <div class="actions">
+        <form method="post" action="{{ url_for('init_all') }}">{{ csrf() }}<input type="hidden" name="mode" value="fill"><button class="btn" type="submit">补齐没设过的</button></form>
+        <form method="post" action="{{ url_for('init_all') }}" onsubmit="return confirm('把所有功能设置改回默认？你改过的设置会被覆盖，不能撤销。')">{{ csrf() }}<input type="hidden" name="mode" value="reset"><button class="btn ghost" type="submit">全部恢复默认设置</button></form>
+        <button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button>
+      </div>
+      <p class="note">「补齐」只填没设过的，不动你改过的；「恢复默认」会覆盖。角色、群、物品、地点等数据都不会删。</p>
+    </div>
+  </details></div></div>
 
 {% if restarting %}
 <div class="warnbox" id="wait">正在重启，大约 20 秒后自动刷新……</div>
@@ -49,7 +79,8 @@
 {% endif %}
 
 <nav class="tabs" aria-label="扩展分页">
-  <a href="{{ url_for('extensions_page') }}" {% if tab != 'ai' %}aria-current="page"{% endif %}>功能列表</a>
+  <a href="{{ url_for('extensions_page') }}" {% if tab not in ('aux', 'ai') %}aria-current="page"{% endif %}>核心功能</a>
+  <a href="{{ url_for('extensions_page', tab='aux') }}" {% if tab == 'aux' %}aria-current="page"{% endif %}>辅助功能</a>
   <a href="{{ url_for('extensions_page', tab='ai') }}" {% if tab == 'ai' %}aria-current="page"{% endif %}>给 AI 的模板</a>
 </nav>
 
@@ -60,8 +91,10 @@
   <a class="btn ghost" href="{{ url_for('extensions_skeleton') }}">下载骨架 zip</a></div>
 <textarea id="aip" readonly style="width:100%;height:420px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font:13px/1.55 ui-monospace,Menlo,monospace">{{ ai_prompt }}</textarea>
 {% else %}
+{% if tab == 'aux' %}<p class="note" style="margin:0 0 12px">辅助功能可以开关：官方扩展和你自己装的扩展。关着的功能，对应的指令和后台页面都不会出现。</p>
+{% else %}<p class="note" style="margin:0 0 12px">核心功能一直开着，不能关；点「进入设置」调这个功能的设置。</p>{% endif %}
 <div class="bar">
-  {% if owner %}
+  {% if owner and tab == 'aux' %}
   <form method="post" action="{{ url_for('extensions_upload') }}" enctype="multipart/form-data" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">{{ csrf() }}
     <input type="file" name="file" accept=".zip" aria-label="选择扩展压缩包" required>
     <label style="font-size:13.5px"><input type="checkbox" name="replace" value="1"> 覆盖已有的同名扩展</label>
@@ -72,7 +105,7 @@
 </div>
 {% if owner %}<p class="note" style="margin:-8px 0 16px">⚠️ 扩展是 Python 代码，装上就和主程序有同样的权限（包括能读到机器人的 AppSecret）。只安装你信得过的人写的扩展。上传的扩展默认是关闭的，要自己打开开关。</p>{% endif %}
 
-{% for it in items %}
+{% for it in items if (tab not in ('aux', 'ai')) == (it.kind == 'core') %}
 <article class="ext" data-search="{{ it.name }} {{ it.description }} {{ it.author }}">
   <div class="head">
     {% if it.kind != 'core' %}<span class="sw {{ 'on' if it.enabled }}">
@@ -95,37 +128,43 @@
   {% if it.fields or it.settings %}
   <dialog id="set-{{ it.id }}" class="setdlg">
     <form method="post" action="{{ url_for('settings_save', group=it.settings_group) if it.fields else url_for('extensions_settings', ext_id=it.id) }}">{{ csrf() }}
-      <h3 style="margin:0 0 4px">{{ it.name }}的设置</h3>
-      <p class="note" style="margin:0 0 14px">保存后机器人马上按新设置运行。</p>
+      <h3 style="margin:0 0 2px;font:700 19px var(--serif)">{{ it.name }}的设置</h3>
+      <p class="note" style="margin:0 0 8px">保存后机器人马上按新设置运行。</p>
       {% if it.fields %}
-      <div class="fields">
+      <div class="setlist">
         {% for f in it.fields %}
         {% if f.kind == 'bool' %}
-        <div class="wide setrow"><label class="sw"><input type="checkbox" name="{{ f.key }}" value="1" {{ 'checked' if f.checked }}><input type="hidden" name="{{ f.key }}" value="0"><i></i></label>
-          <div><b>{{ f.label }}</b>{% if f.hint %}<div class="d">{{ f.hint }}</div>{% endif %}</div></div>
+        <div class="srow"><div class="sl"><b>{{ f.label }}</b>{% if f.hint %}<div class="d">{{ f.hint }}</div>{% endif %}</div>
+          <label class="sw"><input type="checkbox" name="{{ f.key }}" value="1" {{ 'checked' if f.checked }} aria-label="{{ f.label }}"><input type="hidden" name="{{ f.key }}" value="0"><i></i></label></div>
         {% else %}
-        <div class="{{ 'wide' if f.key == 'daily_tip' }}"><label for="{{ f.key }}">{{ f.label }}</label>
-          {% if f.kind == 'number' %}<div class="numwrap"><input id="{{ f.key }}" type="number" inputmode="numeric" step="1" name="{{ f.key }}" value="{{ f.value }}">{% if f.unit %}<span class="unit">{{ f.unit }}</span>{% endif %}</div>
-          {% else %}<input id="{{ f.key }}" type="text" name="{{ f.key }}" value="{{ f.value }}">{% endif %}
-          {% if f.hint %}<div class="d">{{ f.hint }}</div>{% endif %}</div>
+        <div class="srow {{ 'stack' if f.kind != 'number' }}"><label class="sl" for="{{ f.key }}"><b>{{ f.label }}</b>{% if f.hint %}<span class="d">{{ f.hint }}</span>{% endif %}</label>
+          {% if f.kind == 'number' %}<div class="sc"><input id="{{ f.key }}" type="number" inputmode="numeric" step="1" name="{{ f.key }}" value="{{ f.value }}">{% if f.unit %}<span class="unit">{{ f.unit }}</span>{% endif %}</div>
+          {% else %}<div class="sc"><input id="{{ f.key }}" type="text" name="{{ f.key }}" value="{{ f.value }}"></div>{% endif %}</div>
         {% endif %}
         {% endfor %}
       </div>
       {% else %}
+      <div class="setlist">
       {% for st in it.settings %}
-      <div class="field">
-        <label for="f_{{ it.id }}_{{ st.key }}">{{ st.label or st.key }}</label>
-        {% if st.desc %}<p class="d">{{ st.desc }}</p>{% endif %}
-        {% set v = it.vals[st.key] %}
-        {% if st.type == 'bool' %}<input type="checkbox" id="f_{{ it.id }}_{{ st.key }}" name="{{ st.key }}" value="1" {{ 'checked' if v }}>
-        {% elif st.type == 'text' %}<textarea id="f_{{ it.id }}_{{ st.key }}" name="{{ st.key }}" rows="4">{{ v }}</textarea>
-        {% elif st.type == 'choice' %}<select id="f_{{ it.id }}_{{ st.key }}" name="{{ st.key }}">{% for c in st.choices %}<option {{ 'selected' if v|string == c|string }}>{{ c }}</option>{% endfor %}</select>
-        {% elif st.type == 'int' %}<input type="number" id="f_{{ it.id }}_{{ st.key }}" name="{{ st.key }}" value="{{ v }}">
-        {% else %}<input type="text" id="f_{{ it.id }}_{{ st.key }}" name="{{ st.key }}" value="{{ v }}">{% endif %}
-      </div>
-      {% endfor %}
+      {% set v = it.vals[st.key] %}
+      {% set fid = 'f_' ~ it.id ~ '_' ~ st.key %}
+      {% if st.type == 'bool' %}
+      <div class="srow"><div class="sl"><b>{{ st.label or st.key }}</b>{% if st.desc %}<div class="d">{{ st.desc }}</div>{% endif %}</div>
+        <label class="sw"><input type="checkbox" id="{{ fid }}" name="{{ st.key }}" value="1" {{ 'checked' if v }} aria-label="{{ st.label or st.key }}"><i></i></label></div>
+      {% elif st.type == 'int' %}
+      <div class="srow"><label class="sl" for="{{ fid }}"><b>{{ st.label or st.key }}</b>{% if st.desc %}<span class="d">{{ st.desc }}</span>{% endif %}</label>
+        <div class="sc"><input type="number" id="{{ fid }}" name="{{ st.key }}" value="{{ v }}">{% if st.unit %}<span class="unit">{{ st.unit }}</span>{% endif %}</div></div>
+      {% elif st.type == 'choice' %}
+      <div class="srow"><label class="sl" for="{{ fid }}"><b>{{ st.label or st.key }}</b>{% if st.desc %}<span class="d">{{ st.desc }}</span>{% endif %}</label>
+        <div class="sc"><select id="{{ fid }}" name="{{ st.key }}">{% for c in st.choices %}<option {{ 'selected' if v|string == c|string }}>{{ c }}</option>{% endfor %}</select></div></div>
+      {% else %}
+      <div class="srow stack"><label class="sl" for="{{ fid }}"><b>{{ st.label or st.key }}</b>{% if st.desc %}<span class="d">{{ st.desc }}</span>{% endif %}</label>
+        <div class="sc">{% if st.type == 'text' %}<textarea id="{{ fid }}" name="{{ st.key }}" rows="4">{{ v }}</textarea>{% else %}<input type="text" id="{{ fid }}" name="{{ st.key }}" value="{{ v }}">{% endif %}</div></div>
       {% endif %}
-      <div class="actions"><button class="btn" type="submit">保存</button><button class="btn ghost" type="button" onclick="this.closest('dialog').close()">取消</button></div>
+      {% endfor %}
+      </div>
+      {% endif %}
+      <div class="actions stick"><button class="btn" type="submit">保存</button><button class="btn ghost" type="button" onclick="this.closest('dialog').close()">取消</button></div>
     </form>
   </dialog>
   {% endif %}

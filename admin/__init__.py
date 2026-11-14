@@ -8,12 +8,12 @@ from functools import wraps
 from pathlib import Path
 
 from dotenv import load_dotenv
-from flask import Flask, abort, flash, g, make_response, redirect, render_template, request, session, url_for
+from flask import Flask, Response, abort, flash, g, jsonify, make_response, redirect, render_template, request, session, url_for
 from markupsafe import Markup
 
 from core import admins as admins_core, lovemail as lovemail_core, relations as relations_core, roles as roles_core, webusers
 from core.announce import get_announce
-from core import forum as forum_core
+from core import forum as forum_core, sheets as sheets_core
 from core.lockstore import FailStore
 from core import autoreply as autoreply_core, botconf, qqmanager as qqmanager_core, qqpool as qqpool_core, loopbridge, netcheck, setupcode, phonecodes, extensions as ext_core, pool as pool_core, rooms as rooms_core, rpg as rpg_core, season as season_core, trpg as trpg_core, trpglog as trpglog_core, trpgrender as trpgrender_core, trpgexport as trpgexport_core, trpgimport as trpgimport_core, updater
 from core.botconf import configured_bot_ids
@@ -25,9 +25,8 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 SECTIONS = [
     ("基础", {
         "hello_text": ("/ping 的回复", "收到。"),
-        "sms_cooldown_sec": ("短信冷却（秒，0 = 不限）", "60"),
-        "gift_cooldown_sec": ("送礼冷却（秒，0 = 不限）", "60"),
-        "msg_max_len": ("短信/留言最大字数", "200"),
+        "welcome_text": ("卡拉被拉进新群时发的欢迎语（留空用默认）", ""),
+        "error_report_url": ("报错接收地址（http/https 网址；留空 = 报错只存在本机。程序崩溃或出错、恢复后会自动把报错文字发到这里，不含聊天内容和群号。默认发到主站 system.changri.work）", "https://system.changri.work/api/errors"),
         "max_backup_groups": ("每个角色最多几个备用群", "3"),
         "block_undo_hours": ("拉黑满几小时才能解除", "2"),
         "brand_name": ("系统名称（画在长图左上角，留空用默认）", ""),
@@ -35,16 +34,20 @@ SECTIONS = [
         "image_min_chars": ("超过多少字才发图片", "200"),
         "require_prefix": ("指令必须带前缀（1 开 / 0 关；打开后所有指令都要以 / . 。 开头，不带的不响应；关闭时带不带都行）", "0"),
     }),
-    ("短信与礼物", {
+    ("短信", {
+        "sms_cooldown_sec": ("短信冷却（秒，0 = 不限）", "60"),
         "sms_daily_limit": ("每人每天最多发几条短信（0 = 不限，按游戏天数算）", "0"),
-        "gift_daily_limit": ("每人每天最多送几次礼（0 = 不限）", "0"),
+        "msg_max_len": ("短信/留言最大字数", "200"),
         "allow_custom_sign": ("允许自定义署名，如「神秘人短信 张三 你好」（1 开 / 0 关，关了署名只能是自己的角色名）", "0"),
-        "gift_public_send": ("礼物公开播报：送达后按概率把「谁送了什么给谁」发到公告群（1 开 / 0 关）", "0"),
-        "gift_public_chance": ("礼物公开概率（%）", "50"),
+        "window_sms": ("短信与礼物开放时段（写成 10-23 或 20:00-02:00，留空 = 全天开放；礼物也按这个）", ""),
+    }),
+    ("礼物", {
+        "gift_cooldown_sec": ("送礼冷却（秒，0 = 不限）", "60"),
+        "gift_daily_limit": ("每人每天最多送几次礼（0 = 不限）", "0"),
         "gift_catalog": ("礼品店：可送的礼物，用顿号分开（留空 = 没有礼品店）", ""),
         "gift_only_preset": ("只能送礼品店里有的礼物（1 是 / 0 否，随便写）", "0"),
-        "window_sms": ("短信与礼物开放时段（写成 10-23 或 20:00-02:00，留空 = 全天开放）", ""),
-        "welcome_text": ("卡拉被拉进新群时发的欢迎语（留空用默认）", ""),
+        "gift_public_send": ("礼物公开播报：送达后按概率把「谁送了什么给谁」发到公告群（1 开 / 0 关）", "0"),
+        "gift_public_chance": ("礼物公开概率（%）", "50"),
     }),
     ("约会房间", {
         "window_date": ("私约/电话/微信开放时段（写成 10-23 或 20:00-02:00，留空 = 全天开放）", ""),
@@ -59,7 +62,7 @@ SECTIONS = [
         "limit_挂心愿": ("每人每天最多挂几条心愿（0 = 不限）", "0"),
         "limit_摘心愿": ("每人每天最多摘几条心愿（0 = 不限）", "0"),
         "room_expire_hours": ("房间开了多久自动结束（小时，0 = 不自动结束）", "24"),
-        "pool_auto_free": ("房间结束后群自动放回池（1 是 / 0 否，否 = 要管理员确认群里的人清空了才放回）", "0"),
+        "pool_auto_free": ("房间结束后群自动放回池（1 是 / 0 否，否 = 要管理员确认群里的人清空了才放回；开着时，下次分配前会查一遍群里有没有玩家）", "1"),
     }),
     ("心动信", {
         "lovemail_enabled": ("心动信开关（1 开 / 0 关）", "1"),
@@ -79,7 +82,7 @@ SECTIONS = [
         "dice_card": ("检定结果发 Markdown 小卡片（1 开 / 0 关；QQ 没开 Markdown 权限时会自动退回文字，一小时后再试）", "1"),
     }),
     ("地点", {
-        "place_system_enabled": ("启用严格地点检查（1 开 / 0 关）", "0"),
+        "place_system_enabled": ("只能使用预设地点约会（1 开 / 0 关；开了之后，私约等约会的地点必须是「地点」页里建好的，需要钥匙的还要持有钥匙；关了随便填地点）", "0"),
         "allow_private_rooms": ("允许使用「某某的房间」（1 开 / 0 关）", "1"),
     }),
     ("房间复盘", {
@@ -144,6 +147,10 @@ def _bot_status() -> list[dict]:
     return out
 
 
+def _fmt_ts(v) -> str:
+    return time.strftime("%m-%d %H:%M", time.localtime(v)) if v else "—"
+
+
 def _dashboard() -> dict:
     """总览页要的数据：今日通告 + 需要处理的事 + 概况。"""
     now = time.localtime()
@@ -191,7 +198,7 @@ def _dashboard() -> dict:
     if n_slots:
         todo.append(("warn", f"有 {n_slots} 个群位等着认群", url_for("roles_page"), "登记了群号，但还没人在群里发认群码"))
     if n_undelivered:
-        todo.append(("warn", f"最近 24 小时有 {n_undelivered} 条消息没送达", url_for("messages_page"), "收件人的群可能没授权机器人发言"))
+        todo.append(("warn", f"最近 24 小时有 {n_undelivered} 条消息没送达", url_for("reviews_page", tab="sms"), "收件人的群可能没授权机器人发言"))
     late = relations_core.overdue()
     if late:
         top = late[0]
@@ -296,7 +303,7 @@ def create_app() -> Flask:
 
     @app.before_request
     def guard():
-        for prefix, ext_id in (("/lovemail", "lovemail"), ("/relations", "relations"), ("/rpg", "rpg"), ("/places", "places"), ("/forum", "forum")):      # 扩展关了，页面网址也一并关掉
+        for prefix, ext_id in (("/lovemail", "lovemail"), ("/relations", "relations"), ("/sheets", "relations"), ("/rpg", "rpg"), ("/places", "places"), ("/forum", "forum")):      # 扩展关了，页面网址也一并关掉
             if request.path.startswith(prefix) and not ext_core.is_enabled(ext_id):
                 abort(404)
         if request.method == "POST" and not secrets.compare_digest(request.form.get("_csrf", ""), session.get("csrf", "-")):
@@ -407,7 +414,21 @@ def create_app() -> Flask:
                 return redirect(f"/b/{cards[0]['id']}/")          # 只有一个机器人：直接进去
             if cards:
                 return render_template("picker.html", cards=cards)
-        return render_template("dashboard.html", d=_dashboard())
+        from core import errlog
+        return render_template("dashboard.html", d=_dashboard(), errors=errlog.recent(30), err_url=errlog.report_url())
+
+    @app.post("/errors/clear")
+    @login_required
+    def errors_clear():
+        from core import errlog
+        errlog.clear()
+        flash("报错日志已清空")
+        return redirect(url_for("dashboard"))
+
+    @app.route("/healthz")
+    def healthz():
+        """网页自己轮询它：连不上就说明正在重启，页面上显示「正在重启」并在恢复后自动刷新。不需要登录、不返回任何数据。"""
+        return Response("ok", mimetype="text/plain", headers={"Cache-Control": "no-store"})
 
     @app.route("/settings")
     @login_required
@@ -640,16 +661,6 @@ def create_app() -> Flask:
         roles_core.delete_role(role_id)
         flash("角色已删除")
         return redirect(url_for("roles_page"))
-
-    @app.route("/messages")
-    @login_required
-    def messages_page():
-        with get_conn() as conn:
-            rows = conn.execute(
-                "SELECT m.*, f.name AS from_name, t.name AS to_name FROM messages m "
-                "JOIN roles f ON f.id=m.from_role_id JOIN roles t ON t.id=m.to_role_id ORDER BY m.id DESC LIMIT 100"
-            ).fetchall()
-        return render_template("messages.html", rows=rows)
 
     @app.template_filter("ts")
     def _ts_filter(v):
@@ -926,7 +937,6 @@ def create_app() -> Flask:
     @app.route("/reviews/<int:rid>/export")
     @login_required
     def review_export(rid):
-        from flask import Response
         from core import roomlog
         text = roomlog.export_text(rid)
         if not text:
@@ -1077,7 +1087,7 @@ def create_app() -> Flask:
     @app.route("/attrs")
     @login_required
     def rpg_attrs_page():
-        return render_template("rpg_attrs.html", defs=rpg_core.attr_defs())
+        return render_template("rpg_attrs.html", defs=rpg_core.attr_defs(), currencies=[x for x in rpg_core.items() if x["kind"] == "currency"])
 
     @app.route("/places")
     @login_required
@@ -1105,8 +1115,8 @@ def create_app() -> Flask:
         ok, msg = rpg_core.save_item(request.form.get("code", ""), request.form.get("name", ""), request.form.get("kind", "item"),
                                      request.form.get("description", ""), request.form.get("effects", ""), request.form.get("max_uses", -1),
                                      bool(request.form.get("can_give")))
-        flash("物品已保存" if ok else msg)
-        return redirect(url_for("rpg_page"))
+        flash(("货币已保存" if request.form.get("kind") == "currency" else "物品已保存") if ok else msg)
+        return redirect(url_for("rpg_attrs_page" if request.form.get("back") == "attrs" else "rpg_page"))
 
     @app.post("/rpg/items/bulk")
     @login_required
@@ -1167,6 +1177,17 @@ def create_app() -> Flask:
         set_config("lovemail_enabled", "1" if request.form.get("on") else "0")
         return redirect(url_for("lovemail_page"))
 
+    @app.post("/lovemail/time")
+    @login_required
+    def lovemail_time():
+        at = request.form.get("at", "").strip()
+        if not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", at):
+            flash("时间要写成 22:00 这样（24 小时制）")
+        else:
+            set_config("lovemail_delivery_time", at)
+            flash(f"已改：每天 {at} 自动派送")
+        return redirect(url_for("lovemail_page"))
+
     @app.post("/lovemail/deliver")
     @login_required
     def lovemail_deliver():
@@ -1192,8 +1213,53 @@ def create_app() -> Flask:
                 "FROM relations x JOIN roles a ON a.id=x.role_lo JOIN roles b ON b.id=x.role_hi JOIN roles i ON i.id=x.initiator_id "
                 "ORDER BY x.id DESC").fetchall()
         waits = {w["rel_id"]: w for w in relations_core.waiting_lines()}
-        return render_template("relations.html", rels=rels, stats=relations_core.stats(), waits=waits, late=relations_core.overdue(),
-                               limit=relations_core.alert_hours())
+        people: dict[int, dict] = {}                       # 每个角色：发起几条、收到几条、各条线的概况（页面上点开才看）
+        for r in rels:
+            for me, other, sent in ((r["role_lo"], r["b_name"], r["initiator_id"] == r["role_lo"]), (r["role_hi"], r["a_name"], r["initiator_id"] == r["role_hi"])):
+                p = people.setdefault(me, {"id": me, "name": r["a_name"] if me == r["role_lo"] else r["b_name"], "sent": 0, "got": 0, "lines": []})
+                p["sent" if sent else "got"] += 1
+                w = waits.get(r["id"])
+                p["lines"].append({"id": r["id"], "other": r["b_name"] if me == r["role_lo"] else r["a_name"], "sent": sent, "n": r["n"], "chars": r["chars"],
+                                   "confirmed": r["confirmed"], "wait": w})
+        sheets = sheets_core.overview()
+        return render_template("relations.html", rels=rels, people=sorted(people.values(), key=lambda x: x["name"]), stats=relations_core.stats(), waits=waits,
+                               late=relations_core.overdue(), limit=relations_core.alert_hours(), sheets=sheets, sheets_public=sheets_core.public(),
+                               n_gz=sum(1 for x in sheets if x["gongzhi"]), n_eb=sum(1 for x in sheets if x["erbiao"]))
+
+    @app.route("/relations/<int:rel_id>/view")
+    @login_required
+    def relation_view(rel_id):
+        with get_conn() as conn:
+            r = conn.execute("SELECT x.*, a.name AS a_name, b.name AS b_name FROM relations x JOIN roles a ON a.id=x.role_lo JOIN roles b ON b.id=x.role_hi WHERE x.id=?", (rel_id,)).fetchone()
+        if not r:
+            abort(404)
+        return jsonify({"title": f"{r['a_name']} ⇄ {r['b_name']}", "confirmed": bool(r["confirmed"]),
+                        "details": [{"from": d["from_name"], "text": d["text"], "ts": _fmt_ts(d["created_ts"])} for d in relations_core.details(rel_id)]})
+
+    @app.route("/sheets/view/<kind>/<int:role_id>")
+    @login_required
+    def sheet_view(kind, role_id):
+        sh = sheets_core.get(role_id, kind) if kind in sheets_core.KINDS else None
+        if not sh:
+            abort(404)
+        return jsonify({"title": f"{sh['name']}的{sheets_core.KINDS[kind]}", "text": sh["text"], "ts": _fmt_ts(sh["updated_ts"]),
+                        "images": [url_for("sheet_img", name=n) for n in sh["images"]]})
+
+    @app.route("/sheets/img/<name>")
+    @login_required
+    def sheet_img(name):
+        got = sheets_core.image_bytes(name)
+        if not got:
+            abort(404)
+        return Response(got[0], mimetype=got[1], headers={"Cache-Control": "private, max-age=3600", "X-Content-Type-Options": "nosniff"})
+
+    @app.post("/sheets/public")
+    @login_required
+    def sheets_public():
+        on = request.form.get("on") == "1"
+        set_config("gongzhi_public", "1" if on else "0")
+        flash("已开启展示公知：玩家可以用「查看公知 角色名」看别人的公知" if on else "已关闭展示公知：玩家只能看自己的")
+        return redirect(url_for("relations_page"))
 
     @app.post("/relations/alert")
     @login_required
@@ -1433,8 +1499,27 @@ def create_app() -> Flask:
         g = pool_core.get(pool_id) if pool_id else None
         if g and pool_core.is_qq_only(g):                  # 房间群：群名改回空房间
             loopbridge.run(qqmanager_core.room_rename(current_bot(), g, qqpool_core.free_name(g["set_name"])))
-        flash(f"R{rid} 已结束（网页上结束不会通知玩家，群进入待清场）")
+        flash(f"R{rid} 已结束（网页上结束不会通知玩家，群放回池里）")
         return redirect(url_for("pool_page"))
+
+    @app.post("/init")
+    @login_required
+    def init_all():
+        """一键初始化：补齐基础内容（HP、金币）和所有设置的默认值。
+        补齐模式只填没设过的；恢复模式把所有设置改回默认（确认后才会做）。"""
+        from core import rpg
+        mode = request.form.get("mode", "fill")
+        made = rpg.seed_defaults(force=True)
+        n = 0
+        for key, (_label, default) in SETTINGS.items():
+            if key in HIDDEN_FIELDS:
+                continue
+            if mode == "reset" or get_config(key, "\0") == "\0":
+                set_config(key, default)
+                n += 1
+        what = "、".join(made) if made else "基础内容都在"
+        flash(("已恢复全部设置为默认" if mode == "reset" else "已补齐没设过的设置") + f"（{n} 项）；{what}。")
+        return redirect(url_for("extensions_page"))
 
     @app.route("/extensions")
     @login_required
@@ -1446,7 +1531,7 @@ def create_app() -> Flask:
             it["load_error"] = it.get("error") or ext_core.load_error(it["id"])
             if it["kind"] == "user":
                 it["vals"] = {st["key"]: ext_core.get_setting(it["id"], st["key"]) for st in it.get("settings", [])}
-        return render_template("extensions.html", items=items, tab=request.args.get("tab", "list"), pending=ext_core.pending_restart(),
+        return render_template("extensions.html", items=items, tab=request.args.get("tab", "core"), pending=ext_core.pending_restart(),
                                owner=bool(session.get("owner")), restarting=request.args.get("restarting") == "1", ai_prompt=ext_core.ai_prompt() if request.args.get("tab") == "ai" else "")
 
     @app.route("/extensions/ai-prompt.md")

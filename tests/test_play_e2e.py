@@ -18,6 +18,7 @@ from nonebot.adapters.qq.config import BotInfo  # noqa: E402
 
 from core import admins, pool, roles, rooms, season, wishes  # noqa: E402
 from core.db import get_conn, init_db, set_config  # noqa: E402
+from tests._linkup import links_up  # noqa: E402
 
 try:
     nonebot.get_driver()
@@ -49,6 +50,7 @@ class FakeBot(QBot):
 TABLES = ("votes", "join_requests", "replies", "posts", "wishes", "room_members", "rooms", "pool_groups", "seasons", "entrance", "role_groups", "roles", "admins", "admin_codes", "config", "blocks")
 
 
+@links_up
 class PlayE2E(unittest.TestCase):
     def setUp(self):
         init_db()
@@ -109,8 +111,49 @@ class PlayE2E(unittest.TestCase):
         out = self.say("结束私约", member="M1", group="POOL0")
         self.assertTrue(any("已经结束" in o and "请退群" in o for o in out))
         self.assertFalse(any("[P0]" in o and "已结束" in o for o in out))                       # 正常结束不再往个人群发通知
-        self.assertEqual(pool.counts()["cleaning"], 1)
-        self.assertEqual(pool.counts()["free"], 0)
+        self.assertEqual(pool.counts()["cleaning"], 0)                                           # 结束后群直接放回池
+        self.assertEqual(pool.counts()["free"], 1)
+
+    def test_gongzhi_erbiao_submit_and_view(self):
+        """提交公知/二表（覆盖）；查看公知出长图；别人看公知要「展示公知」开着；二表只有本人能看。"""
+        self.assertIn("没有内容", self.say("提交公知")[0])
+        self.assertIn("已提交", self.say("提交公知 我是甲，今年二十五")[0])
+        self.assertIn("已提交", self.say("提交公知 改一版")[0])                     # 覆盖
+        self.assertEqual(self.say("查看公知"), ["<图>"])                          # 自己的：一张长图
+        self.assertIn("暂未开放", self.say("查看公知 甲", member="M1", group="P1")[0])
+        set_config("gongzhi_public", "1")
+        self.assertEqual(self.say("查看公知 甲", member="M1", group="P1"), ["<图>"])
+        self.say("提交二表 二表内容")
+        self.assertIn("只有本人", self.say("查看二表 甲", member="M1", group="P1")[0])
+        self.assertEqual(self.say("查看二表"), ["<图>"])
+        self.assertIn("还没有提交", self.say("查看二表", member="M1", group="P1")[0])
+
+    def test_allocation_skips_group_with_leftover_players(self):
+        """分群前查群成员：群里还有别的玩家（绑过 QQ 的人）就先放一边，房间排队；人退光后自动放回池再分给房间。"""
+        import asyncio
+        from core import qqmanager, qqpool, rooms
+        from plugins import play
+        qqpool.add_rooms("B1", "100001", "A组")
+        roles.bind_qq(roles.get_role_by_name("丙")["id"], "5550009")      # 丙不在这个房间里，却还留在 100001 群
+        members = {"100001": {"5550009"}}
+
+        async def fake(app_id, gid):
+            return members[gid]
+        old, qqmanager.group_members = qqmanager.group_members, fake
+        try:
+            out = self.say("私约 1400-1500 咖啡厅 乙")
+            self.assertFalse(any("请申请入群" in o and "100001" in o for o in out), out)     # 有人的群不能分给房间
+            st = lambda: [g for g in pool.all_groups() if g["real_gid"] == "100001"][0]["state"]      # noqa: E731
+            self.assertEqual(st(), "cleaning")
+            members["100001"] = set()                                    # 人退光了
+            asyncio.run(play._sweep_cleaning())
+            self.assertEqual(st(), "free")
+            got = rooms.assign_waiting()
+            self.assertEqual(len(got), 1)
+            asyncio.run(play._ensure_clean(got[0]))
+            self.assertTrue(rooms.get(got[0])["pool_id"])
+        finally:
+            qqmanager.group_members = old
 
     def test_listener_room_commands_in_qq_group(self):
         """房间群没有卡拉：监听的 QQ 号听到「结束私约」「修改时间线」等，按绑定的 QQ 认人，由 QQ 号在群里回。"""

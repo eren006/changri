@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}账号{% endblock %}
 {% block body %}
+{% import "_rpg_icons.html" as ic %}
 <h1>账号</h1>
 {% if is_owner %}
 <p class="lede">你是主账号。主账号不能被删除或停用，机器人的密钥也只有你能管理。可以生成管理员账号发给搭档，活动结束后停用就行。</p>
@@ -14,48 +15,43 @@
 {% endif %}
 
 <section>
-  <h2>账号</h2>
-  <table class="rt">
-    <tr><th>账号</th><th>身份</th><th>备注</th><th>上次登录</th><th>状态</th><th></th></tr>
+  <div class="sec-head keep"><h2>账号<span class="n">{{ users|length }} 个</span></h2>
+    <span class="btns"><details class="panel"><summary class="btn">{{ ic.plus() }}生成管理员账号</summary>
+      <form class="form" method="post" action="{{ url_for('accounts_generate') }}">{{ csrf() }}
+        <div class="fields"><div><label for="gn">备注（选填，比如给谁用的）</label><input id="gn" type="text" name="note" maxlength="30"></div></div>
+        <p class="note">系统会随机生成账号名和密码。管理员能管角色、心动信、关系线和设置，看不到机器人密钥，也不能管理账号。</p>
+        <div class="actions"><button class="btn" type="submit">生成</button><button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
+      </form></details></span></div>
+  <div class="rowlist">
     {% for u in users %}
-    <tr>
-      <td>{{ u.username }}{% if u.id == my_id %} <span class="tag">（你）</span>{% endif %}</td>
-      <td>{{ '主账号' if u.role == 'owner' else '管理员' }}</td>
-      <td class="tag">{{ u.note or '—' }}</td>
-      <td class="tabular">{{ u.last_login_ts | datetimefmt if u.last_login_ts else '从未登录' }}</td>
-      <td>{% if u.disabled %}<span class="dot bad"></span>已停用{% else %}<span class="dot ok"></span>可用{% endif %}</td>
-      <td>{% if u.role != 'owner' %}
-        <div style="display:flex;gap:14px;flex-wrap:wrap">
-          <form method="post" action="{{ url_for('accounts_disable', user_id=u.id) }}">{{ csrf() }}<input type="hidden" name="off" value="{{ 0 if u.disabled else 1 }}"><button class="linkbtn" style="color:var(--ink)">{{ '恢复' if u.disabled else '停用' }}</button></form>
-          <form method="post" action="{{ url_for('accounts_reset', user_id=u.id) }}" onsubmit="return confirm('重置后旧密码立刻失效，确定吗？')">{{ csrf() }}<button class="linkbtn" style="color:var(--ink)">重置密码</button></form>
-          <form method="post" action="{{ url_for('accounts_delete', user_id=u.id) }}" onsubmit="return confirm('删除账号「{{ u.username }}」？这不能撤销。')">{{ csrf() }}<button class="linkbtn">删除</button></form>
-        </div>{% endif %}</td>
-    </tr>
+    <div class="row">
+      <div class="nm"><b>{{ u.username }}</b>{% if u.id == my_id %} <span class="kind ok">你</span>{% endif %} <span class="kind">{{ '主账号' if u.role == 'owner' else '管理员' }}</span>
+        <div class="muted">{{ u.note or '' }}{% if u.note %} · {% endif %}{{ ('上次登录 ' ~ (u.last_login_ts | datetimefmt)) if u.last_login_ts else '从未登录' }}</div></div>
+      <div>{% if u.disabled %}<span class="dot bad"></span>已停用{% else %}<span class="dot ok"></span>可用{% endif %}</div>
+      {% if u.role != 'owner' %}
+      <div class="acts">
+        <form method="post" action="{{ url_for('accounts_disable', user_id=u.id) }}">{{ csrf() }}<input type="hidden" name="off" value="{{ 0 if u.disabled else 1 }}"><button class="btn sm ghost">{{ '恢复' if u.disabled else '停用' }}</button></form>
+        <form method="post" action="{{ url_for('accounts_reset', user_id=u.id) }}" onsubmit="return confirm('重置后旧密码立刻失效，确定吗？')">{{ csrf() }}<button class="btn sm ghost">重置密码</button></form>
+        <form method="post" action="{{ url_for('accounts_delete', user_id=u.id) }}" onsubmit="return confirm('删除账号「{{ u.username }}」？这不能撤销。')">{{ csrf() }}<button class="linkbtn">删除</button></form>
+      </div>{% endif %}
+    </div>
     {% endfor %}
-  </table>
-</section>
-
-<section>
-  <h2>生成管理员账号</h2>
-  <p class="note">系统会随机生成账号名和密码。管理员能管角色、心动信、关系线和设置，看不到机器人密钥，也不能管理账号。</p>
-  <form class="inline" method="post" action="{{ url_for('accounts_generate') }}">
-    {{ csrf() }}
-    <div><label for="gn">备注（选填，比如给谁用的）</label><input id="gn" type="text" name="note" maxlength="30"></div>
-    <button class="btn" type="submit">生成</button>
-  </form>
+  </div>
 </section>
 {% else %}
 <p class="lede">你是管理员账号。这里只能修改自己的密码；账号和机器人密钥由主账号管理。</p>
 {% endif %}
 
 <section>
-  <h2>修改我的密码</h2>
-  <form class="inline" method="post" action="{{ url_for('accounts_password') }}">
-    {{ csrf() }}
-    <div><label for="op">原密码</label><input id="op" type="password" name="old" required autocomplete="current-password"></div>
-    <div><label for="np2">新密码（至少 8 位）</label><input id="np2" type="password" name="new" required minlength="8" autocomplete="new-password"></div>
-    <div><label for="na2">再输一次</label><input id="na2" type="password" name="again" required minlength="8" autocomplete="new-password"></div>
-    <button class="btn ghost" type="submit">修改</button>
-  </form>
+  <div class="sec-head keep"><h2>我的密码</h2>
+    <span class="btns"><details class="panel"><summary class="btn ghost">{{ ic.sliders() }}修改密码</summary>
+      <form class="form" method="post" action="{{ url_for('accounts_password') }}">{{ csrf() }}
+        <div class="fields">
+          <div><label for="op">原密码</label><input id="op" type="password" name="old" required autocomplete="current-password"></div>
+          <div><label for="np2">新密码（至少 8 位）</label><input id="np2" type="password" name="new" required minlength="8" autocomplete="new-password"></div>
+          <div><label for="na2">再输一次</label><input id="na2" type="password" name="again" required minlength="8" autocomplete="new-password"></div>
+        </div>
+        <div class="actions"><button class="btn" type="submit">修改</button><button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
+      </form></details></span></div>
 </section>
 {% endblock %}

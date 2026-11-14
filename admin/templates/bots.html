@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}机器人{% endblock %}
 {% block body %}
+{% import "_rpg_icons.html" as ic %}
 <h1>机器人</h1>
 {% if owner %}
 <p class="lede">在这里填 QQ 机器人的 AppID 和 AppSecret，保存后几秒内自动连上，不用重启。可以接入你自己的多个机器人。</p>
@@ -16,61 +17,54 @@
 {% endif %}
 
 <section>
-  <h2>已接入</h2>
-  {% if accounts %}
-  <table class="rt">
-    <tr><th>AppID</th><th>状态</th><th>已绑定的群</th><th>QQ 管理员</th>{% if owner %}<th>密钥</th><th></th>{% endif %}</tr>
-    {% for b in accounts %}
-    <tr>
-      <td class="tabular">{{ b.app_id }}{% if b.note %}<div class="tag">{{ b.note }}</div>{% endif %}</td>
-      <td>{% if not b.enabled %}<span class="dot bad"></span>已停用
-          {% elif b.online %}<span class="dot ok"></span>在线
-          {% else %}<span class="dot bad"></span>不在线{% if b.seen %}<div class="tag">上次响应 {{ b.seen | datetimefmt }}</div>{% else %}<div class="tag">还没连上，可点「测试连接」</div>{% endif %}{% endif %}</td>
-      <td class="tabular">{{ b.groups }}</td>
-      <td class="tabular">{{ b.admins }}</td>
-      {% if owner %}
-      <td class="tabular">{{ b.masked }}</td>
-      <td>
-        <div style="display:flex;gap:14px;flex-wrap:wrap">
-          <form method="post" action="{{ url_for('bots_test', app_id=b.app_id) }}">{{ csrf() }}<button class="linkbtn" style="color:var(--ink)">测试连接</button></form>
-          <form method="post" action="{{ url_for('bots_toggle', app_id=b.app_id) }}">{{ csrf() }}<input type="hidden" name="on" value="{{ 0 if b.enabled else 1 }}"><button class="linkbtn" style="color:var(--ink)">{{ '停用' if b.enabled else '启用' }}</button></form>
-          <form method="post" action="{{ url_for('bots_delete', app_id=b.app_id) }}" onsubmit="return confirm('移除机器人 {{ b.app_id }}？它已绑定的角色和数据会保留，只是不再收发消息。')">{{ csrf() }}<button class="linkbtn">移除</button></form>
-          <details style="margin-top:6px"><summary class="tag" style="cursor:pointer">彻底删除…</summary>
-            <form method="post" action="{{ url_for('bots_erase', app_id=b.app_id) }}" style="margin-top:6px">{{ csrf() }}
-              <p class="note" style="color:var(--bad)">会删掉这个机器人的账号和它的全部数据（角色、群、季度、设置、小手机激活码），<b>不能撤销</b>。要保留数据请用上面的「移除」。</p>
-              <input type="text" name="confirm" placeholder="输入 AppID {{ b.app_id }} 确认" autocomplete="off" style="width:200px">
-              <button class="linkbtn">彻底删除</button>
-            </form></details>
+  <div class="sec-head keep"><h2>已接入<span class="n">{{ accounts|length }} 个</span></h2>
+    {% if owner %}<span class="btns"><details class="panel"><summary class="btn">{{ ic.plus() }}添加机器人</summary>
+      <form class="form" method="post" action="{{ url_for('bots_add') }}">{{ csrf() }}
+        <div class="fields">
+          <div><label for="aid">AppID</label><input id="aid" type="text" name="app_id" inputmode="numeric" autocomplete="off" required></div>
+          <div><label for="asec">AppSecret</label><input id="asec" type="password" name="secret" autocomplete="off" required></div>
+          <div><label for="anote">备注（选填）</label><input id="anote" type="text" name="note" maxlength="30"></div>
         </div>
-        <details style="margin-top:8px"><summary class="tag" style="cursor:pointer">改密钥</summary>
-          <form class="inline" method="post" action="{{ url_for('bots_secret', app_id=b.app_id) }}">{{ csrf() }}
-            <div><label for="s{{ b.app_id }}">新的 AppSecret</label><input id="s{{ b.app_id }}" type="password" name="secret" autocomplete="off" required></div>
-            <button class="btn" type="submit">保存</button>
-          </form>
-        </details>
-      </td>
+        <p class="note">两项都在 QQ 开放平台的「开发管理 → 开发设置」里。保存后会马上检查：密钥对不对、这台服务器的 IP 有没有加进白名单。</p>
+        <div class="actions"><button class="btn" type="submit">保存并检查</button><button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
+      </form></details></span>{% endif %}</div>
+  {% if accounts %}
+  <div class="rowlist">
+    {% for b in accounts %}
+    <div class="row">
+      <div class="nm"><b class="tabular">{{ b.app_id }}</b>{% if b.note %} <span class="muted">{{ b.note }}</span>{% endif %}
+        <div class="muted">
+          {% if not b.enabled %}<span class="dot bad"></span>已停用
+          {% elif b.online %}<span class="dot ok"></span>在线
+          {% else %}<span class="dot bad"></span>不在线{% if b.seen %}，上次响应 {{ b.seen | datetimefmt }}{% else %}，还没连上，可点「测试连接」{% endif %}{% endif %}
+          · 群 {{ b.groups }} · QQ 管理员 {{ b.admins }}{% if owner %} · 密钥 <span class="tabular">{{ b.masked }}</span>{% endif %}</div></div>
+      {% if owner %}
+      <div class="acts">
+        <form method="post" action="{{ url_for('bots_test', app_id=b.app_id) }}">{{ csrf() }}<button class="btn sm ghost">测试连接</button></form>
+        <form method="post" action="{{ url_for('bots_toggle', app_id=b.app_id) }}">{{ csrf() }}<input type="hidden" name="on" value="{{ 0 if b.enabled else 1 }}"><button class="btn sm ghost">{{ '停用' if b.enabled else '启用' }}</button></form>
+        <details class="panel"><summary class="btn sm ghost">改密钥</summary>
+          <form class="form" method="post" action="{{ url_for('bots_secret', app_id=b.app_id) }}">{{ csrf() }}
+            <div class="fields"><div><label for="s{{ b.app_id }}">新的 AppSecret</label><input id="s{{ b.app_id }}" type="password" name="secret" autocomplete="off" required></div></div>
+            <div class="actions"><button class="btn" type="submit">保存</button><button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
+          </form></details>
+        <form method="post" action="{{ url_for('bots_delete', app_id=b.app_id) }}" onsubmit="return confirm('移除机器人 {{ b.app_id }}？它已绑定的角色和数据会保留，只是不再收发消息。')">{{ csrf() }}<button class="linkbtn">移除</button></form>
+        <details class="panel"><summary class="btn sm ghost">彻底删除…</summary>
+          <form class="form" method="post" action="{{ url_for('bots_erase', app_id=b.app_id) }}">{{ csrf() }}
+            <p class="note" style="color:var(--bad)">会删掉这个机器人的账号和它的全部数据（角色、群、季度、设置、小手机激活码），<b>不能撤销</b>。要保留数据请用「移除」。</p>
+            <div class="fields"><div><label for="e{{ b.app_id }}">输入 AppID {{ b.app_id }} 确认</label><input id="e{{ b.app_id }}" type="text" name="confirm" autocomplete="off"></div></div>
+            <div class="actions"><button class="btn" type="submit">彻底删除</button><button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
+          </form></details>
+      </div>
       {% endif %}
-    </tr>
+    </div>
     {% endfor %}
-  </table>
+  </div>
   {% else %}
-  <p class="empty">还没有接入机器人。{% if owner %}在下面填入 AppID 和 AppSecret 就能接入。{% else %}请主账号来添加。{% endif %}</p>
+  <p class="empty">还没有接入机器人。{% if owner %}点上面的「添加机器人」，填入 AppID 和 AppSecret 就能接入。{% else %}请主账号来添加。{% endif %}</p>
   {% endif %}
 </section>
 
 {% if owner %}
-<section>
-  <h2>添加机器人</h2>
-  <form class="inline" method="post" action="{{ url_for('bots_add') }}">
-    {{ csrf() }}
-    <div><label for="aid">AppID</label><input id="aid" type="text" name="app_id" inputmode="numeric" autocomplete="off" required></div>
-    <div><label for="asec">AppSecret</label><input id="asec" type="password" name="secret" autocomplete="off" required></div>
-    <div><label for="anote">备注（选填）</label><input id="anote" type="text" name="note" maxlength="30"></div>
-    <button class="btn" type="submit">保存并检查</button>
-  </form>
-  <p class="note">两项都在 QQ 开放平台的「开发管理 → 开发设置」里。保存后会马上检查：密钥对不对、这台服务器的 IP 有没有加进白名单。</p>
-</section>
-
 <section>
   <h2>接入前要在 QQ 开放平台做的事</h2>
   <ol class="note">

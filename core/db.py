@@ -330,6 +330,20 @@ CREATE TABLE IF NOT EXISTS entrance (
     ts      INTEGER,
     done    INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS sheets (
+    role_id    INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+    kind       TEXT NOT NULL,
+    text       TEXT NOT NULL DEFAULT '',
+    updated_ts INTEGER NOT NULL,
+    PRIMARY KEY (role_id, kind)
+);
+CREATE TABLE IF NOT EXISTS sheet_images (
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    role_id  INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+    kind     TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    ord      INTEGER NOT NULL DEFAULT 0
+);
 CREATE TABLE IF NOT EXISTS entrance_images (
     id      INTEGER PRIMARY KEY AUTOINCREMENT,
     role_id INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,

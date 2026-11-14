@@ -15,12 +15,12 @@ form.i{display:inline}
 @media(max-width:720px){.pg input[type=text],.pg textarea{font-size:16px;padding:10px 11px}.pg .row>div{flex:1 1 100%}.pg .meta{gap:6px 12px}}
 </style>
 <h1>群池与房间</h1>
-<p class="lede">私约、电话、官约、心愿约会都要一个群。官方机器人建不了群，所以这里放一批你提前建好、把机器人拉进去的空群：机器人被拉进群、或在群里有人说话后，群会自动出现在下面；你给它填上群号（玩家要靠群号申请入群）、放进池子就行。房间结束后群会「待清场」，等你确认群里的人都退光了再放回池。</p>
+<p class="lede">私约、电话、官约、心愿约会都要一个群。官方机器人建不了群，所以这里放一批你提前建好、把机器人拉进去的空群：机器人被拉进群、或在群里有人说话后，群会自动出现在下面；你给它填上群号（玩家要靠群号申请入群）、放进池子就行。房间结束后群会「等人退群」，等你确认群里的人都退光了再放回池。</p>
 
 <section>
   <h2>现在的情况</h2>
-  <p>空闲 <b>{{ counts.free }}</b> · 占用 <b>{{ counts.occupied }}</b> · 待清场 <b>{{ counts.cleaning }}</b> · 排队等群的房间 <b>{{ counts.waiting }}</b>
-  {% if counts.waiting and not counts.free %}<span style="color:var(--bad)">　群池不够用了，多拉几个空群进来，或把待清场的放回池。</span>{% endif %}</p>
+  <p>空闲 <b>{{ counts.free }}</b> · 占用 <b>{{ counts.occupied }}</b> · 等人退群 <b>{{ counts.cleaning }}</b> · 排队等群的房间 <b>{{ counts.waiting }}</b>
+  {% if counts.waiting and not counts.free %}<span style="color:var(--bad)">　群池不够用了，多拉几个空群进来，或把等人退群的放回池。</span>{% endif %}</p>
   {% if unfilled %}<p class="note">有 {{ unfilled }} 个群还没填群号。</p>{% endif %}
   <span class="btns"><details class="panel"><summary class="btn ghost">{{ ic.tray() }}批量填群号</summary>
     <form class="form" method="post" action="{{ url_for('pool_bulk') }}">{{ csrf() }}
@@ -50,10 +50,10 @@ form.i{display:inline}
     </form>
     <div class="meta">
       <b style="color:var(--ink)">群 {{ g.group_openid[:8] }}…</b>
-        <span class="st {{ g.state }}">{{ {'free':'空闲','occupied':'占用中','cleaning':'待清场'}[g.state] }}</span>
+        <span class="st {{ g.state }}">{{ {'free':'空闲','occupied':'占用中','cleaning':'等人退群'}[g.state] }}</span>
         <span>{{ '在池里' if g.in_pool else '不在池里' }}</span>
         <form class="i" method="post" action="{{ url_for('pool_toggle', pid=g.id) }}">{{ csrf() }}<input type="hidden" name="on" value="{{ 0 if g.in_pool else 1 }}"><button class="linkbtn" style="color:var(--ink)">{{ '移出池' if g.in_pool else '放进池' }}</button></form>
-        {% if g.state == 'cleaning' %}<form class="i" method="post" action="{{ url_for('pool_clean', pid=g.id) }}">{{ csrf() }}<button class="btn sm">群里已清空，放回池</button></form>{% endif %}
+        {% if g.state == 'cleaning' %}<form class="i" method="post" action="{{ url_for('pool_clean', pid=g.id) }}">{{ csrf() }}<button class="btn sm">人已退光，直接放回池</button></form>{% endif %}
         {% if g.room_id %}<span>房间 <a href="{{ url_for('review_view', rid=g.room_id) }}">R{{ g.room_id }}</a></span>{% endif %}
       <form class="i" method="post" action="{{ url_for('pool_delete', pid=g.id) }}" onsubmit="return confirm('从列表里删掉这个群？机器人下次在群里被看到还会再出现。')">{{ csrf() }}<button class="linkbtn">删除</button></form>
 

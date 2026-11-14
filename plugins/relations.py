@@ -173,3 +173,91 @@ def _pending_rels(role) -> list[str]:
 
 
 pending.register("关系线", _pending_rels)
+
+
+# ================= 公知 / 二表 =================
+
+import io  # noqa: E402
+
+from nonebot.adapters.qq import MessageSegment  # noqa: E402
+
+from plugins._long import download_images  # noqa: E402
+from core import sheets  # noqa: E402
+
+
+def _slices(png: bytes, step: int = 4200) -> list[bytes]:
+    """很长的图切成几张发（被动回复同一条消息最多 5 次）。"""
+    from PIL import Image
+    im = Image.open(io.BytesIO(png))
+    if im.height <= step + 600:
+        return [png]
+    out = []
+    for top in range(0, im.height, step):
+        buf = io.BytesIO()
+        im.crop((0, top, im.width, min(im.height, top + step))).save(buf, "PNG")
+        out.append(buf.getvalue())
+    return out[:5]
+
+
+async def _show(matcher, sh: dict, kind: str) -> None:
+    from core.render import sheet_image
+    imgs = [b for b in (sheets.image_bytes(n) for n in sh["images"]) if b]
+    label = sheets.KINDS[kind]
+    try:
+        png = sheet_image.render(f"{sh['name']} 的{label}", f"更新于 {__import__('time').strftime('%m-%d %H:%M', __import__('time').localtime(sh['updated_ts']))}",
+                                 sh["text"], [b[0] for b in imgs])
+        for part in _slices(png):
+            await matcher.send(MessageSegment.file_image(part))
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[{label}] 画图或发图失败，改发文字：{e}")
+        await matcher.send(f"【{sh['name']} 的{label}】\n{sh['text'] or '（只有图片，图片没发出来）'}")
+
+
+def _make_submit(kind: str):
+    label = sheets.KINDS[kind]
+    cmd = _cmd("提交" + label)
+
+    @cmd.handle()
+    async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
+        me = _me(event)
+        if not me:
+            await cmd.finish(NEED_ROLE)
+        text = args.extract_plain_text().strip()
+        images = await download_images(args, limit=sheets.IMG_MAX)
+        ok, info = sheets.submit(me["id"], kind, text, images)
+        if not ok:
+            await cmd.finish(f"❌ {info}\n用法：提交{label} 你的内容（可以同时发图片）。重复提交会覆盖上一次。")
+        extra = "；别人要等管理员开启「展示公知」才能看" if kind == "gongzhi" and not sheets.public() else ""
+        await cmd.finish(f"✅ 「{me['name']}」的{label}已提交（{info}）。发「查看{label}」可以看到做成的长图{extra}。")
+    return cmd
+
+
+def _make_view(kind: str):
+    label = sheets.KINDS[kind]
+    cmd = _cmd("查看" + label)
+
+    @cmd.handle()
+    async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
+        me = _me(event)
+        name = args.extract_plain_text().strip()
+        is_admin = admins.is_admin(_bid(), _sender(event)) if hasattr(admins, "is_admin") else False
+        target = roles.get_role_by_name(name) if name else me
+        if name and not target:
+            await cmd.finish(f"❌ 找不到角色「{name}」。")
+        if not target:
+            await cmd.finish(NEED_ROLE)
+        mine = bool(me) and target["id"] == me["id"]
+        allowed = mine or is_admin or (kind == "gongzhi" and sheets.public())
+        if not allowed:
+            await cmd.finish("🔒 公知暂未开放展示。" if kind == "gongzhi" else "🔒 二表只有本人和管理员能看。")
+        sh = sheets.get(target["id"], kind)
+        if not sh:
+            await cmd.finish(f"「{target['name']}」还没有提交{label}。" + (f"发「提交{label} 内容」就能提交。" if mine else ""))
+        await _show(cmd, sh, kind)
+        await cmd.finish()
+    return cmd
+
+
+for _k in sheets.KINDS:
+    _make_submit(_k)
+    _make_view(_k)

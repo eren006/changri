@@ -282,7 +282,11 @@ class ExtensionAdminTests(_PatchedDir):
 
     def test_page_flow(self):
         self.login()
-        page = self.c.get("/extensions").get_data(as_text=True)
+        core = self.c.get("/extensions").get_data(as_text=True)                 # 核心功能页：开不了关的
+        aux = self.c.get("/extensions?tab=aux").get_data(as_text=True)          # 辅助功能页：可开关的
+        self.assertIn("核心功能", core); self.assertIn("辅助功能", core)
+        self.assertNotIn("跑团骰子", core); self.assertIn("跑团骰子", aux)
+        page = core + aux
         for name in ("出场", "心动信", "关系线", "跑团骰子"):
             self.assertIn(name, page)
         r = self.c.post("/extensions/upload", data={"file": (io.BytesIO(demo_zip()), "x.zip"), "_csrf": token(self.c, "/extensions")},
@@ -294,7 +298,7 @@ class ExtensionAdminTests(_PatchedDir):
         r = self.c.post("/extensions/hello_demo/settings", data={"greeting": "嗨", "times": "2", "_csrf": token(self.c, "/extensions?tab=settings")},
                         follow_redirects=True)
         self.assertIn("已保存", r.get_data(as_text=True))
-        html = self.c.get("/extensions?tab=settings").get_data(as_text=True)
+        html = self.c.get("/extensions?tab=aux").get_data(as_text=True)
         self.assertIn('value="嗨"', html)
         with mock.patch("core.extensions.restart_soon") as rs:
             r = self.c.post("/extensions/restart", data={"_csrf": token(self.c, "/extensions")}, follow_redirects=True)
@@ -305,8 +309,8 @@ class ExtensionAdminTests(_PatchedDir):
 
     def test_settings_live_inside_each_card(self):
         self.login()
-        page = self.c.get("/extensions").get_data(as_text=True)
-        for card in ("set-base", "set-social", "set-play", "set-lovemail", "set-dice", "set-relations"):
+        page = self.c.get("/extensions").get_data(as_text=True) + self.c.get("/extensions?tab=aux").get_data(as_text=True)
+        for card in ("set-base", "set-social", "set-gift", "set-play", "set-lovemail", "set-dice", "set-relations"):
             self.assertIn(f'id="{card}"', page)                                  # 每张卡片自带「进入设置」弹窗
         self.assertIn("进入设置", page)
         self.assertNotIn('id="set-season"', page)                                # 季度没有设置项，只有管理页入口
@@ -320,7 +324,7 @@ class ExtensionAdminTests(_PatchedDir):
     def test_disabled_extension_hides_nav_and_route(self):
         self.login()
         self.c.post("/extensions/toggle", data={"id": "lovemail", "on": "0", "_csrf": token(self.c, "/extensions")})
-        page = self.c.get("/extensions").get_data(as_text=True)
+        page = self.c.get("/extensions?tab=aux").get_data(as_text=True)
         self.assertNotIn('href="/lovemail"', page)
         self.assertEqual(self.c.get("/lovemail").status_code, 404)             # 关了之后直接输网址也进不去
         self.assertEqual(self.c.get("/season").status_code, 200)               # 季度是核心，一直在
