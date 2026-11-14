@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{% block title %}登录{% endblock %} · 长日控制台</title>
 <style>
-:root{--paper:#eeeff4;--surface:#fafafd;--ink:#1f2133;--mute:#5d6079;--line:#d9dbe6;--field:#80839b;--night:#1d1f33;--dusk:#c43a63;--dusk-ink:#fff;--soft:#e4e6ef;
+:root{--paper:#eeeff4;--surface:#fafafd;--ink:#1f2133;--mute:#5d6079;--line:#d9dbe6;--field:#80839b;--card-line:#e5e7eb;--shadow-sm:0 1px 3px 0 rgb(0 0 0 / .08),0 1px 2px -1px rgb(0 0 0 / .08);--night:#1d1f33;--dusk:#c43a63;--dusk-ink:#fff;--soft:#e4e6ef;
   --serif:"Noto Serif CJK SC","Source Han Serif SC","Songti SC","STSong","SimSun",serif;--sans:system-ui,-apple-system,"PingFang SC","Noto Sans CJK SC","Microsoft YaHei",sans-serif}
-@media (prefers-color-scheme: dark){:root{--paper:#15162a;--surface:#1b1d35;--ink:#e8e9f4;--mute:#9a9db8;--line:#2d3050;--field:#6a6e96;--night:#0f1020;--dusk:#ef7a9b;--dusk-ink:#2a0d17;--soft:#25274a}}
+@media (prefers-color-scheme: dark){:root{--paper:#15162a;--surface:#1b1d35;--ink:#e8e9f4;--mute:#9a9db8;--line:#2d3050;--field:#6a6e96;--shadow-sm:0 1px 3px 0 rgb(0 0 0 / .4),0 1px 2px -1px rgb(0 0 0 / .4);--night:#0f1020;--dusk:#ef7a9b;--dusk-ink:#2a0d17;--soft:#25274a}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.65 var(--sans);min-height:100vh;display:grid;grid-template-columns:minmax(280px,5fr) 6fr}
 .side{background:var(--night);color:#e6e7f2;padding:48px clamp(24px,5vw,64px);display:flex;flex-direction:column;justify-content:space-between}
@@ -20,9 +20,12 @@ form{align-self:center;justify-self:center;width:min(380px,100% - 48px);padding:
 h1{font:700 26px/1.3 var(--serif);margin:0 0 6px}
 .lede{margin:0 0 28px;color:var(--mute)}
 label{display:block;font-size:13.5px;color:var(--mute);margin:16px 0 5px}
-input{width:100%;padding:10px 12px;border:1px solid var(--field);border-radius:6px;background:var(--surface);color:var(--ink);font:inherit}
+input{width:100%;padding:10px 12px;border:1px solid var(--field);border-radius:8px;box-shadow:var(--shadow-sm);background:var(--surface);color:var(--ink);font:inherit}
 :focus-visible{outline:2px solid var(--dusk);outline-offset:2px}
-button{margin-top:26px;width:100%;padding:11px;border:0;border-radius:6px;background:var(--dusk);color:var(--dusk-ink);font:600 15px var(--sans);cursor:pointer}
+button{margin-top:26px;width:100%;padding:11px;border:0;border-radius:8px;background:var(--dusk);color:var(--dusk-ink);font:500 15px var(--sans);cursor:pointer;box-shadow:var(--shadow-sm);transition:filter .15s ease,transform .15s ease,box-shadow .15s ease}
+button:hover{filter:brightness(1.08);transform:translateY(-1px);box-shadow:0 4px 10px -2px color-mix(in srgb,var(--dusk) 38%,transparent)}
+button:active{filter:brightness(.94);transform:translateY(0)}
+@media (prefers-reduced-motion: reduce){button{transition:none}button:hover{transform:none}}
 .flash{margin:0 0 4px;padding:10px 14px;border-left:3px solid var(--dusk);background:var(--soft);border-radius:0 6px 6px 0}
 .hint{margin-top:18px;font-size:13px;color:var(--mute)}
 @media (max-width:760px){body{grid-template-columns:1fr}.side{padding:28px 24px;gap:28px}.side b{font-size:44px}.side p{display:none}}

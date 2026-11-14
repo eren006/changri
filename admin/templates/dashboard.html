@@ -3,9 +3,9 @@
 {% block head %}
 <style>
 .dgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:0 36px;align-items:start}
-.dgrid>section{margin:0 0 8px;padding:14px 0 12px}
+.dgrid>section{margin:0 0 16px;padding:22px 0 20px}
 .sheet{list-style:none;margin:0;padding:0}
-.sheet li{display:grid;grid-template-columns:3.8rem 22px minmax(0,1fr);align-items:start;padding:0 0 14px;position:relative}
+.sheet li{display:grid;grid-template-columns:3.8rem 22px minmax(0,1fr);align-items:start;padding:0 0 20px;position:relative}
 .sheet li:last-child{padding-bottom:0}
 .sheet .t{font:700 24px/1.1 var(--serif);font-variant-numeric:tabular-nums;color:var(--mute)}
 .sheet .m{position:relative;height:100%}
@@ -19,7 +19,7 @@
 .sheet li.next .m::before{background:var(--dusk);width:11px;height:11px;margin-left:-3px;top:6px}
 .sheet .nowtag{margin-left:8px;font-size:12.5px;color:var(--dusk);font-weight:600}
 .todo{list-style:none;margin:0;padding:0}
-.todo li{padding:7px 0;border-bottom:1px solid var(--line)}
+.todo li{padding:11px 0;border-bottom:1px solid var(--line)}
 .todo li:last-child{border-bottom:0}
 .todo a{text-decoration:none}
 .todo a:hover b{text-decoration:underline;text-underline-offset:3px}
@@ -83,7 +83,7 @@ dl.facts dd{margin:0;font-variant-numeric:tabular-nums;font-weight:600}
   <details class="errlog"><summary class="muted" style="cursor:pointer">报错日志{% if errors %}（{{ errors|length }} 条）{% endif %}</summary>
     <p class="note">程序出错、或上次没有正常退出（崩溃）时自动记在这里，不用你做什么。{% if err_url %}恢复后会自动发到你填的报错接收地址。{% else %}没有填报错接收地址，只存在本机（在「功能与设置」的基础设置里填）。{% endif %}</p>
     {% for e in errors %}
-    <div class="row" style="padding:8px 0;border-bottom:1px solid var(--line)">
+    <div class="row" style="padding:12px 0;border-bottom:1px solid var(--line)">
       <div><span class="kind {{ 'bad' if e.kind == 'crash' else 'warn' }}">{{ '崩溃' if e.kind == 'crash' else '出错' }}</span>
         <span class="tabular muted">{{ e.ts|ts }}</span>{% if e.reported %} <span class="muted">· 已发送</span>{% endif %}
         <div>{{ e.message }}</div><div class="muted">{{ e.source }}</div>

@@ -1,7 +1,7 @@
 {% extends "base.html" %}{% block title %}{{ label if label != 'all' else '全部' }} 复盘{% endblock %}
 {% block body %}
 <style>
-.ev{border:1px solid var(--line);border-radius:8px;background:var(--surface);padding:10px 14px;margin:0 0 10px}
+.ev{border:1px solid var(--card-line);box-shadow:var(--shadow-sm);border-radius:var(--r-card);background:var(--surface);padding:16px 20px;margin:0 0 14px}
 .ev .h{display:flex;gap:10px;flex-wrap:wrap;align-items:baseline}
 .ev .tp{font-size:12px;border:1px solid var(--line);border-radius:4px;padding:0 7px;color:var(--mute)}
 .ev .m{color:var(--mute);font-size:12.5px}

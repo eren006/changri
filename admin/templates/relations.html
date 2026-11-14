@@ -3,7 +3,7 @@
 {% block body %}
 {% import "_rpg_icons.html" as ic %}
 <style>
-.ui details.fold{border:1px solid var(--line);background:var(--surface);border-radius:10px;margin:0 0 12px}
+.ui details.fold{border:1px solid var(--card-line);box-shadow:var(--shadow-sm);background:var(--surface);border-radius:var(--r-card);margin:0 0 16px}
 .ui details.fold>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 18px;min-height:52px}
 .ui details.fold>summary::-webkit-details-marker{display:none}
 .ui details.fold>summary::after{content:"";margin-left:auto;width:9px;height:9px;border-right:2px solid var(--mute);border-bottom:2px solid var(--mute);transform:rotate(45deg) translateY(-2px);transition:transform .15s}

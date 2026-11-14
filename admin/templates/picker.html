@@ -2,8 +2,8 @@
 {% block title %}选择机器人{% endblock %}
 {% block head %}<style>
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px;margin-top:8px}
-.card{display:block;text-decoration:none;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:18px 20px 16px;position:relative}
-.card:hover{border-color:var(--dusk)}
+.card{display:block;text-decoration:none;border:1px solid var(--card-line);box-shadow:var(--shadow-sm);background:var(--surface);border-radius:var(--r-card);padding:24px 26px 22px;transition:box-shadow .15s ease,transform .15s ease,border-color .15s ease;position:relative}
+.card:hover{border-color:var(--dusk);box-shadow:0 6px 16px -4px rgb(0 0 0 / .14);transform:translateY(-2px)}
 .card h2{margin:0 0 2px}
 .card .id{font-size:13px;color:var(--mute);margin:0 0 14px;font-variant-numeric:tabular-nums}
 .card dl{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:0;font-size:14px}
