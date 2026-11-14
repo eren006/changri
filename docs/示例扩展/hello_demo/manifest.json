@@ -1,0 +1,15 @@
+{
+  "id": "hello_demo",
+  "name": "打招呼示例",
+  "version": "1.0.0",
+  "author": "长日将尽",
+  "description": "示例扩展：群里发「打招呼」，卡拉按你设置的招呼语回一句，并带上你的角色名。可以照着它改。",
+  "homepage": "",
+  "license": "MIT",
+  "api": 1,
+  "settings": [
+    {"key": "greeting", "label": "招呼语", "type": "string", "default": "你好呀", "desc": "回复里的第一句话"},
+    {"key": "loud", "label": "大声一点", "type": "bool", "default": false, "desc": "打开后招呼语末尾加感叹号"},
+    {"key": "times", "label": "重复次数", "type": "int", "default": 1, "desc": "招呼语说几遍"}
+  ]
+}

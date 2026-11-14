@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}功能与设置{% endblock %}
+{% block body %}
+<style>
+.sw{position:relative;display:inline-block;width:44px;height:24px;flex:none}
+.sw button{all:unset;display:block;width:100%;height:100%;cursor:pointer;border-radius:12px;background:var(--bad);transition:background .15s}
+.sw button::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .15s}
+.sw.on button{background:var(--ok)} .sw.on button::after{transform:translateX(20px)}
+.sw button:disabled{opacity:.5;cursor:not-allowed}
+.sw button:focus-visible{outline:2px solid var(--dusk);outline-offset:2px}
+.ext{border:1px solid var(--line);border-radius:8px;background:var(--surface);padding:14px 18px;margin:0 0 12px}
+.ext .head{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.ext .head h3{margin:0;font-size:16px}
+.ext .ver{color:var(--mute);font-size:13.5px}
+.tag{font-size:12px;border:1px solid var(--line);border-radius:4px;padding:1px 7px;color:var(--mute)}
+.ext dl{display:grid;grid-template-columns:auto 1fr;gap:6px 18px;margin:12px 0 0;font-size:14px}
+.ext dt{color:var(--mute)} .ext dd{margin:0}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 0}
+.setdlg{border:1px solid var(--line);border-radius:12px;background:var(--paper);color:var(--ink);padding:22px 24px;width:min(680px,calc(100vw - 32px));max-height:86vh;overflow:auto}
+.setdlg::backdrop{background:rgba(20,20,40,.45)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:0 0 16px}
+.tabs a{padding:8px 18px;text-decoration:none;color:var(--ink);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs a[aria-current="page"]{color:var(--dusk);border-bottom-color:var(--dusk)}
+.bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:0 0 16px}
+.bar input[type=search]{padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);min-width:180px}
+.warnbox{border:1px solid var(--warn);border-radius:8px;padding:10px 14px;margin:0 0 16px;background:color-mix(in srgb,var(--warn) 10%,transparent)}
+.field{margin:12px 0}.field label{display:block;font-weight:600;margin-bottom:3px}.field .d{color:var(--mute);font-size:13px;margin:0 0 4px}
+.field input[type=text],.field input[type=number],.field textarea,.field select{width:100%;max-width:560px;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink);font:inherit}
+</style>
+
+<h1>功能与设置</h1>
+<p class="lede">每个功能一张卡片：核心功能一直开着，官方扩展和你自己的扩展有开关。点「进入设置」改这个功能的设置，点「打开管理页」看这个功能的数据。你自己的扩展放进 <code>extensions/</code> 文件夹，或在这里上传。</p>
+
+{% if restarting %}
+<div class="warnbox" id="wait">正在重启，大约 20 秒后自动刷新……</div>
+<script>
+(function(){var t=0;function poll(){t++;fetch("{{ url_for('login') }}",{cache:"no-store"}).then(function(r){if(r.ok){location.href="{{ url_for('extensions_page') }}";}else{setTimeout(poll,2000);}}).catch(function(){if(t<60)setTimeout(poll,2000);else document.getElementById("wait").textContent="还没恢复，请检查服务是否在运行。";});}setTimeout(poll,6000);})();
+</script>
+{% endif %}
+
+{% if pending and not restarting %}
+<div class="warnbox">
+  <b>有改动要重启才生效。</b>
+  {% if owner %}
+  <form method="post" action="{{ url_for('extensions_restart') }}" style="display:inline" onsubmit="return confirm('现在重启？机器人会断开大约 20 秒。')">{{ csrf() }}
+    <button class="btn sm" type="submit">重启并生效</button></form>
+  {% else %}请让主账号重启。{% endif %}
+</div>
+{% endif %}
+
+<nav class="tabs" aria-label="扩展分页">
+  <a href="{{ url_for('extensions_page') }}" {% if tab != 'ai' %}aria-current="page"{% endif %}>功能列表</a>
+  <a href="{{ url_for('extensions_page', tab='ai') }}" {% if tab == 'ai' %}aria-current="page"{% endif %}>给 AI 的模板</a>
+</nav>
+
+{% if tab == 'ai' %}
+<p class="note" style="margin:0 0 12px">想自己加功能但不会写代码：把下面这一整段复制给 AI（ChatGPT、Claude 都行），把最后「我想要的扩展」那几项改成你的需求，AI 会写出两个文件。把它们放进一个文件夹打成 zip，回到「功能列表」上传。上传时会自动检查，有问题会告诉你哪一行。</p>
+<div class="bar"><button class="btn" type="button" onclick="var t=document.getElementById('aip');t.select();navigator.clipboard&&navigator.clipboard.writeText(t.value);this.textContent='已复制'">复制全部</button>
+  <a class="btn ghost" href="{{ url_for('extensions_ai_prompt') }}">下载成文件</a>
+  <a class="btn ghost" href="{{ url_for('extensions_skeleton') }}">下载骨架 zip</a></div>
+<textarea id="aip" readonly style="width:100%;height:420px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font:13px/1.55 ui-monospace,Menlo,monospace">{{ ai_prompt }}</textarea>
+{% else %}
+<div class="bar">
+  {% if owner %}
+  <form method="post" action="{{ url_for('extensions_upload') }}" enctype="multipart/form-data" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">{{ csrf() }}
+    <input type="file" name="file" accept=".zip" aria-label="选择扩展压缩包" required>
+    <label style="font-size:13.5px"><input type="checkbox" name="replace" value="1"> 覆盖已有的同名扩展</label>
+    <button class="btn" type="submit">上传扩展</button>
+  </form>
+  {% endif %}
+  <input type="search" id="q" placeholder="搜索扩展" aria-label="搜索扩展" oninput="filterExt()">
+</div>
+{% if owner %}<p class="note" style="margin:-8px 0 16px">⚠️ 扩展是 Python 代码，装上就和主程序有同样的权限（包括能读到机器人的 AppSecret）。只安装你信得过的人写的扩展。上传的扩展默认是关闭的，要自己打开开关。</p>{% endif %}
+
+{% for it in items %}
+<article class="ext" data-search="{{ it.name }} {{ it.description }} {{ it.author }}">
+  <div class="head">
+    {% if it.kind != 'core' %}<span class="sw {{ 'on' if it.enabled }}">
+      <form method="post" action="{{ url_for('extensions_toggle') }}" style="margin:0;height:100%">{{ csrf() }}
+        <input type="hidden" name="id" value="{{ it.id }}"><input type="hidden" name="on" value="{{ 0 if it.enabled else 1 }}">
+        <button type="submit" aria-label="{{ '关闭' if it.enabled else '打开' }}{{ it.name }}" {% if not owner %}disabled{% endif %}></button></form>
+    </span>{% endif %}
+    <h3>{{ it.name }}</h3><span class="ver">{{ it.version }}</span>
+    <span class="tag">{{ {'core': '核心', 'official': '官方'}.get(it.kind, '自己的') }}</span>
+    {% if it.load_error %}<span class="dot bad"></span><span style="color:var(--bad)">{{ it.load_error }}</span>{% endif %}
+    {% if it.warnings %}<details style="flex-basis:100%"><summary style="color:var(--warn);cursor:pointer">⚠️ 代码里有 {{ it.warnings|length }} 处要留意</summary><ul style="margin:6px 0 0;padding-left:20px;font-size:13px">{% for w in it.warnings %}<li>{{ w }}</li>{% endfor %}</ul></details>{% endif %}
+    {% if it.kind == 'user' and owner %}
+    <form method="post" action="{{ url_for('extensions_delete', ext_id=it.id) }}" style="margin-left:auto" onsubmit="return confirm('删除扩展「{{ it.name }}」的文件？它的设置数据会保留。')">{{ csrf() }}<button class="linkbtn">删除</button></form>
+    {% endif %}
+  </div>
+  <div class="acts">
+    {% if it.fields or it.settings %}<button class="btn sm" type="button" onclick="document.getElementById('set-{{ it.id }}').showModal()">进入设置</button>{% endif %}
+    {% for ep, label in it.links %}{% if ep not in disabled_nav or it.enabled %}<a class="btn sm ghost" href="{{ url_for(ep) }}">{{ label }}</a>{% endif %}{% endfor %}
+  </div>
+  {% if it.fields or it.settings %}
+  <dialog id="set-{{ it.id }}" class="setdlg">
+    <form method="post" action="{{ url_for('settings_save', group=it.settings_group) if it.fields else url_for('extensions_settings', ext_id=it.id) }}">{{ csrf() }}
+      <h3 style="margin:0 0 4px">{{ it.name }}的设置</h3>
+      <p class="note" style="margin:0 0 14px">保存后机器人马上按新设置运行。</p>
+      {% if it.fields %}
+      <div class="fields">
+        {% for f in it.fields %}
+        {% if f.kind == 'bool' %}
+        <div class="wide setrow"><label class="sw"><input type="checkbox" name="{{ f.key }}" value="1" {{ 'checked' if f.checked }}><input type="hidden" name="{{ f.key }}" value="0"><i></i></label>
+          <div><b>{{ f.label }}</b>{% if f.hint %}<div class="d">{{ f.hint }}</div>{% endif %}</div></div>
+        {% else %}
+        <div class="{{ 'wide' if f.key == 'daily_tip' }}"><label for="{{ f.key }}">{{ f.label }}</label>
+          {% if f.kind == 'number' %}<div class="numwrap"><input id="{{ f.key }}" type="number" inputmode="numeric" step="1" name="{{ f.key }}" value="{{ f.value }}">{% if f.unit %}<span class="unit">{{ f.unit }}</span>{% endif %}</div>
+          {% else %}<input id="{{ f.key }}" type="text" name="{{ f.key }}" value="{{ f.value }}">{% endif %}
+          {% if f.hint %}<div class="d">{{ f.hint }}</div>{% endif %}</div>
+        {% endif %}
+        {% endfor %}
+      </div>
+      {% else %}
+      {% for st in it.settings %}
+      <div class="field">
+        <label for="f_{{ it.id }}_{{ st.key }}">{{ st.label or st.key }}</label>
+        {% if st.desc %}<p class="d">{{ st.desc }}</p>{% endif %}
+        {% set v = it.vals[st.key] %}
+        {% if st.type == 'bool' %}<input type="checkbox" id="f_{{ it.id }}_{{ st.key }}" name="{{ st.key }}" value="1" {{ 'checked' if v }}>
+        {% elif st.type == 'text' %}<textarea id="f_{{ it.id }}_{{ st.key }}" name="{{ st.key }}" rows="4">{{ v }}</textarea>
+        {% elif st.type == 'choice' %}<select id="f_{{ it.id }}_{{ st.key }}" name="{{ st.key }}">{% for c in st.choices %}<option {{ 'selected' if v|string == c|string }}>{{ c }}</option>{% endfor %}</select>
+        {% elif st.type == 'int' %}<input type="number" id="f_{{ it.id }}_{{ st.key }}" name="{{ st.key }}" value="{{ v }}">
+        {% else %}<input type="text" id="f_{{ it.id }}_{{ st.key }}" name="{{ st.key }}" value="{{ v }}">{% endif %}
+      </div>
+      {% endfor %}
+      {% endif %}
+      <div class="actions"><button class="btn" type="submit">保存</button><button class="btn ghost" type="button" onclick="this.closest('dialog').close()">取消</button></div>
+    </form>
+  </dialog>
+  {% endif %}
+  <dl>
+    <dt>作者</dt><dd>{{ it.author or '—' }}</dd>
+    <dt>介绍</dt><dd>{{ it.description or '—' }}</dd>
+    {% if it.kind == 'user' %}
+    <dt>主页</dt><dd>{{ it.homepage or '—' }}</dd>
+    <dt>许可协议</dt><dd>{{ it.license or '—' }}</dd>
+    <dt>安装时间</dt><dd class="tabular">{{ it.installed_ts | datetimefmt }}</dd>
+    <dt>更新时间</dt><dd class="tabular">{{ it.updated_ts | datetimefmt }}</dd>
+    {% endif %}
+  </dl>
+</article>
+{% endfor %}
+<script>
+function filterExt(){var q=document.getElementById("q").value.trim().toLowerCase();document.querySelectorAll("article.ext").forEach(function(a){a.style.display=(!q||a.dataset.search.toLowerCase().indexOf(q)>=0)?"":"none";});}
+</script>
+
+{% endif %}
+{% endblock %}

@@ -1,0 +1,14 @@
+<script>
+(function () {
+  var icons = {
+    {% for name in ['heart','clap','laugh','rose','sparkle','smile','close','gift','music','bookmark','mail'] %}
+    {{ name|tojson }}: {{ phone_symbol(name)|tojson }}{{ ',' if not loop.last else '' }}
+    {% endfor %}
+  };
+  window.PhoneSymbol = function (name) {
+    var box = document.createElement('span');
+    box.innerHTML = icons[name] || icons.smile;
+    return box.firstElementChild;
+  };
+})();
+</script>

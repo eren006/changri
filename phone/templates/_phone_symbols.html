@@ -1,0 +1,24 @@
+{# 小手机共用细线图标：仅装饰，文字和按钮标签由调用者提供。 #}
+{% macro phone_symbol(name) -%}
+<svg class="phone-symbol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+{% if name == 'heart' %}<path d="M20.2 5.7a5 5 0 0 0-7.1 0L12 6.8l-1.1-1.1a5 5 0 0 0-7.1 7.1L12 21l8.2-8.2a5 5 0 0 0 0-7.1Z"/>
+{% elif name == 'clap' %}<path d="m8 14-4-5a1.3 1.3 0 0 1 2-1.6l4 4.8-4-7a1.3 1.3 0 0 1 2.2-1.3l4.1 6.7-2.5-6a1.3 1.3 0 0 1 2.4-1l4 8.6.3-3a1.3 1.3 0 0 1 2.6.2l.1 5.1c0 4-2 6-5 6-2.4 0-4-1.4-5.4-3.3L6 15.8a1.3 1.3 0 0 1 2-1.8Z"/><path d="m19 3 1-1M21 6h1M4 18l-1 1"/>
+{% elif name == 'laugh' %}<circle cx="12" cy="12" r="9"/><path d="m7 9 2-1 2 1m2 0 2-1 2 1M7 13h10c-.5 4-3 5-5 5s-4.5-1-5-5Z"/>
+{% elif name == 'rose' %}<path d="M12 14v8m0-4c3-4 6-3 6-3-1 3-3 4-6 4M12 20c-3-4-6-3-6-3 1 3 3 4 6 4M8 4l4-2 4 2 3 3-2 5-5 2-5-2-2-5 3-3Zm0 0 1 5 3 3 3-3 1-5M9 9l3-3 3 3"/>
+{% elif name == 'sparkle' %}<path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3ZM20 2v4m-2-2h4"/>
+{% elif name == 'smile' %}<circle cx="12" cy="12" r="9"/><path d="M8 14c1 4 7 4 8 0M8 9h.01M16 9h.01"/>
+{% elif name == 'close' %}<path d="m6 6 12 12M6 18 18 6"/>
+{% elif name == 'gift' %}<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M3 7h18v4H3zM12 7v14m0-14S5 8 5 4c0-3 5-2 7 3Zm0 0s7 1 7-3c0-3-5-2-7 3Z"/>
+{% elif name == 'music' %}<path d="M9 17V5l11-2v12M9 9l11-2"/><ellipse cx="6" cy="18" rx="3" ry="2.5"/><ellipse cx="17" cy="16" rx="3" ry="2.5"/>
+{% elif name == 'camera' %}<path d="M8 5h8l2 3h3v12H3V8h3l2-3Z"/><circle cx="12" cy="14" r="3.5"/>
+{% elif name == 'palette' %}<path d="M12 3a9 9 0 1 0 0 18h2a2 2 0 0 0 0-4h-1a2 2 0 0 1 0-4h4a4 4 0 0 0 4-4c0-4-5-6-9-6Z"/><path d="M7 9h.01M11 6h.01M16 8h.01M6 14h.01"/>
+{% elif name == 'book' %}<path d="M12 5C8 2 4 3 2 4v16c3-1 6-1 10 1 4-2 7-2 10-1V4c-2-1-6-2-10 1Zm0 0v16M6 8l3 1M6 12l3 1m6-4 3-1m-3 5 3-1"/>
+{% elif name == 'mail' %}<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 7 9-7m-18 11 6-6m12 6-6-6"/>
+{% elif name == 'mask' %}<path d="M2 8c3-3 6-3 10 0 4-3 7-3 10 0l-2 7c-2 3-5 3-8 0-3 3-6 3-8 0L2 8ZM5 10l4 1-1 2-3-1m14-2-4 1 1 2 3-1"/>
+{% elif name == 'megaphone' %}<path d="M3 9h5l10-5v16L8 15H3V9Zm5 6 2 6h4l-2-4m9-9v8"/>
+{% elif name == 'pin' %}<path d="M19 9c0 6-7 13-7 13S5 15 5 9a7 7 0 0 1 14 0Z"/><circle cx="12" cy="9" r="2.5"/>
+{% elif name == 'moon' %}<path d="M20 15A9 9 0 0 1 9 4a9 9 0 1 0 11 11Z"/>
+{% elif name == 'link' %}<path d="m10 7 3-3a5 5 0 0 1 7 7l-3 3M14 17l-3 3a5 5 0 0 1-7-7l3-3m1 6 8-8"/>
+{% elif name == 'bookmark' %}<path d="M6 3h12v18l-6-4-6 4V3Z"/>
+{% endif %}</svg>
+{%- endmacro %}

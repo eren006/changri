@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% set mode = 'entry' %}
+{% block title %}{{ brand }}{% endblock %}
+{% block body %}
+  <header class="bar big">
+    <h1>{{ skin.words.messages }}</h1>
+    <div class="sub">输入管理员发给你的激活码</div>
+  </header>
+  <form class="entry" method="post" action="{{ url_for('entry') }}">
+    {{ csrf()|safe if false else '' }}<input type="hidden" name="_csrf" value="{{ csrf() }}">
+    <input name="code" placeholder="10 位激活码" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="10" autofocus>
+    <button type="submit">打开我的手机</button>
+    {% if error %}<div class="err">{{ error }}</div>{% endif %}
+    <p class="hint">激活码只能看你自己的手机，别发给别人。<br>本季结束后自动失效。</p>
+    <p class="hint">请勿发送任何违法、色情、暴力、政治敏感、广告引流或他人隐私等内容。</p>
+    <p class="hint"><a href="{{ url_for('guide') }}">第一次用？看使用指南 ›</a></p>
+  </form>
+{% endblock %}

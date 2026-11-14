@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}远程访问{% endblock %}
+{% block body %}
+<h1>远程访问</h1>
+<p class="lede">后台只有一个端口（{{ port }}）。不开这个，谁能连上由服务器防火墙/云安全组决定；开了，从服务器本机以外来的访问只放你填的 IP，并且禁止危险操作。</p>
+<section>
+  <h2>防护是怎么做的</h2>
+  <ul class="note">
+    <li><b>只认你填的 IP</b>：名单外的人访问，看到的是「找不到页面」，连登录页都看不到；名单是空的就谁都进不来。</li>
+    <li><b>危险操作公网不能做</b>：机器人密钥、账号和密码、更新、装/删/开关扩展、重启、这个页面，只能在服务器本机或隧道里做，别人就算拿到密码也动不了这些。</li>
+    <li><b>登录失败会被锁</b>：连续输错 5 次锁 5 分钟。</li>
+    <li><b>要诚实说的缺点</b>：这里是 http 明文，名单只是缩小了被盯上的范围，并不加密。IP 一变（换网络、重拨号）就要来改名单，且改名单本身只能在本机或隧道里做，所以先别把自己锁在门外。想完全放心，请配 HTTPS 域名。</li>
+  </ul>
+</section>
+<section>
+  <h2>设置</h2>
+  <form method="post" action="{{ url_for('remote_save') }}">{{ csrf() }}
+    <label><input type="checkbox" name="on" {{ 'checked' if on }}> 允许从公网打开设置平台</label>
+    <div class="row">
+      <div style="flex:2 1 280px"><label>允许的 IP（多个用逗号或空格隔开，也可以写网段如 1.2.3.0/24）</label><input type="text" name="ips" value="{{ ips }}" placeholder="例如 203.0.113.8" style="width:100%"></div>
+    </div>
+    <p class="note">不知道自己的 IP？在你自己电脑的浏览器里搜「IP」就能看到。现在已填 {{ count }} 个。</p>
+    <button class="btn" type="submit">保存</button>
+  </form>
+  {% if on and count %}<p class="note">地址：<b>http://{{ ip or '服务器IP' }}:{{ port }}</b>（云服务商的安全组要放行 {{ port }} 端口）。</p>{% endif %}
+</section>
+{% endblock %}

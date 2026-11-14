@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}选择机器人{% endblock %}
+{% block head %}<style>
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px;margin-top:8px}
+.card{display:block;text-decoration:none;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:18px 20px 16px;position:relative}
+.card:hover{border-color:var(--dusk)}
+.card h2{margin:0 0 2px}
+.card .id{font-size:13px;color:var(--mute);margin:0 0 14px;font-variant-numeric:tabular-nums}
+.card dl{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:0;font-size:14px}
+.card dt{color:var(--mute)} .card dd{margin:0}
+.card.off{opacity:.65}
+.card.add{border-style:dashed;display:flex;align-items:center;justify-content:center;min-height:150px;color:var(--mute)}
+</style>{% endblock %}
+{% block body %}
+<h1>选择机器人</h1>
+<p class="lede">每个机器人是一套独立的系统：自己的角色、季度、群和设置，互不影响。点进去管理它。</p>
+<div class="cards">
+  {% for c in cards %}
+  <a class="card {{ 'off' if not c.enabled }}" href="/b/{{ c.id }}/">
+    <h2>{{ c.label }}</h2>
+    <p class="id">AppID {{ c.id }}</p>
+    <dl>
+      <dt>状态</dt><dd>{% if not c.enabled %}<span class="dot bad"></span>已停用{% elif c.online %}<span class="dot ok"></span>在线{% else %}<span class="dot bad"></span>不在线{% endif %}</dd>
+      <dt>角色</dt><dd>{{ c.roles }} 个</dd>
+      <dt>当前季度</dt><dd>{{ c.season or '没有进行中的季度' }}</dd>
+      <dt>小手机</dt><dd>{% if c.phone_on %}已开启，端口 {{ c.phone_port }}{% else %}没开{% endif %}</dd>
+    </dl>
+  </a>
+  {% endfor %}
+  {% if is_owner %}<a class="card add" href="{{ root_url('bots_page') }}">＋ 添加机器人</a>{% endif %}
+</div>
+{% endblock %}

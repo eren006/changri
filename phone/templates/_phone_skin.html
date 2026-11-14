@@ -1,0 +1,183 @@
+<style>
+:root { --bg: {{ skin.style.light[0] }}; --theirs: {{ skin.style.light[1] }}; --text: {{ skin.style.light[2] }}; --muted: {{ skin.style.light[3] }}; --bar: {{ skin.style.light[0] }}; --mine: {{ skin.style.accent }}; --mine-text: #fff; --theirs-text: var(--text); --line: color-mix(in srgb,var(--text) 14%,var(--bg)); }
+@media (prefers-color-scheme: dark) { :root { --bg: {{ skin.style.dark[0] }}; --theirs: {{ skin.style.dark[1] }}; --text: {{ skin.style.dark[2] }}; --muted: {{ skin.style.dark[3] }}; --bar: {{ skin.style.dark[0] }}; } }
+.phone .bar .title, .phone .bar h1, .phone .profile-name h1 { font-family: {{ skin.style.font }}; }
+.phone .broadcast, .phone .library-card, .phone .arc-card, .phone .count-tile { border-radius: {{ skin.style.radius }}; }
+{% if skin.visual != 'modern' %}
+.phone .bubble { border-radius: {{ skin.style.radius }}; }
+/* 淡色渐变铺在整个滚动区上；铺在 .chat 上的话，内容少时只盖住下半截，顶边会出现一条分界线 */
+.phone #scroll { background-image: linear-gradient(135deg, color-mix(in srgb,var(--mine) 5%,transparent), transparent); }
+{% endif %}
+{% if skin.visual == 'scifi' %}
+.phone #scroll { background-image: linear-gradient(color-mix(in srgb,var(--mine) 7%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--mine) 7%,transparent) 1px,transparent 1px); background-size: 24px 24px; }
+{% endif %}
+{% if skin.visual == 'cloudpost' %}
+{% set cp = url_for('static', filename='themes/cloudpost/') %}
+/* 云絮邮局：奶油信纸 + 粉色天际线 + 火漆印。图片都在 static/themes/cloudpost/，缺图时回退成纯色和渐变 */
+.phone:is(:not([data-wall]), [data-wall="default"]) { background-image: url({{ cp }}paper.webp); background-size: 256px 256px; }
+.phone:is(:not([data-wall]), [data-wall="default"]) :is(.scroll, #scroll, .chat, .moments-scroll) { background-color: transparent; background-image: none; }
+.phone .bar { background-color: #f59ea0; background-image: url({{ cp }}skyline.webp), linear-gradient(180deg, #f7a9a8 0%, #ee7489 100%); background-size: 100% auto, auto; background-position: left calc(100% + 14px), 0 0; background-repeat: no-repeat; border-bottom: 1px solid #4b2236; }
+.phone .bar .title, .phone .bar h1, .phone .tab-head h1 { letter-spacing: .04em; color: #2b1f1d; text-shadow: 0 0 7px rgba(255,214,208,.95), 0 0 2px rgba(255,214,208,.95); }
+/* 顶栏里压在楼群上的小字（额度、副标题）：垫一块奶油底，字用深色 */
+.phone .bar .quota, .phone .bar .tab-sub:not(.keep), .phone .bar .title small { background: rgba(255,244,230,.92) !important; color: #4b2236 !important; border-radius: 8px; box-shadow: 0 0 0 2px rgba(255,244,230,.92); text-shadow: none; }
+.phone .bar .quota .near-limit { color: #b42318 !important; }
+.phone .bar .tab-sub:not(.keep) { display: inline-block; padding: 0 4px; }
+.phone .theirs .bubble { border: 1px solid color-mix(in srgb, var(--text) 62%, transparent); background: color-mix(in srgb, var(--bg) 70%, #fff); }
+.phone .broadcast, .phone .library-card, .phone .arc-card, .phone .count-tile { border: 1px solid color-mix(in srgb, var(--text) 40%, transparent); }
+.phone .empty { display: flex; flex-direction: column; align-items: center; }
+.phone .book .empty { grid-column: 1 / -1; justify-self: center; align-self: center; text-align: center; }
+.phone .empty::before { content: ""; display: block; width: 104px; height: 156px; margin: 0 auto 16px; background: url({{ cp }}window.webp) center / contain no-repeat; }
+.phone .phone-nav a.dock-plus { background: url({{ cp }}seal.webp) center / 118% no-repeat; color: #fff4e2; box-shadow: 0 0 0 7px var(--chat-bg, var(--bg)), 0 8px 18px color-mix(in srgb, var(--mine) 40%, transparent); }
+.phone .phone-nav a.dock-plus svg { filter: drop-shadow(0 1px 0 rgba(90,20,40,.45)); }
+/* 日期章：短的日期（D1、D12）盖成圆邮戳，长日期保持原样 */
+.phone .stamp b.pm { display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 48px; margin-right: 4px; vertical-align: middle; background: url({{ cp }}stamp.webp) center / contain no-repeat; color: #4b2236; font-size: 11px; font-weight: 700; transform: rotate(-8deg); }
+/* 点歌没有封面时用黑胶 */
+.phone .sc-nocover { background: url({{ cp }}vinyl.webp) center / cover; font-size: 0; border-radius: 50%; }
+/* 礼物入口：右下角垂下一根灯绳，拉一下进礼品店 */
+.phone .shop-fab { right: 20px; bottom: calc(100% + 2px); width: 40px; height: 132px; padding: 0; border: 0; border-radius: 0; background: url({{ cp }}chain.webp) center 6px / 10px 109px no-repeat; box-shadow: none; font-size: 0; color: transparent; overflow: visible; transform-origin: 50% 0; transition: transform .22s cubic-bezier(.3,1.6,.5,1); -webkit-tap-highlight-color: transparent; align-items: flex-start; }
+.phone .shop-fab::before { content: ""; position: absolute; left: 50%; top: 0; width: 22px; height: 8px; margin-left: -11px; border-radius: 4px; background: linear-gradient(#e0bd74, #94702f); box-shadow: 0 1px 3px rgba(60,30,20,.35); }
+.phone .shop-fab:active { transform: scaleY(1.1); }
+.phone .shop-fab.pulled { transform: scaleY(1.15); }
+/* 点歌页顶部的黑胶，缓慢转动 */
+.cp-vinyl { width: 132px; height: 132px; margin: 14px auto 4px; border-radius: 50%; background: url({{ cp }}vinyl.webp) center / cover no-repeat; box-shadow: 0 6px 16px rgba(75,34,54,.28); animation: cp-spin 16s linear infinite; }
+@keyframes cp-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .cp-vinyl { animation: none; } }
+/* 角色标签、公开播报顶图、角饰 */
+.cp-tag { position: relative; width: 116px; margin: 12px auto 2px; }
+.cp-tag img { display: block; width: 116px; height: auto; }
+.cp-tag span { position: absolute; left: 9%; right: 9%; top: 41.5%; height: 18.7%; line-height: 1; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; color: #3a1b2a; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.cp-banner { height: 92px; margin: 0; background: url({{ cp }}fireescape.webp) center 38% / cover no-repeat; -webkit-mask-image: linear-gradient(#000 55%, transparent); mask-image: linear-gradient(#000 55%, transparent); border-bottom: 0; }
+.phone .shop-page, .phone .ch-page { background-image: url({{ cp }}corner_soft.webp); background-size: 96px auto; background-position: left top; background-repeat: no-repeat; background-attachment: local; }
+.phone .shelf { background: color-mix(in srgb, var(--bg) 70%, #fff); color: var(--text); border-color: color-mix(in srgb, var(--text) 45%, transparent); }
+@media (prefers-color-scheme: dark) {
+  .phone:is(:not([data-wall]), [data-wall="default"]) { background-image: linear-gradient(rgba(35,26,28,.9), rgba(35,26,28,.9)), url({{ cp }}paper.webp); background-size: auto, 256px 256px; }
+  .phone .bar { background-image: linear-gradient(rgba(35,26,28,.5), rgba(35,26,28,.5)), url({{ cp }}skyline.webp), linear-gradient(180deg, #7a3f52 0%, #5b2a3c 100%); background-size: auto, 100% auto, auto; background-position: 0 0, left calc(100% + 14px), 0 0; }
+  .phone .bar .title, .phone .bar h1, .phone .tab-head h1 { color: #f6e9d6; text-shadow: 0 1px 6px rgba(35,26,28,.9); }
+  .phone .theirs .bubble { background: color-mix(in srgb, var(--bg) 80%, #fff 6%); }
+  .phone .bar .quota, .phone .bar .tab-sub:not(.keep), .phone .bar .title small { background: rgba(35,26,28,.82) !important; color: #f6e9d6 !important; box-shadow: 0 0 0 2px rgba(35,26,28,.82); }
+  .phone .bar .quota .near-limit { color: #ff9b8f !important; }
+  .cp-tag span { color: #3a1b2a; }
+}
+/* 礼品店：货架 + 台灯，拉灯链才进货架 */
+.cp-stage { position: relative; width: 100%; max-width: 400px; aspect-ratio: 1 / 1; margin: 0 auto; background: url({{ cp }}shelf.webp) center / cover no-repeat; overflow: hidden; }
+.cp-lamp { position: absolute; left: 50%; bottom: calc(26% - 14px); width: 210px; height: 330px; margin-left: -105px; transform: scale(.82); transform-origin: 50% 100%; }
+.cp-lamp img { display: block; }
+.cp-lamp .lamp { position: absolute; left: 0; top: 0; width: 210px; height: auto; transition: opacity .35s; pointer-events: none; user-select: none; }
+.cp-lamp .lamp.on { opacity: 0; }
+.cp-lamp[data-lit="1"] .lamp.on { opacity: 1; }
+.cp-lamp[data-lit="1"] .lamp.off { opacity: 0; }
+.cp-chain { position: absolute; left: 122px; top: 154px; width: 10px; padding: 0 16px 24px; margin: 0 -16px; display: block; transition: transform .22s cubic-bezier(.3,1.6,.5,1); -webkit-tap-highlight-color: transparent; }
+.cp-chain img { width: 10px; height: auto; max-height: 112px; object-fit: cover; object-position: top; }
+.cp-chain { transform-origin: 50% 0; }
+.cp-chain.pulled { transform: scaleY(1.16); }
+.cp-chain:active { transform: scaleY(1.1); }
+.cp-lamp-hint { text-align: center; font-size: 12.5px; color: var(--muted); margin: 8px 0 2px; }
+{% endif %}
+{% if skin.visual == 'medici' %}
+{% set md = url_for('static', filename='themes/medici/') %}
+/* Private Florentine correspondence: paper, oxblood leather and restrained gilt. */
+:root { --medici-gold: #a78547; --medici-gold-light: #ead6a4; --medici-gold-dark: #5c421b; --medici-cream: #fff2d8; --medici-wine: #561722; }
+.phone[data-visual="medici"] { --line: color-mix(in srgb,var(--medici-gold) 45%,var(--bg)); }
+.phone[data-visual="medici"]:is(:not([data-wall]),[data-wall="default"]) { background-color: var(--bg); background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22176%22%20height%3D%22176%22%20viewBox%3D%220%200%20176%20176%22%3E%3Cdefs%3E%3Cpath%20id%3D%22f%22%20d%3D%22M20%202C13%2011%2013%2019%2017%2027H13C12%2017%202%2017%203%2025c1%206%206%209%2012%209h2v3h-5v3h5l3%206%203-6h5v-3h-5v-3h2c6%200%2011-3%2012-9%201-8-9-8-10%202h-4c4-8%204-16-3-25Z%22%20fill%3D%22none%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%22.8%22%2F%3E%3C%2Fdefs%3E%3Cg%20transform%3D%22translate%2824%2024%29%20scale%28.68%29%22%3E%3Cuse%20href%3D%22%23f%22%20transform%3D%22translate%28-.8%20-1%29%22%20stroke%3D%22white%22%20opacity%3D%22.36%22%2F%3E%3Cuse%20href%3D%22%23f%22%20transform%3D%22translate%28.8%201%29%22%20stroke%3D%22black%22%20opacity%3D%22.065%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%28112%20112%29%20scale%28.68%29%22%3E%3Cuse%20href%3D%22%23f%22%20transform%3D%22translate%28-.8%20-1%29%22%20stroke%3D%22white%22%20opacity%3D%22.36%22%2F%3E%3Cuse%20href%3D%22%23f%22%20transform%3D%22translate%28.8%201%29%22%20stroke%3D%22black%22%20opacity%3D%22.065%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E"),linear-gradient(color-mix(in srgb,var(--bg) 72%,transparent),color-mix(in srgb,var(--bg) 72%,transparent)),url({{ md }}paper.webp); background-size: 176px 176px,auto,256px 256px; }
+.phone[data-visual="medici"]:is(:not([data-wall]),[data-wall="default"]) :is(.scroll,#scroll,.chat,.moments-scroll) { background-color: transparent; background-image: none; }
+.phone[data-visual="medici"] .bar { --bar: var(--medici-wine); --link: var(--medici-cream); --muted: var(--medici-gold-light); background: linear-gradient(115deg,var(--mine),var(--bar)); color: var(--medici-cream); border-bottom: 1px solid var(--medici-gold); box-shadow: inset 0 -4px 0 var(--bar); }
+.phone[data-visual="medici"] .bar :is(.title,h1,.tab-head h1,.back,.linkbtn,.quiet-button,.quota,.sub,.tab-sub) { color: var(--medici-cream); text-shadow: none; }
+.phone[data-visual="medici"] .bar :is(.title,h1) { font-family: Georgia,"Songti SC","Noto Serif CJK SC",serif; letter-spacing: .03em; }
+.phone[data-visual="medici"] .theirs .bubble { background: var(--theirs); color: var(--text); border: 1px solid var(--line); border-radius: 8px; box-shadow: none; }
+.phone[data-visual="medici"] .mine .bubble { background: var(--mine); color: var(--mine-text); border-radius: 8px; box-shadow: none; }
+.phone[data-visual="medici"] :is(.broadcast,.library-card,.arc-card,.count-tile,.shelf) { border: 1px solid var(--line); border-radius: 8px; }
+
+.phone[data-visual="medici"] .stamp { opacity: 1; color: var(--muted); }
+.phone[data-visual="medici"] .stamp b.pm { display: inline-block; padding: 4px 10px; border: 1px solid var(--line); border-radius: 3px; color: var(--muted); background: var(--bg); font-family: Georgia,serif; letter-spacing: .06em; }
+/* The gift catalogue opens like a small gilt invitation. */
+.phone[data-visual="medici"] .song-cta.shelf-go { position: relative; isolation: isolate; display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 58px; box-sizing: border-box; padding: 12px 40px; border: 1px solid var(--medici-gold); border-radius: 8px; background: linear-gradient(115deg,color-mix(in srgb,var(--medici-wine) 82%,var(--medici-gold)),var(--medici-wine)); color: var(--medici-cream) !important; box-shadow: inset 0 0 0 3px var(--medici-wine),inset 0 0 0 4px color-mix(in srgb,var(--medici-gold) 48%,transparent),0 4px 10px color-mix(in srgb,var(--text) 12%,transparent); font-family: Georgia,"Songti SC","Noto Serif CJK SC",serif; font-weight: 600; letter-spacing: .08em; text-decoration: none; }
+.phone[data-visual="medici"] .shelf-go .phone-symbol { flex: none; width: 20px; height: 20px; padding: 6px; box-sizing: content-box; border: 1px solid var(--medici-gold); border-radius: 50%; color: var(--medici-gold-light); background: color-mix(in srgb,var(--medici-gold) 12%,var(--medici-wine)); }
+.phone[data-visual="medici"] .shelf-go:hover { filter: brightness(1.08); }
+.phone[data-visual="medici"] .shelf-go:active { transform: translateY(1px); }
+.phone[data-visual="medici"] .shelf-go:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+/* The cherub is split into three CSS layers; the face stays still as wings flutter. */
+.phone[data-visual="medici"] .shop-fab { width: 88px; height: 56px; right: 12px; border: 0; outline: 0; border-radius: 8px; background: transparent; box-shadow: none; }
+.phone[data-visual="medici"] .shop-fab:focus-visible { outline: 2px solid var(--mine); outline-offset: 3px; }
+.md-cherub { display: none; position: absolute; inset: 0; pointer-events: none; }
+.md-cherub i { position: absolute; inset: 0; background: url({{ md }}cherub.webp) center / contain no-repeat; }
+.md-angel-body { clip-path: inset(0 35%); }
+.md-wing-left { clip-path: inset(0 65% 0 0); transform-origin: 35% 55%; }
+.md-wing-right { clip-path: inset(0 0 0 65%); transform-origin: 65% 55%; }
+.md-angel-ready .md-cherub { display: block; }
+.phone[data-visual="medici"] .md-angel-ready > .phone-symbol { visibility: hidden; }
+.md-flutter .md-wing-left { animation: md-left .25s ease-in-out 2; }
+.md-flutter .md-wing-right { animation: md-right .25s ease-in-out 2; }
+@keyframes md-left { 50% { transform: rotate(18deg) scaleX(.86); } }
+@keyframes md-right { 50% { transform: rotate(-18deg) scaleX(.86); } }
+@media (prefers-reduced-motion: reduce) { .md-flutter :is(.md-wing-left,.md-wing-right) { animation: none; } }
+.phone[data-visual="medici"] :is(a[href$="/song"] .app-icon,.song-avatar,.sc-nocover) { background: url({{ md }}lute.webp) center / contain no-repeat var(--theirs) !important; border-radius: 8px; font-size: 0; }
+.phone[data-visual="medici"] a[href$="/song"] .app-icon svg { visibility: hidden; }
+.phone[data-visual="medici"][data-mode="song"] > .scroll::before { content: ""; display: block; width: 96px; height: 100px; margin: 16px auto 4px; background: url({{ md }}lute.webp) center / contain no-repeat; }
+/* Abstract palle, drawn with CSS so missing images never break the seal. */
+.phone[data-visual="medici"] .empty::before { content: ""; display: block; width: 34px; height: 42px; margin: 0 auto 16px; border: 1px solid var(--medici-gold); border-radius: 3px 3px 45% 45%; background: radial-gradient(circle at 50% 20%,var(--mine) 0 3px,transparent 3.5px),radial-gradient(circle at 25% 40%,var(--mine) 0 3px,transparent 3.5px),radial-gradient(circle at 75% 40%,var(--mine) 0 3px,transparent 3.5px),radial-gradient(circle at 28% 63%,var(--mine) 0 3px,transparent 3.5px),radial-gradient(circle at 72% 63%,var(--mine) 0 3px,transparent 3.5px),radial-gradient(circle at 50% 82%,var(--mine) 0 3px,transparent 3.5px),var(--theirs); }
+@media (prefers-color-scheme: dark) {
+ .phone[data-visual="medici"]:is(:not([data-wall]),[data-wall="default"]) { background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22176%22%20height%3D%22176%22%20viewBox%3D%220%200%20176%20176%22%3E%3Cdefs%3E%3Cpath%20id%3D%22f%22%20d%3D%22M20%202C13%2011%2013%2019%2017%2027H13C12%2017%202%2017%203%2025c1%206%206%209%2012%209h2v3h-5v3h5l3%206%203-6h5v-3h-5v-3h2c6%200%2011-3%2012-9%201-8-9-8-10%202h-4c4-8%204-16-3-25Z%22%20fill%3D%22none%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%22.8%22%2F%3E%3C%2Fdefs%3E%3Cg%20transform%3D%22translate%2824%2024%29%20scale%28.68%29%22%3E%3Cuse%20href%3D%22%23f%22%20transform%3D%22translate%28-.8%20-1%29%22%20stroke%3D%22white%22%20opacity%3D%22.045%22%2F%3E%3Cuse%20href%3D%22%23f%22%20transform%3D%22translate%28.8%201%29%22%20stroke%3D%22black%22%20opacity%3D%22.20%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%28112%20112%29%20scale%28.68%29%22%3E%3Cuse%20href%3D%22%23f%22%20transform%3D%22translate%28-.8%20-1%29%22%20stroke%3D%22white%22%20opacity%3D%22.045%22%2F%3E%3Cuse%20href%3D%22%23f%22%20transform%3D%22translate%28.8%201%29%22%20stroke%3D%22black%22%20opacity%3D%22.20%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E"),linear-gradient(color-mix(in srgb,var(--bg) 96%,transparent),color-mix(in srgb,var(--bg) 96%,transparent)),url({{ md }}paper.webp); }
+
+ .phone[data-visual="medici"] .app-icon-medici { color: var(--text); }
+ .phone[data-visual="medici"] .empty::before { --mine: var(--medici-gold-light); }
+}
+
+/* Painted surface treatment only: preserve the phone's existing layout and typography. */
+:root { --md-blue: #536b91; --md-rose: #ba8290; --medici-gold: #a2814c; --medici-gold-light: #e2c68f; --medici-cream: #fbf3e2; }
+.phone[data-visual="medici"] { --line: color-mix(in srgb,var(--medici-gold) 42%,var(--bg)); --ios-group: var(--theirs); }
+.phone[data-visual="medici"] .bar { --bar: var(--bg); --link: var(--md-blue); --muted: var(--text); background: linear-gradient(180deg,var(--theirs),var(--bg)); color: var(--text); border-bottom: 1px solid var(--line); box-shadow: none; }
+.phone[data-visual="medici"] .bar::after { content: ""; position: absolute; inset: 0; background: url({{ md }}header-sprigs.webp) right bottom / 76% auto no-repeat; pointer-events: none; }
+.phone[data-visual="medici"] .bar :is(.title,h1,.tab-head h1,.back,.linkbtn,.quiet-button,.quota,.sub,.tab-sub) { color: var(--text); }
+.phone[data-visual="medici"] .bar :is(.back,.quiet-button) { color: var(--md-blue); }
+.phone[data-visual="medici"] :is(.disc-group,.daily-card,.broadcast,.library-card,.arc-card,.shelf,.book-item) { position: relative; background-color: var(--theirs); }
+/* Frames are overlays: no added border width, padding or reflow. */
+.phone[data-visual="medici"] :is(.disc-group,.daily-card,.broadcast,.library-card,.arc-card,.shelf,.book-item)::after { content: ""; position: absolute; inset: 0; border: 0 solid transparent; border-image: url({{ md }}manuscript-frame.webp?v=2) 190 / 22px / 0 stretch; pointer-events: none; }
+.phone[data-visual="medici"] .disc-group a.row .app-icon { color: var(--md-blue); background: color-mix(in srgb,var(--md-blue) 9%,var(--theirs)); border-color: var(--line); }
+.phone[data-visual="medici"] .disc-group a.row:nth-child(even) .app-icon { color: color-mix(in srgb,var(--md-rose) 65%,var(--text)); background: color-mix(in srgb,var(--md-rose) 12%,var(--theirs)); }
+.phone[data-visual="medici"] .song-cta.shelf-go { background: var(--theirs); color: var(--text) !important; border-color: var(--line); box-shadow: none; }
+.phone[data-visual="medici"] .shelf-go::after { content: ""; position: absolute; inset: 0; border: 0 solid transparent; border-image: url({{ md }}manuscript-frame.webp?v=2) 190 / 22px / 0 stretch; pointer-events: none; }
+.phone[data-visual="medici"] .shelf-go .phone-symbol { color: var(--md-blue); border-color: var(--medici-gold); background: color-mix(in srgb,var(--md-rose) 12%,var(--theirs)); }
+.phone[data-visual="medici"] .app-icon-medici { color: var(--md-blue); background: var(--theirs); }
+@media (max-width: 359px) { .phone[data-visual="medici"] .bar::after { background-size: 70% auto; background-position: right bottom; } }
+@media (prefers-color-scheme: dark) { :root { --md-blue: #b0c5e2; --md-rose: #c99ba6; } .phone[data-visual="medici"] .bar::after { opacity: .85; } }
+/* Only the central compose control changes shape; retain the dock layout. */
+.phone[data-visual="medici"] .bottom-dock .phone-nav a.dock-plus { position: relative; isolation: isolate; background: transparent; border: 0; border-radius: 0; box-shadow: none; color: var(--mine-text); }
+.phone[data-visual="medici"] .bottom-dock .dock-plus::before { content: ""; position: absolute; width: 20px; height: 20px; left: 50%; top: calc(50% + 6px); transform: translate(-50%,-50%); border-radius: 50%; background: var(--medici-wine); pointer-events: none; }
+.phone[data-visual="medici"] .bottom-dock .dock-plus::after { content: ""; position: absolute; inset: -8px; background: url({{ md }}shell-crest.webp) center / contain no-repeat; pointer-events: none; }
+.phone[data-visual="medici"] .bottom-dock .dock-plus svg { position: relative; z-index: 1; width: 18px; height: 18px; transform: translateY(6px); }
+/* Secondary-page titles need a clear area; catalogue empty states span the grid. */
+.phone[data-visual="medici"] .bar:not(.tab-bar)::after { left: 50%; background-size: 100% auto; }
+.phone[data-visual="medici"] .book > .empty { grid-column: 1 / -1; justify-self: stretch; width: 100%; text-align: center; }
+.phone[data-visual="medici"] .disc-group::after { -webkit-mask: radial-gradient(ellipse at top left,var(--text) 42%,transparent 72%) left top / 42px 42px no-repeat,radial-gradient(ellipse at bottom right,var(--text) 42%,transparent 72%) right bottom / 42px 42px no-repeat; mask: radial-gradient(ellipse at top left,var(--text) 42%,transparent 72%) left top / 42px 42px no-repeat,radial-gradient(ellipse at bottom right,var(--text) 42%,transparent 72%) right bottom / 42px 42px no-repeat; }
+/* Profile uses its own pf-* components; share the same surface and corner treatment. */
+.phone[data-visual="medici"] .profile-page :is(.pf-card,.pf-group) { position: relative; background: var(--theirs); border-color: var(--line); }
+.phone[data-visual="medici"] .profile-page :is(.pf-card,.pf-group)::after { content: ""; position: absolute; inset: 0; border: 0 solid transparent; border-image: url({{ md }}manuscript-frame.webp?v=2) 190 / 22px / 0 stretch; -webkit-mask: radial-gradient(ellipse at top left,var(--text) 42%,transparent 72%) left top / 42px 42px no-repeat,radial-gradient(ellipse at bottom right,var(--text) 42%,transparent 72%) right bottom / 42px 42px no-repeat; mask: radial-gradient(ellipse at top left,var(--text) 42%,transparent 72%) left top / 42px 42px no-repeat,radial-gradient(ellipse at bottom right,var(--text) 42%,transparent 72%) right bottom / 42px 42px no-repeat; pointer-events: none; }
+.phone[data-visual="medici"] .pf-row .tile { color: var(--md-blue); background: color-mix(in srgb,var(--md-blue) 9%,var(--theirs)); border: 1px solid var(--line); }
+.phone[data-visual="medici"] .pf-row:nth-child(even) .tile { color: color-mix(in srgb,var(--md-rose) 65%,var(--text)); background: color-mix(in srgb,var(--md-rose) 12%,var(--theirs)); }
+.phone[data-visual="medici"] .pf-card .avatar.big { border: 1px solid var(--medici-gold); box-shadow: 0 0 0 3px color-mix(in srgb,var(--medici-gold) 18%,transparent); }
+.phone[data-visual="medici"] .pf-cam { color: var(--md-blue); background: var(--theirs); }
+{% endif %}
+{% if skin.visual == 'blush' %}
+/* 粉紫雾面：和语擦日历同款——渐变底 + 柔焦光斑 + 磨砂玻璃卡片/顶栏 + 渐变主按钮。只在「纯色」底色下铺渐变，选了其他页面底色就让位给底色 */
+.phone:is(:not([data-wall]), [data-wall="default"]) { background: linear-gradient(145deg, #f7d3e1, #ebdff6 55%, #e0e8fb); position: relative; }
+.phone:is(:not([data-wall]), [data-wall="default"])::before { content: ""; position: absolute; inset: -8%; pointer-events: none; z-index: 0; filter: blur(44px);
+  background: radial-gradient(ellipse at 12% 18%, #ef8bb066, transparent 32%), radial-gradient(ellipse at 84% 30%, #c3a5ec77, transparent 30%), radial-gradient(ellipse at 45% 88%, #fff5e399, transparent 32%); }
+.phone > * { position: relative; z-index: 1; }
+.phone:is(:not([data-wall]), [data-wall="default"]) :is(.scroll, #scroll, .chat, .moments-scroll) { background-color: transparent; background-image: none; }
+.phone .bar { background: rgba(255,255,255,.55); border-bottom: 1px solid rgba(255,255,255,.75); backdrop-filter: blur(18px) saturate(1.2); -webkit-backdrop-filter: blur(18px) saturate(1.2); }
+.phone .bar :is(.title, h1, .tab-head h1) { color: #8a3f64; }
+.phone .theirs .bubble { background: rgba(255,255,255,.7); border: 1px solid rgba(255,255,255,.9); box-shadow: 0 4px 14px #9a6aa51a; color: var(--text); }
+.phone .mine .bubble { background: linear-gradient(120deg, #e99cbb, #c5a3dc); color: #4a2d45; box-shadow: 0 6px 16px #b9689a28; }
+.phone :is(.broadcast, .library-card, .arc-card, .count-tile, .pf-card, .pf-group) { background: rgba(255,255,255,.58); border: 1px solid rgba(255,255,255,.8); backdrop-filter: blur(16px) saturate(1.15); -webkit-backdrop-filter: blur(16px) saturate(1.15); box-shadow: 0 12px 32px #9a6aa51a; }
+.phone .bottom-dock .phone-nav { background: rgba(255,255,255,.6); border: 1px solid rgba(255,255,255,.8); backdrop-filter: blur(18px) saturate(1.2); -webkit-backdrop-filter: blur(18px) saturate(1.2); }
+.phone .phone-nav a.dock-plus { background: linear-gradient(120deg, #e99cbb, #c5a3dc); color: #fff; box-shadow: 0 6px 18px #b9689a40; }
+@media (prefers-color-scheme: dark) {
+  .phone:is(:not([data-wall]), [data-wall="default"]) { background: linear-gradient(145deg, #2a1830, #231b33 55%, #1a2033); }
+  .phone:is(:not([data-wall]), [data-wall="default"])::before { opacity: .45; }
+  .phone .bar, .phone .bottom-dock .phone-nav { background: rgba(40,28,46,.6); border-color: rgba(255,255,255,.1); }
+  .phone .bar :is(.title, h1, .tab-head h1) { color: #f0c6dc; }
+  .phone .theirs .bubble { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.14); box-shadow: none; }
+  .phone :is(.broadcast, .library-card, .arc-card, .count-tile, .pf-card, .pf-group) { background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.12); box-shadow: none; }
+}
+{% endif %}
+</style>

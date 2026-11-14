@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}更新{% endblock %}
+{% block body %}
+<h1>更新</h1>
+<p class="lede">从发布者的主页获取新版本。更新前会先备份当前代码和数据库，更新包要通过签名校验才会安装。你的数据、密钥和设置都不会被改动。</p>
+
+{% if failed %}
+<section>
+  <h2>上次更新没有成功</h2>
+  <p><span class="dot bad"></span>{{ failed }}</p>
+  <p class="note">已经自动回到更新前的版本，数据没有丢。可以稍后再试，或联系发布者。</p>
+</section>
+{% endif %}
+
+{% if done %}
+<section>
+  <h2>已更新到 {{ done }}</h2>
+  <p id="wait">正在重启，大约 20 秒……</p>
+  <p class="note">页面会在重启完成后自动刷新。如果一分钟后还没恢复，看看服务有没有在运行。</p>
+</section>
+<script>
+(function () {
+  var tries = 0;
+  function poll() {
+    tries++;
+    fetch("{{ url_for('login') }}", {cache: "no-store"}).then(function (r) {
+      if (r.ok) { location.href = "{{ url_for('update_page') }}"; } else { setTimeout(poll, 2000); }
+    }).catch(function () { if (tries < 60) setTimeout(poll, 2000); else document.getElementById("wait").textContent = "还没恢复，请检查服务是否在运行。"; });
+  }
+  setTimeout(poll, 6000);
+})();
+</script>
+{% else %}
+<section>
+  <h2>当前版本</h2>
+  <p class="tabular"><b>{{ current }}</b></p>
+  <form method="post" action="{{ url_for('update_check') }}">{{ csrf() }}<button class="btn" type="submit">检查更新</button></form>
+</section>
+
+{% if info %}
+<section>
+  {% if info.newer %}
+  <h2>有新版本 {{ info.version }}</h2>
+  {% if info.notes %}<p style="white-space:pre-line">{{ info.notes }}</p>{% endif %}
+  {% if info.size %}<p class="tag">更新包约 {{ (info.size / 1048576) | round(1) }} MB</p>{% endif %}
+  <form method="post" action="{{ url_for('update_apply') }}" onsubmit="this.querySelector('button').disabled=true;this.querySelector('button').textContent='正在更新，请不要关闭页面……';">
+    {{ csrf() }}
+    <button class="btn" type="submit">立即更新</button>
+  </form>
+  <p class="note">更新大约需要一分钟，完成后机器人会重启一次（约 20 秒），期间群里的消息可能晚几秒回复。</p>
+  {% else %}
+  <h2>已经是最新版本</h2>
+  <p>当前 {{ info.current }}，发布者目前的最新版本是 {{ info.version }}。</p>
+  {% endif %}
+</section>
+{% endif %}
+{% endif %}
+{% endblock %}

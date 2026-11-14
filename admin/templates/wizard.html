@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}安装向导{% endblock %}
+{% block head %}<style>
+.steps{list-style:none;margin:0;padding:0;max-width:720px}
+.steps>li{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:16px 20px;margin:0 0 14px;display:grid;grid-template-columns:34px 1fr;gap:4px 14px}
+.steps>li.now{border-color:var(--dusk)}
+.steps>li.done{opacity:.8}
+.mark{width:28px;height:28px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-size:14px;font-weight:700;color:var(--mute)}
+.done .mark{background:var(--ok);border-color:var(--ok);color:#fff}
+.now .mark{border-color:var(--dusk);color:var(--dusk)}
+.steps h2{margin:0 0 4px;font-size:17px}
+.steps .body{grid-column:2}
+.steps ol{margin:6px 0 0;padding-left:20px;color:var(--ink)}
+.steps .fields{grid-template-columns:minmax(0,1fr);max-width:420px}
+.steps .body{min-width:0}
+.steps code{background:var(--soft);padding:1px 6px;border-radius:4px}
+</style>{% endblock %}
+{% block body %}
+<h1>安装向导</h1>
+<p class="lede">跟着做五步，机器人就能在群里工作。每一步做完会自动打勾，做到一半离开也没关系，回来接着做。</p>
+<ol class="steps">
+  <li class="{{ 'done' if steps[0] else ('now' if cur == 0) }}"><span class="mark">{{ '✓' if steps[0] else '1' }}</span>
+    <div><h2>接入你的 QQ 机器人</h2></div>
+    <div class="body">
+    {% if steps[0] %}
+      <p class="note">已接入：{{ acc.note or '机器人' }}（AppID {{ acc.app_id }}）。想再接一个，在「机器人接入」页添加。</p>
+    {% else %}
+      <p class="note">到 QQ 开放平台（q.qq.com）建好机器人后，在「开发管理 → 开发设置」里找到 AppID 和 AppSecret，填在这里。</p>
+      <form method="post" action="{{ url_for('bots_add') }}">{{ csrf() }}<input type="hidden" name="next" value="wizard">
+        <div class="fields">
+          <div><label for="w_id">AppID（一串数字）</label><input id="w_id" type="text" name="app_id" inputmode="numeric" autocomplete="off" required></div>
+          <div><label for="w_sec">AppSecret</label><input id="w_sec" type="password" name="secret" autocomplete="off" required></div>
+          <div><label for="w_note">给它起个名字（选填）</label><input id="w_note" type="text" name="note" maxlength="30"></div>
+        </div>
+        <div class="actions"><button class="btn" type="submit">保存并检查</button></div>
+      </form>
+    {% endif %}
+    </div></li>
+
+  <li class="{{ 'done' if steps[1] else ('now' if cur == 1) }}"><span class="mark">{{ '✓' if steps[1] else '2' }}</span>
+    <div><h2>让机器人连上</h2></div>
+    <div class="body">
+    {% if not steps[0] %}<p class="note">先完成上一步。</p>
+    {% elif steps[1] %}<p class="note"><span class="dot ok"></span>机器人在线。</p>
+    {% else %}
+      {% if result %}<p><span class="dot {{ 'ok' if result.ok else 'bad' }}"></span>{{ result.message }}</p>{% endif %}
+      <p class="note">QQ 要求把这台服务器的公网 IP 加进白名单：开放平台 → 开发管理 → 开发设置 → IP 白名单，添加 <b>{{ result.ip if result and result.ip else (ip or '这台服务器的公网 IP') }}</b>，保存后点下面的按钮再检查。连上后这一步会自动打勾（可能要等几秒，刷新一下）。</p>
+      <form method="post" action="{{ url_for('bots_test', app_id=bid) }}">{{ csrf() }}<input type="hidden" name="next" value="wizard"><button class="btn ghost" type="submit">检查连接</button></form>
+    {% endif %}
+    </div></li>
+
+  <li class="{{ 'done' if steps[2] else ('now' if cur == 2) }}"><span class="mark">{{ '✓' if steps[2] else '3' }}</span>
+    <div><h2>设一位 QQ 管理员</h2></div>
+    <div class="body">
+    {% if not steps[1] %}<p class="note">先让机器人连上。</p>
+    {% elif steps[2] %}<p class="note">已有 {{ n_admins }} 位管理员。</p>
+    {% else %}
+      <p class="note">管理员能在群里用管理指令（设公告群、统一送心动信等），不用有角色。</p>
+      <ol><li>先在 QQ 里建一个群，把机器人加进去。</li>
+      <li><a href="/b/{{ bid }}/admins">打开「QQ 管理员」页</a>，点「生成管理员码」。</li>
+      <li>在群里发：<code>认管理员 管理员码</code>（别忘了先 @机器人）。</li>
+      <li>想让这个群当公告群，再发：<code>设为公告群</code>。</li></ol>
+    {% endif %}
+    </div></li>
+
+  <li class="{{ 'done' if steps[3] else ('now' if cur == 3) }}"><span class="mark">{{ '✓' if steps[3] else '4' }}</span>
+    <div><h2>建第一个角色</h2></div>
+    <div class="body">
+    {% if not steps[2] %}<p class="note">先设管理员。</p>
+    {% elif steps[3] %}<p class="note">已有 {{ n_roles }} 个角色。更多角色在「角色与群」页管理。</p>
+    {% else %}
+      <p class="note">每位玩家有一个自己的「个人群」，在里面发 <code>创建新角色 名字</code> 就绑定了角色。你可以先拿自己试一个。</p>
+      <p class="note">想看进度：<a href="/b/{{ bid }}/roles">角色与群</a>。</p>
+    {% endif %}
+    </div></li>
+
+  <li class="{{ 'done' if steps[4] else ('now' if cur == 4) }}"><span class="mark">{{ '✓' if steps[4] else '5' }}</span>
+    <div><h2>开启小手机（可选）</h2></div>
+    <div class="body">
+    {% if steps[4] %}<p class="note">已开启，可在小手机页检查玩家能不能从外网打开。</p>
+    {% else %}<p class="note">玩家用激活码在网页里发短信、送礼。不开也不影响群里的玩法。</p>{% endif %}
+    {% if steps[0] %}<p class="note"><a href="/b/{{ bid }}/phone">{{ '打开小手机设置' if steps[4] else '去开启小手机' }}</a></p>{% endif %}
+    </div></li>
+</ol>
+{% if cur == 4 %}<p class="note">必做的四步都完成了，机器人已经能正常使用。接下来去 <a href="{{ url_for('dashboard') }}">总览</a> 看看。</p>{% endif %}
+{% endblock %}

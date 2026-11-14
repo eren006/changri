@@ -1,0 +1,113 @@
+"""群池：机器人被拉进的群。约会房间从池里领空群，结束后先「待清场」，管理员确认群里的人都清走了再放回池。
+官方机器人读不到真实群号、踢不了人，所以群号要管理员在设置平台填，清场也要人工确认。"""
+import time
+
+from .db import get_conn, get_config
+
+
+def note_group(bot_id: str, group_openid: str) -> bool:
+    """机器人被拉进群时登记一下（已有则不动）。返回是否新登记。"""
+    with get_conn() as c:
+        cur = c.execute("INSERT OR IGNORE INTO pool_groups(bot_id, group_openid, added_ts) VALUES(?,?,?)",
+                        (bot_id, group_openid, int(time.time())))
+        return cur.rowcount > 0
+
+
+def register(bot_id: str, group_openid: str, real_gid: str = "", set_name: str = "", label: str = "") -> int:
+    """直接放进池（管理员在群里发「设为群池」）。"""
+    note_group(bot_id, group_openid)
+    with get_conn() as c:
+        c.execute("UPDATE pool_groups SET in_pool=1, real_gid=CASE WHEN ?!='' THEN ? ELSE real_gid END, "
+                  "set_name=CASE WHEN ?!='' THEN ? ELSE set_name END, label=CASE WHEN ?!='' THEN ? ELSE label END "
+                  "WHERE bot_id=? AND group_openid=?", (real_gid, real_gid, set_name, set_name, label, label, bot_id, group_openid))
+        return c.execute("SELECT id FROM pool_groups WHERE bot_id=? AND group_openid=?", (bot_id, group_openid)).fetchone()["id"]
+
+
+def is_pool_group(bot_id: str, group_openid: str):
+    with get_conn() as c:
+        return c.execute("SELECT * FROM pool_groups WHERE bot_id=? AND group_openid=?", (bot_id, group_openid)).fetchone()
+
+
+def get(pool_id: int):
+    with get_conn() as c:
+        return c.execute("SELECT * FROM pool_groups WHERE id=?", (pool_id,)).fetchone()
+
+
+def all_groups() -> list:
+    """带上「已绑成个人群/戏群/公告群」的标记，避免把玩家的个人群当成房间用。"""
+    with get_conn() as c:
+        rows = c.execute("SELECT * FROM pool_groups ORDER BY set_name, id").fetchall()
+        bound = {(r["bot_id"], r["group_openid"]) for r in c.execute("SELECT bot_id, group_openid FROM role_groups WHERE group_openid IS NOT NULL")}
+    stage, ann = get_config("stage_group", ""), get_config("announce_group", "")
+    out = []
+    for r in rows:
+        d = dict(r)
+        key = f"{r['bot_id']}|{r['group_openid']}"
+        d["conflict"] = "个人群" if (r["bot_id"], r["group_openid"]) in bound else "戏群" if key == stage else "公告群" if key == ann else ""
+        out.append(d)
+    return out
+
+
+def update(pool_id: int, real_gid: str, label: str, set_name: str) -> None:
+    with get_conn() as c:
+        c.execute("UPDATE pool_groups SET real_gid=?, label=?, set_name=? WHERE id=?", (real_gid.strip(), label.strip(), set_name.strip(), pool_id))
+
+
+def set_in_pool(pool_id: int, on: bool) -> tuple[bool, str]:
+    g = get(pool_id)
+    if not g:
+        return False, "没有这个群"
+    if on:
+        d = [x for x in all_groups() if x["id"] == pool_id][0]
+        if d["conflict"]:
+            return False, f"这个群已经是{d['conflict']}，不能放进群池"
+    elif g["state"] != "free":
+        return False, "这个群正在使用或等待清场，先处理完再移出"
+    with get_conn() as c:
+        c.execute("UPDATE pool_groups SET in_pool=? WHERE id=?", (int(on), pool_id))
+    return True, ""
+
+
+def set_set(set_name: str, on: bool) -> tuple[int, int]:
+    """开启/关闭一整个群号组。返回 (成功数, 跳过数)。"""
+    ok = skip = 0
+    with get_conn() as c:
+        ids = [r["id"] for r in c.execute("SELECT id FROM pool_groups WHERE set_name=?", (set_name,))]
+    for i in ids:
+        done, _ = set_in_pool(i, on)
+        ok, skip = ok + done, skip + (not done)
+    return ok, skip
+
+
+def delete(pool_id: int) -> tuple[bool, str]:
+    g = get(pool_id)
+    if g and g["state"] != "free":
+        return False, "这个群正在使用或等待清场"
+    with get_conn() as c:
+        c.execute("DELETE FROM pool_groups WHERE id=?", (pool_id,))
+    return True, ""
+
+
+def allocate(room_id: int):
+    """领一个空群给房间。池里没有空群返回 None（房间排队）。"""
+    with get_conn() as c:
+        g = c.execute("SELECT * FROM pool_groups WHERE in_pool=1 AND state='free' ORDER BY id LIMIT 1").fetchone()
+        if not g:
+            return None
+        c.execute("UPDATE pool_groups SET state='occupied', room_id=? WHERE id=?", (room_id, g["id"]))
+        c.execute("UPDATE rooms SET pool_id=? WHERE id=?", (g["id"], room_id))
+        return g
+
+
+def release(pool_id: int, to: str = "cleaning") -> None:
+    with get_conn() as c:
+        c.execute("UPDATE pool_groups SET state=?, room_id=NULL WHERE id=?", (to, pool_id))
+
+
+def counts() -> dict:
+    with get_conn() as c:
+        r = {k: 0 for k in ("free", "occupied", "cleaning")}
+        for row in c.execute("SELECT state, COUNT(*) n FROM pool_groups WHERE in_pool=1 GROUP BY state"):
+            r[row["state"]] = row["n"]
+        r["waiting"] = c.execute("SELECT COUNT(*) FROM rooms WHERE status='open' AND pool_id IS NULL").fetchone()[0]
+        return r

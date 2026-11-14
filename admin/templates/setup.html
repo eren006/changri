@@ -1,0 +1,16 @@
+{% extends "auth.html" %}
+{% block title %}首次设置{% endblock %}
+{% block form %}
+<h1>创建第一个账号</h1>
+<p class="lede">这是新装的控制台，先建一个管理账号。之后可以在「登录账号」里添加其他人。</p>
+{% for m in get_flashed_messages() %}<p class="flash" role="alert">{{ m }}</p>{% endfor %}
+{% if need_code %}<label for="sc">验证码（安装完成时打印在屏幕上的 8 位字母数字）</label>
+<input id="sc" name="setup_code" autocomplete="off" autocapitalize="characters" maxlength="8" required>
+{% endif %}<label for="u">账号</label>
+<input id="u" name="username" autocomplete="username" {% if not need_code %}autofocus {% endif %}required>
+<label for="p">密码（至少 8 位）</label>
+<input id="p" type="password" name="password" autocomplete="new-password" required minlength="8">
+<label for="a">再输入一次密码</label>
+<input id="a" type="password" name="again" autocomplete="new-password" required minlength="8">
+<button type="submit">创建并进入</button>
+{% endblock %}

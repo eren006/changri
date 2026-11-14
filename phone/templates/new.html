@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block title %}{{ skin.words.new }} · {{ brand }}{% endblock %}
+{% block body %}
+  <header class="bar">
+    <a class="back" href="{{ url_for('inbox') }}">取消</a>
+    <div class="title">{{ skin.words.new }}</div>
+    <div class="right"></div>
+  </header>
+  <div class="scroll new-message-page">
+  <p class="new-intro">{% if gift %}送「{{ gift }}」，选一位收件人{% else %}选择一位收件人，开始对话{% endif %}</p>
+  <h2 class="recipient-heading">联系人 <span>{{ others|length }} 位</span></h2>
+  <div class="list recipient-list">
+    {% for o in others %}
+    <a class="row" href="{{ url_for('thread', other=o.id, gift=gift) if gift else url_for('thread', other=o.id) }}">
+      <div class="avatar sm" data-name="{{ o.name }}">{{ o.name[:1] }}</div>
+      <div class="body"><div class="top"><span class="name">{{ o.name }}</span><span class="recipient-arrow" aria-hidden="true">›</span></div></div>
+    </a>
+    {% else %}
+    <div class="empty">还没有可以发送的对象</div>
+    {% endfor %}
+  </div>
+  </div>
+{% endblock %}

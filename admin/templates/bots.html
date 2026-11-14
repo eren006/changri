@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}机器人{% endblock %}
+{% block body %}
+<h1>机器人</h1>
+{% if owner %}
+<p class="lede">在这里填 QQ 机器人的 AppID 和 AppSecret，保存后几秒内自动连上，不用重启。可以接入你自己的多个机器人。</p>
+{% else %}
+<p class="lede">这里显示机器人有没有在线。添加、修改密钥只有主账号能做。</p>
+{% endif %}
+
+{% if result %}
+<section>
+  <h2>连接检查 · {{ result.app_id }}</h2>
+  <p><span class="dot {{ 'ok' if result.ok else 'bad' }}"></span>{{ result.message }}</p>
+</section>
+{% endif %}
+
+<section>
+  <h2>已接入</h2>
+  {% if accounts %}
+  <table>
+    <tr><th>AppID</th><th>状态</th><th>已绑定的群</th><th>QQ 管理员</th>{% if owner %}<th>密钥</th><th></th>{% endif %}</tr>
+    {% for b in accounts %}
+    <tr>
+      <td class="tabular">{{ b.app_id }}{% if b.note %}<div class="tag">{{ b.note }}</div>{% endif %}</td>
+      <td>{% if not b.enabled %}<span class="dot bad"></span>已停用
+          {% elif b.online %}<span class="dot ok"></span>在线
+          {% else %}<span class="dot bad"></span>不在线{% if b.seen %}<div class="tag">上次响应 {{ b.seen | datetimefmt }}</div>{% else %}<div class="tag">还没连上，可点「测试连接」</div>{% endif %}{% endif %}</td>
+      <td class="tabular">{{ b.groups }}</td>
+      <td class="tabular">{{ b.admins }}</td>
+      {% if owner %}
+      <td class="tabular">{{ b.masked }}</td>
+      <td>
+        <div style="display:flex;gap:14px;flex-wrap:wrap">
+          <form method="post" action="{{ url_for('bots_test', app_id=b.app_id) }}">{{ csrf() }}<button class="linkbtn" style="color:var(--ink)">测试连接</button></form>
+          <form method="post" action="{{ url_for('bots_toggle', app_id=b.app_id) }}">{{ csrf() }}<input type="hidden" name="on" value="{{ 0 if b.enabled else 1 }}"><button class="linkbtn" style="color:var(--ink)">{{ '停用' if b.enabled else '启用' }}</button></form>
+          <form method="post" action="{{ url_for('bots_delete', app_id=b.app_id) }}" onsubmit="return confirm('移除机器人 {{ b.app_id }}？它已绑定的角色和数据会保留，只是不再收发消息。')">{{ csrf() }}<button class="linkbtn">移除</button></form>
+          <details style="margin-top:6px"><summary class="tag" style="cursor:pointer">彻底删除…</summary>
+            <form method="post" action="{{ url_for('bots_erase', app_id=b.app_id) }}" style="margin-top:6px">{{ csrf() }}
+              <p class="note" style="color:var(--bad)">会删掉这个机器人的账号和它的全部数据（角色、群、季度、设置、小手机激活码），<b>不能撤销</b>。要保留数据请用上面的「移除」。</p>
+              <input type="text" name="confirm" placeholder="输入 AppID {{ b.app_id }} 确认" autocomplete="off" style="width:200px">
+              <button class="linkbtn">彻底删除</button>
+            </form></details>
+        </div>
+        <details style="margin-top:8px"><summary class="tag" style="cursor:pointer">改密钥</summary>
+          <form class="inline" method="post" action="{{ url_for('bots_secret', app_id=b.app_id) }}">{{ csrf() }}
+            <div><label for="s{{ b.app_id }}">新的 AppSecret</label><input id="s{{ b.app_id }}" type="password" name="secret" autocomplete="off" required></div>
+            <button class="btn" type="submit">保存</button>
+          </form>
+        </details>
+      </td>
+      {% endif %}
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="empty">还没有接入机器人。{% if owner %}在下面填入 AppID 和 AppSecret 就能接入。{% else %}请主账号来添加。{% endif %}</p>
+  {% endif %}
+</section>
+
+{% if owner %}
+<section>
+  <h2>添加机器人</h2>
+  <form class="inline" method="post" action="{{ url_for('bots_add') }}">
+    {{ csrf() }}
+    <div><label for="aid">AppID</label><input id="aid" type="text" name="app_id" inputmode="numeric" autocomplete="off" required></div>
+    <div><label for="asec">AppSecret</label><input id="asec" type="password" name="secret" autocomplete="off" required></div>
+    <div><label for="anote">备注（选填）</label><input id="anote" type="text" name="note" maxlength="30"></div>
+    <button class="btn" type="submit">保存并检查</button>
+  </form>
+  <p class="note">两项都在 QQ 开放平台的「开发管理 → 开发设置」里。保存后会马上检查：密钥对不对、这台服务器的 IP 有没有加进白名单。</p>
+</section>
+
+<section>
+  <h2>接入前要在 QQ 开放平台做的事</h2>
+  <ol class="note">
+    <li>把这台服务器的公网 IP 加进白名单：{% if ip %}<b class="tabular">{{ ip }}</b>{% else %}（这里没能自动查到，可在服务器上用浏览器搜「IP」查看）{% endif %}。位置是「开发管理 → 开发设置 → IP 白名单」。</li>
+    <li>在「沙箱配置」里添加你的测试群和测试用户（机器人没上线前只能在沙箱里用）。</li>
+    <li>每个机器人看到的群和用户标识各自独立，所以同一个玩家在两个机器人下需要各认一次群、各认一次管理员。角色、短信、心动信、关系线是全团共用的。</li>
+  </ol>
+</section>
+{% endif %}
+{% endblock %}

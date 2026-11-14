@@ -1,0 +1,262 @@
+<style>
+/* ── 小手机统一页面风格（以「信息」列表和聊天页为样板）──────────────────────────────────────────
+   原则：白底、少边框、细线分隔；输入框是淡灰填充的圆角块（跟搜索条一样）；主按钮是主题色实心圆角；
+   小标题是 12px 的淡灰字（跟发现页的「互动 / 玩乐 / 其他」一样）；列表行是头像/图标 + 粗体名字 + 淡灰预览 + 细线，不再套一圈圈边框卡片。
+   颜色全用主题变量（--theirs --mine --muted --line --text），六套外观都跟着变。新页面按这几条写，别再各写一套。 */
+.phone { --pk-fill: var(--theirs); --pk-radius: 14px; --pk-focus: color-mix(in srgb, var(--mine) 55%, transparent); }
+
+/* 1. 表单：淡灰填充的输入块，无边框 */
+.phone .song-form, .phone .wish-form, .phone .bottle-letter { background: none; border: 0; border-radius: 0; box-shadow: none; }
+.phone .wish-form, .phone .bottle-letter { padding-left: 0; padding-right: 0; }
+.phone .song-form { padding-left: var(--gutter, 18px); padding-right: var(--gutter, 18px); }
+.phone .wish-form, .phone .bottle-letter { padding-top: 4px; padding-bottom: 4px; }
+.phone .song-form input, .phone .song-form select, .phone .song-form textarea,
+.phone .wish-form input, .phone .wish-form select, .phone .wish-form textarea,
+.phone .bottle-letter textarea, .phone .song-search input {
+  background: var(--pk-fill); border: 0; border-radius: var(--pk-radius); min-height: 48px; padding: 12px 14px; color: var(--text); font-size: 16px; box-shadow: none; }
+.phone .bottle-letter textarea { border: 0; min-height: 132px; resize: vertical; }
+.phone .song-form textarea, .phone .wish-form textarea { min-height: 112px; }
+.phone .song-form input:focus, .phone .song-form textarea:focus, .phone .song-form select:focus,
+.phone .wish-form input:focus, .phone .wish-form textarea:focus, .phone .wish-form select:focus,
+.phone .bottle-letter textarea:focus, .phone .song-search input:focus { outline: 0; box-shadow: 0 0 0 2px var(--pk-focus); }
+.phone .song-form label, .phone .wish-form label, .phone .wish-label { font-size: 13px; font-weight: 500; color: var(--muted); margin: 16px 0 8px; }
+.phone .wish-form .wish-label { margin-top: 0; }
+.phone .song-form label { margin: 6px 0 0; }
+.phone .wish-intro h2, .phone .bottle-letter-head label { font-size: 17px; font-weight: 700; color: var(--text); }
+
+/* 2. 按钮：主按钮实心，次按钮淡灰填充，都是圆角胶囊 */
+.phone .wish-form .wish-button, .phone .wish-card .wish-button:not(.wish-quiet), .phone .bottle-letter button, .phone .bottle-compose button,
+.phone .song-submit, .phone .song-search button {
+  background: var(--mine); color: var(--mine-text); border: 0; border-radius: 24px; min-height: 46px; padding: 0 22px; font: inherit; font-weight: 600; box-shadow: none; }
+.phone .wish-quiet, .phone .wish-card .wish-quiet { background: var(--pk-fill); color: var(--text); border: 0; border-radius: 22px; }
+.phone .wish-button:disabled, .phone .bottle-letter button:disabled, .phone .bottle-compose button:disabled, .phone .song-submit:disabled { opacity: .45; }
+.phone .song-submit { width: 100%; margin-top: 4px; }
+.phone .song-tabs button { background: var(--pk-fill); border: 0; border-radius: 20px; padding: 9px; font-weight: 500; color: var(--muted); box-shadow: none; }
+.phone .song-tabs button[aria-pressed="true"] { background: var(--mine); color: var(--mine-text); box-shadow: none; font-weight: 600; }
+
+/* 3. 小标题：12px 淡灰，跟发现页分组标题一致 */
+.phone .wish-section h2, .phone .wish-section-heading h2, .phone .bottle-section h2, .phone .ch-h {
+  font-size: 12px; font-weight: 500; letter-spacing: .12em; color: var(--muted); margin: 0; }
+.phone .wish-section, .phone .bottle-section, .phone .wish-section-heading { margin-top: 28px; }
+.phone .wish-section-heading, .phone .bottle-section { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; }
+.phone .bottle-section span, .phone .wish-section-heading .wish-hint { font-size: 11px; color: var(--muted); letter-spacing: .08em; }
+
+/* 4. 列表行：不套边框卡片，行与行之间一条细线 */
+.phone .bottle-list, .phone .wish-wall, .phone .wish-operations { display: block; gap: 0; }
+.phone .bottle-row, .phone .wish-card, .phone .wish-operation {
+  background: none; border: 0; border-bottom: .5px solid var(--line); border-radius: 0; box-shadow: none; padding: 16px 2px; min-height: 0; }
+.phone .bottle-row:last-child, .phone .wish-card:last-child, .phone .wish-operation:last-child { border-bottom: 0; }
+.phone .wish-card.is-mine { background: color-mix(in srgb, var(--mine) 6%, transparent); border-radius: var(--pk-radius); padding: 16px 14px; border-bottom: 0; margin: 6px 0; }
+.phone .wish-card.is-ending { opacity: .72; }
+.phone .bottle-row.is-pending, .phone .wish-operation.is-waiting { background: none; border-style: solid; opacity: .7; }
+.phone .bottle-row.is-failed, .phone .wish-operation.is-failed, .phone .bottle-alert, .phone .wish-notice {
+  background: color-mix(in srgb, var(--tag) 9%, transparent); border: 0; border-radius: var(--pk-radius); padding: 12px 14px; color: var(--text); }
+.phone .bottle-row.is-failed, .phone .wish-operation.is-failed { padding: 16px 14px; margin: 6px 0; }
+.phone .bottle-empty, .phone .wish-empty { border: 0; background: none; color: var(--muted); }
+
+.phone .wish-card::before { display: none; }
+.phone .wish-card-foot { border-top: 0; padding-top: 0; margin-top: 14px; }
+.phone .wish-submit-row { border-top: 0; padding-top: 6px; margin-top: 14px; }
+
+/* 5. 图标块：跟信息列表的头像一样是淡灰圆块，发现页里的图标跟其它行的 emoji 一个大小 */
+.phone .app-icon { border-radius: 50%; border: 0; background: var(--pk-fill); }
+.phone .disc-group .app-icon { width: 32px; height: 32px; flex: none; border-radius: 0; background: none; border: 0; display: flex; align-items: center; justify-content: center; }
+.phone .disc-group .app-icon svg { width: 28px; height: 28px; }
+.phone .wish-intro .app-icon, .phone .bottle-letter-head .app-icon { width: 44px; height: 44px; }
+
+/* 分段切换（心动信箱等）：跟点歌平台切换一样的胶囊 */
+.phone .lm-tabs a { background: var(--pk-fill); border: 0; border-radius: 20px; padding: 9px; color: var(--muted); font-weight: 500; box-shadow: none; }
+.phone .lm-tabs a[aria-current] { background: var(--mine); color: var(--mine-text); box-shadow: none; font-weight: 600; }
+
+/* 6. 单个瓶子 / 聊天式页面的气泡跟聊天页一致：对方淡灰、自己主题色 */
+.phone .bottle-thread .bubble { border: 0; }
+.phone .bottle-thread .mine .bubble { background: var(--mine); color: var(--mine-text); border: 0; }
+.phone .bottle-compose { border-top: .5px solid var(--line); }
+.phone .bottle-compose textarea { background: var(--pk-fill); border: 0; border-radius: 22px; padding: 11px 16px; min-height: 44px; }
+.phone .bottle-compose textarea:focus { outline: 0; box-shadow: 0 0 0 2px var(--pk-focus); }
+/* 7. 卡片：浅色下跟发现页分组卡片一样去掉硬边线，改成柔和光晕；深色保留细边 */
+@media (prefers-color-scheme: light) {
+  .phone .public-ticker, .phone .broadcast { border-color: transparent !important; box-shadow: 0 1px 2px rgba(20,20,40,.04), 0 6px 20px color-mix(in srgb, var(--mine) 11%, transparent); }
+}
+
+/* ── 8. iOS 质感层（2026-10）──────────────────────────────────────────────────────────────────
+   参照 iOS 的设计语言：分组列表的灰底画布 + 白色圆角分组、半透明玻璃材质（顶栏/底栏）、系统分段控件、
+   实心主按钮 + 淡色填充次按钮、圆角方块图标、按下反馈、跟随系统的深浅色。主题色（--mine）就是 iOS 里的 tint。
+   画布只铺在「工具类」页面（发现/心愿/漂流瓶/点歌/心动信箱/小游戏/地图）；信息列表和聊天页保持白底（像「信息」App）。
+   云絮邮局那套是纸质拟物风格，不套玻璃和画布，保留它自己的样子。 */
+.phone { -webkit-font-smoothing: antialiased; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Helvetica Neue", sans-serif; }
+@media (prefers-color-scheme: light) { .phone { --ios-canvas: color-mix(in srgb, var(--bg) 94%, #5a5a6e 6%); --ios-group: var(--bg); --ios-thumb: var(--bg); } }
+@media (prefers-color-scheme: dark) { .phone { --ios-canvas: var(--bg); --ios-group: color-mix(in srgb, var(--bg) 88%, #fff 12%); --ios-thumb: color-mix(in srgb, var(--bg) 70%, #fff 30%); } }
+
+/* 画布 + 分组 */
+.phone:is([data-mode="discover"],[data-mode="wishes"],[data-mode="bottles"],[data-mode="song"],[data-mode="games"],[data-mode="maps"],[data-mode="lovemail"]):not([data-visual="cloudpost"]) {
+  background: var(--ios-canvas); --pk-fill: var(--ios-group); }
+.phone:is([data-mode="discover"],[data-mode="wishes"],[data-mode="bottles"],[data-mode="song"],[data-mode="games"],[data-mode="maps"],[data-mode="lovemail"]):not([data-visual="cloudpost"]) .scroll { background: transparent; }
+.phone:is([data-mode="discover"],[data-mode="wishes"],[data-mode="bottles"],[data-mode="song"],[data-mode="games"],[data-mode="maps"],[data-mode="lovemail"]):not([data-visual="cloudpost"]) .disc-group { background: var(--ios-group); border-radius: 12px; }
+.phone[data-visual]:not([data-visual="cloudpost"]) .wish-wall, .phone[data-visual]:not([data-visual="cloudpost"]) .bottle-list, .phone[data-visual]:not([data-visual="cloudpost"]) .wish-operations {
+  background: var(--ios-group); border-radius: 12px; padding: 0 16px; }
+.phone[data-visual]:not([data-visual="cloudpost"]) .wish-card.is-mine { margin: 0 -16px; padding: 16px; border-radius: 0; }
+.phone .wish-empty, .phone .bottle-empty { padding: 36px 16px; }
+
+/* 分段控件：灰色轨道 + 白色滑块 */
+.phone .song-tabs, .phone .lm-tabs { background: color-mix(in srgb, var(--text) 8%, transparent); border-radius: 9px; padding: 2px; gap: 2px; margin: 12px var(--gutter, 18px) 0; }
+.phone .song-tabs button, .phone .lm-tabs a { background: transparent; border-radius: 7px; padding: 7px 4px; color: var(--text); font-size: 13px; font-weight: 500; box-shadow: none; }
+.phone .song-tabs button[aria-pressed="true"], .phone .lm-tabs a[aria-current] { background: var(--ios-thumb); color: var(--text); font-weight: 600; box-shadow: 0 3px 8px rgba(0,0,0,.12), 0 1px 1px rgba(0,0,0,.08); }
+
+/* 按钮：主按钮实心圆角矩形，行内小按钮是淡色填充 */
+.phone .wish-form .wish-button, .phone .bottle-letter button, .phone .song-submit, .phone .song-search button { border-radius: 14px; min-height: 50px; font-size: 17px; letter-spacing: -.01em; }
+.phone .song-search button { min-height: 44px; font-size: 15px; padding: 0 18px; }
+.phone .wish-submit-row, .phone .bottle-letter-foot { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.phone .wish-submit-row .wish-button, .phone .bottle-letter-foot button { width: 100%; }
+.phone .wish-card .wish-button:not(.wish-quiet) { background: color-mix(in srgb, var(--mine) 14%, transparent); color: var(--mine); min-height: 34px; padding: 0 16px; border-radius: 17px; font-size: 14px; }
+.phone .wish-card .wish-quiet { background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--text); min-height: 34px; padding: 0 16px; border-radius: 17px; font-size: 14px; }
+.phone button:not(:disabled):active, .phone .wish-copy:active { transform: scale(.97); }
+.phone .disc-group a.row:active, .phone #inbox a.row:active { background: color-mix(in srgb, var(--text) 7%, transparent); }
+.phone button, .phone a.row { transition: transform .15s cubic-bezier(.2,.8,.2,1), background-color .15s; }
+
+/* 对齐：点歌页的搜索行和说明文字跟页面左右边距一致 */
+.phone .song-search { padding-left: var(--gutter, 18px); padding-right: var(--gutter, 18px); }
+.phone .song-note { padding-left: var(--gutter, 18px); padding-right: var(--gutter, 18px); }
+/* 页面里的图标块：主题色淡填充的圆角方块 */
+.phone .app-icon { border-radius: 10px; background: color-mix(in srgb, var(--mine) 12%, transparent); }
+
+/* 右侧的「›」：iOS 的细灰箭头 */
+.phone .disc-group .chev, .phone .row .chev { font-size: 22px; font-weight: 300; line-height: 1; color: color-mix(in srgb, var(--muted) 65%, transparent); }
+
+/* 发现页入口右边的灰色小字（心愿几个、今天点了几首、图鉴进度） */
+.phone .disc-group .detail { margin-left: auto; margin-right: 6px; font-size: 14px; color: var(--muted); white-space: nowrap; }
+.phone .disc-group .detail + .chev { margin-left: 0; }
+
+/* 圆角方块图标（像「设置」里的图标）：每个入口一种淡色 */
+.phone .disc-group .avatar.tile, .phone .disc-group .app-icon { width: 30px; height: 30px; border-radius: 8px; font-size: 17px; display: flex; align-items: center; justify-content: center; flex: none; }
+.phone .disc-group .app-icon svg { width: 22px; height: 22px; }
+.phone .disc-group a.row:nth-child(5n+1) .avatar.tile, .phone .disc-group a.row:nth-child(5n+1) .app-icon { background: color-mix(in srgb, #0a84ff 16%, transparent); }
+.phone .disc-group a.row:nth-child(5n+2) .avatar.tile, .phone .disc-group a.row:nth-child(5n+2) .app-icon { background: color-mix(in srgb, #ff375f 16%, transparent); }
+.phone .disc-group a.row:nth-child(5n+3) .avatar.tile, .phone .disc-group a.row:nth-child(5n+3) .app-icon { background: color-mix(in srgb, #30d158 18%, transparent); }
+.phone .disc-group a.row:nth-child(5n+4) .avatar.tile, .phone .disc-group a.row:nth-child(5n+4) .app-icon { background: color-mix(in srgb, #ff9f0a 20%, transparent); }
+.phone .disc-group a.row:nth-child(5n) .avatar.tile, .phone .disc-group a.row:nth-child(5n) .app-icon { background: color-mix(in srgb, #bf5af2 16%, transparent); }
+
+/* 底部导航：玻璃胶囊（iOS 26 的浮动标签栏）；主题色只用在选中项和中间的「+」上 */
+.phone:not([data-visual="cloudpost"]) .phone-nav {
+  --dock-bg: transparent; background: color-mix(in srgb, var(--bg) 70%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(26px); backdrop-filter: saturate(180%) blur(26px);
+  border: .5px solid color-mix(in srgb, var(--text) 12%, transparent);
+  box-shadow: 0 8px 30px rgba(0,0,0,.14), inset 0 1px 0 rgba(255,255,255,.35); }
+.phone:not([data-visual="cloudpost"]) .phone-nav a { color: var(--muted); }
+.phone:not([data-visual="cloudpost"]) .phone-nav a[aria-current] { background: color-mix(in srgb, var(--mine) 14%, transparent); color: var(--mine); }
+.phone:not([data-visual="cloudpost"]) .phone-nav a.dock-plus { background: var(--mine); color: var(--mine-text); box-shadow: 0 0 0 6px color-mix(in srgb, var(--bg) 78%, transparent), 0 8px 20px color-mix(in srgb, var(--mine) 40%, transparent); }
+.phone:not([data-visual="cloudpost"]) .phone-nav a.unread span::after { box-shadow: 0 0 0 2px var(--bg); background: #ff453a; }
+.phone:not([data-visual="cloudpost"]):not([data-visual="medici"]) .shop-fab { background: color-mix(in srgb, var(--bg) 78%, transparent); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); border: .5px solid color-mix(in srgb, var(--text) 12%, transparent); }
+
+
+/* ── 9. 管理端（管理员手机）套同一套 iOS 风格 ─────────────────────────────────────────────── */
+.phone[data-mode^="admin_"]:not([data-visual="cloudpost"]) { background: var(--ios-canvas); --pk-fill: var(--ios-group); }
+.phone[data-mode^="admin_"]:not([data-visual="cloudpost"]) .scroll { background: transparent; }
+.phone[data-mode^="admin_"] .ch-page, .phone[data-mode^="admin_"] .admin-desktop { padding-bottom: 112px; }   /* 别被底栏挡住 */
+.phone[data-mode^="admin_"] .ch-h { margin: 22px calc(var(--gutter, 18px) + 4px) 8px; font-size: 12px; font-weight: 500; letter-spacing: .12em; color: var(--muted); }
+.phone[data-mode^="admin_"] .ch-note { margin: 8px calc(var(--gutter, 18px) + 4px) 0; }
+.phone[data-mode^="admin_"] .ch-flash { background: color-mix(in srgb, var(--mine) 10%, transparent); border-radius: 12px; padding: 10px 14px; }
+.phone .plugin-chip { border-radius: 12px; background: color-mix(in srgb, var(--text) 6%, transparent); color: var(--text); padding: 9px 14px; }
+.phone .plugin-chip.ok { background: color-mix(in srgb, #34c759 14%, transparent); color: color-mix(in srgb, #34c759 55%, var(--text)); }
+.phone .plugin-chip.warn { background: color-mix(in srgb, #ff9f0a 16%, transparent); color: color-mix(in srgb, #ff9f0a 45%, var(--text)); }
+.phone .plugin-chip.bad { background: color-mix(in srgb, #ff453a 14%, transparent); color: color-mix(in srgb, #ff453a 60%, var(--text)); }
+
+/* 分组列表：白色圆角分组 + 细线 */
+.phone[data-mode^="admin_"] .ch-list { background: var(--ios-group); border: 0; border-radius: 12px; overflow: hidden; }
+.phone[data-mode^="admin_"] .ch-item { padding: 12px 16px; }
+.phone[data-mode^="admin_"] .ch-row { min-height: 52px; }
+.phone[data-mode^="admin_"] .ch-row select { flex: 1 1 140px; min-width: 0; min-height: 40px; padding: 0 10px; font: inherit; font-size: 16px; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; }
+.phone[data-mode^="admin_"] .ch-row:has(select) { flex-wrap: wrap; row-gap: 8px; }
+.phone[data-mode^="admin_"] .ch-row:has(select) .nm { flex: 1 1 100%; }
+.phone[data-mode^="admin_"] .ch-row input[type=number], .phone[data-mode^="admin_"] .ch-row input[type=time] {
+  background: var(--theirs); border: 0; border-radius: 10px; min-height: 36px; padding: 6px 10px; }
+
+/* 按钮：行内是淡色填充小胶囊，表单里的主按钮是整行实心 */
+.phone .ch-btn { border: 0; border-radius: 17px; background: color-mix(in srgb, var(--mine) 14%, transparent); color: var(--mine); font-weight: 600; padding: 0 16px; min-height: 34px; font-size: 14px; }
+.phone .ch-give .ch-btn, .phone .urge-actions .ch-btn:first-child { background: var(--mine); color: var(--mine-text); min-height: 50px; border-radius: 14px; font-size: 17px; width: 100%; }
+.phone .urge-actions .ch-btn + .ch-btn { background: color-mix(in srgb, var(--mine) 14%, transparent); color: var(--mine); border: 0; min-height: 46px; border-radius: 14px; }
+.phone .urge-actions .ch-btn:first-child { border: 0; }
+
+/* 表单控件：白色圆角块，不再是浏览器默认样子 */
+.phone .ch-give { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px var(--gutter, 18px) 0; }
+.phone .ch-give > * { flex: 1 1 100%; }
+.phone .ch-give > input[name=value], .phone .ch-give > select[name=sign], .phone .ch-give > select[name=scope] { flex: 1 1 calc(33.3% - 8px); }
+.phone .ch-give input, .phone .ch-give select, .phone .ch-set input {
+  background: var(--ios-group); border: 0; border-radius: 12px; min-height: 48px; padding: 12px 14px; color: var(--text); font-size: 16px; box-shadow: none; flex-basis: auto; width: auto; }
+.phone .ch-give > input, .phone .ch-give > select { width: 100%; }
+.phone .ch-give input:focus, .phone .ch-give select:focus { outline: 0; box-shadow: 0 0 0 2px var(--pk-focus); }
+.phone .ch-give input[type=time] { min-width: 0; width: 100%; }
+.phone .ch-give details { background: var(--ios-group); border-radius: 12px; padding: 12px 14px; }
+.phone .ch-give summary { font-size: 15px; color: var(--text); cursor: pointer; }
+.phone .ch-give label { font-size: 15px; }
+
+/* 带输入框的参数行：名称独占一行，下面是 输入框 + 单位 + 保存，不再把名字挤成竖排 */
+.phone[data-mode^="admin_"] .ch-row:has(input[type=number], input[type=time]) { flex-wrap: wrap; row-gap: 8px; }
+.phone[data-mode^="admin_"] .ch-row:has(input[type=number], input[type=time]) .nm { flex: 1 1 100%; }
+.phone[data-mode^="admin_"] .ch-row input[type=number], .phone[data-mode^="admin_"] .ch-row input[type=time] { flex: 1 1 120px; min-width: 0; }
+
+/* iOS 开关（管理员手机「设置」里的开关类参数） */
+.phone .ios-switch { position: relative; flex: none; width: 51px; height: 31px; min-height: 0; padding: 0; border: 0; border-radius: 16px; background: color-mix(in srgb, var(--text) 18%, transparent); font-size: 0; color: transparent; transition: background-color .2s; }
+.phone .ios-switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 3px 8px rgba(0,0,0,.16), 0 1px 1px rgba(0,0,0,.16); transition: transform .25s cubic-bezier(.2,.8,.2,1); }
+.phone .ios-switch[aria-checked="true"] { background: #34c759; }
+.phone .ios-switch[aria-checked="true"]::after { transform: translateX(20px); }
+.phone .ios-switch:active { transform: none; }
+.phone .ios-switch:active::after { width: 31px; }
+.phone .ios-switch[aria-checked="true"]:active::after { transform: translateX(16px); }
+
+/* 催戏页：按时间勾选的一排小按钮、已催过的分隔和淡化 */
+.phone .urge-quick { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 14px var(--gutter, 18px) 0; }
+.phone .urge-quick span { flex: 1 1 100%; font-size: 12px; color: var(--muted); letter-spacing: .08em; }
+.phone .urge-quick button { background: color-mix(in srgb, var(--mine) 12%, transparent); color: var(--mine); border: 0; border-radius: 16px; min-height: 34px; padding: 0 12px; font-size: 13px; font-weight: 500; }
+.phone .urge-quick button:disabled { opacity: .35; }
+.phone .urge-divider { padding: 12px 0 6px; font-size: 12px; letter-spacing: .08em; color: var(--muted); border-bottom: .5px solid var(--line); }
+.phone .admin-urge .urge-card.is-urged { opacity: .6; }
+.phone .urge-tag { font-weight: 500; font-size: 11px; padding: 1px 7px; border-radius: 9px; background: color-mix(in srgb, var(--tag) 14%, transparent); color: var(--tag); }
+/* 催戏页：勾选卡片改成分组里的行 */
+.phone .admin-urge .ch-list { background: var(--ios-group); border-radius: 12px; padding: 0 16px; overflow: hidden; }
+.phone .admin-urge .urge-card { background: none; border: 0; border-bottom: .5px solid var(--line); border-radius: 0; margin: 0; padding: 14px 0; box-shadow: none; }
+.phone .admin-urge .urge-card:last-child { border-bottom: 0; }
+.phone .admin-urge .is-overdue { border-inline-start: 0; }
+.phone .urge-filter a { background: color-mix(in srgb, var(--text) 8%, transparent); border: 0; color: var(--text); }
+.phone .urge-actions { margin-top: 20px; }
+.phone .admin-urge .urge-summary .app-icon { width: 56px; height: 56px; border-radius: 14px; }
+
+/* 外观页的选项：未选中是淡灰填充胶囊，选中是主题色实心 */
+.phone .choices .choice { background: var(--pk-fill); border: 0; border-radius: 16px; padding: 8px 14px; font-size: 14px; color: var(--text); box-shadow: none; }
+.phone .choices .choice[aria-pressed="true"] { background: var(--mine); color: var(--mine-text); box-shadow: none; font-weight: 600; }
+.phone .choices .choice i { border-color: color-mix(in srgb, var(--text) 18%, transparent); }
+.phone .admin-appearance .appearance-preview { background: var(--ios-group); border: 0; border-radius: 12px; margin: 14px var(--gutter, 18px) 0; }
+.phone .admin-appearance .choices, .phone .admin-appearance .ch-note { margin-left: calc(var(--gutter, 18px) + 4px); margin-right: calc(var(--gutter, 18px) + 4px); }
+.phone .admin-appearance .ch-note .quiet-button { color: var(--mine); }
+/* 角色列表、漂流瓶总览：白色圆角分组 */
+/* 角色列表：白色圆角分组。注意别动 .scroll 自己的 flex/overflow（动了就滑不动了）——圆角和白底画在每一行上，首尾两行各切一边的圆角 */
+.phone[data-mode="admin_index"] .admin-roles { padding: 14px var(--gutter, 18px) 112px; }
+.phone[data-mode="admin_index"] .admin-roles .row { background: var(--ios-group); border-bottom: .5px solid var(--line); }
+.phone[data-mode="admin_index"] .admin-roles .row:first-child { border-radius: 12px 12px 0 0; }
+.phone[data-mode="admin_index"] .admin-roles .row:last-child { border-bottom: 0; border-radius: 0 0 12px 12px; }
+.phone[data-mode="admin_index"] .admin-roles .row:only-child { border-radius: 12px; }
+.phone .bottle-admin-card { background: var(--ios-group); border: 0; border-radius: 12px; }
+.phone .bottle-admin-intro { border-bottom: 0; }
+
+/* 弹层：背景轻微模糊，卡片圆角更大 */
+.phone dialog.appearance::backdrop, dialog.appearance::backdrop { -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); background: rgba(0,0,0,.28); }
+.phone dialog.appearance { border-radius: 24px; }
+@media (prefers-reduced-motion: reduce) { .phone button, .phone a.row { transition: none; } .phone button:active { transform: none; } }
+</style>
+
+<style>
+/* 共用小图标跟随主题颜色，避免系统 emoji 的颜色和尺寸差异。 */
+.phone-symbol { display: inline-block; width: 18px; height: 18px; flex: none; vertical-align: -.2em; }
+.phone .shop-fab .phone-symbol { width: 24px; height: 24px; }
+.phone .sc-nocover .phone-symbol { width: 25px; height: 25px; color: var(--muted); }
+.phone .public-avatar .phone-symbol, .phone .song-avatar .phone-symbol { width: 23px; height: 23px; }
+.lm-arrived-ic .phone-symbol { width: 42px; height: 42px; color: var(--mine); }
+.phone .pf-cam .phone-symbol { width: 13px; height: 13px; }
+.phone .pf-row .tile { color: var(--muted); }
+.phone .compose .gift-toggle { filter: none; opacity: 1; color: var(--muted); }
+.phone .compose.gift-mode .gift-toggle { color: var(--gift-text); }
+.phone .save-message[aria-pressed="true"] .phone-symbol { fill: color-mix(in srgb, var(--mine) 18%, transparent); color: var(--mine); }
+.phone .preset-open .phone-symbol { margin-right: 4px; }
+</style>
+
+<style>.phone .m-like.liked .phone-symbol { fill: color-mix(in srgb, var(--mine) 18%, transparent); }</style>

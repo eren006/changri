@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}心动信{% endblock %}
+{% block body %}
+<h1>心动信</h1>
+<p class="lede">玩家投的信先放在信池里，到了派送时间统一发给收信人。</p>
+
+<section>
+  <h2>信箱</h2>
+  <form method="post" action="{{ url_for('lovemail_open') }}" class="setrow">{{ csrf() }}
+    <label class="sw"><input type="checkbox" name="on" value="1" {{ 'checked' if open_ }} onchange="this.form.submit()" aria-label="信箱开放"><i></i></label>
+    <div><b>信箱开放，玩家可以投信</b><div class="d">季度开始会自动打开、结束会自动关闭；也可以在这里手动开关。</div></div>
+  </form>
+</section>
+
+<section>
+  <h2>派送</h2>
+  <p>每天 <b class="tabular">{{ at }}</b> 自动派送。上次派送日：{{ last }}。公告群：{% if announce %}已设置（机器人 {{ announce[0] }}）{% else %}<span class="dot warn"></span>还没设置，管理员在目标群里发「设为公告群」{% endif %}</p>
+  <form method="post" action="{{ url_for('lovemail_deliver') }}" onsubmit="return confirm('现在就把信池里所有的信派送出去？')">
+    {{ csrf() }}
+    <button class="btn" type="submit" {% if pending_now %}disabled{% endif %}>{{ '等待机器人处理…' if pending_now else '立即派送' }}</button>
+  </form>
+  <p class="note">点击后机器人会在 30 秒内处理。</p>
+</section>
+
+<section>
+  <h2>信池（{{ pool|length }} 封）</h2>
+  <table>
+    <tr><th>日期</th><th>谁 → 谁</th><th>署名</th><th>内容</th><th></th></tr>
+    {% for m in pool %}
+    <tr><td class="tabular">{{ m.day }}</td><td>{{ m.from_name }} → {{ m.to_name }}</td><td>{{ m.signature }}</td><td>{{ m.content }}</td>
+      <td><form method="post" action="{{ url_for('lovemail_delete', mail_id=m.id) }}" onsubmit="return confirm('删除这封信？')">{{ csrf() }}<button class="linkbtn">删除</button></form></td></tr>
+    {% else %}<tr><td colspan="5" class="empty">信池是空的。</td></tr>{% endfor %}
+  </table>
+</section>
+{% endblock %}

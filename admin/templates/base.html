@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block title %}长日{% endblock %} · 控制台</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231d1f33'/%3E%3Ccircle cx='16' cy='19' r='6' fill='%23d4476f'/%3E%3Crect x='5' y='19' width='22' height='2' fill='%231d1f33'/%3E%3C/svg%3E">
+<style>
+:root{
+  --paper:#eeeff4; --surface:#fafafd; --ink:#1f2133; --mute:#686b84; --line:#d9dbe6; --soft:#e4e6ef;
+  --night:#1d1f33; --night-ink:#e6e7f2; --night-mute:#9396b3; --night-line:#34375a;
+  --dusk:#c43a63; --dusk-ink:#fff; --ok:#23826d; --warn:#9a6212; --bad:#bb3228;
+  --serif:"Noto Serif CJK SC","Source Han Serif SC","Songti SC","STSong","SimSun",serif;
+  --sans:system-ui,-apple-system,"PingFang SC","Noto Sans CJK SC","Microsoft YaHei",sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --paper:#15162a; --surface:#1b1d35; --ink:#e8e9f4; --mute:#9a9db8; --line:#2d3050; --soft:#25274a;
+    --night:#0f1020; --night-line:#25274a;
+    --dusk:#ef7a9b; --dusk-ink:#2a0d17; --ok:#4cc1a6; --warn:#e0a94e; --bad:#ff8b80;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.65 var(--sans)}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--dusk);outline-offset:2px;border-radius:4px}
+
+.shell{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh}
+.rail{background:var(--night);color:var(--night-ink);padding:28px 20px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;overflow-y:auto}
+.brand{display:flex;align-items:baseline;gap:10px;text-decoration:none;margin:0 8px 28px}
+.brand b{font:700 30px/1 var(--serif);letter-spacing:.04em}
+.brand span{color:var(--night-mute);font-size:13px}
+.rail nav{display:flex;flex-direction:column;gap:22px;flex:1}
+.rail h3{margin:0 8px 6px;font-size:12px;font-weight:500;color:var(--night-mute);letter-spacing:.06em}
+.rail ul{list-style:none;margin:0;padding:0}
+.rail li a{display:block;padding:7px 8px 7px 12px;margin:1px 0;border-left:2px solid transparent;text-decoration:none;color:var(--night-ink);border-radius:0 6px 6px 0;font-size:14.5px}
+.rail li a:hover{background:rgba(255,255,255,.06)}
+.rail li a[aria-current=page]{border-left-color:var(--dusk);background:rgba(255,255,255,.08);font-weight:600}
+.botswitch{margin:-14px 8px 18px}
+.botswitch select{width:100%;background:rgba(255,255,255,.08);color:var(--night-ink);border:1px solid var(--night-line);padding:6px 8px;border-radius:6px;font:inherit;font-size:14px}
+.botswitch select option{color:#1f2133}
+.who{margin:20px 8px 0;padding-top:16px;border-top:1px solid var(--night-line);font-size:13px;color:var(--night-mute);display:flex;justify-content:space-between;align-items:center;gap:8px}
+.who button{background:none;border:0;color:var(--night-ink);cursor:pointer;font:inherit;text-decoration:underline;text-underline-offset:3px;padding:0}
+
+main{padding:44px clamp(20px,5vw,64px) 80px;max-width:1040px;width:100%}
+h1{font:700 30px/1.25 var(--serif);margin:0 0 6px}
+.lede{margin:0 0 36px;color:var(--mute);max-width:62ch}
+h2{font:700 19px/1.3 var(--serif);margin:0 0 14px}
+section{border-top:1px solid var(--line);padding:26px 0 34px}
+section:first-of-type{border-top:0;padding-top:0}
+.note{color:var(--mute);font-size:13.5px;margin:6px 0 0;max-width:62ch}
+.flash{margin:0 0 24px;padding:10px 14px;border-left:3px solid var(--dusk);background:var(--soft);border-radius:0 6px 6px 0}
+
+label{display:block;font-size:13.5px;color:var(--mute);margin:0 0 5px}
+input[type=text],input[type=password],select,textarea{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);font:inherit}
+input::placeholder{color:var(--mute);opacity:.7}
+.btn{display:inline-block;padding:8px 16px;border:1px solid var(--dusk);border-radius:6px;background:var(--dusk);color:var(--dusk-ink);font:600 14px var(--sans);cursor:pointer;text-decoration:none}
+.btn:hover{filter:brightness(1.06)}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line);font-weight:500}
+.btn.ghost:hover{border-color:var(--mute)}
+.btn.sm{padding:3px 10px;font-size:12.5px}
+.sw{position:relative;width:38px;height:22px;flex:none}
+.sw input{position:absolute;inset:0;opacity:0;cursor:pointer;margin:0}
+.sw i{position:absolute;inset:0;border-radius:11px;background:var(--line);transition:background .15s}
+.sw i::after{content:"";position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .15s}
+.sw input:checked~i{background:var(--ok)}
+.sw input:checked~i::after{transform:translateX(16px)}
+.sw input:focus-visible~i{outline:2px solid var(--dusk);outline-offset:2px}
+.setrow{display:flex;gap:12px;align-items:flex-start;padding:8px 0}
+.setrow .sw{margin-top:2px}
+.setrow .d,.fields .d{font-size:12.5px;color:var(--mute);margin-top:3px;font-weight:400}
+.numwrap{display:flex;align-items:center;gap:8px}
+.numwrap input{max-width:140px}
+.numwrap .unit{color:var(--mute);font-size:14px}
+.linkbtn{background:none;border:0;padding:0;font:inherit;color:var(--bad);cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px 20px;max-width:760px}
+.fields .wide{grid-column:1/-1}
+.actions{margin-top:18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.inline{display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-top:12px}
+.inline>*{width:auto}
+.inline input[type=text],.inline input[type=password]{width:150px}
+
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:10px 12px 10px 0;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:500;color:var(--mute);font-size:13px}
+tr:last-child td{border-bottom:0}
+.tag{font-size:13px;color:var(--mute)}
+.tabular{font-variant-numeric:tabular-nums}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;vertical-align:1px;background:var(--mute)}
+.dot.ok{background:var(--ok)} .dot.bad{background:var(--bad)} .dot.warn{background:var(--warn)}
+.code{font:700 34px/1.1 var(--serif);letter-spacing:.14em;color:var(--dusk);margin:6px 0}
+.empty{color:var(--mute);padding:6px 0}
+
+@media (max-width:860px){
+  .shell{grid-template-columns:1fr}
+  .rail{position:static;height:auto;padding:14px 16px 10px;flex-direction:row;flex-wrap:wrap;align-items:center;gap:10px 16px}
+  .brand{margin:0}
+  .rail nav{flex-direction:row;overflow-x:auto;gap:4px;flex:1 1 100%;order:3;padding-bottom:4px}
+  .rail nav>div{display:flex;gap:2px;align-items:center}
+  .rail h3{display:none}
+  .rail ul{display:flex}
+  .rail li a{border-left:0;border-bottom:2px solid transparent;border-radius:0;white-space:nowrap;padding:6px 10px}
+  .rail li a[aria-current=page]{border-bottom-color:var(--dusk);background:none}
+  .who{margin:0 0 0 auto;padding:0;border:0}
+  main{padding-top:28px}
+}
+</style>
+{% block head %}{% endblock %}
+</head>
+<body>
+<div class="shell">
+  <aside class="rail">
+    <a class="brand" href="{{ url_for('dashboard') }}{{ '?pick=1' if not in_bot }}"><b>长日</b><span>控制台</span></a>
+    {% if in_bot and bots|length > 1 %}
+    <form class="botswitch" aria-label="切换机器人"><select onchange="location=this.value">
+      {% for bid, lbl in bots %}<option value="/b/{{ bid }}/" {{ 'selected' if bid == bot_id }}>{{ lbl }}</option>{% endfor %}
+    </select></form>
+    {% elif in_bot %}<div class="botswitch"><span class="tag" style="color:var(--night-mute)">{{ bot_label }}</span></div>{% endif %}
+    <nav aria-label="主导航">
+      {% set groups = [
+        ('', [('dashboard','总览')]),
+        ('玩家', [('roles_page','角色与群'),('messages_page','消息记录')]),
+        ('玩法', [('season_page','季度与出场'),('lovemail_page','心动信'),('relations_page','关系线'),('pool_page','群池与房间'),('forum_page','论坛'),('rpg_page','物品与地点'),('autoreply_page','自定义回复'),('phone_page','小手机')]),
+        ('这个机器人', [('extensions_page','功能与设置'),('admins_page','QQ 管理员')]),
+      ] if in_bot else [] %}
+      {% for title, items in groups %}
+      <div>
+        {% if title %}<h3>{{ title }}</h3>{% endif %}
+        <ul>{% for ep, label in items %}{% if ep not in disabled_nav %}<li><a href="{{ url_for(ep) }}" {% if request.endpoint == ep %}aria-current="page"{% endif %}>{{ label }}</a></li>{% endif %}{% endfor %}</ul>
+      </div>
+      {% endfor %}
+      <div>
+        <h3>全部机器人共用</h3>
+        <ul>
+          <li><a href="{{ root_url('dashboard') }}?pick=1" {% if request.endpoint == 'dashboard' and not in_bot %}aria-current="page"{% endif %}>选择机器人</a></li>
+          {% for ep, label in [('wizard','安装向导'),('bots_page','机器人接入'),('accounts_page','账号'),('remote_page','远程访问'),('update_page','更新')] %}{% if (ep not in ('update_page','wizard')) or is_owner %}<li><a href="{{ root_url(ep) }}" {% if request.endpoint == ep %}aria-current="page"{% endif %}>{{ label }}</a></li>{% endif %}{% endfor %}
+        </ul>
+      </div>
+    </nav>
+    <form class="who" method="post" action="{{ url_for('logout') }}">{{ csrf() }}<span>{{ me }}</span><button type="submit">退出</button></form>
+  </aside>
+  <main>
+    {% for m in get_flashed_messages() %}<p class="flash" role="status">{{ m }}</p>{% endfor %}
+    {% block body %}{% endblock %}
+  </main>
+</div>
+</body>
+</html>

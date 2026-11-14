@@ -1,0 +1,48 @@
+{% extends "base.html" %}{% block title %}物品与地点{% endblock %}
+{% block head %}<style>
+.rpg input[type=number]{width:110px;padding:9px 11px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);font:inherit}
+.rpg .table{overflow-x:auto}.rpg .check{display:flex;align-items:center;gap:6px;padding-bottom:9px;color:var(--ink)}
+@media(max-width:520px){.rpg .inline>*{width:100%}.rpg .inline input,.rpg .inline select{width:100%!important}.rpg .inline button{width:auto}}
+</style>{% endblock %}
+{% block body %}
+<div class="rpg">
+<h1>物品、属性、地点与商城</h1>
+<p class="sub">属性被骰子和物品共用；商城用“货币”类物品结算。严格地点检查在“功能与设置”的本功能卡片里开启。</p>
+
+<section class="card"><h2>属性定义</h2>
+<form class="inline" method="post" action="{{ url_for('rpg_attr_save') }}">{{ csrf() }}
+<label>名称<input name="name" required placeholder="体力"></label><label>下限<input name="min" type="number"></label>
+<label>上限<input name="max" type="number"></label><label>默认<input name="default" type="number" value="0"></label>
+<label>说明<input name="description"></label><button>保存</button></form>
+{% if defs %}<div class="table"><table><thead><tr><th>名称</th><th>范围</th><th>默认</th><th>说明</th></tr></thead><tbody>
+{% for x in defs %}<tr><td>{{ x.name }}</td><td>{{ x.min_value if x.min_value is not none else '−∞' }} ~ {{ x.max_value if x.max_value is not none else '+∞' }}</td><td>{{ x.default_value }}</td><td>{{ x.description or '—' }}</td></tr>{% endfor %}
+</tbody></table></div>{% else %}<p class="empty">还没有属性定义。</p>{% endif %}</section>
+
+<section class="card"><h2>物品库</h2>
+<form class="inline" method="post" action="{{ url_for('rpg_item_save') }}">{{ csrf() }}
+<label>物品码<input name="code" required placeholder="ITEM_001"></label><label>名称<input name="name" required></label>
+<label>类型<select name="kind"><option value="item">普通物品</option><option value="currency">货币</option></select></label>
+<label>属性效果<input name="effects" placeholder="体力+2 理智-1"></label><label>可使用次数<input name="max_uses" type="number" value="1"></label>
+<label>描述<input name="description"></label><label class="check"><input type="checkbox" name="can_give" checked>可赠送</label><button>保存</button></form>
+{% if items %}<div class="table"><table><thead><tr><th>代码</th><th>名称</th><th>类型</th><th>效果</th><th>描述</th></tr></thead><tbody>
+{% for x in items %}<tr><td><code>{{ x.code }}</code></td><td>{{ x.name }}</td><td>{{ '货币' if x.kind=='currency' else '物品' }}</td><td>{{ x.attr_effects }}</td><td>{{ x.description or '—' }}</td></tr>{% endfor %}
+</tbody></table></div>{% endif %}
+<h3>调整背包</h3><form class="inline" method="post" action="{{ url_for('rpg_inventory_adjust') }}">{{ csrf() }}
+<label>角色<select name="role_id">{% for r in roles %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}</select></label>
+<label>物品<input name="item" placeholder="名称或码" required></label><label>增减数量<input name="delta" type="number" placeholder="3 或 -2" required></label><button>调整</button></form></section>
+
+<section class="card"><h2>商城</h2><form class="inline" method="post" action="{{ url_for('rpg_shop_save') }}">{{ csrf() }}
+<label>上架物品<input name="item" required></label><label>价格<input name="price" type="number" min="1" required></label>
+<label>货币<input name="currency" required placeholder="货币名或码"></label><button>上架/改价</button></form>
+{% for x in shop %}<div class="setrow"><div><b>[{{ x.item_code }}] {{ x.name }}</b><p>{{ x.price }} {{ x.currency_name }}</p></div>
+<form method="post" action="{{ url_for('rpg_shop_delete',code=x.item_code) }}">{{ csrf() }}<button class="danger">下架</button></form></div>{% else %}<p class="empty">暂无上架物品。</p>{% endfor %}</section>
+
+<section class="card"><h2>地点与钥匙</h2><form class="inline" method="post" action="{{ url_for('rpg_place_save') }}">{{ csrf() }}
+<label>地点名<input name="name" required></label><label>描述<input name="description"></label><label class="check"><input type="checkbox" name="locked">需要钥匙</label><button>保存</button></form>
+{% for p in places %}<div class="setrow"><div><b>{{ '🔒' if p.locked else '📍' }} {{ p.name }}</b><p>{{ p.description or '—' }}</p></div></div>{% else %}<p class="empty">还没有地点。</p>{% endfor %}
+<h3>发放/收回钥匙</h3><form class="inline" method="post" action="{{ url_for('rpg_key_save') }}">{{ csrf() }}
+<label>角色<select name="role_id">{% for r in roles %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}</select></label>
+<label>地点<select name="place_id">{% for p in places %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select></label>
+<label class="check"><input type="checkbox" name="on" checked>持有钥匙</label><button>保存</button></form></section>
+</div>
+{% endblock %}

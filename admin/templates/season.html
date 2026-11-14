@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}季度与出场{% endblock %}
+{% block body %}
+<h1>季度与出场</h1>
+<p class="lede">先预订季度，开始后筹备期玩家创建角色，档期开始日自动进入 D0，之后每天 23:59 自动加一天。</p>
+
+<section>
+  <h2>现在</h2>
+  {% if running %}
+    <p><b>「{{ running.name }}」</b>
+      {{ {'prep':'筹备期','playing':'进行中','over':'档期已过，等着结束'}[phase] }}，现在是 <b class="tabular">{{ day }}</b>。
+      档期 <span class="tabular">{{ running.start_date }} ~ {{ running.end_date }}</span>{% if running.supp_end %}，补戏到 <span class="tabular">{{ running.supp_end }}</span>{% endif %}。
+      {% if running.npcs %}NPC：{{ running.npcs }}。{% endif %}</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <form method="post" action="{{ url_for('season_day') }}" style="display:flex;gap:6px">{{ csrf() }}
+        <input name="day" placeholder="D3" size="4" aria-label="天数"><button class="btn" type="submit">设置天数</button></form>
+      <form method="post" action="{{ url_for('season_autoday') }}">{{ csrf() }}<input type="hidden" name="on" value="{{ 0 if auto else 1 }}">
+        <button class="btn" type="submit">自动天数：{{ '开（点击关闭）' if auto else '关（点击开启）' }}</button></form>
+      <form method="post" action="{{ url_for('season_end') }}" onsubmit="return confirm('结束这个季度？')">{{ csrf() }}<button class="btn" type="submit">结束季度</button></form>
+    </div>
+  {% elif phase == 'ended' %}
+    <p>上一季已结束，还没收尾。收尾会清空：{% for k, v in preview.items() %}{{ k }} {{ v }}{{ '、' if not loop.last }}{% endfor %}。管理员、设置、季度记录保留。</p>
+    <form method="post" action="{{ url_for('season_wipe') }}" style="display:flex;gap:6px">{{ csrf() }}
+      <input name="confirm" placeholder="输入「收尾」确认" aria-label="确认"><button class="btn" type="submit">收尾</button></form>
+  {% else %}
+    <p>现在没有进行中的季度。</p>
+  {% endif %}
+</section>
+
+<section>
+  <h2>预订的季度</h2>
+  <table>
+    <tr><th>名字</th><th>档期</th><th>补戏到</th><th>NPC</th><th></th></tr>
+    {% for b in booked %}
+    <tr><td>{{ b.name }}</td><td class="tabular">{{ b.start_date }} ~ {{ b.end_date }}</td><td class="tabular">{{ b.supp_end or '—' }}</td><td>{{ b.npcs or '—' }}</td>
+      <td style="display:flex;gap:8px">
+        {% if not running %}<form method="post" action="{{ url_for('season_start') }}">{{ csrf() }}<input type="hidden" name="name" value="{{ b.name }}">
+          <label><input type="checkbox" name="clear" value="1"> 清空旧数据后</label> <button class="linkbtn">开始</button></form>{% endif %}
+        <form method="post" action="{{ url_for('season_delete', season_id=b.id) }}" onsubmit="return confirm('删除这个预订？')">{{ csrf() }}<button class="linkbtn">删除</button></form></td></tr>
+    {% else %}<tr><td colspan="5" class="empty">还没有预订。</td></tr>{% endfor %}
+  </table>
+  <form method="post" action="{{ url_for('season_book') }}" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:end">{{ csrf() }}
+    <label>名字<br><input name="name" required maxlength="30"></label>
+    <label>开始日<br><input type="date" name="start" required></label>
+    <label>结束日<br><input type="date" name="end" required></label>
+    <label>补戏截止（可空）<br><input type="date" name="supp"></label>
+    <label>NPC 名单（顿号分开，可空）<br><input name="npcs"></label>
+    <button class="btn" type="submit">预订</button>
+  </form>
+</section>
+
+<section>
+  <h2>出场</h2>
+  <p>戏群：{% if stage %}已设置（机器人 {{ stage[0] }}）{% else %}<span class="dot warn"></span>还没设置，管理员在戏群里发「设为戏群」{% endif %}。
+     状态：{% if not queue %}还没抽顺序（群里发「抽取出场顺序」）{% elif entrance_on %}进行中{% else %}已抽好顺序，未开始或已完成{% endif %}。</p>
+  {% if queue %}
+  <table><tr><th>顺序</th><th>角色</th><th>状态</th></tr>
+    {% for q in queue %}<tr><td class="tabular">{{ loop.index }}</td><td>{{ q.name }}</td><td>{{ '已出场' if q.done else ('已提交' if q.text else '未提交') }}</td></tr>{% endfor %}
+  </table>{% endif %}
+  <p class="note">出场用的指令都在群里发：抽取出场顺序、开始出场、跳过出场、查看出场状态；玩家发「提交出场 角色名 内容」。</p>
+</section>
+
+{% if past %}
+<section>
+  <h2>历史季度</h2>
+  <table><tr><th>名字</th><th>档期</th></tr>
+    {% for p in past %}<tr><td>{{ p.name }}</td><td class="tabular">{{ p.start_date }} ~ {{ p.end_date }}</td></tr>{% endfor %}
+  </table>
+</section>{% endif %}
+{% endblock %}

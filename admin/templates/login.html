@@ -1,0 +1,11 @@
+{% extends "auth.html" %}
+{% block form %}
+<h1>登录</h1>
+<p class="lede">用你在这个团里的管理账号进入。</p>
+{% for m in get_flashed_messages() %}<p class="flash" role="alert">{{ m }}</p>{% endfor %}
+<label for="u">账号</label>
+<input id="u" name="username" autocomplete="username" autofocus required>
+<label for="p">密码</label>
+<input id="p" type="password" name="password" autocomplete="current-password" required>
+<button type="submit">进入控制台</button>
+{% endblock %}

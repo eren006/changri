@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block title %}我的 · {{ brand }}{% endblock %}
+{% block body %}
+  <header class="bar tab-bar"><div class="tab-head"><h1>我的</h1></div></header>
+  <div class="scroll profile-page">
+    <section class="pf-card">
+      <span class="pf-avatar" style="cursor:default"><span class="avatar big" data-name="{{ role['name'] }}">{{ role['name'][:1] }}</span></span>
+      <div class="pf-who"><h1>{{ role['name'] }}</h1>{% if season %}<p>{{ season['name'] }}</p>{% endif %}</div>
+    </section>
+    <form class="pf-group" method="post" action="{{ url_for('set_skin') }}" style="padding:14px 16px">
+      <input type="hidden" name="_csrf" value="{{ csrf() }}">
+      <div style="font-size:15px;font-weight:600;margin-bottom:10px">主题风格</div>
+      <div class="choices" style="display:flex;flex-wrap:wrap;gap:8px">
+        <button class="choice" name="skin" value="" aria-pressed="{{ 'false' if skin.picked else 'true' }}">跟随本季</button>
+        {% for key, t in phone_themes.items() %}<button class="choice" name="skin" value="{{ key }}" aria-pressed="{{ 'true' if skin.picked == key else 'false' }}">{{ t.name }}</button>{% endfor %}
+      </div>
+      <p style="margin:10px 0 0;font-size:13px;line-height:1.7;color:var(--muted)">只换外观，保存在这台设备；页面用语跟随本季设置。</p>
+    </form>
+    <div class="pf-group">
+      <a class="pf-row" href="{{ url_for('guide') }}"><span class="tile">{{ phone_symbol('book') }}</span><span class="name">使用指南</span><span class="chev" aria-hidden="true">›</span></a>
+    </div>
+    {% if not https %}<p style="margin:14px 22px 0;font-size:12px;line-height:1.7;color:var(--muted)">当前是 http 连接。别在这里填任何密码；想更安全可以请管理员开通 HTTPS。</p>{% endif %}
+    <form class="pf-group" method="post" action="{{ url_for('logout') }}"><input type="hidden" name="_csrf" value="{{ csrf() }}"><button class="pf-row pf-out" type="submit">退出这部手机</button></form>
+  </div>
+{% endblock %}

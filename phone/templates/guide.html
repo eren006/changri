@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+{% set mode = 'guide' %}
+{% block title %}使用指南 · {{ brand }}{% endblock %}
+{% block body %}
+  <header class="bar"><a class="back" href="{{ url_for('entry') }}">返回</a><div class="title">使用指南</div></header>
+  <div class="scroll" style="padding:16px 18px;line-height:1.7">
+    <p><b>怎么拿到激活码？</b><br>在你的个人群里发「手机码」，机器人会把链接和激活码发给你。</p>
+    <p><b>怎么登录？</b><br>打开链接，输入 10 位激活码。登录后 30 天内不用再输。</p>
+    <p><b>换外观？</b><br>「我的」页里可以换主题风格，只影响你这台设备。</p>
+    <p><b>激活码泄露了？</b><br>请管理员在设置平台重置，旧码立刻失效。</p>
+  </div>
+{% endblock %}

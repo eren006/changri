@@ -1,0 +1,10 @@
+.env
+.venv
+venv/
+runtime/
+__pycache__/
+data/*.db*
+data/.secret_key
+release_out/
+extensions/
+tests/_ext_*/

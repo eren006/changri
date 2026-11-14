@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+{% block title %}自定义回复{% endblock %}
+{% block head %}<style>
+.tester{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:16px 18px;max-width:760px}
+.tester input{font-size:15px}
+.tres{margin-top:12px;display:grid;gap:8px}
+.tres .none{color:var(--mute);font-size:14px}
+.tres .hit{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;align-items:start}
+.tres .who{font-size:12.5px;color:var(--mute);grid-column:1/-1}
+.tres .who b{color:var(--ink)}
+.tres .first .who b::after{content:"  · 会发这条";color:var(--dusk);font-weight:500}
+.bubble{display:inline-block;max-width:100%;padding:8px 12px;border-radius:4px 14px 14px 14px;background:var(--soft);white-space:pre-wrap;word-break:break-word;font-size:14.5px;line-height:1.55}
+.bubble.me{background:var(--dusk);color:var(--dusk-ink);border-radius:14px 4px 14px 14px}
+
+.rules{list-style:none;margin:20px 0 0;padding:0;max-width:760px;display:grid;gap:12px}
+.rule{border:1px solid var(--line);background:var(--surface);border-radius:12px;overflow:hidden}
+.rule.off .sum{opacity:.55}
+.sum{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:14px 16px}
+.when{font-size:14.5px;min-width:0}
+.when .trig{font-weight:600}
+.when .arrow{color:var(--mute);margin:0 6px}
+.when .rep{color:var(--mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;margin-top:2px}
+.meta{font-size:12.5px;color:var(--mute);margin-top:4px;display:flex;gap:6px 12px;flex-wrap:wrap}
+.chip-mini{background:var(--soft);border-radius:10px;padding:0 8px}
+.ops{display:flex;gap:4px;align-items:center}
+.ops button,.ops a{background:none;border:0;color:var(--mute);cursor:pointer;font:inherit;font-size:13px;padding:4px 6px;border-radius:6px;text-decoration:none}
+.ops button:hover,.ops a:hover{background:var(--soft);color:var(--ink)}
+details.edit>summary{list-style:none;cursor:pointer}
+details.edit>summary::-webkit-details-marker{display:none}
+.editor{border-top:1px solid var(--line);padding:18px 16px 16px;display:grid;gap:18px}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:22px}
+@media (max-width:760px){.cols{grid-template-columns:1fr}.sum{grid-template-columns:auto 1fr}.ops{grid-column:1/-1;justify-content:flex-end}}
+.cap{font:600 13px var(--sans);color:var(--mute);margin:0 0 8px}
+.pills{display:flex;flex-wrap:wrap;gap:6px}
+.pills label{margin:0;position:relative}
+.pills input{position:absolute;opacity:0}
+.pills span{display:block;padding:5px 12px;border:1px solid var(--line);border-radius:16px;font-size:13.5px;color:var(--ink);cursor:pointer;background:var(--paper)}
+.pills input:checked+span{background:var(--dusk);border-color:var(--dusk);color:var(--dusk-ink)}
+.pills input:focus-visible+span{outline:2px solid var(--dusk);outline-offset:2px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;padding:7px;border:1px solid var(--line);border-radius:8px;background:var(--paper);min-height:44px;cursor:text}
+.chips .c{display:inline-flex;align-items:center;gap:4px;background:var(--soft);border-radius:14px;padding:3px 6px 3px 11px;font-size:14px}
+.chips .c button{background:none;border:0;color:var(--mute);cursor:pointer;font-size:15px;line-height:1;padding:0 4px}
+.chips input{flex:1;min-width:120px;border:0;background:transparent;padding:4px;outline:none;color:var(--ink);font:inherit}
+.hint{font-size:12.5px;color:var(--mute);margin:6px 0 0}
+.reps{display:grid;gap:8px}
+.rp{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:start}
+.rp textarea{min-height:64px;resize:vertical;font-size:14.5px}
+.rp button{background:none;border:0;color:var(--mute);cursor:pointer;padding:4px}
+.addrep{margin-top:8px}
+.live{margin-top:14px;padding:12px 14px;background:var(--paper);border-radius:10px;border:1px dashed var(--line)}
+.live .cap{margin-bottom:6px}
+.more>summary{cursor:pointer;color:var(--mute);font-size:13.5px}
+.more .fields{margin-top:12px}
+.save{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between}
+.empty{max-width:760px;border:1px dashed var(--line);border-radius:12px;padding:28px;text-align:center;color:var(--mute)}
+</style>{% endblock %}
+
+{% macro editor(r) %}
+{% set R = r or {'id': '', 'name': '', 'mode': 'contains', 'word_list': [], 'reply_list': [''], 'who': 'all', 'place': 'all', 'cooldown': 0, 'send_mode': 'random'} %}
+<form class="editor rule-form" method="post" action="{{ url_for('autoreply_save') }}">
+  {{ csrf() }}<input type="hidden" name="id" value="{{ R.id }}">
+  <input type="hidden" name="words" class="f-words"><input type="hidden" name="replies_json" class="f-replies">
+  <div class="cols">
+    <div>
+      <p class="cap">群里有人说…… {% if not R.id %}<button type="button" class="linkbtn sample" style="color:var(--dusk);font-weight:500;margin-left:6px">填入示例</button>{% endif %}</p>
+      <div class="pills" role="radiogroup" aria-label="匹配方式">
+        {% for k, v in modes.items() %}<label><input type="radio" name="mode" value="{{ k }}" {{ 'checked' if R.mode == k }}><span>{{ v }}</span></label>{% endfor %}
+      </div>
+      <div class="chips" data-words='{{ R.word_list | tojson | forceescape }}' style="margin-top:10px" aria-label="触发词"><input type="text" class="c-in" placeholder="例如：小圆（输入后按回车添加）" enterkeyhint="done"></div>
+      <p class="hint mode-hint"></p>
+    </div>
+    <div>
+      <p class="cap">机器人就回……</p>
+      <div class="reps" data-replies='{{ R.reply_list | tojson | forceescape }}'></div>
+      <button type="button" class="btn ghost sm addrep">＋ 再写一条</button>
+      <div class="pills sendm" role="radiogroup" aria-label="发送方式" style="margin-top:10px">
+        {% for k, v in send.items() %}<label><input type="radio" name="send_mode" value="{{ k }}" {{ 'checked' if R.send_mode == k }}><span>{{ v }}</span></label>{% endfor %}
+      </div>
+      <p class="hint">有多条回复时：随机发其中一条，或按顺序全部发出。</p>
+      <div class="live"><p class="cap">群里看起来是这样</p><span class="bubble me" style="display:none"></span><span class="bubble live-q" style="display:none"></span><div class="live-a"></div></div>
+    </div>
+  </div>
+  <details class="more" {{ 'open' if (R.who != 'all' or R.place != 'all' or R.cooldown) }}>
+    <summary>更多条件（谁能触发、在哪个群、冷却、规则名）</summary>
+    <div class="fields">
+      <div><label>规则名（只给自己看，选填）</label><input type="text" name="name" value="{{ R.name }}" maxlength="30" placeholder="例如：问候"></div>
+      <div><label>谁说了才回</label><select name="who">{% for k, v in who.items() %}<option value="{{ k }}" {{ 'selected' if R.who == k }}>{{ v }}</option>{% endfor %}</select></div>
+      <div><label>在哪里回</label><select name="place">{% for k, v in place.items() %}<option value="{{ k }}" {{ 'selected' if R.place == k }}>{{ v }}</option>{% endfor %}</select></div>
+      <div><label>冷却（秒，同一个群内这条规则两次触发的最短间隔，0 = 不限）</label><input type="text" name="cooldown" value="{{ R.cooldown }}" inputmode="numeric"></div>
+    </div>
+  </details>
+  <div class="save"><span class="hint" style="margin:0">回复里写 <code>{角色}</code>，会换成说话人的角色名。</span><button class="btn" type="submit">保存</button></div>
+</form>
+{% endmacro %}
+
+{% block body %}
+<h1>自定义回复</h1>
+<p class="lede">群里有人说了某个词，机器人自动回一句。游戏指令永远优先，不会被这里抢走；一句话命中多条规则时，只发排在最前面的那条。</p>
+
+<section class="tester" style="border-top:1px solid var(--line);padding:16px 18px">
+  <p class="cap" style="margin-top:0">试一试：假如群里有人说</p>
+  <input type="text" id="t-in" placeholder="输入一句话，看会触发哪条" autocomplete="off">
+  <div class="tres" id="t-out" aria-live="polite"></div>
+  <input type="hidden" id="t-csrf" value="{{ csrf() | striptags }}">
+</section>
+
+<ul class="rules">
+  <li class="rule">
+    <details class="edit" {{ 'open' if (not rules and edit is none) }}>
+      <summary class="sum"><span></span><span class="when"><span class="trig">＋ 新建一条回复</span><span class="rep">例如：有人说「小圆」，机器人回一句，再发一首歌</span></span><span></span></summary>
+      {{ editor(none) }}
+    </details>
+  </li>
+  {% for r in rules %}
+  <li class="rule {{ '' if r.enabled else 'off' }}">
+    <details class="edit" {{ 'open' if edit == r.id }}>
+      <summary class="sum">
+        <form method="post" action="{{ url_for('autoreply_toggle', rule_id=r.id) }}" class="sw" onclick="event.stopPropagation()">{{ csrf() }}
+          <input type="checkbox" name="on" value="1" {{ 'checked' if r.enabled }} aria-label="开关" onchange="this.form.submit()"><i></i></form>
+        <span class="when">
+          <span class="trig">{% if r.name %}{{ r.name }}　{% endif %}{{ modes[r.mode] }}「{{ r.word_list[0] }}」{% if r.word_list|length > 1 %}等 {{ r.word_list|length }} 个词{% endif %}</span>
+          <span class="rep">→ {{ r.reply_list[0] if r.reply_list else '' }}{% if r.reply_list|length > 1 %}　（共 {{ r.reply_list|length }} 条，{{ '依次全发' if r.send_mode == 'all' else '随机一条' }}）{% endif %}</span>
+          <span class="meta"><span>触发过 {{ r.hits }} 次</span>{% if r.who != 'all' %}<span class="chip-mini">{{ who[r.who] }}</span>{% endif %}{% if r.place != 'all' %}<span class="chip-mini">{{ place[r.place] }}</span>{% endif %}{% if r.cooldown %}<span class="chip-mini">冷却 {{ r.cooldown }} 秒</span>{% endif %}</span>
+        </span>
+        <span class="ops" onclick="event.stopPropagation()">
+          <form method="post" action="{{ url_for('autoreply_move', rule_id=r.id) }}">{{ csrf() }}<input type="hidden" name="dir" value="up"><button title="往前排" aria-label="上移">↑</button></form>
+          <form method="post" action="{{ url_for('autoreply_move', rule_id=r.id) }}">{{ csrf() }}<input type="hidden" name="dir" value="down"><button title="往后排" aria-label="下移">↓</button></form>
+          <form method="post" action="{{ url_for('autoreply_delete', rule_id=r.id) }}" onsubmit="return confirm('删除这条自定义回复？')">{{ csrf() }}<button style="color:var(--bad)">删除</button></form>
+        </span>
+      </summary>
+      {{ editor(r) }}
+    </details>
+  </li>
+  {% endfor %}
+</ul>
+{% if not rules %}<p class="note" style="margin-top:16px">还没有规则。点上面「新建一条回复」开始。</p>{% endif %}
+
+<script>
+(function () {
+  var SAMPLE = {mode: 'exact', words: ['小圆'], replies: ['一个艺术天才和一个永远幸福的人！', '这是一首关于小圆的歌：Lana Del Rey的单曲《Cinnamon Girl》：https://163cn.tv/4lcTft1 (来自@网易云音乐)'], send: 'all'};
+  var HINTS = {contains: '句子里只要出现其中任何一个词就触发。', exact: '整句话必须和其中一个词一模一样。', prefix: '句子以其中一个词开头就触发。', suffix: '句子以其中一个词结尾就触发。', regex: '每个词按正则表达式匹配（进阶用法，写错了保存时会提示）。'};
+  function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+  document.querySelectorAll('.rule-form').forEach(function (form) {
+    var chipsBox = form.querySelector('.chips'), cin = form.querySelector('.c-in');
+    var words = JSON.parse(chipsBox.dataset.words || '[]');
+    var repsBox = form.querySelector('.reps'), reps = JSON.parse(repsBox.dataset.replies || '[]');
+    if (!reps.length) reps = [''];
+    var hint = form.querySelector('.mode-hint');
+    var bubbleMe = form.querySelector('.bubble.me'), live = form.querySelector('.live-a');
+
+    function drawChips() {
+      chipsBox.querySelectorAll('.c').forEach(function (n) { n.remove(); });
+      words.forEach(function (w, i) {
+        var c = document.createElement('span'); c.className = 'c';
+        c.innerHTML = esc(w) + '<button type="button" aria-label="删除触发词 ' + esc(w) + '">×</button>';
+        c.querySelector('button').onclick = function () { words.splice(i, 1); drawChips(); drawLive(); };
+        chipsBox.insertBefore(c, cin);
+      });
+    }
+    function addWord(v) { v = v.trim(); if (v && words.indexOf(v) < 0 && words.length < 20) { words.push(v); drawChips(); drawLive(); } cin.value = ''; }
+    cin.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ',' || e.key === '，') { e.preventDefault(); addWord(cin.value); }
+      else if (e.key === 'Backspace' && !cin.value && words.length) { words.pop(); drawChips(); drawLive(); }
+    });
+    cin.addEventListener('blur', function () { if (cin.value.trim()) addWord(cin.value); });
+    chipsBox.addEventListener('click', function () { cin.focus(); });
+
+    function drawReps() {
+      repsBox.innerHTML = '';
+      reps.forEach(function (t, i) {
+        var row = document.createElement('div'); row.className = 'rp';
+        row.innerHTML = '<textarea maxlength="1000" placeholder="机器人要回的话" aria-label="第 ' + (i + 1) + ' 条回复"></textarea>' + (reps.length > 1 ? '<button type="button" aria-label="删除这条回复">✕</button>' : '');
+        var ta = row.querySelector('textarea'); ta.value = t;
+        ta.oninput = function () { reps[i] = ta.value; drawLive(); };
+        var b = row.querySelector('button'); if (b) b.onclick = function () { reps.splice(i, 1); drawReps(); drawLive(); };
+        repsBox.appendChild(row);
+      });
+    }
+    var sampleBtn = form.querySelector('.sample');
+    if (sampleBtn) sampleBtn.onclick = function () {
+      words = SAMPLE.words.slice(); reps = SAMPLE.replies.slice();
+      form.querySelector('input[name=mode][value=' + SAMPLE.mode + ']').checked = true;
+      form.querySelector('input[name=send_mode][value=' + SAMPLE.send + ']').checked = true;
+      drawChips(); drawReps(); drawLive();
+    };
+    form.querySelector('.addrep').onclick = function () { if (reps.length < 10) { reps.push(''); drawReps(); repsBox.querySelector('.rp:last-child textarea').focus(); } };
+
+    function modeVal() { return form.querySelector('input[name=mode]:checked').value; }
+    function drawLive() {
+      hint.textContent = HINTS[modeVal()];
+      var w = words[0], mode = modeVal();
+      var sample = w ? (mode === 'regex' ? w : mode === 'contains' ? w : w) : '';
+      bubbleMe.style.display = sample ? 'inline-block' : 'none'; bubbleMe.textContent = sample;
+      var all = reps.filter(function (x) { return x.trim(); });
+      var sendAll = form.querySelector('input[name=send_mode]:checked').value === 'all';
+      var shown = sendAll ? all.slice(0, 5) : all.slice(0, 1);
+      live.innerHTML = shown.length ? shown.map(function (t) { return '<div style="margin:0 0 6px"><span class="bubble">' + esc(t.replace(/\{角色\}/g, '小明')) + '</span></div>'; }).join('') + (!sendAll && all.length > 1 ? '<span class="hint">（还有 ' + (all.length - 1) + ' 条，每次随机发一条）</span>' : '') : '<span class="hint">在左边写好触发词、右边写好回复，这里会预览。</span>';
+    }
+    form.querySelectorAll('input[name=mode],input[name=send_mode]').forEach(function (r) { r.onchange = drawLive; });
+    form.addEventListener('submit', function (e) {
+      if (cin.value.trim()) addWord(cin.value);
+      form.querySelector('.f-words').value = words.join('\n');
+      form.querySelector('.f-replies').value = JSON.stringify(reps.filter(function (x) { return x.trim(); }));
+    });
+    drawChips(); drawReps(); drawLive();
+  });
+
+  // 试一试
+  var tin = document.getElementById('t-in'), tout = document.getElementById('t-out'), tok = document.getElementById('t-csrf').value, timer = null;
+  var csrfMatch = document.querySelector('.tester input[name=_csrf]');
+  tin.addEventListener('input', function () {
+    clearTimeout(timer);
+    timer = setTimeout(function () {
+      var t = tin.value.trim();
+      if (!t) { tout.innerHTML = ''; return; }
+      var fd = new FormData(); fd.append('text', t); fd.append('_csrf', document.querySelector('input[name=_csrf]').value);
+      fetch('{{ url_for("autoreply_test") }}', {method: 'POST', body: fd}).then(function (r) { return r.json(); }).then(function (rows) {
+        if (!rows.length) { tout.innerHTML = '<div class="none">不会触发任何规则。</div>'; return; }
+        var firstOn = rows.findIndex(function (x) { return x.enabled; });
+        tout.innerHTML = rows.map(function (x, i) {
+          return '<div class="hit ' + (i === firstOn ? 'first' : '') + '"><div class="who"><b>' + esc(x.name) + '</b>' + (x.enabled ? '' : '（已关闭，不会发）') + '</div><span class="bubble me">' + esc(t) + '</span><span>' + x.replies.map(function (t) { return '<span class="bubble" style="margin:0 0 4px">' + esc(t) + '</span>'; }).join('<br>') + '</span></div>';
+        }).join('');
+      }).catch(function () { tout.innerHTML = '<div class="none">暂时测不了，刷新页面再试。</div>'; });
+    }, 250);
+  });
+})();
+</script>
+{% endblock %}

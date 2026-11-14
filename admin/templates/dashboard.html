@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}总览{% endblock %}
+{% block head %}
+<style>
+.sheet{list-style:none;margin:0;padding:0;max-width:640px}
+.sheet li{display:grid;grid-template-columns:5.2rem 22px minmax(0,1fr);align-items:start;padding:0 0 26px;position:relative}
+.sheet li:last-child{padding-bottom:0}
+.sheet .t{font:700 34px/1 var(--serif);font-variant-numeric:tabular-nums;color:var(--mute)}
+.sheet .m{position:relative;height:100%}
+.sheet .m::before{content:"";position:absolute;left:10px;top:7px;width:9px;height:9px;border-radius:50%;background:var(--line);border:2px solid var(--paper);box-sizing:content-box;margin-left:-2px}
+.sheet .m::after{content:"";position:absolute;left:12px;top:24px;bottom:-26px;width:1px;background:var(--line)}
+.sheet li:last-child .m::after{display:none}
+.sheet .what b{display:block;font-weight:600}
+.sheet .what span{color:var(--mute);font-size:14px}
+.sheet li.done .t,.sheet li.done .what{opacity:.5}
+.sheet li.next .t{color:var(--dusk)}
+.sheet li.next .m::before{background:var(--dusk);width:11px;height:11px;margin-left:-3px;top:6px}
+.sheet .nowtag{margin-left:8px;font-size:12.5px;color:var(--dusk);font-weight:600}
+.todo{list-style:none;margin:0;padding:0;max-width:640px}
+.todo li{padding:10px 0;border-bottom:1px solid var(--line)}
+.todo li:last-child{border-bottom:0}
+.todo a{text-decoration:none}
+.todo a:hover b{text-decoration:underline;text-underline-offset:3px}
+.todo span{display:block;margin-left:16px;color:var(--mute);font-size:13.5px}
+dl.facts{display:grid;grid-template-columns:max-content 1fr;gap:8px 28px;margin:0;max-width:420px}
+dl.facts dt{color:var(--mute)}
+dl.facts dd{margin:0;font-variant-numeric:tabular-nums;font-weight:600}
+</style>
+{% endblock %}
+{% block body %}
+<h1>{{ d.date }}</h1>
+<p class="lede">现在 <span class="tabular">{{ d.now }}</span>。下面是今天要发生的事，以及需要你处理的。</p>
+
+<section>
+  <h2>今日通告</h2>
+  <ol class="sheet">
+    {% for s in d.sheet %}
+    <li class="{{ s.state }}">
+      <div class="t">{{ s.time }}</div><div class="m" aria-hidden="true"></div>
+      <div class="what"><b>{{ s.name }}{% if s.state == 'next' %}<em class="nowtag" style="font-style:normal">下一项</em>{% endif %}</b><span>{{ s.desc }}</span></div>
+    </li>
+    {% endfor %}
+  </ol>
+  <p class="note">时间来自「设置 → 心动信 → 每天派送时间」。</p>
+</section>
+
+<section>
+  <h2>需要处理</h2>
+  {% if d.todo %}
+  <ul class="todo">
+    {% for level, title, href, hint in d.todo %}
+    <li><a href="{{ href }}"><b><span class="dot {{ level }}" style="display:inline-block;margin:0 7px 0 0"></span>{{ title }}</b></a><span>{{ hint }}</span></li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty">没有待处理的事项。</p>
+  {% endif %}
+</section>
+
+<section>
+  <h2>现状</h2>
+  <dl class="facts">
+    {% for k, v in d.facts %}<dt>{{ k }}</dt><dd>{{ v }}</dd>{% endfor %}
+  </dl>
+</section>
+{% endblock %}

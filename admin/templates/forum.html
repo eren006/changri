@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}论坛{% endblock %}
+{% block body %}
+<h1>论坛</h1>
+<p class="lede">玩家发的帖子。署名是玩家自己写的，括号里是真实角色，只有这里看得到。删除帖子会连回复和点赞一起删；删楼层会保留楼号，内容换成「该楼层已被删除」。</p>
+{% for p in posts %}
+<section>
+  <h2>{{ pid(p.id) }}　{{ p.sign }} <span class="tag">（{{ p.real_name }}）</span></h2>
+  <p style="white-space:pre-wrap">{{ p.content }}</p>
+  <form method="post" action="{{ url_for('forum_delete_post', post_id=p.id) }}" onsubmit="return confirm('删除这个帖子和它的全部回复？')">{{ csrf() }}<button class="linkbtn">删除整帖</button></form>
+  {% for x in by_post.get(p.id, []) %}
+  <div style="margin:10px 0 0 18px;padding-left:12px;border-left:2px solid var(--line)">
+    <b>{{ x.floor }} 楼</b> {{ x.sign }} <span class="tag">（{{ x.real_name }}）</span>
+    {% if x.quote %}<div class="note">引用 {{ x.quote }}</div>{% endif %}
+    <div style="white-space:pre-wrap">{{ x.content }}</div>
+    <form method="post" action="{{ url_for('forum_delete_floor', post_id=p.id, floor=x.floor) }}" onsubmit="return confirm('删除这一楼？')">{{ csrf() }}<button class="linkbtn">删除这一楼</button></form>
+  </div>
+  {% endfor %}
+</section>
+{% else %}<p class="empty">还没有帖子。</p>{% endfor %}
+{% endblock %}

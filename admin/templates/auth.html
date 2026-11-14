@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block title %}登录{% endblock %} · 长日控制台</title>
+<style>
+:root{--paper:#eeeff4;--surface:#fafafd;--ink:#1f2133;--mute:#686b84;--line:#d9dbe6;--night:#1d1f33;--dusk:#c43a63;--dusk-ink:#fff;--soft:#e4e6ef;
+  --serif:"Noto Serif CJK SC","Source Han Serif SC","Songti SC","STSong","SimSun",serif;--sans:system-ui,-apple-system,"PingFang SC","Noto Sans CJK SC","Microsoft YaHei",sans-serif}
+@media (prefers-color-scheme: dark){:root{--paper:#15162a;--surface:#1b1d35;--ink:#e8e9f4;--mute:#9a9db8;--line:#2d3050;--night:#0f1020;--dusk:#ef7a9b;--dusk-ink:#2a0d17;--soft:#25274a}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.65 var(--sans);min-height:100vh;display:grid;grid-template-columns:minmax(280px,5fr) 6fr}
+.side{background:var(--night);color:#e6e7f2;padding:48px clamp(24px,5vw,64px);display:flex;flex-direction:column;justify-content:space-between}
+.side b{font:700 64px/1 var(--serif);letter-spacing:.08em;display:block}
+.side p{margin:18px 0 0;color:#9396b3;max-width:24ch}
+.side i{display:block;width:46px;height:46px;border-radius:50%;background:var(--dusk);box-shadow:0 22px 0 -2px var(--dusk);opacity:.0}
+.side .horizon{height:1px;background:#34375a;position:relative;margin:0 0 0}
+.side .horizon::before{content:"";position:absolute;left:0;bottom:1px;width:58px;height:29px;border-radius:58px 58px 0 0;background:var(--dusk)}
+form{align-self:center;justify-self:center;width:min(380px,100% - 48px);padding:40px 0}
+h1{font:700 26px/1.3 var(--serif);margin:0 0 6px}
+.lede{margin:0 0 28px;color:var(--mute)}
+label{display:block;font-size:13.5px;color:var(--mute);margin:16px 0 5px}
+input{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);font:inherit}
+:focus-visible{outline:2px solid var(--dusk);outline-offset:2px}
+button{margin-top:26px;width:100%;padding:11px;border:0;border-radius:6px;background:var(--dusk);color:var(--dusk-ink);font:600 15px var(--sans);cursor:pointer}
+.flash{margin:0 0 4px;padding:10px 14px;border-left:3px solid var(--dusk);background:var(--soft);border-radius:0 6px 6px 0}
+.hint{margin-top:18px;font-size:13px;color:var(--mute)}
+@media (max-width:760px){body{grid-template-columns:1fr}.side{padding:28px 24px;gap:28px}.side b{font-size:44px}.side p{display:none}}
+</style>
+</head>
+<body>
+<div class="side"><div><b>长日</b><p>管理这个团的机器人、角色和玩法。</p></div><div class="horizon" aria-hidden="true"></div></div>
+<form method="post">
+  {{ csrf() }}
+  {% block form %}{% endblock %}
+</form>
+</body>
+</html>

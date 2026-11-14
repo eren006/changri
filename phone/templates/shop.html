@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% from '_phone_icons.html' import admin_app_icon with context %}
+{% block title %}礼品店 · {{ brand }}{% endblock %}
+{% block body %}
+  <header class="bar">
+    <a class="back" href="{{ url_for('inbox') }}">{{ skin.words.messages }}</a>
+    <div class="title">礼品店<small>{{ '只能送这里的礼物' if only else '也可以送别的，随便写' }}</small></div>
+  </header>
+  <div class="scroll list">
+    {% include '_flash.html' %}
+    <div class="disc-label">可以送的礼物</div>
+    {% if items %}<div class="disc-group">
+      {% for g in items %}<a class="row" href="{{ url_for('new_chat', gift=g) }}">{{ admin_app_icon('shop') }}<span class="name">{{ g }}</span><span class="chev" aria-hidden="true">›</span></a>{% endfor %}
+    </div>{% else %}<div class="empty">礼品店还没有上架礼物，送礼可以随便写礼物名。</div>{% endif %}
+    <div class="disc-label">我的图鉴</div>
+    {% if album %}<div class="disc-group">
+      {% for a in album %}<div class="row">{{ admin_app_icon('shop') }}<span class="name">{{ a.title }}</span><span class="detail">×{{ a.n }}</span></div>{% endfor %}
+    </div>{% else %}<div class="empty">图鉴还是空的，还没有人送过你礼物。</div>{% endif %}
+  </div>
+{% endblock %}

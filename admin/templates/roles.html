@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}角色与群{% endblock %}
+{% block body %}
+<h1>角色与群</h1>
+<p class="lede">玩家在自己的个人群里发「创建新角色 名字」就会出现在这里。每个角色有一个主群，还可以有备用群，消息先发主群，发不出去再试备用群。</p>
+
+{% if code %}
+<section>
+  <h2>「{{ code_role }}」的认群码</h2>
+  <div class="code">{{ code }}</div>
+  <p class="note">24 小时内有效，只能用一次。把对应的机器人拉进那个群，在群里发：{{ '换主群' if code_kind == 'main' else '绑定备用群' }} {{ code }}</p>
+</section>
+{% endif %}
+
+{% for it in items %}
+<section>
+  <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px">
+    <h2>{{ it.role.name }}</h2>
+    <form method="post" action="{{ url_for('delete_role', role_id=it.role.id) }}" onsubmit="return confirm('删除角色「{{ it.role.name }}」及其群、消息和关系线？这不能撤销。')">{{ csrf() }}<button class="linkbtn">删除角色</button></form>
+  </div>
+  <table>
+    <tr><th>类型</th><th>群号（给你看的标签）</th><th>机器人</th><th>状态</th><th></th></tr>
+    {% for g in it.groups %}
+    <tr>
+      <td>{{ '主群' if g.kind == 'main' else '备用群' }}</td>
+      <td class="tabular">{{ g.real_gid or '—' }}</td>
+      <td class="tabular tag">{{ g.bot_id or '—' }}</td>
+      <td>{% if g.group_openid %}<span class="dot ok"></span>已认群{% else %}<span class="dot warn"></span>等待认群{% endif %}</td>
+      <td>{% if g.kind == 'backup' %}<form method="post" action="{{ url_for('delete_slot', role_id=it.role.id, slot_id=g.id) }}">{{ csrf() }}<button class="linkbtn">移除</button></form>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  <form class="inline" method="post" action="{{ url_for('add_slot', role_id=it.role.id) }}">
+    {{ csrf() }}
+    <div><label for="g{{ it.role.id }}">登记群号</label><input id="g{{ it.role.id }}" type="text" name="real_gid" required pattern="\d{5,12}" inputmode="numeric"></div>
+    <div><label for="k{{ it.role.id }}">用途</label><select id="k{{ it.role.id }}" name="kind"><option value="backup">备用群</option><option value="main">换主群</option></select></div>
+    <button class="btn ghost sm" type="submit">生成认群码</button>
+  </form>
+</section>
+{% else %}
+<section><p class="empty">还没有角色。</p></section>
+{% endfor %}
+{% endblock %}
