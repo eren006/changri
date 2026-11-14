@@ -146,6 +146,36 @@ def mark_entered(room_id: int, role_id: int) -> None:
         c.execute("UPDATE room_members SET entered_ts=COALESCE(entered_ts, ?) WHERE room_id=? AND role_id=?", (int(time.time()), room_id, role_id))
 
 
+def _mark_here(room, here: list[int]) -> dict | None:
+    mem = members(room["id"])
+    if not here:
+        return None
+    was_all = all(m["entered_ts"] for m in mem)
+    for rid in here:
+        mark_entered(room["id"], rid)
+    return {"room_id": room["id"], "complete": not was_all and all(m["entered_ts"] or m["role_id"] in here for m in mem) and len(mem) > 1}
+
+
+def note_qq_speech(bot_id: str, gid: str, qq: str) -> dict | None:
+    """QQ 号听到房间群（只有群号的群）里有人说话：这个 QQ 号认过角色、又是房间的参与者，就算到场。
+    没标记返回 None；标记了返回 {"room_id", "complete"}，complete 表示这一次正好让所有人都到齐了（只会有一次）。"""
+    from . import roles
+    room = room_of_group(bot_id, pool.QQ_PREFIX + gid)
+    if not room:
+        return None
+    mine = {r["id"] for r in roles.roles_by_qq(qq)}                      # 这个人名下的所有角色
+    return _mark_here(room, [m["role_id"] for m in members(room["id"]) if m["role_id"] in mine])
+
+
+def note_presence(room, qqs: set[str]) -> dict | None:
+    """房间群的成员名单（QQ 号集合）：名单里认过角色的参与者都算到场，不用等他们发言。返回值同 note_qq_speech。"""
+    from . import roles
+    mine: set[int] = set()
+    for q in qqs:
+        mine.update(r["id"] for r in roles.roles_by_qq(q))
+    return _mark_here(room, [m["role_id"] for m in members(room["id"]) if m["role_id"] in mine])
+
+
 def group_info(room) -> tuple[str, str, str] | None:
     """(bot_id, group_openid, 给玩家看的群描述)；没领到群返回 None。"""
     if not room["pool_id"]:
@@ -181,6 +211,11 @@ def assign_waiting() -> list[int]:
         else:
             break
     return got
+
+
+def open_rooms() -> list:
+    with get_conn() as c:
+        return c.execute("SELECT * FROM rooms WHERE status='open' AND pool_id IS NOT NULL").fetchall()
 
 
 def expired() -> list:

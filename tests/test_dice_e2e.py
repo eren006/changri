@@ -16,7 +16,7 @@ from nonebot.adapters.qq import Adapter, Bot as QBot, GroupMessageCreateEvent  #
 from nonebot.adapters.qq.config import BotInfo  # noqa: E402
 
 from core import roles  # noqa: E402
-from core.db import get_conn, init_db, set_config  # noqa: E402
+from core.db import get_conn, get_config, init_db, set_config  # noqa: E402
 
 try:
     nonebot.get_driver()
@@ -58,11 +58,15 @@ class DiceE2E(unittest.TestCase):
         asyncio.new_event_loop().run_until_complete(handle_event(self.bot, ev))
         return [m if isinstance(m, str) else "<图>" for m in SENT[before:]]
 
-    def test_prefixes_and_no_false_trigger(self):
-        for p in ("/", ".", "。"):
-            self.assertTrue(self.say(f"{p}rd d20")[0].startswith("D20 ="))
+    def test_prefix_optional_by_default_and_required_when_set(self):
+        for text in ("/rd d20", ".rd d20", "。rd d20", "rd d20", "r d6"):               # 默认带不带前缀都行
+            self.assertTrue(self.say(text)[0].startswith(("D20 =", "D6 =")), text)
+        self.assertEqual(self.say("hello"), [])
+        set_config("require_prefix", "1")                                              # 设置里勾上「必须带前缀」
         for text in ("rd d20", "r d6", "at 你好", "en 路上", "hello"):
             self.assertEqual(self.say(text), [], text)
+        for p in ("/", ".", "。"):
+            self.assertTrue(self.say(f"{p}rd d20")[0].startswith("D20 ="))
 
     def test_attrs_flow_and_rule_switch(self):
         self.assertIn("已记下", self.say("/录属性 力量60 SAN55")[0])
@@ -83,6 +87,39 @@ class DiceE2E(unittest.TestCase):
         self.assertIn("COC7", self.say("/切换规则", group="G2")[0])
         self.assertIn("DND5e", self.say("/切换规则")[0])
 
+    def test_setcoc_ti_li_and_hidden_roll(self):
+        self.assertTrue(self.say("/setcoc"))                                       # 说明比较长，会发成图
+        self.assertIn("房规 3", self.say("/setcoc 3")[0])
+        self.assertIn("房规只有", self.say("/setcoc 9")[0])
+        self.assertEqual(get_config("coc_house:B1|G1"), "3")
+        self.assertEqual(get_config("coc_house:B1|G2"), "")                        # 每个群各记各的
+        self.assertIn("临时疯狂", self.say("/ti")[0])
+        self.assertIn("总结疯狂", self.say("/li 甲")[0])
+        out = self.say("/rh d20")                                                  # 甲有个人群 G1，结果私发，群里只有一句
+        self.assertIn("暗骰", out[0])
+        self.assertNotIn("D20 =", "".join(out))
+        self.assertIn("发不出去", out[0])                                          # 测试里没有真机器人，投递失败时结果不能露在群里
+        from plugins import dice as dice_plugin
+        sent = []
+
+        async def fake_push(role_id, text, send, at=True):
+            sent.append(text)
+            return True, "G1"
+        orig = dice_plugin.messaging.push_to_role
+        dice_plugin.messaging.push_to_role = fake_push
+        try:
+            out = self.say("/rh d20")
+            self.assertIn("已私下发给 TA", out[0])
+            self.assertIn("D20 =", sent[0])
+            self.assertNotIn("D20 =", "".join(out))
+            self.say("/rah 力量 60")
+            self.assertIn("暗骰结果", sent[-1])
+            self.assertIn("检定", sent[-1])
+        finally:
+            dice_plugin.messaging.push_to_role = orig
+        self.say("/切换规则 dnd")
+        self.assertIn("COC 的东西", self.say("/ti")[0])
+
     def test_no_role_gets_hint_but_explicit_value_works(self):
         self.assertIn("绑定角色", self.say("/录属性 力量60", member="M9")[0])
         self.assertIn("检定：D100=", self.say("/ra 侦查 70", member="M9")[0])
@@ -99,3 +136,42 @@ class DiceE2E(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TrpgE2E(unittest.TestCase):
+    """跑团模式走真正的事件分发：不带前缀的指令、角色卡、log 记录、恋综指令被屏蔽。"""
+
+    def setUp(self):
+        init_db()
+        with get_conn() as c:
+            for t in ("trpg_log_lines", "trpg_logs", "trpg_attr_history", "trpg_active", "trpg_card_attrs", "trpg_cards",
+                      "trpg_identities", "trpg_players", "role_attrs", "role_groups", "roles", "config"):
+                c.execute(f"DELETE FROM {t}")
+        SENT.clear()
+        self.bot = FakeBot(nonebot.get_adapter(Adapter), "B1", BotInfo(id="B1", token="", secret="x" * 16))
+        roles.create_role("甲", "B1", "G9", "M1")
+        from core import trpg
+        trpg.set_mode("G1", "trpg")
+        self.n = 100
+
+    say = DiceE2E.say
+
+    def test_flow(self):
+        from core import trpglog
+        self.assertIn("力量：60", self.say("st 力量60 理智55")[0])
+        self.assertIn("力量60", self.say("ra 力量")[0])                                   # 骰子读当前角色卡
+        self.assertEqual(self.say("我的角色"), [])                                         # 恋综指令在跑团群里不响应
+        self.assertIn("开始记录", self.say("log new 测试")[0])
+        self.say("大家好")
+        self.say("（场外话）")
+        self.say("ra 力量")
+        self.assertIn("没结束的 log", self.say("log new 再来一个")[0])       # 管理指令不带前缀也生效，并且不进 log
+        texts = [(l["kind"], l["text"]) for l in trpglog.lines(trpglog.current("G1")["id"])]
+        self.assertEqual(texts[0], ("say", "大家好"))
+        self.assertEqual(texts[1][0], "say")                                              # 「ra 力量」这条指令本身
+        self.assertEqual(texts[2][0], "dice")                                             # 它的骰点结果，和上一条配对
+        self.assertEqual(len(texts), 3)
+        self.assertIn("已结束", self.say("log end")[0])
+        set_config("require_prefix", "1")
+        self.assertEqual(self.say("st 力量10"), [])                                       # 打开必须带前缀后，不带的不响应
+        self.assertIn("力量", self.say("/st 力量10")[0])

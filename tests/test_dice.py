@@ -170,5 +170,45 @@ class AttrTests(unittest.TestCase):
             self.assertEqual(c.execute("SELECT COUNT(*) FROM role_attrs").fetchone()[0], 0)    # 删角色时属性一起删
 
 
+class HouseRuleAndMadnessTests(unittest.TestCase):
+    def test_house_rules(self):
+        j = dice.judge_success
+        self.assertEqual(j(3, 70, "1"), "大成功")
+        self.assertEqual(j(3, 70, "0"), "极难成功" if 3 <= 70 // 5 else "x")     # 规则书：只有 1 才大成功
+        self.assertEqual(j(1, 30, "0"), "大成功")
+        self.assertEqual(j(99, 70, "1"), "失败")
+        self.assertEqual(j(99, 70, "5"), "大失败")                              # 房规 5：满 50 出 99-100 大失败
+        self.assertEqual(j(98, 40, "3"), "大失败")                              # 房规 3：96-100 都算
+        self.assertEqual(j(4, 3, "2"), "失败")                                  # 房规 2：大成功要 ≤ 成功率
+        self.assertEqual(j(4, 40, "2"), "大成功")
+        self.assertEqual(j(97, 20, "2"), "大失败")
+        self.assertEqual(j(97, 98, "2"), "成功")
+        self.assertEqual(j(5, 60, "4"), "大成功" if 5 <= 60 // 10 else "极难成功")   # 60//10=6，5 ≤ 6
+        self.assertEqual(j(7, 60, "4"), "极难成功" if 7 <= 12 else "x")
+        self.assertEqual(j(100, 30, "4"), "大失败")
+        self.assertEqual(j(2, 100, "5"), "大成功")
+        self.assertEqual(j(3, 100, "5"), "极难成功")
+        for h in dice.HOUSE_RULES:
+            for r in range(1, 101):
+                self.assertIn(j(r, 55, h), dice.LEVEL_RANK)
+
+    def test_check_uses_house(self):
+        random.seed(1)
+        for h in ("0", "3", "5"):
+            self.assertIn("检定", dice.coc_check("侦查 60", 0, lookup_none, house=h))
+        self.assertIn("房规 3", dice.house_text("3"))
+
+    def test_madness(self):
+        random.seed(3)
+        t = dice.madness("", False)
+        self.assertIn("临时疯狂", t)
+        self.assertIn("轮", t)
+        s = dice.madness("甲", True)
+        self.assertIn("甲 的总结疯狂", s)
+        self.assertIn("小时", s)
+        self.assertEqual(len(dice.TEMP_MADNESS), 10)
+        self.assertEqual(len(dice.SUMMARY_MADNESS), 10)
+
+
 if __name__ == "__main__":
     unittest.main()

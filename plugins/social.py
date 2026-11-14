@@ -10,7 +10,7 @@ from nonebot.matcher import current_bot
 from nonebot.params import CommandArg
 from nonebot.typing import T_State
 
-from plugins._long import recall_group_message, reply_long, send_to_group  # noqa: E402
+from plugins._long import make_send, recall_group_message, reply_long, send_to_group  # noqa: E402
 from core import admins, blocks, forms, gifts, messaging, roles, season, sendmsg, windows
 from core.db import get_config, get_conn, get_int, per_bot
 
@@ -32,14 +32,8 @@ def _sender_role(event: GroupMessageCreateEvent):
 
 
 def _make_send() -> messaging.Send:
-    """发消息时按群所属的机器人选发送者。"""
-    async def send(bot_id: str, group_openid: str, text: str) -> str:
-        bot = nonebot.get_bots().get(bot_id)
-        if bot is None:
-            raise RuntimeError(f"机器人 {bot_id} 当前不在线")
-        return await send_to_group(bot, group_openid, text)
-
-    return send
+    """发消息时按群所属的机器人选发送者（开头的 {{AT:…}} 由 make_send 处理，不处理就会原样显示成一串码）。"""
+    return make_send()
 
 
 def _cmd(name: str, aliases: set[str] | None = None):
@@ -56,6 +50,8 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
     parts = args.extract_plain_text().split()
     if len(parts) not in (1, 2):
         await create_role.finish("用法：创建新角色 名字 [群号]\n群号可填可不填，只是给管理员看的标签。")
+    if not season.running():           # 没有进行中的季度（筹备期也算进行中）就不能建角色
+        await create_role.finish("现在没有进行中的季度，暂时不能创建新角色。等管理员开了季度（筹备期就可以）再来。")
     ok, msg = roles.create_role(parts[0], _bid(), event.group_openid, _sender(event), parts[1] if len(parts) == 2 else "")
     await create_role.finish(msg)
 

@@ -218,7 +218,7 @@ def wipe_preview() -> dict[str, int]:
 def wipe() -> None:
     """清空本季数据：角色（连带群位、属性、出场、认群码）、短信、拉黑、心动信、关系线。管理员、设置、季度记录都保留。"""
     with get_conn() as conn:
-        for t in ("votes", "replies", "posts", "wishes", "join_requests", "room_members", "rooms", "lovemails", "rel_details", "relations", "messages", "blocks", "entrance_images", "entrance", "bind_codes", "role_attrs", "role_groups", "roles"):
+        for t in ("votes", "replies", "posts", "wishes", "join_requests", "room_lines", "room_members", "rooms", "lovemails", "rel_details", "relations", "messages", "blocks", "entrance_images", "entrance", "bind_codes", "role_attrs", "role_groups", "roles"):
             conn.execute(f"DELETE FROM {t}")
         conn.execute("UPDATE pool_groups SET state='free', room_id=NULL")
     set_config("season_wiped", "1")

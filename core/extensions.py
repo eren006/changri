@@ -22,7 +22,7 @@ USER_DIR = Path(os.environ.get("CHANGRI_EXT_DIR") or ROOT / "extensions")
 API_VERSION = 1
 
 # 核心：别的功能的地基，不能关
-CORE_MODULES = ["plugins.ping", "plugins.botsync", "plugins.social", "plugins.core_admin", "plugins.season", "plugins.play", "plugins.phone", "plugins.autoreply"]  # 季度与游戏天数是地基：短信礼物、心动信的每日次数都按它算「今天」
+CORE_MODULES = ["plugins.ping", "plugins.botsync", "plugins.social", "plugins.core_admin", "plugins.season", "plugins.play", "plugins.phone", "plugins.autoreply", "plugins.trpg", "plugins.trpglog", "plugins.prefix", "plugins.qqwatch"]  # 季度与游戏天数是地基：短信礼物、心动信的每日次数都按它算「今天」
 
 # 官方扩展：随包带的可选功能。settings_group = 设置页里属于它的那一组；nav = 左侧菜单里属于它的页面
 OFFICIAL = [

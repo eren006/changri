@@ -61,7 +61,13 @@ async def _remember_loop() -> None:
     loopbridge.set_loop(asyncio.get_running_loop())     # 网页要让机器人主线程发消息时用
 
 
+async def _start_qq_links() -> None:
+    from core import qqmanager
+    await qqmanager.start_all()
+
+
 driver.on_startup(_remember_loop)
+driver.on_startup(_start_qq_links)
 driver.on_startup(_start_phone_server)
 
 if __name__ == "__main__":

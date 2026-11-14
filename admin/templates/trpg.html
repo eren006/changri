@@ -1,0 +1,24 @@
+{% extends "base.html" %}{% block title %}跑团角色库{% endblock %}
+{% block body %}
+<h1>跑团角色库</h1>
+<p class="lede">跑团模式的群里，玩家用 /st 录的角色卡都在这里，按玩家分。官方机器人看不到真实 QQ 号，玩家用 /nn 设的名字最方便认；没设就显示「玩家编号」。恋综角色在「角色与群」，两边的数据互不相通。</p>
+
+<form class="inline" method="get" style="margin:0 0 14px"><label>搜索<input name="q" value="{{ q }}" placeholder="玩家名或卡名"></label><button>搜索</button>{% if q %}<a href="{{ url_for('trpg_page') }}">清除</a>{% endif %}</form>
+
+{% for p in players %}
+<section>
+  <h2>{{ p.display }} <span class="tag">{{ p.cards|length }} 张卡{% if p.openids %} · 标识 {{ p.openids|length }} 个{% endif %}</span></h2>
+  {% if p.cards %}
+  <div style="overflow-x:auto"><table>
+    <tr><th>卡名</th><th>规则</th><th>属性</th><th>变动</th><th>最近变动</th><th></th></tr>
+    {% for c in p.cards %}
+    <tr><td>{{ c.name }}</td><td>{{ 'DND5e' if c.rule == 'dnd' else 'COC7' }}</td><td class="tabular">{{ c.n_attrs }}</td><td class="tabular">{{ c.n_changes }}</td><td class="tabular">{{ c.last_ts|ts }}</td>
+      <td><a class="btn" href="{{ url_for('trpg_card_page', card_id=c.id) }}">详情</a></td></tr>
+    {% endfor %}
+  </table></div>
+  {% else %}<p class="empty">还没有角色卡。</p>{% endif %}
+</section>
+{% else %}
+<p class="empty">{% if q %}没有匹配的玩家。{% elif total == 0 %}还没有人建过角色卡。在群里发「/模式 跑团」切到跑团模式，再用 /st 录属性，这里就会出现。{% else %}没有匹配的玩家。{% endif %}</p>
+{% endfor %}
+{% endblock %}

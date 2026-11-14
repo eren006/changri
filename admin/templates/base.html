@@ -121,9 +121,9 @@ tr:last-child td{border-bottom:0}
     <nav aria-label="主导航">
       {% set groups = [
         ('', [('dashboard','总览')]),
-        ('玩家', [('roles_page','角色与群'),('messages_page','消息记录')]),
-        ('玩法', [('season_page','季度与出场'),('lovemail_page','心动信'),('relations_page','关系线'),('pool_page','群池与房间'),('forum_page','论坛'),('rpg_page','物品与地点'),('autoreply_page','自定义回复'),('phone_page','小手机')]),
-        ('这个机器人', [('extensions_page','功能与设置'),('admins_page','QQ 管理员')]),
+        ('通用', [('autoreply_page','自定义回复'),('phone_page','小手机'),('extensions_page','功能与设置'),('admins_page','QQ 管理员'),('qqlink_page','QQ 号监听')]),
+        ('恋综', [('roles_page','角色与群'),('messages_page','消息记录'),('season_page','季度与出场'),('lovemail_page','心动信'),('relations_page','关系线'),('pool_page','群池与房间'),('reviews_page','房间复盘'),('forum_page','论坛'),('rpg_page','物品与地点')]),
+        ('跑团', [('trpg_page','角色库'),('trpglog_page','日志')]),
       ] if in_bot else [] %}
       {% for title, items in groups %}
       <div>
@@ -146,5 +146,14 @@ tr:last-child td{border-bottom:0}
     {% block body %}{% endblock %}
   </main>
 </div>
+<script>
+/* 提交表单后回到原来的滚动位置（保存、开关、删除都不再跳回顶部） */
+(function(){var K='scroll:'+location.pathname;
+function save(){try{sessionStorage.setItem(K,String(window.scrollY))}catch(e){}}
+document.addEventListener('submit',save,true);
+var sub=HTMLFormElement.prototype.submit;HTMLFormElement.prototype.submit=function(){save();return sub.apply(this,arguments)};
+try{var y=sessionStorage.getItem(K);if(y!==null){sessionStorage.removeItem(K);window.addEventListener('load',function(){window.scrollTo(0,parseInt(y,10)||0)})}}catch(e){}
+})();
+</script>
 </body>
 </html>

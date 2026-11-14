@@ -8,8 +8,9 @@ from pathlib import Path
 
 from flask import Flask, abort, flash, jsonify, make_response, redirect, render_template, request, session, url_for
 
-from core import blocks, gifts, loopbridge, messaging, phonecodes, phonegate, season, sendmsg
+from core import trpgexport, trpglog, trpgrender, blocks, gifts, loopbridge, messaging, phonecodes, phonegate, season, sendmsg
 from core.db import get_conn, get_config
+from core.lockstore import FailStore
 from phone.themes import PHONE_THEMES, phone_theme
 
 HERE = Path(__file__).resolve().parent
@@ -22,7 +23,7 @@ def _cookie() -> str:
 SKIN_COOKIE = "phone_skin"
 MAX_AGE = 30 * 86400
 LOCK_AFTER, LOCK_SECONDS = 5, 300
-_fails: dict[str, tuple[int, float]] = {}
+_fails = FailStore("phone")      # 存数据库，重启不清零
 
 
 def _sign(key: str, role_id: int, code: str, ts: int) -> str:
@@ -328,6 +329,31 @@ def create_phone_app(secret_key: str) -> Flask:
         if size not in (180, 192, 512):
             abort(404)
         return send_from_directory(HERE / "static" / "themes" / "phone-icons", f"icon-{size}.png")
+
+    @app.route("/l/<token>")
+    def trpg_log_share(token):
+        """跑团 log 的只读分享页：不用登录，token 是长随机串；只有 /log end 或 /log get 公开过的才能打开。"""
+        log = trpglog.by_token(token)
+        if not log:
+            abort(404)
+        resp = make_response(trpgrender.render_html(log, trpglog.lines(log["id"]), download_url=url_for("trpg_log_zip", token=token)))
+        resp.headers["Cache-Control"] = "no-store"
+        resp.headers["Referrer-Policy"] = "no-referrer"
+        resp.headers["X-Robots-Tag"] = "noindex"
+        resp.headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'"
+        return resp
+
+    @app.route("/l/<token>/zip")
+    def trpg_log_zip(token):
+        from urllib.parse import quote
+        log = trpglog.by_token(token)
+        if not log:
+            abort(404)
+        data, fname, mime = trpgexport.build(log, "zip")
+        resp = make_response(data)
+        resp.headers["Content-Type"] = mime
+        resp.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(fname)}"
+        return resp
 
     @app.route("/p/health")
     def health():

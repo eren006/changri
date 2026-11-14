@@ -1,0 +1,66 @@
+{% extends "base.html" %}{% block title %}{{ log.name }}{% endblock %}
+{% block head %}<style>
+.lv-form .row{display:flex;align-items:center;gap:10px;margin:6px 0}.lv-form .row>label:first-child{white-space:nowrap}.lv-form select{width:auto}.lv-form input[type=color]{width:38px;height:30px;padding:0;border:1px solid var(--line);border-radius:6px;background:none}
+.pv{width:100%;height:560px;border:1px solid var(--line);border-radius:8px;background:#fff}
+@media(max-width:520px){.pv{height:440px}}
+</style>{% endblock %}
+{% block body %}
+<p><a href="{{ url_for('trpglog_page') }}">← 跑团日志</a></p>
+<h1>{{ log.name }}</h1>
+<p class="lede">{{ status[log.status] }}　·　{{ stats.lines }} 条，{{ stats.speakers }} 位发言人，骰点 {{ stats.dice }} 次（成功 {{ stats.success }} / 失败 {{ stats.fail }}），属性变动 {{ stats.changes }} 次。</p>
+
+<section>
+  <h2>分享链接</h2>
+  {% if log.shared %}
+    {% if url %}<p><input type="text" readonly value="{{ url }}" onclick="this.select()" style="width:100%;max-width:560px"></p>
+    {% else %}<p class="note">还没设置玩家访问网址，链接发不出去。先在「小手机」页开启小手机并填好玩家访问网址。</p>{% endif %}
+    <p class="note">有这个链接的人都能看，不用登录。小手机必须是开着的。</p>
+    <form method="post" action="{{ url_for('trpglog_share', log_id=log.id) }}">{{ csrf() }}<button class="linkbtn">关闭分享链接</button></form>
+  {% else %}
+    <p class="note">现在没有公开。群里 /log end 或 /log get 会自动公开，也可以在这里直接公开。强制停止的 log 默认不公开。</p>
+    <form method="post" action="{{ url_for('trpglog_share', log_id=log.id) }}">{{ csrf() }}<input type="hidden" name="on" value="1"><button class="btn">公开分享链接</button></form>
+  {% endif %}
+</section>
+
+<section>
+  <h2>着色器</h2>
+  <form class="lv-form" method="post" action="{{ url_for('trpglog_style', log_id=log.id) }}">{{ csrf() }}
+    <div class="row"><label for="theme">主题</label><select id="theme" name="theme">{% for k, v in themes.items() %}<option value="{{ k }}" {{ 'selected' if style.theme == k }}>{{ v }}</option>{% endfor %}</select></div>
+    {% for n, c in colors %}<div class="row"><input type="color" name="color_{{ loop.index0 }}" value="{{ style.colors.get(n, c) }}" aria-label="{{ n }} 的颜色"><span>{{ n }}</span></div>
+    {% else %}<p class="empty">还没有发言人。</p>{% endfor %}
+    <div class="row"><label><input type="checkbox" name="dice_hl" value="1" {{ 'checked' if style.dice_hl }}> 骰点结果高亮（大成功、成功、失败、大失败各有标记）</label></div>
+    <div class="row"><label><input type="checkbox" name="dim_bot" value="1" {{ 'checked' if style.dim_bot }}> 机器人的系统回复淡化</label></div>
+    <p><button class="btn">保存样式</button></p>
+  </form>
+  <p class="note">自己改过的颜色深色主题里也照用，选色时留意对比度；没改的颜色会自动跟着主题换深浅。</p>
+</section>
+
+<section>
+  <h2>下载</h2>
+  <p><a class="btn" href="{{ url_for('trpglog_download', log_id=log.id, fmt='zip') }}">下载 zip（全部）</a></p>
+  <p class="note">zip 里有：log.html（带着色，离线能打开）、log.txt（QQ 风格纯文本）、log.json（结构化，含骰点汇总）、骰点汇总.txt。也可以单独下载：
+    <a href="{{ url_for('trpglog_download', log_id=log.id, fmt='html') }}">html</a> ·
+    <a href="{{ url_for('trpglog_download', log_id=log.id, fmt='txt') }}">txt</a> ·
+    <a href="{{ url_for('trpglog_download', log_id=log.id, fmt='json') }}">json</a> ·
+    <a href="{{ url_for('trpglog_download', log_id=log.id, fmt='summary') }}">骰点汇总</a></p>
+</section>
+
+<section>
+  <h2>导入聊天记录</h2>
+  <p class="note">没开自动听取时，机器人只能看到 @ 它的消息。想补全整场对话（或补记 log 开始前的内容），把 QQ 导出的聊天记录（txt）传进来，会和已有的骰点按时间合并，重复的自动去掉。支持「2026-11-14 21:03:11 昵称」和「昵称(2026-11-14 21:03:11)」两种写法。括号开头等不记录规则同样生效。</p>
+  <form method="post" enctype="multipart/form-data" action="{{ url_for('trpglog_import', log_id=log.id) }}">{{ csrf() }}
+    <div class="row"><input type="file" name="file" accept=".txt,text/plain"></div>
+    <p class="note">或者直接粘贴：</p>
+    <textarea name="text" rows="5" style="width:100%;max-width:560px" placeholder="2026-11-14 21:03:11 小明&#10;我推开门"></textarea>
+    <label style="display:block;margin-top:8px">跳过这些昵称（机器人自己的，逗号分隔）<input type="text" name="skip" placeholder="卡拉" style="width:100%;max-width:320px"></label>
+    <p><button class="btn">导入</button></p>
+  </form>
+</section>
+
+<section>
+  <h2>预览</h2>
+  <iframe class="pv" sandbox="allow-scripts" srcdoc="{{ preview }}" title="预览"></iframe>
+</section>
+
+<form method="post" action="{{ url_for('trpglog_delete', log_id=log.id) }}" onsubmit="return confirm('删除「{{ log.name }}」？不能撤销，分享链接也会失效。')">{{ csrf() }}<button class="linkbtn">删除这个 log</button></form>
+{% endblock %}

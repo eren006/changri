@@ -105,6 +105,18 @@ class AdminTests(unittest.TestCase):
         self.assertIn("输错太多次", r.get_data(as_text=True))
         self.assertEqual(admin_mod._fails["127.0.0.1|*"][0], 5)
 
+    def test_login_lock_survives_restart(self):
+        from core.lockstore import FailStore
+        webusers.create_user("boss", "longenough1", "owner")
+        t = token(self.c)
+        for i in range(5):
+            self.c.post("/login", data={"username": f"u{i}", "password": "bad", "_csrf": t})
+        fresh = FailStore("admin")                                   # 模拟进程重启：一个全新的对象，只能从数据库里读
+        n, until = fresh["127.0.0.1|*"]
+        self.assertEqual(n, 5)
+        self.assertGreater(until, time.time())
+        self.assertIsNone(FailStore("phone").get("127.0.0.1|*"))      # 后台和小手机各记各的
+
     def test_first_run_setup(self):
         self.assertEqual(self.c.get("/").status_code, 302)
         self.assertTrue(self.c.get("/").headers["Location"].endswith("/setup"))

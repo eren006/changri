@@ -72,14 +72,19 @@ def render(kind: str, from_name: str, title: str, content: str) -> str:
     return text + (f"\n留言：{content}" if content else "")
 
 
-async def push_to_role_ex(role_id: int, text: str, send: Send) -> tuple[bool, str, str, str]:
+async def push_to_role_ex(role_id: int, text: str, send: Send, at: bool = True) -> tuple[bool, str, str, str]:
     """把一段文字发到某角色：主群优先，失败依次试备用群。返回 (是否送达, 群 openid 或错误, 机器人 ID, 消息 id)。"""
     errors = []
+    with get_conn() as conn:
+        r = conn.execute("SELECT name FROM roles WHERE id=?", (role_id,)).fetchone()
+    name = (r["name"] if r else "").replace("}", "")
     for g in list_groups(role_id):
         if not g["group_openid"]:   # 后台登记了群号但还没认群
             continue
+        # 发给本人的通知（短信、礼物、邀请……）开头 @ 本人；认过群成员才能 @，文本已经带了 @ 的不重复加
+        body = "{{AT:%s:%s}}%s" % (g["member_openid"], name, text) if at and g["member_openid"] and name and not text.startswith("{{AT:") else text
         try:
-            mid = await send(g["bot_id"], g["group_openid"], text)
+            mid = await send(g["bot_id"], g["group_openid"], body)
         except Exception as e:  # noqa: BLE001 官方接口失败原因很杂，原样记下
             errors.append(f"{g['kind']}:{str(e)[:80]}")
             continue
@@ -87,8 +92,8 @@ async def push_to_role_ex(role_id: int, text: str, send: Send) -> tuple[bool, st
     return False, "; ".join(errors) or "收件人没有可用的群", "", ""
 
 
-async def push_to_role(role_id: int, text: str, send: Send) -> tuple[bool, str]:
-    ok, info, _bot, _mid = await push_to_role_ex(role_id, text, send)
+async def push_to_role(role_id: int, text: str, send: Send, at: bool = True) -> tuple[bool, str]:
+    ok, info, _bot, _mid = await push_to_role_ex(role_id, text, send, at)
     return ok, info
 
 

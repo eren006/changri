@@ -1,0 +1,24 @@
+{% extends "base.html" %}{% block title %}R{{ room.id }} 复盘{% endblock %}
+{% block body %}
+<style>
+.ln{display:grid;grid-template-columns:48px 110px 1fr;gap:10px;padding:5px 0;border-bottom:1px solid var(--line);align-items:baseline}
+.ln .t{color:var(--mute);font-size:12.5px} .ln .w{font-weight:600} .ln.chat .x{color:var(--mute)} .ln .x{white-space:pre-wrap;word-break:break-word}
+@media (max-width:560px){.ln{grid-template-columns:44px 1fr}.ln .x{grid-column:1 / -1}}
+</style>
+<p><a href="{{ url_for('reviews_page') }}">← 房间复盘</a></p>
+<h1>R{{ room.id }} {{ room.kind }}</h1>
+<p class="lede">{{ slot }}　·　参与者：{{ who|join('、') }}　·　{{ status_text }}　<a class="btn sm ghost" href="{{ url_for('review_export', rid=room.id) }}">导出文本</a></p>
+
+<section>
+  <h2>每个人说了多少</h2>
+  {% if stats %}<table><tr><th>谁</th><th>戏文</th><th>戏文字数</th><th>闲聊</th></tr>
+    {% for s in stats %}<tr><td>{{ s.name }}</td><td class="tabular">{{ s.rp or 0 }} 条</td><td class="tabular">{{ s.chars or 0 }}</td><td class="tabular">{{ s.chat or 0 }} 条</td></tr>{% endfor %}</table>
+  {% else %}<p class="empty">还没有记到发言。要房间群里有监听的 QQ 号、说话的人绑定过 QQ，才会存下来。</p>{% endif %}
+</section>
+
+<section>
+  <h2>全部发言</h2>
+  {% for l in lines %}<div class="ln {{ '' if l.is_rp else 'chat' }}"><span class="t">{{ l.ts|ts }}</span><span class="w">{{ l.name }}</span><span class="x">{{ l.text }}</span></div>
+  {% else %}<p class="empty">没有记录。</p>{% endfor %}
+</section>
+{% endblock %}

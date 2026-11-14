@@ -345,19 +345,60 @@ _DIFFICULTY = {"困难": ("困难成功", 2), "极难": ("极难成功", 5)}
 _BP_TOKEN_RE = re.compile(r"^([bBpP])(\d?)$")
 
 
-def judge_success(roll: int, target: int) -> str:
-    """COC7：属性<50 时 1 大成功、96-100 大失败；属性>=50 时 1-5 大成功、100 大失败。"""
-    is_crit = roll == 1 or (target >= 50 and roll <= 5)
-    is_fumble = (target < 50 and roll >= 96) or (target >= 50 and roll == 100)
-    if is_crit:
+# 房规（.setcoc）：大成功 / 大失败的范围。键是房规编号，值说明在 HOUSE_RULES；默认 1（和以前一致）。
+HOUSE_RULES = {
+    "0": "规则书：出1大成功；不满50出96-100大失败，满50出100大失败",
+    "1": "不满50出1大成功、满50出1-5大成功；不满50出96-100大失败，满50出100大失败（默认）",
+    "2": "出1-5且≤成功率大成功；出100，或出96-99且>成功率大失败",
+    "3": "出1-5大成功；出96-100大失败",
+    "4": "出1-5且≤成功率/10大成功；不满50出≥96+成功率/10大失败，满50出100大失败",
+    "5": "出1-2且≤成功率/5大成功；不满50出96-100大失败，满50出99-100大失败",
+}
+DEFAULT_HOUSE = "1"
+
+
+def is_crit(roll: int, target: int, house: str = DEFAULT_HOUSE) -> bool:
+    if house == "0":
+        return roll == 1
+    if house == "2":
+        return roll <= 5 and roll <= target
+    if house == "3":
+        return roll <= 5
+    if house == "4":
+        return roll <= 5 and roll <= target // 10
+    if house == "5":
+        return roll <= 2 and roll <= target // 5
+    return roll == 1 or (target >= 50 and roll <= 5)
+
+
+def is_fumble(roll: int, target: int, house: str = DEFAULT_HOUSE) -> bool:
+    if house == "2":
+        return roll == 100 or (roll >= 96 and roll > target)
+    if house == "3":
+        return roll >= 96
+    if house == "4":
+        return roll == 100 if target >= 50 else roll >= min(96 + target // 10, 100)
+    if house == "5":
+        return roll >= 99 if target >= 50 else roll >= 96
+    return (target < 50 and roll >= 96) or (target >= 50 and roll == 100)      # 0 和 1 的大失败相同
+
+
+def judge_success(roll: int, target: int, house: str = DEFAULT_HOUSE) -> str:
+    """COC7 成功等级；大成功 / 大失败的范围按房规（默认 1：属性<50 时 1 大成功、96-100 大失败；>=50 时 1-5 大成功、100 大失败）。"""
+    if is_crit(roll, target, house):
         return "大成功"
-    if is_fumble:
+    if is_fumble(roll, target, house):
         return "大失败"
     if roll <= target // 5:
         return "极难成功"
     if roll <= target // 2:
         return "困难成功"
     return "成功" if roll <= target else "失败"
+
+
+def house_text(house: str) -> str:
+    lines = [f"{k}　{v}" for k, v in HOUSE_RULES.items()]
+    return f"当前房规 {house}：{HOUSE_RULES.get(house, '')}\n\n可选：\n" + "\n".join(lines)
 
 
 def roll_d100(extra: int) -> tuple[int, str]:
@@ -376,7 +417,7 @@ COC_USAGE = ("格式：/ra [b奖励/p惩罚] [困难|极难] [技能名] 数值\
              "也可以直接写角色属性名，例如 /ra 力量（先 /录属性 力量60）")
 
 
-def coc_check(raw: str, extra: int, lookup: Lookup, proxy: bool = False) -> str:
+def coc_check(raw: str, extra: int, lookup: Lookup, proxy: bool = False, house: str = DEFAULT_HOUSE) -> str:
     tokens = raw.strip().split()
     difficulty = None
     while tokens:
@@ -412,7 +453,7 @@ def coc_check(raw: str, extra: int, lookup: Lookup, proxy: bool = False) -> str:
     if abs(extra) > MAX_EXTRA_DICE:
         return f"奖励/惩罚骰最多 {MAX_EXTRA_DICE} 颗。"
     roll, note = roll_d100(extra)
-    level = judge_success(roll, target)
+    level = judge_success(roll, target, house)
     shown, verdict, key = str(target), level, level
     if difficulty:
         need_level, div = _DIFFICULTY[difficulty]
@@ -438,7 +479,7 @@ def _roll_loss(expr: str):
     return max(total, 0), max(expr_range(terms)[1], 0), detail
 
 
-def coc_sanity(raw: str, lookup: Lookup) -> str:
+def coc_sanity(raw: str, lookup: Lookup, house: str = DEFAULT_HOUSE) -> str:
     m = re.match(r"^(\S+?)/(\S+?)(?:\s+(\d{1,3}))?$", raw.strip())
     if not m:
         return "格式：/sc 成功损失/失败损失 [当前理智]\n例：/sc 1/1d6 60；不写理智就取你角色的 SAN（先 /录属性 SAN60）"
@@ -455,7 +496,7 @@ def coc_sanity(raw: str, lookup: Lookup) -> str:
     if ok_loss is None or bad_loss is None:
         return "损失的写法看不懂，数字或 1d6 这类即可。"
     roll = random.randint(1, 100)
-    fumble = roll == 100 or (san < 50 and roll >= 96)
+    fumble = is_fumble(roll, san, house)
     passed = roll <= san and not fumble
     if passed:
         loss, process, verdict = ok_loss[0], ok_loss[2], "成功"
@@ -479,6 +520,46 @@ def coc_growth(raw: str) -> str:
         gain = random.randint(1, 10)
         return f"{prefix}成长检定：D100={roll}/{value} —— 成长！+{gain}（1D10），{value} → {value + gain}。"
     return f"{prefix}成长检定：D100={roll}/{value} —— 没有成长。经验急不得。"
+
+
+# ---------- 疯狂症状（COC7 第 8 章，文字是概括的）----------
+
+TEMP_MADNESS = [
+    "失忆：发现自己身处陌生的地方，忘了自己是谁，记忆在持续时间结束后恢复",
+    "假性残疾：心理性的失明、失聪或肢体失去知觉",
+    "暴力倾向：六亲不认地攻击周围的人和物",
+    "偏执：陷入严重的偏执妄想，觉得有人监视、同伴要背叛，谁也不能信",
+    "人际依赖：把别人误认成背景里的重要之人，努力维持关系",
+    "昏厥：当场昏倒，被唤醒后能正常行动",
+    "逃避行为：不择手段地逃离所在的地方，哪怕抛下同伴",
+    "歇斯底里：大笑、哭泣、嘶吼、恐惧等极端情绪爆发",
+    "恐惧：患上一种恐惧症，持续时间内对恐惧源有反应（恐惧症状表请掷 1D100 或由 KP 选）",
+    "狂躁：出现一种狂躁，持续时间内沉浸其中（狂躁症状表请掷 1D100 或由 KP 选）",
+]
+SUMMARY_MADNESS = [
+    "失忆：回过神来身处陌生的地方，忘了自己是谁，记忆会随时间恢复",
+    "被窃：恢复清醒后发现被盗，人毫发无损；带着贵重物品的话做幸运检定，有价值的东西可能全部消失",
+    "遍体鳞伤：满身拳痕和瘀伤，生命值降到疯狂前的一半（不算重伤），没有被盗",
+    "暴力倾向：陷入暴力和破坏欲，事后可能记得也可能毫无印象，对谁施暴、后果如何由 KP 定",
+    "极端信念：以疯狂的方式表现背景里的某个思想或信念",
+    "重要之人：不顾一切接近背景里的重要之人，并为这段关系做出行动",
+    "被收容：在精神病院病房或警察局牢房里醒来，会慢慢想起原因",
+    "逃避行为：醒来发现自己在很远的地方，也许迷失在荒野，或是在远行的车上",
+    "恐惧：患上一种新的恐惧症（恐惧症状表请掷 1D100 或由 KP 选），会设法避开恐惧源",
+    "狂躁：患上一种新的狂躁（狂躁症状表请掷 1D100 或由 KP 选），沉浸其中",
+]
+
+
+def madness(raw: str, summary: bool) -> str:
+    """ti：临时疯狂（持续 1D10 轮）；li：总结疯狂（持续 1D10 小时）。raw 可以写「某某」当作被疯狂的人。"""
+    who = raw.strip()
+    idx = random.randint(1, 10)
+    last = random.randint(1, 10)
+    table = SUMMARY_MADNESS if summary else TEMP_MADNESS
+    unit = "小时" if summary else "轮"
+    kind = "总结疯狂（li）" if summary else "临时疯狂（ti）"
+    head = f"{who} 的{kind}" if who else kind
+    return f"{head}：1D10={idx}\n{table[idx - 1]}\n持续 1D10={last} {unit}。"
 
 
 # ======================== DND5e ========================
@@ -622,7 +703,10 @@ HELP_COC = (
     "/en [技能名] 当前数值　技能成长，如 /en 侦查 55\n"
     "不写数值就取你角色的同名属性：/ra 力量（要先 /录属性 力量60，超过100按100算）\n"
     "代骰：/ra 力量 @某人，取被 @ 者角色的数值替 TA 投\n"
-    "/sc 1/1d6 不写理智就取你的 SAN"
+    "/sc 1/1d6 不写理智就取你的 SAN\n"
+    "/ti　临时疯狂症状；/li　总结疯狂症状（后面可以写人名）\n"
+    "/setcoc [0-5]　房规：改大成功/大失败的范围，不带数字看说明；每个群各记各的\n"
+    "/rh [表达式]　暗骰，结果私下发给你，群里只说一声；/rah 技能 数值　暗检定"
 )
 HELP_DND = (
     "【DND5e 规则】/切换规则 DND\n"

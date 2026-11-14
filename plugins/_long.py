@@ -10,8 +10,17 @@ from core.db import get_config, get_int
 from core.textutil import chunk_text
 
 
+IMG = "{{IMG}}"        # 文本开头带这个标记：不管多长都画成图发（复盘用）；画不出来就退回文字
+
+
 def _image_wanted(text: str) -> bool:
+    if text.startswith(IMG):
+        return True
     return get_config("long_as_image", "1") == "1" and len(text) > get_int("image_min_chars", 200)
+
+
+def _strip_img(text: str) -> str:
+    return text[len(IMG):] if text.startswith(IMG) else text
 
 
 def _render(text: str) -> list[bytes]:
@@ -24,7 +33,9 @@ def _render(text: str) -> list[bytes]:
 async def send_to_group(bot, group_openid: str, text: str) -> str:
     """主动发到某个群：够长就发图。图发了一半失败就不再补文字，免得重复。返回第一条消息的 id（撤回要用，拿不到就是空串）。"""
     first = ""
-    if _image_wanted(text):
+    wanted = _image_wanted(text)
+    text = _strip_img(text)
+    if wanted:
         sent = 0
         try:
             for png in _render(text):
@@ -42,7 +53,14 @@ async def send_to_group(bot, group_openid: str, text: str) -> str:
 
 async def reply_long(matcher, text: str) -> None:
     """回复触发指令的人：够长就发图，否则按 5 条以内的文字发。"""
-    if _image_wanted(text):
+    try:
+        from plugins._logtap import tap_reply
+        tap_reply(matcher, text)                  # 跑团 log 在记时，骰子回复也进 log
+    except Exception as e:  # noqa: BLE001 记 log 出错不能影响回复
+        logger.warning(f"[跑团log] 记录回复出错：{e}")
+    wanted = _image_wanted(text)
+    text = _strip_img(text)
+    if wanted:
         sent = 0
         try:
             for png in _render(text):
@@ -61,19 +79,24 @@ AT_RE = re.compile(r"\A\{\{AT:(\w+):([^}]*)\}\}")
 _md_off_until = 0.0
 
 
-async def send_at(bot, group_openid: str, member_openid: str, name: str, text: str) -> None:
+async def send_at(bot, group_openid: str, member_openid: str, name: str, text: str) -> str:
     """开头 @ 一个人。官方机器人只有 markdown 消息里的 <qqbot-at-user> 才是真 @（要机器人有群 markdown 权限）；
-    没权限或被拒，就退回纯文字「@名字」，并且一小时内不再试 markdown。群消息里的 <@openid> 不会渲染成 @，所以不用。"""
+    没权限或被拒，就退回纯文字「@名字」，并且一小时内不再试 markdown。群消息里的 <@openid> 不会渲染成 @，所以不用。
+    返回发出去的那条消息的 id（撤回要用）。内容很长要发图时：先单发一条 @，图另发，返回图的 id。"""
     global _md_off_until
+    if _image_wanted(text):
+        await send_at(bot, group_openid, member_openid, name, "")
+        return await send_to_group(bot, group_openid, text)
     if time.time() >= _md_off_until:
         try:
-            await bot.send_to_group(group_openid=group_openid,
-                                    message=MessageSegment.markdown(f'<qqbot-at-user id="{member_openid}" />\n{text}'))
-            return
+            r = await bot.send_to_group(group_openid=group_openid,
+                                        message=MessageSegment.markdown(f'<qqbot-at-user id="{member_openid}" />\n{text}'))
+            return getattr(r, "id", "") or ""
         except Exception as e:  # noqa: BLE001
             _md_off_until = time.time() + 3600
             logger.warning(f"[@] markdown 发送失败（多半是机器人没有群 markdown 权限），一小时内改发纯文字 @：{e}")
-    await bot.send_to_group(group_openid=group_openid, message=f"@{name} {text}")
+    r = await bot.send_to_group(group_openid=group_openid, message=f"@{name} {text}")
+    return getattr(r, "id", "") or ""
 
 
 def make_send():

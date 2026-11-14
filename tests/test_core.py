@@ -115,7 +115,7 @@ class MessagingTests(Base):
         mid = messaging.queue_message("gift", self.a, self.b, "玫瑰", "给你")
         run(messaging.deliver(mid, self.sender(fail={"G2"})))
         self.assertEqual(run(messaging.retry_pending(self.sender())), 1)
-        self.assertEqual(self.sent[0], ("G2", "🎁 甲 送了你「玫瑰」\n留言：给你"))
+        self.assertEqual(self.sent[0], ("G2", "{{AT:M2:乙}}🎁 甲 送了你「玫瑰」\n留言：给你"))      # 发给本人的通知开头 @ 本人
 
     def test_cooldown(self):
         set_config("sms_cooldown_sec", "60")

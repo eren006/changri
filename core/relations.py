@@ -129,3 +129,39 @@ def stats() -> list:
         return conn.execute(
             "SELECT r.name, COUNT(*) AS n FROM roles r JOIN relations x ON x.role_lo=r.id OR x.role_hi=r.id GROUP BY r.id ORDER BY n DESC, r.name"
         ).fetchall()
+
+
+def alert_hours() -> float:
+    """超过多少小时没回复就提醒；0 = 不提醒。"""
+    try:
+        return max(0.0, float(get_config("rel_alert_hours", "24") or 0))
+    except ValueError:
+        return 0.0
+
+
+def waiting_lines(now: float | None = None) -> list[dict]:
+    """所有进行中（没确认）、至少有一段细节的关系线：最后一段是谁发的、在等谁回、已经等了多久，
+    以及这条线上「对方回复」平均隔多久。等得最久的在前。"""
+    now = now or time.time()
+    out = []
+    with get_conn() as conn:
+        for r in conn.execute("SELECT x.*, a.name AS a_name, b.name AS b_name FROM relations x "
+                              "JOIN roles a ON a.id=x.role_lo JOIN roles b ON b.id=x.role_hi WHERE x.confirmed=0"):
+            ds = conn.execute("SELECT from_role_id, created_ts FROM rel_details WHERE rel_id=? ORDER BY id", (r["id"],)).fetchall()
+            if not ds:
+                continue
+            last = ds[-1]
+            names = {r["role_lo"]: r["a_name"], r["role_hi"]: r["b_name"]}
+            waiting_id = r["role_hi"] if last["from_role_id"] == r["role_lo"] else r["role_lo"]
+            gaps = [ds[i]["created_ts"] - ds[i - 1]["created_ts"] for i in range(1, len(ds)) if ds[i]["from_role_id"] != ds[i - 1]["from_role_id"]]
+            out.append({"rel_id": r["id"], "a_name": r["a_name"], "b_name": r["b_name"], "last_from": names[last["from_role_id"]],
+                        "waiting_on": names[waiting_id], "last_ts": last["created_ts"], "hours": max(0.0, (now - last["created_ts"]) / 3600),
+                        "avg_reply_hours": (sum(gaps) / len(gaps) / 3600) if gaps else None, "count": len(ds)})
+    out.sort(key=lambda x: -x["hours"])
+    return out
+
+
+def overdue(now: float | None = None) -> list[dict]:
+    """超过提醒时限还没人回的关系线。"""
+    limit = alert_hours()
+    return [x for x in waiting_lines(now) if limit > 0 and x["hours"] >= limit]

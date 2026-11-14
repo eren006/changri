@@ -5,6 +5,18 @@ import time
 from .db import get_conn, get_config
 
 
+QQ_PREFIX = "qq:"          # 只有群号、卡拉不在里面的群（QQ 号监听那条线管着）：group_openid 用 qq:群号 占位
+
+
+def is_qq_only(g) -> bool:
+    return str(g["group_openid"]).startswith(QQ_PREFIX)
+
+
+def register_qq(bot_id: str, gid: str, set_name: str = "", label: str = "") -> int:
+    """QQ 号那条线上的群直接放进房间群池：不需要卡拉进群，机器人在里面一言不发，只靠 QQ 号改群名。"""
+    return register(bot_id, QQ_PREFIX + gid, real_gid=gid, set_name=set_name, label=label)
+
+
 def note_group(bot_id: str, group_openid: str) -> bool:
     """机器人被拉进群时登记一下（已有则不动）。返回是否新登记。"""
     with get_conn() as c:
@@ -91,7 +103,7 @@ def delete(pool_id: int) -> tuple[bool, str]:
 def allocate(room_id: int):
     """领一个空群给房间。池里没有空群返回 None（房间排队）。"""
     with get_conn() as c:
-        g = c.execute("SELECT * FROM pool_groups WHERE in_pool=1 AND state='free' ORDER BY id LIMIT 1").fetchone()
+        g = c.execute("SELECT * FROM pool_groups WHERE in_pool=1 AND state='free' ORDER BY RANDOM() LIMIT 1").fetchone()
         if not g:
             return None
         c.execute("UPDATE pool_groups SET state='occupied', room_id=? WHERE id=?", (room_id, g["id"]))

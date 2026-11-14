@@ -74,6 +74,61 @@ def find_group_binding(bot_id: str, group_openid: str):
         return conn.execute("SELECT 1 FROM role_groups WHERE bot_id=? AND group_openid=?", (bot_id, group_openid)).fetchone()
 
 
+def bind_qq(role_id: int, qq: str) -> str:
+    """把一个真实 QQ 号认到这个角色的主人名下：按「人」认，之后这个人建的新角色也自动算他的；永久保存，后台可看可删。
+    返回空串表示成功。"""
+    import re
+    import time
+    qq = qq.strip()
+    if not re.fullmatch(r"\d{5,12}", qq):
+        return "QQ 号是 5 到 12 位数字"
+    with get_conn() as conn:
+        row = conn.execute("SELECT member_openid FROM roles WHERE id=?", (role_id,)).fetchone()
+        if not row:
+            return "没有这个角色"
+        conn.execute("INSERT INTO person_qq(qq, member_openid, created_ts) VALUES(?,?,?) "
+                     "ON CONFLICT(qq) DO UPDATE SET member_openid=excluded.member_openid", (qq, row["member_openid"], int(time.time())))
+    return ""
+
+
+def roles_by_qq(qq: str) -> list:
+    """这个 QQ 号对应的人，名下所有角色（包括绑定之后才建的）。"""
+    with get_conn() as conn:
+        return conn.execute("SELECT r.* FROM person_qq q JOIN roles r ON r.member_openid=q.member_openid WHERE q.qq=? ORDER BY r.id", (str(qq),)).fetchall()
+
+
+def qq_bindings() -> list[dict]:
+    """后台用：所有 QQ 号绑定，带上现在名下的角色名。"""
+    with get_conn() as conn:
+        out = []
+        for q in conn.execute("SELECT * FROM person_qq ORDER BY created_ts DESC"):
+            d = dict(q)
+            d["roles"] = [r["name"] for r in conn.execute("SELECT name FROM roles WHERE member_openid=? ORDER BY id", (q["member_openid"],))]
+            out.append(d)
+        return out
+
+
+def unbind_qq(qq: str) -> bool:
+    with get_conn() as conn:
+        return conn.execute("DELETE FROM person_qq WHERE qq=?", (qq,)).rowcount > 0
+
+
+def qqs_of_role(role_id: int) -> list[str]:
+    """这个角色的主人绑过的 QQ 号。"""
+    with get_conn() as conn:
+        return [r["qq"] for r in conn.execute("SELECT q.qq FROM person_qq q JOIN roles r ON r.member_openid=q.member_openid WHERE r.id=?", (role_id,))]
+
+
+def get_role(role_id: int):
+    with get_conn() as conn:
+        return conn.execute("SELECT * FROM roles WHERE id=?", (role_id,)).fetchone()
+
+
+def list_all() -> list:
+    with get_conn() as conn:
+        return conn.execute("SELECT id, name FROM roles ORDER BY name").fetchall()
+
+
 def get_role_by_name(name: str):
     with get_conn() as conn:
         return conn.execute("SELECT * FROM roles WHERE name=?", (name,)).fetchone()

@@ -1,0 +1,25 @@
+{% extends "base.html" %}{% block title %}跑团日志{% endblock %}
+{% block body %}
+<h1>跑团日志</h1>
+<p class="lede">跑团模式的群里用 /log new 开始记录。一场 log 就是一场战役，可以暂停、结束，结束后还能接着记。群里开了「自动听取」（全量接收群消息）时，所有发言和骰点都会自动记，不用 /说；没开时机器人只看得到 @ 它的消息，玩家的台词就要用 /说 记。</p>
+
+<section>
+  <h2>记录规则</h2>
+  <p class="note">被规则跳过的消息不会存进数据库，下载的文件里也没有。只对之后新记的内容生效。</p>
+  <form method="post" action="{{ url_for('trpglog_rules') }}">{{ csrf() }}
+    <div class="setrow wide"><label class="sw"><input type="checkbox" name="brackets" value="1" {{ 'checked' if rules.brackets }}><i></i></label><div><b>括号开头的话不记</b><div class="d">（场外话）(场外话)【…】[…] 开头的整条都不记，中英文括号都算。</div></div></div>
+    <div class="setrow wide"><label class="sw"><input type="checkbox" name="cmds" value="1" {{ 'checked' if rules.cmds }}><i></i></label><div><b>指令文字不记，只记骰点结果</b><div class="d">关闭时，「/ra 侦查 50」这句指令和它的结果会一起记下来。</div></div></div>
+    <label style="display:block;margin-top:10px">这些开头的话不记（一行一个）<textarea name="prefixes" rows="3" style="width:100%;max-width:320px">{{ prefixes }}</textarea></label>
+    <p><button class="btn">保存</button></p>
+  </form>
+</section>
+
+<section>
+  <h2>所有 log</h2>
+  {% if logs %}<div style="overflow-x:auto"><table>
+    <tr><th>名字</th><th>编号</th><th>状态</th><th>条数</th><th>开始</th><th></th></tr>
+    {% for l in logs %}<tr><td>{{ l.name }}</td><td class="tabular">{{ l.token[:4] }}</td><td>{{ status[l.status] }}</td><td class="tabular">{{ l.n }}</td><td class="tabular">{{ l.started_ts|ts }}</td>
+      <td><a class="btn" href="{{ url_for('trpglog_view', log_id=l.id) }}">查看</a></td></tr>{% endfor %}
+  </table></div>{% else %}<p class="empty">还没有 log。在跑团模式的群里发 /log new 名字 开始。</p>{% endif %}
+</section>
+{% endblock %}

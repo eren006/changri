@@ -107,9 +107,40 @@ class PlayE2E(unittest.TestCase):
         self.assertNotIn("还没进群", self.say("我的待回")[0])
         # 结束
         out = self.say("结束私约", member="M1", group="POOL0")
-        self.assertTrue(any("已结束" in o for o in out))
+        self.assertTrue(any("已经结束" in o and "请退群" in o for o in out))
+        self.assertFalse(any("[P0]" in o and "已结束" in o for o in out))                       # 正常结束不再往个人群发通知
         self.assertEqual(pool.counts()["cleaning"], 1)
         self.assertEqual(pool.counts()["free"], 0)
+
+    def test_listener_room_commands_in_qq_group(self):
+        """房间群没有卡拉：监听的 QQ 号听到「结束私约」「修改时间线」等，按绑定的 QQ 认人，由 QQ 号在群里回。"""
+        from core import qqmanager, qqpool
+        from core.qqlink import GroupMsg
+        from plugins import play
+        qqpool.add_rooms("B1", "100001", "A组")
+        out = self.say("私约 1400-1500 咖啡厅 乙")
+        self.assertTrue(any("请申请入群" in o and "100001" in o for o in out))
+        roles.bind_qq(roles.get_role_by_name("甲")["id"], "555555")
+        said = []
+
+        async def fake_say(app, gid, text, ats):
+            said.append((gid, text))
+            return ""
+
+        orig = qqmanager.room_say
+        qqmanager.room_say = fake_say
+        try:
+            run = lambda text, uid: asyncio.new_event_loop().run_until_complete(play._listen_cmd("B1", GroupMsg("9", "100001", uid, "x", text, 1, "1")))   # noqa: E731
+            self.assertFalse(run("你好", "555555"))                                  # 不是房间指令
+            self.assertTrue(run("结束私约", "999999"))                               # 没绑定：提示先绑定
+            self.assertIn("绑定QQ", said[-1][1])
+            self.assertTrue(run("修改时间线 D1 1600-1700", "555555"))
+            self.assertIn("申请把时间线改成", said[-1][1])
+            self.assertTrue(run("结束私约", "555555"))
+        finally:
+            qqmanager.room_say = orig
+        self.assertTrue(any("已经结束，请退群" in t for _, t in said))
+        self.assertIsNone(rooms.room_of_group("B1", "qq:100001"))
 
     def test_queue_when_pool_empty_then_assign(self):
         out = self.say("电话 1400-1500 乙")
@@ -211,7 +242,8 @@ class PlayE2E(unittest.TestCase):
         self.assertIn("加入申请", self.say("加入请求")[0]); self.assertIn("想加入", self.say("我的待回")[0])
         self.assertIn("不是发给你", self.say(f"同意加入 {qid}", member="M2", group="P2")[0])
         out = self.say(f"同意加入 {qid}")
-        self.assertTrue(any("[P2]" in o and "同意了你加入" in o and "1234560" in o for o in out))
+        self.assertTrue(any("[P2]" in o and "同意了你加入" in o for o in out))
+        self.assertTrue(any("[P2]" in o and "请申请入群" in o and "1234560" in o and "@" not in o for o in out))      # 群号单独一条纯文字
         self.assertEqual(len(rooms.members(rooms.timeline(roles.get_role_by_name("丙")["id"])[0]["id"])), 3)
         self.assertIn("没有这条", self.say(f"同意加入 {qid}")[0])
 

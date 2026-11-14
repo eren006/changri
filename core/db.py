@@ -210,6 +210,108 @@ CREATE TABLE IF NOT EXISTS rpg_item_log (
     detail     TEXT NOT NULL DEFAULT '',
     created_ts INTEGER NOT NULL
 );
+-- 跑团模块：玩家、角色卡、属性变动历史（跟恋综的 roles / role_attrs 完全分开，见 docs/跑团模块设计.md）
+CREATE TABLE IF NOT EXISTS trpg_players (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    name       TEXT NOT NULL DEFAULT '',
+    created_ts INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS trpg_identities (
+    member_openid TEXT PRIMARY KEY,
+    player_id     INTEGER NOT NULL REFERENCES trpg_players(id) ON DELETE CASCADE,
+    group_openid  TEXT NOT NULL DEFAULT '',
+    created_ts    INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS trpg_cards (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id  INTEGER NOT NULL REFERENCES trpg_players(id) ON DELETE CASCADE,
+    name       TEXT NOT NULL,
+    rule       TEXT NOT NULL DEFAULT 'coc',
+    note       TEXT NOT NULL DEFAULT '',
+    created_ts INTEGER NOT NULL,
+    UNIQUE(player_id, name)
+);
+CREATE TABLE IF NOT EXISTS trpg_card_attrs (
+    card_id INTEGER NOT NULL REFERENCES trpg_cards(id) ON DELETE CASCADE,
+    name    TEXT NOT NULL,
+    value   INTEGER NOT NULL,
+    PRIMARY KEY (card_id, name)
+);
+CREATE TABLE IF NOT EXISTS trpg_active (
+    group_openid TEXT NOT NULL,
+    player_id    INTEGER NOT NULL REFERENCES trpg_players(id) ON DELETE CASCADE,
+    card_id      INTEGER NOT NULL REFERENCES trpg_cards(id) ON DELETE CASCADE,
+    PRIMARY KEY (group_openid, player_id)
+);
+CREATE TABLE IF NOT EXISTS trpg_attr_history (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    card_id   INTEGER NOT NULL REFERENCES trpg_cards(id) ON DELETE CASCADE,
+    log_id    INTEGER,
+    ts        INTEGER NOT NULL,
+    name      TEXT NOT NULL,
+    old_value INTEGER,
+    new_value INTEGER,
+    source    TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS trpg_history_card ON trpg_attr_history(card_id, id);
+CREATE TABLE IF NOT EXISTS trpg_logs (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    scope      TEXT NOT NULL,
+    name       TEXT NOT NULL,
+    status     TEXT NOT NULL DEFAULT 'on' CHECK (status IN ('on','off','ended','halted')),
+    token      TEXT NOT NULL,
+    started_by TEXT NOT NULL DEFAULT '',
+    started_ts INTEGER NOT NULL,
+    ended_ts   INTEGER,
+    palette    TEXT NOT NULL DEFAULT '{}',
+    shared     INTEGER NOT NULL DEFAULT 0,
+    UNIQUE(scope, name)
+);
+CREATE TABLE IF NOT EXISTS trpg_log_lines (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    log_id       INTEGER NOT NULL REFERENCES trpg_logs(id) ON DELETE CASCADE,
+    ts           INTEGER NOT NULL,
+    speaker_key  TEXT NOT NULL DEFAULT '',
+    speaker_name TEXT NOT NULL DEFAULT '',
+    kind         TEXT NOT NULL DEFAULT 'say' CHECK (kind IN ('say','dice','bot')),
+    text         TEXT NOT NULL,
+    ref          INTEGER
+);
+CREATE INDEX IF NOT EXISTS trpg_log_lines_log ON trpg_log_lines(log_id, id);
+CREATE TABLE IF NOT EXISTS trpg_log_members (
+    log_id    INTEGER NOT NULL REFERENCES trpg_logs(id) ON DELETE CASCADE,
+    player_id INTEGER NOT NULL REFERENCES trpg_players(id) ON DELETE CASCADE,
+    card_id   INTEGER REFERENCES trpg_cards(id) ON DELETE SET NULL,
+    PRIMARY KEY (log_id, player_id)
+);
+CREATE TABLE IF NOT EXISTS trpg_observers (
+    group_openid TEXT NOT NULL,
+    player_id    INTEGER NOT NULL REFERENCES trpg_players(id) ON DELETE CASCADE,
+    PRIMARY KEY (group_openid, player_id)
+);
+-- QQ 号 ↔ 人（用 roles.member_openid 认人）：绑一次，这个人之后建的新角色也自动算他的，永久保存，后台可看可删
+CREATE TABLE IF NOT EXISTS person_qq (
+    qq            TEXT PRIMARY KEY,
+    member_openid TEXT NOT NULL,
+    created_ts    INTEGER NOT NULL
+);
+-- 一个官方机器人可以连多个 QQ 号（每个号一条连接），它们的群放在同一个群号池里
+CREATE TABLE IF NOT EXISTS qq_links (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    name       TEXT NOT NULL DEFAULT '',
+    url        TEXT NOT NULL,
+    token      TEXT NOT NULL DEFAULT '',
+    enabled    INTEGER NOT NULL DEFAULT 1,
+    created_ts INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS qq_groups (
+    gid          TEXT PRIMARY KEY,
+    link_id      INTEGER NOT NULL DEFAULT 0,
+    note         TEXT NOT NULL DEFAULT '',
+    kind         TEXT NOT NULL DEFAULT 'listen' CHECK (kind IN ('listen', 'bot', 'room')),
+    group_openid TEXT NOT NULL DEFAULT '',
+    created_ts   INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS seasons (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     name       TEXT NOT NULL UNIQUE,
@@ -273,6 +375,19 @@ CREATE TABLE IF NOT EXISTS rooms (
     created_ts     INTEGER NOT NULL,
     ended_ts       INTEGER
 );
+-- 房间群里监听到的发言（复盘用）：只记正在进行的房间群，房间删了（收尾）这些也一起清掉
+CREATE TABLE IF NOT EXISTS room_lines (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    room_id   INTEGER NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+    ts        INTEGER NOT NULL,
+    qq        TEXT NOT NULL DEFAULT '',
+    role_id   INTEGER,
+    name      TEXT NOT NULL DEFAULT '',
+    text      TEXT NOT NULL,
+    is_rp     INTEGER NOT NULL DEFAULT 0,
+    chars     INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS room_lines_room ON room_lines(room_id, id);
 CREATE TABLE IF NOT EXISTS room_members (
     room_id    INTEGER NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
     role_id    INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
@@ -584,6 +699,12 @@ def _migrate(path: Path | None = None) -> None:
             conn.execute("DROP TABLE admins")
             conn.execute("ALTER TABLE admins_new RENAME TO admins")
         ar = _cols(conn, "autoreplies")
+        tl = _cols(conn, "trpg_logs")
+        qg = _cols(conn, "qq_groups")
+        if qg and "link_id" not in qg:
+            conn.execute("ALTER TABLE qq_groups ADD COLUMN link_id INTEGER NOT NULL DEFAULT 0")
+        if tl and "shared" not in tl:
+            conn.execute("ALTER TABLE trpg_logs ADD COLUMN shared INTEGER NOT NULL DEFAULT 0")
         if ar and "send_mode" not in ar:
             conn.execute("ALTER TABLE autoreplies ADD COLUMN send_mode TEXT NOT NULL DEFAULT 'random'")
         wu = _cols(conn, "web_users")

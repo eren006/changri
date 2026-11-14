@@ -1,19 +1,21 @@
 import json
 import logging
 import os
+import re
 import secrets
 import time
 from functools import wraps
 from pathlib import Path
 
 from dotenv import load_dotenv
-from flask import Flask, abort, flash, g, redirect, render_template, request, session, url_for
+from flask import Flask, abort, flash, g, make_response, redirect, render_template, request, session, url_for
 from markupsafe import Markup
 
 from core import admins as admins_core, lovemail as lovemail_core, relations as relations_core, roles as roles_core, webusers
 from core.announce import get_announce
 from core import forum as forum_core
-from core import autoreply as autoreply_core, botconf, netcheck, setupcode, phonecodes, extensions as ext_core, pool as pool_core, rooms as rooms_core, rpg as rpg_core, season as season_core, updater
+from core.lockstore import FailStore
+from core import autoreply as autoreply_core, botconf, qqmanager as qqmanager_core, qqpool as qqpool_core, loopbridge, netcheck, setupcode, phonecodes, extensions as ext_core, pool as pool_core, rooms as rooms_core, rpg as rpg_core, season as season_core, trpg as trpg_core, trpglog as trpglog_core, trpgrender as trpgrender_core, trpgexport as trpgexport_core, trpgimport as trpgimport_core, updater
 from core.botconf import configured_bot_ids
 from core.db import DB_PATH, current_bot, enter_bot, get_config, get_conn, init_db, leave_bot, list_bot_ids, set_config, use_bot
 
@@ -31,6 +33,7 @@ SECTIONS = [
         "brand_name": ("系统名称（画在长图左上角，留空用默认）", ""),
         "long_as_image": ("长内容发图片（1 开 / 0 关，关了就拆成文字）", "1"),
         "image_min_chars": ("超过多少字才发图片", "200"),
+        "require_prefix": ("指令必须带前缀（1 开 / 0 关；打开后所有指令都要以 / . 。 开头，不带的不响应；关闭时带不带都行）", "0"),
     }),
     ("短信与礼物", {
         "sms_daily_limit": ("每人每天最多发几条短信（0 = 不限，按游戏天数算）", "0"),
@@ -78,8 +81,12 @@ SECTIONS = [
         "place_system_enabled": ("启用严格地点检查（1 开 / 0 关）", "0"),
         "allow_private_rooms": ("允许使用「某某的房间」（1 开 / 0 关）", "1"),
     }),
+    ("房间复盘", {
+        "room_auto_review": ("房间结束时自动把本场戏文（复盘）发给每个参与者（1 开 / 0 关，默认关）", "0"),
+    }),
     ("关系线", {
         "rel_enabled": ("关系线开关（1 开 / 0 关）", "1"),
+        "rel_alert_hours": ("关系线多少小时没人回复就在后台提醒（0 = 不提醒）", "24"),
         "max_detail_chars": ("单条拉线字数上限", "500"),
         "max_detail_count": ("单条关系线段数上限", "20"),
         "max_rel_total_chars": ("单条关系线总字数上限", "3000"),
@@ -96,7 +103,7 @@ log = logging.getLogger("changri.admin")
 
 LOCK_AFTER = 5          # 连续输错几次就锁
 LOCK_SECONDS = 300      # 锁多久
-_fails: dict[str, tuple[int, float]] = {}
+_fails = FailStore("admin")      # 存数据库，重启不清零
 ONLINE_WITHIN = 90      # 机器人心跳多少秒内算在线
 
 
@@ -184,6 +191,11 @@ def _dashboard() -> dict:
         todo.append(("warn", f"有 {n_slots} 个群位等着认群", url_for("roles_page"), "登记了群号，但还没人在群里发认群码"))
     if n_undelivered:
         todo.append(("warn", f"最近 24 小时有 {n_undelivered} 条消息没送达", url_for("messages_page"), "收件人的群可能没授权机器人发言"))
+    late = relations_core.overdue()
+    if late:
+        top = late[0]
+        todo.append(("warn", f"有 {len(late)} 条关系线超过 {relations_core.alert_hours():g} 小时没人回复", url_for("relations_page"),
+                     f"最久的：{top['a_name']} ⇄ {top['b_name']}，{top['waiting_on']} 已经 {top['hours']:.0f} 小时没回"))
     latest = get_config("update_latest", "")
     if latest and updater.is_newer(latest, updater.current_version()):
         todo.append(("warn", f"有新版本 {latest} 可以更新", url_for("update_page"), "到「更新」页点一下就行，会备份并自动重启"))
@@ -638,6 +650,401 @@ def create_app() -> Flask:
             ).fetchall()
         return render_template("messages.html", rows=rows)
 
+    @app.template_filter("ts")
+    def _ts_filter(v):
+        import time as _t
+        return _t.strftime("%m-%d %H:%M", _t.localtime(v)) if v else "—"
+
+    # ---------- 跑团角色库 ----------
+    @app.route("/trpg")
+    @login_required
+    def trpg_page():
+        q = request.args.get("q", "").strip().lower()
+        players = trpg_core.players_overview()
+        if q:
+            players = [p for p in players if q in p["display"].lower() or any(q in c["name"].lower() for c in p["cards"])]
+        return render_template("trpg.html", players=players, q=q, total=len(trpg_core.players_overview()))
+
+    @app.route("/trpg/card/<int:card_id>")
+    @login_required
+    def trpg_card_page(card_id):
+        card = trpg_core.get_card(card_id)
+        if not card:
+            flash("没有这张角色卡")
+            return redirect(url_for("trpg_page"))
+        attrs = trpg_core.list_attrs(card_id)
+        return render_template("trpg_card.html", card=card, owner=trpg_core.card_owner(card_id), attrs=attrs,
+                               history=trpg_core.card_history(card_id), battles=trpglog_core.logs_of_card(card_id), title=trpg_core.dice.RULE_TITLE.get(card["rule"], card["rule"]))
+
+    # ---------- QQ 号监听（群号池）----------
+    @app.route("/qqlink")
+    @login_required
+    def qqlink_page():
+        from core.db import current_bot
+        qqpool_core.ensure_links()
+        st = qqmanager_core.status(current_bot())
+        link_rows, live, errs = [], [], []
+        for ln in qqpool_core.links():
+            ls = qqmanager_core.link_status(current_bot(), ln["id"])
+            link_rows.append({**ln, "st": ls, "used": qqpool_core.link_usage(ln["id"]), "groups": len(qqpool_core.link_groups(ln["id"]))})
+            if ls["connected"]:
+                try:
+                    for g in loopbridge.run(qqmanager_core.group_list(current_bot(), ln["id"]), timeout=15):
+                        live.append({**g, "link_id": ln["id"], "link_name": ln["name"]})
+                except Exception as e:  # noqa: BLE001
+                    errs.append(f"{ln['name']}：{e or '取群列表失败'}")
+        live_err = "；".join(errs)
+        in_sets = {}
+        sets = qqpool_core.sets(current_bot())
+        for x in sets:
+            for g in x["groups"]:
+                in_sets[g["real_gid"]] = x["name"]
+        names = {str(g.get("group_id")): g.get("group_name", "") for g in live}
+        multi = len(link_rows) > 1
+        tpl = get_config("qqlink_room_name", "auto")
+        if tpl == "{kind}·{names}":
+            tpl = "auto"
+        sample = {"kind": "私约", "id": 12, "day": 3, "start_hm": "20:00", "end_hm": "21:00", "place": "海边咖啡馆"}
+        presets = list(qqpool_core.ROOM_NAME_PRESETS)
+        return render_template("qqlink.html", conf=qqpool_core.conf(), pool=[g for g in qqpool_core.list_groups() if g["kind"] != "room"], kinds=qqpool_core.KINDS,
+                               st=st, link_rows=link_rows, multi=multi, has_token=bool(get_config("qqlink_token", "")), skip="\n".join(sorted(qqpool_core.skip_users())),
+                               tpl=tpl, presets=presets, is_preset=tpl in {t for t, _ in qqpool_core.ROOM_NAME_PRESETS},
+                               preview=qqpool_core.room_name(sample, ["小明", "小红"], tpl), free_name=get_config("qqlink_free_name", "空房间"),
+                               sets=sets, live=live, live_err=live_err, in_sets=in_sets, names=names,
+                               auth="\n".join(sorted(qqpool_core.auth_qqs())),
+                               binds=roles_core.qq_bindings(), role_names=[r["name"] for r in roles_core.list_all()], trpg_binds=qqpool_core.trpg_bindings())
+
+    @app.post("/qqlink/sets/add")
+    @login_required
+    def qqlink_sets_add():
+        name = (request.form.get("new_set", "").strip() or request.form.get("pick_set", "").strip())
+        gids = request.form.getlist("gid")                       # 每项是「QQ号连接编号:群号」
+        if not gids:
+            flash("先勾选要加的群")
+            return redirect(url_for("qqlink_page"))
+        bad = []
+        for item in gids:
+            lid, _, gid = item.partition(":")
+            err = qqpool_core.join_set(current_bot(), gid, name, int(lid) if lid.isdigit() else 0)
+            if err:
+                bad.append(f"{gid}：{err}")
+        flash(f"已把 {len(gids) - len(bad)} 个群加进群号组「{name}」" + (("；没加成：" + "；".join(bad)) if bad else ""))
+        return redirect(url_for("qqlink_page"))
+
+    @app.post("/qqlink/sets/rename")
+    @login_required
+    def qqlink_sets_rename():
+        old, new = request.form.get("old", ""), request.form.get("new", "")
+        err = qqpool_core.rename_set(current_bot(), old, new)
+        flash(err or f"群号组已改名为「{new.strip()}」")
+        return redirect(url_for("qqlink_page"))
+
+    @app.post("/qqlink/sets/toggle")
+    @login_required
+    def qqlink_sets_toggle():
+        name, on = request.form.get("name", ""), request.form.get("on") == "1"
+        err = qqpool_core.set_enabled(current_bot(), name, on)
+        flash(err or (f"群号组「{name}」已开启使用" if on else f"群号组「{name}」已关闭，不再分配房间"))
+        return redirect(url_for("qqlink_page"))
+
+    @app.post("/qqlink/sets/remove/<gid>")
+    @login_required
+    def qqlink_sets_remove(gid):
+        err = qqpool_core.leave_set(current_bot(), gid)
+        flash(err or "已移出群号组")
+        return redirect(url_for("qqlink_page"))
+
+    @app.post("/qqlink/auth")
+    @login_required
+    def qqlink_auth():
+        qqpool_core.save_auth(request.form.get("auth", ""))
+        flash("已保存")
+        return redirect(url_for("qqlink_page"))
+
+    @app.post("/qqlink/conf")
+    @login_required
+    def qqlink_conf():
+        from core.db import current_bot
+        err = qqpool_core.save_conf(request.form.get("url", ""), request.form.get("token") or None, bool(request.form.get("on")))
+        if err:
+            flash(err)
+        else:
+            loopbridge.run(qqmanager_core.restart(current_bot()))
+            flash("设置已保存，连接已按新设置重启")
+        return redirect(url_for("qqlink_page"))
+
+    @app.post("/qqlink/link/add")
+    @login_required
+    def qqlink_link_add():
+        from core.db import current_bot
+        lid, err = qqpool_core.add_link(request.form.get("name", ""), request.form.get("url", ""), request.form.get("token", ""), bool(request.form.get("on")))
+        if err:
+            flash(err)
+        else:
+            loopbridge.run(qqmanager_core.restart(current_bot()))
+            flash("已添加 QQ 号连接")
+        return redirect(url_for("qqlink_page"))
+
+    @app.post("/qqlink/link/<int:lid>/save")
+    @login_required
+    def qqlink_link_save(lid):
+        from core.db import current_bot
+        err = qqpool_core.update_link(lid, request.form.get("name", ""), request.form.get("url", ""), request.form.get("token") or None, bool(request.form.get("on")))
+        if err:
+            flash(err)
+        else:
+            loopbridge.run(qqmanager_core.restart(current_bot()))
+            flash("已保存，连接已按新设置重启")
+        return redirect(url_for("qqlink_page"))
+
+    @app.post("/qqlink/link/<int:lid>/delete")
+    @login_required
+    def qqlink_link_delete(lid):
+        from core.db import current_bot
+        err = qqpool_core.delete_link(current_bot(), lid)
+        if not err:
+            qqmanager_core.stop_link(current_bot(), lid)
+        flash(err or "已删除这个 QQ 号连接，它名下的群也一起移出了群号池")
+        return redirect(url_for("qqlink_page"))
+
+    @app.post("/qqlink/skip")
+    @login_required
+    def qqlink_skip():
+        qqpool_core.save_skip(request.form.get("skip", ""))
+        flash("已保存")
+        return redirect(url_for("qqlink_page"))
+
+    @app.post("/qqlink/bind")
+    @login_required
+    def qqlink_bind():
+        name, qq = request.form.get("role", "").strip(), request.form.get("qq", "").strip()
+        role = roles_core.get_role_by_name(name)
+        err = "没有叫这个名字的角色" if not role else roles_core.bind_qq(role["id"], qq)
+        flash(err or f"已把 QQ {qq} 认到「{name}」名下")
+        return redirect(url_for("qqlink_page"))
+
+    @app.post("/qqlink/unbind/<qq>")
+    @login_required
+    def qqlink_unbind(qq):
+        done = roles_core.unbind_qq(qq) | qqpool_core.unbind_trpg(qq)
+        flash("已解除绑定" if done else "没有这个绑定")
+        return redirect(url_for("qqlink_page"))
+
+    @app.post("/qqlink/rooms")
+    @login_required
+    def qqlink_rooms_add():
+        ok, bad = qqpool_core.add_rooms(current_bot(), request.form.get("gids", ""), request.form.get("set_name", "").strip())
+        flash(f"已加 {ok} 个房间群" + (("；没加成：" + "；".join(bad)) if bad else ""))
+        return redirect(url_for("qqlink_page"))
+
+    @app.post("/qqlink/roomname")
+    @login_required
+    def qqlink_roomname():
+        pick = request.form.get("preset", "")
+        tpl = request.form.get("custom", "").strip() if pick == "custom" else pick
+        set_config("qqlink_room_name", tpl or "auto")
+        set_config("qqlink_free_name", request.form.get("free_name", "").strip() or "空房间")
+        flash("已保存")
+        return redirect(url_for("qqlink_page"))
+
+    @app.post("/qqlink/group")
+    @login_required
+    def qqlink_group_add():
+        err = qqpool_core.add_group(request.form.get("gid", ""), request.form.get("note", ""), request.form.get("kind", "listen"))
+        flash(err or "已加进群号池")
+        return redirect(url_for("qqlink_page"))
+
+    @app.post("/qqlink/group/<gid>/edit")
+    @login_required
+    def qqlink_group_edit(gid):
+        ok = qqpool_core.update_group(gid, request.form.get("note", ""), request.form.get("kind", "listen"), request.form.get("group_openid", ""))
+        flash("已保存" if ok else "没有这个群")
+        return redirect(url_for("qqlink_page"))
+
+    @app.post("/qqlink/group/<gid>/delete")
+    @login_required
+    def qqlink_group_delete(gid):
+        flash("已从群号池移除" if qqpool_core.remove_group(gid) else "没有这个群")
+        return redirect(url_for("qqlink_page"))
+
+    @app.post("/qqlink/group/<gid>/rename")
+    @login_required
+    def qqlink_group_rename(gid):
+        from core.db import current_bot
+        err = loopbridge.run(qqmanager_core.rename(current_bot(), gid, request.form.get("name", "")))
+        flash(err or "群名已改")
+        return redirect(url_for("qqlink_page"))
+
+    # ---------- 房间复盘：所有人的房间记录 ----------
+    def _review_filters():
+        return {k: request.args.get(k, "").strip() for k in ("role", "kind", "q")}
+
+    @app.route("/reviews")
+    @login_required
+    def reviews_page():
+        from core import roomlog
+        f = _review_filters()
+        with get_conn() as conn:
+            names = [r["name"] for r in conn.execute("SELECT name FROM roles ORDER BY name")]
+        evts = roomlog.events(**f)
+        return render_template("reviews.html", f=f, names=names, days=roomlog.day_summary(evts), total=len(evts))
+
+    @app.route("/reviews/day/<label>")
+    @login_required
+    def review_day(label):
+        from core import roomlog
+        f = _review_filters()
+        with get_conn() as conn:
+            names = [r["name"] for r in conn.execute("SELECT name FROM roles ORDER BY name")]
+        evts = roomlog.events(**f)
+        if label != "all":
+            evts = [e for e in evts if e["day_label"] == label]
+        return render_template("review_day.html", f=f, names=names, label=label, evts=evts,
+                               status_text={"open": "进行中", "ended": "已结束", "cancelled": "已取消", "pending": "待送达", "sent": "已送达", "failed": "没送到"})
+
+    @app.route("/reviews/<int:rid>")
+    @login_required
+    def review_view(rid):
+        from core import roomlog
+        room = rooms_core.get(rid)
+        if not room:
+            abort(404)
+        from core.overview import slot_text
+        return render_template("review_view.html", room=room, slot=slot_text(room), who=[m["name"] for m in rooms_core.members(rid)],
+                               lines=roomlog.lines(rid), stats=roomlog.stats(rid),
+                               status_text={"open": "进行中", "ended": "已结束", "cancelled": "已取消"}[room["status"]])
+
+    @app.route("/reviews/<int:rid>/export")
+    @login_required
+    def review_export(rid):
+        from flask import Response
+        from core import roomlog
+        text = roomlog.export_text(rid)
+        if not text:
+            abort(404)
+        return Response(text, mimetype="text/plain; charset=utf-8", headers={"Content-Disposition": f"attachment; filename=R{rid}.txt"})
+
+    # ---------- 跑团日志 ----------
+    @app.route("/trpglog")
+    @login_required
+    def trpglog_page():
+        with get_conn() as conn:
+            logs = [dict(x) for x in conn.execute(
+                "SELECT l.*, (SELECT COUNT(*) FROM trpg_log_lines WHERE log_id=l.id) AS n FROM trpg_logs l ORDER BY l.id DESC")]
+        return render_template("trpglog.html", logs=logs, rules=trpglog_core.rules(), status=trpglog_core.STATUS_TEXT,
+                               prefixes=get_config("trpg_log_skip_prefixes", trpglog_core.DEFAULT_PREFIXES))
+
+    @app.post("/trpglog/rules")
+    @login_required
+    def trpglog_rules():
+        set_config("trpg_log_skip_brackets", "1" if request.form.get("brackets") else "0")
+        set_config("trpg_log_skip_cmds", "1" if request.form.get("cmds") else "0")
+        set_config("trpg_log_skip_prefixes", "\n".join(x.strip() for x in request.form.get("prefixes", "").splitlines() if x.strip()))
+        flash("记录规则已保存，对之后新记的内容生效")
+        return redirect(url_for("trpglog_page"))
+
+    @app.route("/trpglog/<int:log_id>")
+    @login_required
+    def trpglog_view(log_id):
+        log = trpglog_core.get(log_id)
+        if not log:
+            flash("没有这个 log")
+            return redirect(url_for("trpglog_page"))
+        ls = trpglog_core.lines(log_id)
+        style = trpgrender_core.parse_style(log["palette"])
+        cmap = trpgrender_core.color_map(ls, style)
+        return render_template("trpglog_view.html", log=log, stats=trpglog_core.stats(log_id), status=trpglog_core.STATUS_TEXT,
+                               style=style, themes=trpgrender_core.THEMES, colors=[(n, c[0]) for n, c in cmap.items()],
+                               preview=trpgrender_core.render_html(log, ls, style), url=trpglog_core.share_url(log))
+
+    @app.post("/trpglog/<int:log_id>/style")
+    @login_required
+    def trpglog_style(log_id):
+        log = trpglog_core.get(log_id)
+        if not log:
+            return redirect(url_for("trpglog_page"))
+        ls = trpglog_core.lines(log_id)
+        defaults = {n: c[0] for n, c in trpgrender_core.color_map(ls, trpgrender_core.parse_style("{}")).items()}
+        colors = {}
+        for i, n in enumerate(trpgrender_core.speakers(ls)):
+            c = request.form.get(f"color_{i}", "")
+            if c and c.lower() != defaults[n].lower():
+                colors[n] = c
+        trpglog_core.save_style(log_id, {"theme": request.form.get("theme", "auto"), "colors": colors,
+                                          "dice_hl": bool(request.form.get("dice_hl")), "dim_bot": bool(request.form.get("dim_bot"))})
+        flash("样式已保存，分享页和下载的文件都会用这套")
+        return redirect(url_for("trpglog_view", log_id=log_id))
+
+    @app.route("/trpglog/<int:log_id>/download/<fmt>")
+    @login_required
+    def trpglog_download(log_id, fmt):
+        from urllib.parse import quote
+        log = trpglog_core.get(log_id)
+        if not log or fmt not in ("zip", "html", "txt", "json", "summary"):
+            abort(404)
+        data, fname, mime = trpgexport_core.build(log, fmt)
+        resp = make_response(data)
+        resp.headers["Content-Type"] = mime
+        resp.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(fname)}"
+        return resp
+
+    @app.post("/trpglog/<int:log_id>/import")
+    @login_required
+    def trpglog_import(log_id):
+        log = trpglog_core.get(log_id)
+        if not log:
+            return redirect(url_for("trpglog_page"))
+        up = request.files.get("file")
+        raw = up.read(trpgimport_core.MAX_BYTES + 1) if up and up.filename else request.form.get("text", "").encode()
+        if len(raw) > trpgimport_core.MAX_BYTES:
+            flash("文件太大了，最多 2MB")
+        else:
+            entries = trpgimport_core.parse(trpgimport_core.decode(raw))
+            if not entries:
+                flash("没有认出聊天记录的格式。需要每条消息前有一行「2026-11-14 21:03:11 昵称」或「昵称(2026-11-14 21:03:11)」。")
+            else:
+                skip = {x.strip() for x in re.split(r"[,，\n]", request.form.get("skip", "")) if x.strip()}
+                r = trpgimport_core.import_into(log_id, entries, skip)
+                flash(f"导入完成：新增 {r['added']} 条，重复 {r['dup']} 条，跳过 {r['skipped']} 条（机器人昵称或不记录规则）")
+        return redirect(url_for("trpglog_view", log_id=log_id))
+
+    @app.post("/trpglog/<int:log_id>/share")
+    @login_required
+    def trpglog_share(log_id):
+        log = trpglog_core.get(log_id)
+        if log:
+            on = bool(request.form.get("on"))
+            trpglog_core.mark_shared(log_id, on)
+            flash("已公开分享链接" if on else "已关闭分享链接（旧链接立刻失效）")
+        return redirect(url_for("trpglog_view", log_id=log_id))
+
+    @app.post("/trpglog/<int:log_id>/delete")
+    @login_required
+    def trpglog_delete(log_id):
+        trpglog_core.delete(log_id)
+        flash("已删除")
+        return redirect(url_for("trpglog_page"))
+
+    @app.post("/trpg/card/<int:card_id>/attr")
+    @login_required
+    def trpg_card_attr(card_id):
+        if not trpg_core.get_card(card_id):
+            return redirect(url_for("trpg_page"))
+        items = trpg_core.parse_st(request.form.get("text", ""))
+        if not items:
+            flash("格式：力量60 或 力量+5（可以一次写多个）")
+        else:
+            ok, lines = trpg_core.apply_st(card_id, items, source="后台手改")
+            flash("；".join(lines) if ok else lines[0])
+        return redirect(url_for("trpg_card_page", card_id=card_id))
+
+    @app.post("/trpg/card/<int:card_id>/attr/delete")
+    @login_required
+    def trpg_card_attr_delete(card_id):
+        name = request.form.get("name", "")
+        flash("已删除" if trpg_core.delete_attr(card_id, name, source="后台手改") else "没有这个属性")
+        return redirect(url_for("trpg_card_page", card_id=card_id))
+
     # ---------- 物品、属性、地点与商城 ----------
     @app.route("/rpg")
     @login_required
@@ -736,7 +1143,21 @@ def create_app() -> Flask:
                 "(SELECT COALESCE(SUM(LENGTH(text)),0) FROM rel_details d WHERE d.rel_id=x.id) AS chars "
                 "FROM relations x JOIN roles a ON a.id=x.role_lo JOIN roles b ON b.id=x.role_hi JOIN roles i ON i.id=x.initiator_id "
                 "ORDER BY x.id DESC").fetchall()
-        return render_template("relations.html", rels=rels, stats=relations_core.stats())
+        waits = {w["rel_id"]: w for w in relations_core.waiting_lines()}
+        return render_template("relations.html", rels=rels, stats=relations_core.stats(), waits=waits, late=relations_core.overdue(),
+                               limit=relations_core.alert_hours())
+
+    @app.post("/relations/alert")
+    @login_required
+    def relations_alert():
+        try:
+            hours = max(0.0, float(request.form.get("hours", "0") or 0))
+        except ValueError:
+            flash("请填数字，0 表示不提醒")
+            return redirect(url_for("relations_page"))
+        set_config("rel_alert_hours", f"{hours:g}")
+        flash("已保存：" + (f"超过 {hours:g} 小时没回复会提醒" if hours else "不再提醒"))
+        return redirect(url_for("relations_page"))
 
     @app.post("/relations/<int:rel_id>/delete")
     @login_required
@@ -955,7 +1376,12 @@ def create_app() -> Flask:
     @app.post("/rooms/<int:rid>/end")
     @login_required
     def room_end(rid):
+        room = rooms_core.get(rid)
+        pool_id = room["pool_id"] if room else None
         rooms_core.end(rid)
+        g = pool_core.get(pool_id) if pool_id else None
+        if g and pool_core.is_qq_only(g):                  # 房间群：群名改回空房间
+            loopbridge.run(qqmanager_core.room_rename(current_bot(), g, qqpool_core.free_name(g["set_name"])))
         flash(f"R{rid} 已结束（网页上结束不会通知玩家，群进入待清场）")
         return redirect(url_for("pool_page"))
 

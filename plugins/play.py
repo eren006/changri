@@ -11,7 +11,7 @@ from nonebot.adapters.qq import Bot, GroupAddRobotEvent, GroupMessageCreateEvent
 from nonebot.params import CommandArg
 
 from plugins._long import make_send, reply_long, send_to_group  # noqa: E402
-from core import admins, announce, forum, messaging, pending, pool, roles, rooms, season, windows, wishes
+from core import admins, announce, forum, messaging, pending, pool, qqmanager, qqpool, roles, rooms, season, windows, wishes
 from core.db import get_config, get_conn, get_int, per_bot, set_config
 
 nonebot.require("nonebot_plugin_apscheduler")
@@ -46,12 +46,22 @@ def _resolve(names: list[str]) -> tuple[list, str]:
     return found, ("、".join(missing) if missing else "")
 
 
-async def _push(role_id: int, text: str) -> bool:
-    ok, _ = await messaging.push_to_role(role_id, text, make_send())
+async def _push(role_id: int, text: str, at: bool = True) -> bool:
+    ok, _ = await messaging.push_to_role(role_id, text, make_send(), at)     # 发到角色群时默认自动 @ 本人（见 messaging.push_to_role_ex）
     return ok
 
 
+async def _push_group(role_id: int, room) -> bool:
+    """分配到群号的通知拆成两条里的第二条：不 @、纯文字，只写请入群 + 群号（方便直接复制）。"""
+    return await _push(role_id, _group_line(room), at=False)
+
+
 async def _to_group(bot_id: str, group_openid: str, text: str) -> None:
+    if group_openid.startswith(pool.QQ_PREFIX):          # 只有群号的房间群：卡拉不在里面，由监听的 QQ 号在群里说
+        err = await qqmanager.room_say(bot_id, group_openid[len(pool.QQ_PREFIX):], text, [])
+        if err:
+            logger.warning(f"[房间] 群里发话失败：{err}")
+        return
     bot = nonebot.get_bots().get(bot_id)
     if bot is None:
         return
@@ -64,10 +74,27 @@ async def _to_group(bot_id: str, group_openid: str, text: str) -> None:
 from core.overview import group_line as _group_line, slot_text as _slot  # noqa: E402
 
 
+RP_FORMAT_TIP = "✍️ 戏文格式：首行「角色名」+ 换行/空格/冒号（：或:）+ 正文，其余视为闲聊，不计入存档与字数"
+
+
 def _room_text(room, who_from: str = "") -> str:
+    """通知的第一条：@ 本人 + 类型、时间地点、参与者 + 须知（跟长日系统一样）。群号另发第二条（_push_group）。"""
     mem = "、".join(m["name"] for m in rooms.members(room["id"]))
     head = f"💌 {who_from} 向你发起了{room['kind']}" if who_from else f"💌 {room['kind']}"
-    return f"{head}\n{_slot(room)}\n参与者：{mem}\n{_group_line(room)}\n房间号 R{room['id']}（进群后发「结束{room['kind']}」可以结束）"
+    tips = [RP_FORMAT_TIP]
+    if room["kind"] != "微信":
+        tips += [f"修改时间 ➜ 修改时间线 D{room['day']} 新时间", f"不想参加 ➜ 拒绝时间线 R{room['id']}"]
+    tips.append(f"结束互动 ➜ 在约会群里直接发「结束{room['kind']}」")
+    return f"{head}\n{_slot(room)}\n参与者：{mem}\n房间号 R{room['id']}\n\n" + "\n".join(tips)
+
+
+async def _invite(role_id: int, room, who_from: str = "", fix=None) -> None:
+    """发邀请：第一条 @ + 时间地点人物 + 须知，第二条纯文字「请入群：群号」。fix 可对第一条做替换（官约、官电的标题）。"""
+    text = _room_text(room, who_from)
+    if fix:
+        text = text.replace(*fix)
+    await _push(role_id, text)
+    await _push_group(role_id, room)
 
 
 async def _announce_in_room(room_id: int) -> None:
@@ -77,6 +104,9 @@ async def _announce_in_room(room_id: int) -> None:
     if not gi:
         return
     mem = "、".join(m["name"] for m in rooms.members(room_id))
+    if gi[1].startswith(pool.QQ_PREFIX):                                 # 房间群：只改群名，不发言
+        await qqmanager.room_rename(gi[0], pool.get(r["pool_id"]), qqpool.room_name(r, [m["name"] for m in rooms.members(room_id)]))
+        return
     await _to_group(gi[0], gi[1], f"📌 R{room_id} {r['kind']}\n{_slot(r)}\n参与者：{mem}\n参与者请进群后在这里聊；聊完发「结束{r['kind']}」。群里没有的人，进群后随便说一句就算到场。")
 
 
@@ -163,7 +193,7 @@ async def _start_room(matcher, bot: Bot, event: GroupMessageCreateEvent, kind: s
         await matcher.finish(f"❌ {info}")
     room = rooms.get(room_id)
     for t in targets:
-        await _push(t["id"], _room_text(room, me["name"]))
+        await _invite(t["id"], room, me["name"])
     await _announce_in_room(room_id)
     await matcher.finish(f"✅ {kind}已发起，房间号 R{room_id}。\n{_slot(room)}\n{_group_line(room)}\n对方已收到通知。")
 
@@ -221,7 +251,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
         await official.finish(f"❌ {info}")
     room = rooms.get(room_id)
     for t in targets:
-        await _push(t["id"], _room_text(room).replace("💌 官约", "🏢 官约"))
+        await _invite(t["id"], room, fix=("💌 官约", "🏢 官约"))
     await _announce_in_room(room_id)
     await official.finish(f"✅ 官约已发起，房间号 R{room_id}，已通知 {len(targets)} 人。\n{_slot(room)}\n{_group_line(room)}")
 
@@ -246,7 +276,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
         await official_phone.finish(f"❌ {info}")
     room = rooms.get(room_id)
     for t in targets:
-        await _push(t["id"], _room_text(room).replace("💌 电话", "📞 官电"))
+        await _invite(t["id"], room, fix=("💌 电话", "📞 官电"))
     await _announce_in_room(room_id)
     await official_phone.finish(f"✅ 官电已发起，房间号 R{room_id}，已通知 {len(targets)} 人。\n{_slot(room)}\n{_group_line(room)}")
 
@@ -297,7 +327,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent):
         if ok:
             room = rooms.get(rid)
             for t in targets:
-                await _push(t["id"], _room_text(room).replace("💌 官约", "🏢 官约"))
+                await _invite(t["id"], room, fix=("💌 官约", "🏢 官约"))
             await _announce_in_room(rid)
             done.append(f"R{rid} {p['time']} {p['names']}")
         else:
@@ -312,22 +342,67 @@ async def _finish_room(room_id: int, status: str, why: str) -> None:
     mem = rooms.members(room_id)
     gi = rooms.group_info(room) if room else None
     g = rooms.end(room_id, status)
-    verb = "已结束" if status == "ended" else "已取消"
-    for m in mem:
-        await _push(m["role_id"], f"🔚 R{room_id} {room['kind']}{verb}{why}。" + ("请退出那个群，管理员清场后才能再给别人用。" if gi else ""))
+    verb = "已经结束" if status == "ended" else "已经取消"
+    if status != "ended":                                                # 正常结束不再往个人群发通知；取消、超时这类参与者不一定在场，才通知
+        for m in mem:
+            await _push(m["role_id"], f"🔚 R{room_id} {room['kind']}{verb}{why}。" + ("请退出那个群，管理员清场后才能再给别人用。" if gi else ""))
+    if status == "ended":
+        from core import roomlog
+        from plugins._long import IMG
+        if get_config("room_auto_review", "0") == "1":                   # 自动复盘开着：把本场复盘画成图发给每个参与者
+            text = roomlog.review_text(room_id)
+            for m in (mem if text else []):
+                await _push(m["role_id"], IMG + text)
+        else:                                                            # 关着：发一条统计回执，带「复盘 R编号」的查看提示
+            text = roomlog.receipt_text(room_id)
+            for m in (mem if text else []):
+                await _push(m["role_id"], text)
+    if gi and gi[1].startswith(pool.QQ_PREFIX):                          # 房间群：群名改回空房间
+        await qqmanager.room_rename(gi[0], pool.get(room["pool_id"]), qqpool.free_name(pool.get(room["pool_id"])["set_name"]))
     if gi:
-        await _to_group(gi[0], gi[1], f"🔚 R{room_id} {verb}{why}。请大家退出本群，谢谢。")
-        await _tell_announce(f"🧹 R{room_id} {room['kind']}{verb}，群 {gi[2]} 等待清场（设置平台「群池」页确认清空后放回池）。")
+        await _to_group(gi[0], gi[1], f"{room['kind']}{verb}{why}，请退群！")
+        await _tell_announce(f"🧹 R{room_id} {room['kind']}{verb[1:]}，群 {gi[2]} 等待清场（设置平台「群池」页确认清空后放回池）。")
+
+
+review_cmd = _cmd("复盘")
+
+
+@review_cmd.handle()
+async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
+    """发「复盘 R12」：把那一场房间的戏文画成图发出来（只有参与者和管理员能看）。不带编号就看我最近一场。"""
+    from core import roomlog
+    from plugins._long import IMG
+    me = _me(bot, event)
+    if not me and not _is_admin(bot, event):
+        await review_cmd.finish(NEED_ROLE)
+    rid = _room_arg(args.extract_plain_text())
+    room = rooms.get(rid) if rid else None
+    if not room and not rid and me:
+        mine = [r for r in rooms.timeline(me["id"]) if r["status"] == "ended"]
+        room = mine[-1] if mine else None
+    if not room:
+        await review_cmd.finish("用法：复盘 R12（房间号在邀请和回执里）。不带编号看你最近结束的一场。")
+    if me and not any(m["role_id"] == me["id"] for m in rooms.members(room["id"])) and not _is_admin(bot, event):
+        await review_cmd.finish("你不是这个房间的参与者。")
+    text = roomlog.review_text(room["id"])
+    if not text:
+        await review_cmd.finish("这场没有记到戏文。房间群里要有监听的 QQ 号，说话的人要绑定过 QQ，戏文要按「角色名：正文」的格式写。")
+    await reply_long(review_cmd, IMG + text)
 
 
 end_room = _cmd("结束私约", {"结束电话", "结束官约", "结束微信", "结束心愿", "结束约会"})
 
 
 @end_room.handle()
-async def _(bot: Bot, event: GroupMessageCreateEvent):
+async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     room = rooms.room_of_group(bot.self_id, event.group_openid)
+    arg = _room_arg(args.extract_plain_text())
+    if not room and arg:                         # 房间群里没有卡拉：在自己的群里发「结束私约 R12」
+        room = rooms.get(arg)
+        if room and room["status"] != "open":
+            room = None
     if not room:
-        await end_room.finish("这里没有进行中的约会房间。")
+        await end_room.finish("这里没有进行中的约会房间。在自己的群里结束，要带房间号：结束私约 R12。")
     me = _me(bot, event)
     if not me and not _is_admin(bot, event):
         await end_room.finish(NEED_ROLE)
@@ -425,7 +500,8 @@ async def _answer(matcher, bot, event, args, accept: bool):
         await matcher.finish(f"❌ {why}")
     room = rooms.get(q["room_id"])
     if accept:
-        await _push(q["role_id"], f"✅ {me['name']} 同意了你加入 R{room['id']} {room['kind']}。\n{_slot(room)}\n{_group_line(room)}")
+        await _push(q["role_id"], f"✅ {me['name']} 同意了你加入 R{room['id']} {room['kind']}。\n{_slot(room)}")
+        await _push_group(q["role_id"], room)
         await matcher.finish("✅ 已同意，对方会收到群号。")
     await _push(q["role_id"], f"❌ 你加入 R{room['id']} 的申请被拒绝了。")
     await matcher.finish("已拒绝。")
@@ -629,7 +705,8 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     if not ok:
         await wish_take.finish(f"❌ {info}")
     w, room = wishes.get(n), rooms.get(room_id)
-    await _push(w["poster_id"], f"🌠 你的心愿 #{n} 被 {me['name']} 摘走了！\n" + _room_text(room).replace("💌 心愿", "💌 心愿约会"))
+    await _push(w["poster_id"], f"🌠 你的心愿 #{n} 被 {me['name']} 摘走了！")
+    await _invite(w["poster_id"], room, fix=("💌 心愿", "💌 心愿约会"))
     await _announce_in_room(room_id)
     await wish_take.finish(f"✅ 你摘了心愿 #{n}，{w['poster_name']} 已收到通知。\n{_slot(room)}\n{_group_line(room)}\n房间号 R{room_id}")
 
@@ -811,7 +888,127 @@ async def _tick():
         for rid in rooms.assign_waiting():
             room = rooms.get(rid)
             for m in rooms.members(rid):
-                await _push(m["role_id"], f"🔔 R{rid} {room['kind']}有空群了。\n{_slot(room)}\n{_group_line(room)}")
+                await _push(m["role_id"], f"🔔 R{rid} {room['kind']}有空群了。\n{_slot(room)}")
+                await _push_group(m["role_id"], room)
             await _announce_in_room(rid)
+        await _check_presence()
     except Exception as e:  # noqa: BLE001
         logger.warning(f"[房间] 定时任务出错：{e}")
+
+
+async def _receipt_all_here(room) -> None:
+    """人到齐了。房间群（只有群号）：由监听的 QQ 号在群里 @ 所有参与者，说清楚是什么、几点、在哪；
+    发不出去（QQ 号掉线、没权限）才退回发到每个人自己的群里。"""
+    from core.db import current_bot
+    gi = rooms.group_info(room)
+    mem = rooms.members(room["id"])
+    if gi and gi[1].startswith(pool.QQ_PREFIX):
+        qqs = [q for m in mem for q in roles.qqs_of_role(m["role_id"])[:1]]
+        names = "、".join(m["name"] for m in mem)
+        text = (f"✅ 人都到齐了：R{room['id']} {room['kind']}\n时间地点：{_slot(room)}\n参与者：{names}\n"
+                f"聊完了，直接在这个群里发「结束{room['kind']}」就行。")
+        err = await qqmanager.room_say(current_bot(), gi[1][len(pool.QQ_PREFIX):], text, qqs)
+        if not err:
+            return
+        logger.warning(f"[房间] R{room['id']} 群里发人齐提示失败，改发各人自己的群：{err}")
+    for m in mem:
+        await _push(m["role_id"], f"✅ R{room['id']} {room['kind']}：人都到齐了。\n{_slot(room)}\n聊完了发「结束{room['kind']} R{room['id']}」。")
+
+
+async def _check_presence(only_gid: str = "") -> None:
+    """房间群（只有群号的群）：问 QQ 号群里现在有谁，认过 QQ 的参与者都在群里就算到齐，不用等发言。
+    有人进群时马上查那一个群（only_gid）；定时任务每 30 秒再把所有房间扫一遍兜底。"""
+    from core.db import current_bot
+    bot_id = current_bot()
+    for room in rooms.open_rooms():
+        gi = rooms.group_info(room)
+        if not gi or not gi[1].startswith(pool.QQ_PREFIX) or all(m["entered_ts"] for m in rooms.members(room["id"])):
+            continue
+        if only_gid and gi[1] != pool.QQ_PREFIX + only_gid:
+            continue
+        present = await qqmanager.group_members(bot_id, gi[1][len(pool.QQ_PREFIX):])
+        res = rooms.note_presence(room, present) if present else None
+        if res and res["complete"]:
+            await _receipt_all_here(rooms.get(room["id"]))
+
+
+_ROOM_CMD = re.compile(r"[/.。]?(结束(?:私约|电话|官约|微信|心愿|约会)|修改时间线|同意时间线|拒绝时间线)\s*(.*)")
+
+
+async def _listen_cmd(app_id, msg) -> bool:
+    """房间群里没有卡拉：有监听的 QQ 号时，群里发「结束私约 / 修改时间线 / 同意时间线 / 拒绝时间线」由 QQ 号听到，
+    按发言人绑定的 QQ 认出他是房间的哪位参与者，照常处理，结果由 QQ 号在群里回。返回是否是房间指令。"""
+    m = _ROOM_CMD.fullmatch(msg.text.strip())
+    if not m:
+        return False
+    room = rooms.room_of_group(app_id, pool.QQ_PREFIX + msg.group_id)
+    if not room:
+        return False
+    cmd, arg = m.group(1), m.group(2).strip()
+    rid = _room_arg(arg) if re.fullmatch(r"[Rr]\d+", arg) else None
+    if rid and rid != room["id"]:
+        return False
+    say = lambda t: _to_group(app_id, pool.QQ_PREFIX + msg.group_id, t)       # noqa: E731
+    mine = {r["id"] for r in roles.roles_by_qq(msg.user_id)}
+    me = next((roles.get_role(x["role_id"]) for x in rooms.members(room["id"]) if x["role_id"] in mine), None)
+    if not me:
+        await say("认不出你是谁：请先在自己的群里对卡拉发「/绑定QQ 你的QQ号」，绑定后才能在这里用。")
+        return True
+    if cmd.startswith("结束"):
+        await _finish_room(room["id"], "ended", "")
+    elif cmd == "修改时间线":
+        p = arg.split()
+        day = room["day"]
+        if p and re.fullmatch(r"[Dd]\d+", p[0]):
+            day = int(p.pop(0)[1:])
+        hm = rooms.parse_hm(p[0]) if p else None
+        if not hm:
+            await say("用法：修改时间线 [D几] 时间\n例：修改时间线 D1 1400-1500")
+            return True
+        ok, why = rooms.propose_change(room["id"], me["id"], day, *hm)
+        await say(f"📝 {me['name']} 申请把时间线改成 D{day} {hm[0]}-{hm[1]}。其他人发「同意时间线」，全部同意后生效；不同意发「拒绝时间线」。" if ok else f"❌ {why}")
+    else:
+        st, ch = rooms.vote_change(room["id"], me["id"], cmd == "同意时间线")
+        if st == "none":
+            await say("现在没有待处理的时间线申请。")
+        elif st == "rejected":
+            await _push(ch["by"], f"❌ {me['name']} 拒绝了 R{room['id']} 的时间线修改。")
+            await say("已拒绝，申请作废。")
+        elif st == "waiting":
+            await say("已记下你同意，等其他人。")
+        else:
+            for x in rooms.members(room["id"]):
+                await _push(x["role_id"], f"✅ R{room['id']} 时间线已改为 D{ch['day']} {ch['a']}-{ch['b']}。")
+            await say(f"✅ 全部同意，时间线已改为 D{ch['day']} {ch['a']}-{ch['b']}。")
+    return True
+
+
+async def _on_listened(app_id, msg) -> None:
+    """QQ 号听到房间群里有人说话 = 到场（群里没有卡拉，靠这个补上）；最后一个人到了，私下回执给每个参与者。"""
+    try:
+        from core import roomlog
+        roomlog.record(app_id, msg)                                  # 复盘：房间群里的发言存下来
+        if await _listen_cmd(app_id, msg):
+            return
+        res = rooms.note_qq_speech(app_id, msg.group_id, msg.user_id)
+        if res and res["complete"]:
+            await _receipt_all_here(rooms.get(res["room_id"]))
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[房间] 记录到场出错：{e}")
+
+
+async def _on_join(app_id, gid, user_id) -> None:
+    """QQ 号看到有人进了房间群：马上查一次谁到了。"""
+    try:
+        from core.db import use_bot
+        with use_bot(app_id):
+            await _check_presence(gid)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[房间] 进群后查到场出错：{e}")
+
+
+if _on_join not in qqmanager._join_listeners:
+    qqmanager.add_join_listener(_on_join)
+
+if _on_listened not in qqmanager._listeners:
+    qqmanager.add_listener(_on_listened)

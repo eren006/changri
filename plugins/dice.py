@@ -6,9 +6,9 @@ from nonebot.matcher import current_bot
 from nonebot.params import CommandArg
 from nonebot.rule import Rule
 
-from core import attrs, dice, roles
+from core import attrs, dice, messaging, roles, trpg
 from core.db import get_config, set_config
-from plugins._long import reply_long
+from plugins._long import make_send, reply_long
 
 NEED_ROLE = "请先在你的个人群里发「创建新角色 名字」绑定角色。"
 _initiative: dict[str, dict] = {}        # 先攻表，程序重启就清空，一场战斗够用
@@ -26,13 +26,8 @@ async def _on(event: MessageEvent) -> bool:
     return _enabled()
 
 
-async def _explicit(event: MessageEvent) -> bool:
-    """r / at / en / sc 这类很短的英文指令，必须带 / 或 . 才算，免得聊天里一句「at 你」就掷骰。"""
-    return _enabled() and event.get_plaintext().lstrip().startswith(("/", ".", "。"))
-
-
 def _cmd(name: str, aliases: set[str] | None = None, short: bool = False):
-    return on_command(name, aliases=aliases or set(), rule=Rule(_explicit if short else _on), priority=20, block=True)
+    return on_command(name, aliases=aliases or set(), rule=Rule(_on), priority=20, block=True)
 
 
 def _scope(event: MessageEvent) -> str:
@@ -45,6 +40,11 @@ def _scope(event: MessageEvent) -> str:
 
 def _rule(event: MessageEvent) -> str:
     return get_config(f"dice_rule:{_scope(event)}", "") or get_config("dice_default_rule", "coc") or "coc"
+
+
+def _house(event: MessageEvent) -> str:
+    h = get_config(f"coc_house:{_scope(event)}", "") or get_config("coc_default_house", dice.DEFAULT_HOUSE)
+    return h if h in dice.HOUSE_RULES else dice.DEFAULT_HOUSE
 
 
 def _proxy_openid(event: MessageEvent) -> str | None:
@@ -64,10 +64,26 @@ def _role_of(event: MessageEvent, member: str | None = None):
     return roles.find_role_for_sender(_bid(), event.group_openid, member or event.get_user_id())
 
 
+def _trpg_lookup(event: GroupMessageCreateEvent, proxy: str | None, name: str):
+    """跑团模式：读当前角色卡（被 @ 的人就读他的卡）。"""
+    pid = trpg.player_for(proxy or event.author.member_openid, event.group_openid, create=False)
+    card = trpg.active_card(event.group_openid, pid) if pid else None
+    if not card:
+        return ("被 @ 的这位还没有角色卡，数值取不到。让 TA 先 /st 录属性，或者你直接写数值。" if proxy
+                else "你还没有角色卡。用 /st 力量60 敏捷70 录属性，或者直接写数值。")
+    val = trpg.get_attr(card["id"], name)
+    if val is None:
+        have = "、".join(n for n, _ in trpg.list_attrs(card["id"])) or "（没有）"
+        return f"角色「{card['name']}」还没有「{name}」这个属性。现有：{have}\n用 /st {name}60 记一个。"
+    return card["name"], val
+
+
 def _lookup(event: MessageEvent):
     proxy = _proxy_openid(event)
 
     def lookup(name: str):
+        if isinstance(event, GroupMessageCreateEvent) and trpg.get_mode(event.group_openid) == "trpg":
+            return _trpg_lookup(event, proxy, name)
         if not isinstance(event, GroupMessageCreateEvent):
             return "读角色属性只能在群里用，请在群里发，或者直接写数值。"
         role = _role_of(event, proxy)
@@ -93,6 +109,11 @@ en_cmd = _cmd("en", {"成长"}, short=True)
 dnd_cmd = _cmd("dnd", {"属性生成"}, short=True)
 ri_cmd = _cmd("ri", {"先攻"}, short=True)
 at_cmd = _cmd("at", {"攻击"}, short=True)
+rh_cmd = _cmd("rh", {"暗骰"}, short=True)
+rah_cmd = _cmd("rah", {"暗检定"}, short=True)
+ti_cmd = _cmd("ti", {"临时疯狂"}, short=True)
+li_cmd = _cmd("li", {"总结疯狂"}, short=True)
+setcoc_cmd = _cmd("setcoc", {"房规"}, short=True)
 
 
 @rd_cmd.handle()
@@ -100,12 +121,39 @@ async def _(event: MessageEvent, args=CommandArg()):
     await reply_long(rd_cmd, dice.rd(args.extract_plain_text()))
 
 
-async def _check(matcher, event: MessageEvent, raw: str, extra: int) -> None:
+def _check_text(event: MessageEvent, raw: str, extra: int) -> str:
     if _rule(event) == "dnd":
-        text = dice.dnd_check(raw, (extra > 0) - (extra < 0), _lookup(event))
-    else:
-        text = dice.coc_check(raw, extra, _lookup(event), proxy=bool(_proxy_openid(event)))
-    await reply_long(matcher, text)
+        return dice.dnd_check(raw, (extra > 0) - (extra < 0), _lookup(event))
+    return dice.coc_check(raw, extra, _lookup(event), proxy=bool(_proxy_openid(event)), house=_house(event))
+
+
+async def _check(matcher, event: MessageEvent, raw: str, extra: int) -> None:
+    await reply_long(matcher, _check_text(event, raw, extra))
+
+
+async def _whisper(event: MessageEvent, text: str) -> bool:
+    """把暗骰结果私下发给本人：先发到 TA 的个人群，没有角色就试官方的单聊。都发不出去返回 False（结果不会在群里露出来）。"""
+    role = _role_of(event)
+    if role:
+        ok, _ = await messaging.push_to_role(role["id"], text, make_send())
+        if ok:
+            return True
+    try:
+        await current_bot.get().send_to_c2c(openid=event.get_user_id(), message=text)
+        return True
+    except Exception:  # noqa: BLE001 单聊要玩家先私聊过机器人，发不出去很正常
+        return False
+
+
+async def _hidden(matcher, event: MessageEvent, text: str) -> None:
+    if not isinstance(event, GroupMessageCreateEvent):      # 本来就是私聊，直接回
+        await reply_long(matcher, text)
+        return
+    role = _role_of(event)
+    who = role["name"] if role else "有人"
+    if await _whisper(event, "🎲 暗骰结果（只有你看得到）\n" + text):
+        await matcher.finish(f"🎲 {who} 掷了一次暗骰，结果已私下发给 TA。")
+    await matcher.finish(f"🎲 {who} 想掷暗骰，但私下发不出去，所以没掷。先在个人群里绑定角色，或私聊机器人一句话再试。")
 
 
 @ra_cmd.handle()
@@ -127,7 +175,7 @@ async def _(event: MessageEvent, args=CommandArg()):
 async def _(event: MessageEvent, args=CommandArg()):
     if _rule(event) == "dnd":
         await sc_cmd.finish("理智检定是 COC 的规矩，DND 里没有。要用就 /切换规则 COC。")
-    await reply_long(sc_cmd, dice.coc_sanity(args.extract_plain_text(), _lookup(event)))
+    await reply_long(sc_cmd, dice.coc_sanity(args.extract_plain_text(), _lookup(event), _house(event)))
 
 
 @en_cmd.handle()
@@ -135,6 +183,46 @@ async def _(event: MessageEvent, args=CommandArg()):
     if _rule(event) == "dnd":
         await en_cmd.finish("技能成长是 COC 的规矩，DND 里没有。要用就 /切换规则 COC。")
     await reply_long(en_cmd, dice.coc_growth(args.extract_plain_text()))
+
+
+@rh_cmd.handle()
+async def _(event: MessageEvent, args=CommandArg()):
+    await _hidden(rh_cmd, event, dice.rd(args.extract_plain_text()))
+
+
+@rah_cmd.handle()
+async def _(event: MessageEvent, args=CommandArg()):
+    await _hidden(rah_cmd, event, _check_text(event, args.extract_plain_text(), 0))
+
+
+async def _need_coc(matcher, event: MessageEvent) -> None:
+    if _rule(event) == "dnd":
+        await matcher.finish("疯狂症状和房规是 COC 的东西，DND 里没有。要用就 /切换规则 COC。")
+
+
+@ti_cmd.handle()
+async def _(event: MessageEvent, args=CommandArg()):
+    await _need_coc(ti_cmd, event)
+    await reply_long(ti_cmd, dice.madness(args.extract_plain_text(), False))
+
+
+@li_cmd.handle()
+async def _(event: MessageEvent, args=CommandArg()):
+    await _need_coc(li_cmd, event)
+    await reply_long(li_cmd, dice.madness(args.extract_plain_text(), True))
+
+
+@setcoc_cmd.handle()
+async def _(event: MessageEvent, args=CommandArg()):
+    await _need_coc(setcoc_cmd, event)
+    text = args.extract_plain_text().strip()
+    if not text:
+        await reply_long(setcoc_cmd, dice.house_text(_house(event)))
+        return
+    if text not in dice.HOUSE_RULES:
+        await setcoc_cmd.finish("房规只有 0-5，不带数字可以看说明。")
+    set_config(f"coc_house:{_scope(event)}", text)
+    await setcoc_cmd.finish(f"好，这里改用房规 {text}：{dice.HOUSE_RULES[text]}")
 
 
 async def _need_dnd(matcher, event: MessageEvent) -> None:
