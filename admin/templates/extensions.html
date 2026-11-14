@@ -39,10 +39,10 @@
 .tabs a{padding:8px 18px;text-decoration:none;color:var(--ink);border-bottom:2px solid transparent;margin-bottom:-1px}
 .tabs a[aria-current="page"]{color:var(--dusk);border-bottom-color:var(--dusk)}
 .bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:0 0 16px}
-.bar input[type=search]{padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);min-width:180px}
+.bar input[type=search]{padding:6px 10px;border:1px solid var(--field);border-radius:6px;background:var(--surface);color:var(--ink);min-width:180px}
 .warnbox{border:1px solid var(--warn);border-radius:8px;padding:10px 14px;margin:0 0 16px;background:color-mix(in srgb,var(--warn) 10%,transparent)}
 .field{margin:12px 0}.field label{display:block;font-weight:600;margin-bottom:3px}.field .d{color:var(--mute);font-size:13px;margin:0 0 4px}
-.field input[type=text],.field input[type=number],.field textarea,.field select{width:100%;max-width:560px;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink);font:inherit}
+.field input[type=text],.field input[type=number],.field textarea,.field select{width:100%;max-width:560px;padding:6px 10px;border:1px solid var(--field);border-radius:6px;background:var(--paper);color:var(--ink);font:inherit}
 </style>
 
 <h1>功能与设置</h1>
@@ -103,7 +103,7 @@
   {% endif %}
   <input type="search" id="q" placeholder="搜索扩展" aria-label="搜索扩展" oninput="filterExt()">
 </div>
-{% if owner %}<p class="note" style="margin:-8px 0 16px">⚠️ 扩展是 Python 代码，装上就和主程序有同样的权限（包括能读到机器人的 AppSecret）。只安装你信得过的人写的扩展。上传的扩展默认是关闭的，要自己打开开关。</p>{% endif %}
+{% if owner %}<p class="note" style="margin:-8px 0 16px"><b style="color:var(--warn)">注意：</b>扩展是 Python 代码，装上就和主程序有同样的权限（包括能读到机器人的 AppSecret）。只安装你信得过的人写的扩展。上传的扩展默认是关闭的，要自己打开开关。</p>{% endif %}
 
 {% for it in items if (tab not in ('aux', 'ai')) == (it.kind == 'core') %}
 <article class="ext" data-search="{{ it.name }} {{ it.description }} {{ it.author }}">
@@ -116,7 +116,7 @@
     <h3>{{ it.name }}</h3><span class="ver">{{ it.version }}</span>
     <span class="tag">{{ {'core': '核心', 'official': '官方'}.get(it.kind, '自己的') }}</span>
     {% if it.load_error %}<span class="dot bad"></span><span style="color:var(--bad)">{{ it.load_error }}</span>{% endif %}
-    {% if it.warnings %}<details style="flex-basis:100%"><summary style="color:var(--warn);cursor:pointer">⚠️ 代码里有 {{ it.warnings|length }} 处要留意</summary><ul style="margin:6px 0 0;padding-left:20px;font-size:13px">{% for w in it.warnings %}<li>{{ w }}</li>{% endfor %}</ul></details>{% endif %}
+    {% if it.warnings %}<details style="flex-basis:100%"><summary style="color:var(--warn);cursor:pointer">代码里有 {{ it.warnings|length }} 处要留意</summary><ul style="margin:6px 0 0;padding-left:20px;font-size:13px">{% for w in it.warnings %}<li>{{ w }}</li>{% endfor %}</ul></details>{% endif %}
     {% if it.kind == 'user' and owner %}
     <form method="post" action="{{ url_for('extensions_delete', ext_id=it.id) }}" style="margin-left:auto" onsubmit="return confirm('删除扩展「{{ it.name }}」的文件？它的设置数据会保留。')">{{ csrf() }}<button class="linkbtn">删除</button></form>
     {% endif %}

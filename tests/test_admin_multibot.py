@@ -164,7 +164,8 @@ class AdminMultiBot(unittest.TestCase):
             roles.create_role("只在甲号", "111111", "G1", "M1")
         self.assertIn("只在甲号", self.c.get("/b/111111/").get_data(as_text=True))
         self.assertNotIn("只在甲号", self.c.get("/b/222222/").get_data(as_text=True))
-        self.assertIn('id="roles"', self.c.get("/b/222222/").get_data(as_text=True))   # 页面链接自带前缀
+        self.assertIn('id="roles"', self.c.get("/b/222222/").get_data(as_text=True))
+        self.assertIn('id="rooms"', self.c.get("/b/222222/").get_data(as_text=True))                  # 进行中的房间在总览里   # 页面链接自带前缀
         self.assertIn("/b/111111/", self.c.get("/b/222222/").get_data(as_text=True))                # 切换下拉
         self.assertEqual(self.c.get("/accounts").status_code, 200)                                   # 全局页面不带前缀
 

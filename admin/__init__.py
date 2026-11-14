@@ -420,7 +420,13 @@ def create_app() -> Flask:
         with get_conn() as conn:
             rrows = conn.execute("SELECT * FROM roles ORDER BY id").fetchall()
         role_items = [{"role": r, "groups": roles_core.list_groups(r["id"])} for r in rrows]
+        with get_conn() as conn:
+            live = conn.execute("SELECT * FROM rooms WHERE status='open' ORDER BY id").fetchall()
+        live_rooms = [{**dict(r), "slot": ("不占时间线" if r["kind"] == "微信" else f"D{r['day']} {r['start_hm']}-{r['end_hm']}"),
+                       "who": "、".join(m["name"] for m in rooms_core.members(r["id"])),
+                       "grp": (pool_core.get(r["pool_id"]) if r["pool_id"] else None)} for r in live]
         return render_template("dashboard.html", d=_dashboard(), errors=errlog.recent(30), err_url=errlog.report_url(), role_items=role_items,
+                               live_rooms=live_rooms, waiting_rooms=sum(1 for r in live_rooms if not r["grp"]),
                                code=request.args.get("code", ""), code_role=request.args.get("role", ""), code_kind=request.args.get("kind", ""))
 
     @app.post("/errors/clear")
@@ -1435,12 +1441,7 @@ def create_app() -> Flask:
         for g in groups:
             if not g["conflict"]:
                 sets.setdefault(g["set_name"] or "（未分组）", []).append(g)
-        with get_conn() as conn:
-            live = conn.execute("SELECT * FROM rooms WHERE status='open' ORDER BY id").fetchall()
-        live_rows = [{**dict(r), "slot": ("不占时间线" if r["kind"] == "微信" else f"D{r['day']} {r['start_hm']}-{r['end_hm']}"),
-                      "who": "、".join(m["name"] for m in rooms_core.members(r["id"])),
-                      "grp": (pool_core.get(r["pool_id"]) if r["pool_id"] else None)} for r in live]
-        return render_template("pool.html", sets=sets, blocked=blocked, counts=pool_core.counts(), live=live_rows,
+        return render_template("pool.html", sets=sets, blocked=blocked, counts=pool_core.counts(),
                                unfilled=sum(1 for g in groups if not g["real_gid"] and not g["conflict"]))
 
     @app.post("/pool/<int:pid>/save")
@@ -1503,7 +1504,7 @@ def create_app() -> Flask:
         if g and pool_core.is_qq_only(g):                  # 房间群：群名改回空房间
             loopbridge.run(qqmanager_core.room_rename(current_bot(), g, qqpool_core.free_name(g["set_name"])))
         flash(f"R{rid} 已结束（网页上结束不会通知玩家，群放回池里）")
-        return redirect(url_for("pool_page"))
+        return redirect(url_for("dashboard") + "#rooms")
 
     @app.post("/init")
     @login_required

@@ -53,7 +53,7 @@ CORE_CARDS = [
      "description": "短信、署名、竖着写、撤回、拉群引导。冷却、每日次数、字数上限、开放时段都在这里设置。"},
     {"id": "gift", "name": "礼物", "settings_group": "礼物", "links": [("reviews_page", "礼物复盘")],
      "description": "送礼、礼品店与图鉴、礼物公开播报。送礼冷却、每日次数在这里设置。"},
-    {"id": "play", "name": "约会", "settings_group": "约会房间", "links": [("pool_page", "房间"), ("reviews_page", "复盘")],
+    {"id": "play", "name": "约会", "settings_group": "约会房间", "links": [("pool_page", "官方机器人群池（高级）"), ("reviews_page", "复盘")],
      "description": "私约、电话、微信、官约、群池分配房间、时间线、我的待回。心愿是单独的可开关扩展。"},
 ]
 for _e in CORE_CARDS:

@@ -7,15 +7,16 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231d1f33'/%3E%3Ccircle cx='16' cy='19' r='6' fill='%23d4476f'/%3E%3Crect x='5' y='19' width='22' height='2' fill='%231d1f33'/%3E%3C/svg%3E">
 <style>
 :root{
-  --paper:#eeeff4; --surface:#fafafd; --ink:#1f2133; --mute:#686b84; --line:#d9dbe6; --soft:#e4e6ef;
+  --paper:#eeeff4; --surface:#fafafd; --ink:#1f2133; --mute:#5d6079; --line:#d9dbe6; --soft:#e4e6ef;
+  --field:#80839b; /* 输入框、开关这类控件的边线：和底色对比 ≥3:1，看得出哪里能填 */
   --night:#1d1f33; --night-ink:#e6e7f2; --night-mute:#9396b3; --night-line:#34375a;
-  --dusk:#c43a63; --dusk-ink:#fff; --ok:#23826d; --warn:#9a6212; --bad:#bb3228;
+  --dusk:#c43a63; --dusk-ink:#fff; --ok:#1f7a66; --warn:#9a6212; --bad:#bb3228;
   --serif:"Noto Serif CJK SC","Source Han Serif SC","Songti SC","STSong","SimSun",serif;
   --sans:system-ui,-apple-system,"PingFang SC","Noto Sans CJK SC","Microsoft YaHei",sans-serif;
 }
 @media (prefers-color-scheme: dark){
   :root{
-    --paper:#15162a; --surface:#1b1d35; --ink:#e8e9f4; --mute:#9a9db8; --line:#2d3050; --soft:#25274a;
+    --paper:#15162a; --surface:#1b1d35; --ink:#e8e9f4; --mute:#9a9db8; --line:#2d3050; --soft:#25274a; --field:#6a6e96;
     --night:#0f1020; --night-line:#25274a;
     --dusk:#ef7a9b; --dusk-ink:#2a0d17; --ok:#4cc1a6; --warn:#e0a94e; --bad:#ff8b80;
   }
@@ -58,17 +59,18 @@ section:first-of-type{border-top:0;padding-top:0}
 .flash{margin:0 0 24px;padding:10px 14px;border-left:3px solid var(--dusk);background:var(--soft);border-radius:0 6px 6px 0}
 
 label{display:block;font-size:13.5px;color:var(--mute);margin:0 0 5px}
-input[type=text],input[type=password],input:not([type]),select,textarea{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);font:inherit}
+input[type=text],input[type=password],input:not([type]),select,textarea{width:100%;padding:9px 11px;border:1px solid var(--field);border-radius:6px;background:var(--surface);color:var(--ink);font:inherit}
 input::placeholder{color:var(--mute);opacity:.7}
 .btn{display:inline-block;padding:8px 16px;border:1px solid var(--dusk);border-radius:6px;background:var(--dusk);color:var(--dusk-ink);font:600 14px var(--sans);cursor:pointer;text-decoration:none}
 .btn:hover{filter:brightness(1.06)}
+.btn:active{filter:brightness(.94)}
 .btn[disabled]{opacity:.5;cursor:not-allowed}
 .btn.ghost{background:transparent;color:var(--ink);border-color:var(--line);font-weight:500}
 .btn.ghost:hover{border-color:var(--mute)}
 .btn.sm{padding:3px 10px;font-size:12.5px}
 .sw{position:relative;width:38px;height:22px;flex:none}
 .sw input{position:absolute;inset:0;opacity:0;cursor:pointer;margin:0}
-.sw i{position:absolute;inset:0;border-radius:11px;background:var(--line);transition:background .15s}
+.sw i{position:absolute;inset:0;border-radius:11px;background:var(--field);transition:background .15s}
 .sw i::after{content:"";position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .15s}
 .sw input:checked~i{background:var(--ok)}
 .sw input:checked~i::after{transform:translateX(16px)}
@@ -115,7 +117,7 @@ tr:last-child td{border-bottom:0}
 .ui .btns details.panel[open]{order:2}
 .ui .form{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:18px 20px;margin:10px 0 18px}
 .ui .form .fields{max-width:none}
-.ui input[type=number],.ui input[type=search],.ui input[type=url],.ui input[type=date]{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);font:inherit}
+.ui input[type=number],.ui input[type=search],.ui input[type=url],.ui input[type=date]{width:100%;padding:9px 11px;border:1px solid var(--field);border-radius:6px;background:var(--surface);color:var(--ink);font:inherit}
 .ui textarea{line-height:1.6;resize:vertical}
 .ui .check{display:flex;align-items:center;gap:10px;margin:0;color:var(--ink);font-size:14px;cursor:pointer}
 .ui .check .sw{margin:0}
@@ -154,6 +156,8 @@ tr:last-child td{border-bottom:0}
 .ui .empty{color:var(--mute);margin:10px 0}
 .ui .sub-h{font:700 16px var(--serif);margin:28px 0 4px}
 .ui .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}
+
+@media (prefers-reduced-motion: reduce){*,*::before,*::after{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
 
 @media (max-width:860px){
   .shell{grid-template-columns:1fr}
@@ -228,7 +232,7 @@ tr:last-child td{border-bottom:0}
       {% set groups = [
         ('', [('dashboard','总览')]),
         ('通用', [('autoreply_page','自定义回复'),('phone_page','小手机'),('extensions_page','功能与设置'),('admins_page','QQ 管理员'),('qqlink_page','连接群号组')]),
-        ('恋综', [('rpg_attrs_page','属性与货币'),('season_page','季度与出场'),('lovemail_page','心动信'),('relations_page','公知、二表与关系线'),('pool_page','房间'),('reviews_page','复盘')]),
+        ('恋综', [('rpg_attrs_page','属性与货币'),('season_page','季度与出场'),('lovemail_page','心动信'),('relations_page','公知、二表与关系线'),('reviews_page','复盘')]),
         ('跑团', [('trpg_page','角色库'),('trpglog_page','日志')]),
       ] if in_bot else [] %}
       {% set extras = [('forum_page','论坛'),('rpg_page','物品与商城'),('rpg_places_page','地点')] %}

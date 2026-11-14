@@ -68,6 +68,12 @@ dl.facts dd{margin:0;font-variant-numeric:tabular-nums;font-weight:600}
 </section>
 </div>
 <section>
+  <details class="errlog" id="rooms"{% if live_rooms|length %} open{% endif %}><summary class="muted" style="cursor:pointer">进行中的房间（{{ live_rooms|length }} 个{% if waiting_rooms %}，{{ waiting_rooms }} 个在排队等群{% endif %}）</summary>
+    {% with live=live_rooms %}{% include "_rooms_block.html" %}{% endwith %}
+    <p class="note">玩家在房间群里发「结束私约」、管理员发「强结私约 R号」可以结束并通知大家；这里的「结束」只改状态，不通知。房间用的群在「连接群号组」里管理。</p>
+  </details>
+</section>
+<section>
   <details class="errlog" id="roles"{% if code %} open{% endif %}><summary class="muted" style="cursor:pointer">角色与群（{{ role_items|length }} 个角色）</summary>
     <p class="note">玩家在自己的个人群里发「创建新角色 名字」就会出现在这里。每个角色有一个主群，还可以有备用群，消息先发主群，发不出去再试备用群。</p>
     {% with items=role_items %}{% include "_roles_block.html" %}{% endwith %}
