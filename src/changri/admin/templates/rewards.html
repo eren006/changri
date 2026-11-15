@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}结戏奖励{% endblock %}
+{% block body %}
+{% macro item_select(name, selected='', with_attrs=True) %}
+<select name="{{ name }}"><option value="">（选一个）</option>
+  <optgroup label="物品和货币">{% for x in items %}<option value="i:{{ x.code }}" {{ 'selected' if selected == 'i:' ~ x.code }}>{{ x.name }}</option>{% endfor %}</optgroup>
+  {% if with_attrs and attrs %}<optgroup label="属性（直接加减）">{% for a in attrs %}<option value="a:{{ a.name }}" {{ 'selected' if selected == 'a:' ~ a.name }}>{{ a.name }}</option>{% endfor %}</optgroup>{% endif %}
+</select>
+{% endmacro %}
+{% macro rule_form(r=None) %}
+<form class="form" method="post" action="{{ url_for('rewards_save') }}">{{ csrf() }}
+  {% if r %}<input type="hidden" name="id" value="{{ r.id }}">{% endif %}
+  <div class="fields">
+    <div class="wide"><label>规则名字（玩家收到奖励时会看到）</label><input type="text" name="name" required value="{{ r.name if r else '' }}" placeholder="例如：认真演了一场"></div>
+  </div>
+  <h3 class="sub">什么时候发</h3>
+  <p class="note">每个人单独判断，不填 = 不限。</p>
+  <div class="fields">
+    <div class="wide"><label>哪些房间</label>
+      <div class="chips kinds"><label class="chip"><input type="checkbox" data-all {{ 'checked' if not r or not r.kind_list }}>全部</label>
+        {% for k in kinds %}<label class="chip"><input type="checkbox" name="kinds" value="{{ k }}" {{ 'checked' if not r or not r.kind_list or k in r.kind_list }}>{{ k }}</label>{% endfor %}</div></div>
+  </div>
+  <p class="note" style="margin-top:14px">再加条件（不加就不限制，参加了就发）：</p>
+  {% set shown = r.conds if r else {} %}
+  <div class="rg">
+    {% for key, label, unit in rewards.METRICS %}
+    <div class="rgrow" data-m="{{ key }}" {{ 'hidden' if key not in shown }}>
+      <span>{{ label }}（{{ unit }}）<button class="linkbtn" type="button" data-rm>去掉</button></span>
+      <input type="number" min="0" name="{{ key }}_min" placeholder="至少" aria-label="{{ label }}至少" value="{{ shown[key][0] if key in shown and shown[key][0] is not none else '' }}">
+      <input type="number" min="0" name="{{ key }}_max" placeholder="至多" aria-label="{{ label }}至多" value="{{ shown[key][1] if key in shown and shown[key][1] is not none else '' }}">
+    </div>
+    {% endfor %}
+  </div>
+  <div class="chips addc">{% for key, label, unit in rewards.METRICS %}<button class="btn ghost sm" type="button" data-add="{{ key }}" {{ 'hidden' if key in shown }}>＋ {{ label }}</button>{% endfor %}</div>
+  <h3 class="sub">发什么</h3>
+  <p class="note">满足条件的人，每一行各按自己的概率抽一次：写 100% 就是一定发，30% 就是三成机会。数量不限，每人都有。</p>
+  <div class="rows" data-rows="fx">
+    {% for f in (r.fixed if r and r.fixed else [{}]) %}
+    <div class="rl fx">{{ item_select('fx_ref', ('a:' if f.type == 'attr' else 'i:') ~ f.ref if f else '') }}<span class="x">{{ '＋' if f and f.type == 'attr' else '×' }}</span><input type="number" name="fx_n" aria-label="数量" value="{{ f.n if f else 1 }}"><span class="x w">概率</span><input type="number" min="0" max="100" name="fx_p" aria-label="概率百分比" value="{{ f.p if f and f.p is defined else 100 }}"><span class="x">%</span></div>
+    {% endfor %}
+  </div>
+  <button class="btn ghost sm" type="button" data-more="fx">＋ 再加一项</button>
+
+  <div class="luck" {{ 'hidden' if not (r and r.pool) }}>
+    <h3 class="sub">限量奖励<button class="linkbtn" type="button" data-nolotto>不要限量奖励</button></h3>
+    <p class="note">数量有限的奖品，发完为止（比如「限量 5 份的玩偶」）。每行：物品 × 每次发几件，一共限 几 份，概率 几 %。</p>
+    <div class="rows" data-rows="pl">
+      {% for p in (r.pool if r and r.pool else [{}]) %}
+      <div class="rl pool">{{ item_select('pl_ref', 'i:' ~ p.ref if p else '', False) }}<span class="x">×</span><input type="number" min="1" name="pl_n" aria-label="每次发几件" value="{{ p.n if p else 1 }}"><span class="x w">限</span><input type="number" min="1" name="pl_s" aria-label="一共几份" value="{{ p.stock if p else 1 }}"><span class="x">份</span><span class="x w">概率</span><input type="number" min="0" max="100" name="pl_p" aria-label="概率百分比" value="{{ p.p if p and p.p is defined else 100 }}"><span class="x">%</span></div>
+      {% endfor %}
+    </div>
+    <button class="btn ghost sm" type="button" data-more="pl">＋ 再加一种</button>
+    <div class="rl" style="margin-top:12px"><span class="x">每人最多拿</span><input type="number" min="1" name="pool_draws" aria-label="每人最多拿几样" value="{{ r.pool_draws if r else 1 }}"><span class="x">样限量奖励</span></div>
+    <p class="note">编辑时「限 几 份」显示的是现在还剩几份，改了就是重新设定。</p>
+  </div>
+  <button class="btn ghost sm addlotto" type="button" {{ 'hidden' if r and r.pool }}>＋ 加限量奖励</button>
+  <label class="chip" style="margin-top:12px"><input type="checkbox" name="enabled" {{ 'checked' if (not r) or r.enabled }}>启用这条规则</label>
+  <div class="actions"><button class="btn" type="submit">保存</button></div>
+</form>
+{% endmacro %}
+
+<h1>结戏奖励</h1>
+<p class="lede">房间<b>正常结束</b>时，按每个人这一场的表现自动发奖励，并发到 TA 的个人群。想让「演得越多奖励越好」，就建几条规则，条件一档比一档高；满足几条发几条。奖励用的物品、货币在「物品与商城」里建。</p>
+
+<section>
+  <div class="sec-head"><h2>规则<span class="n">{{ rules|length }} 条</span></h2>
+    <details class="panel"><summary class="btn">新建规则</summary>{{ rule_form() }}</details></div>
+  {% for r in rules %}
+  <div class="rowlist"><div class="row"><div class="nm"><b>{{ r.name }}</b>{% if not r.enabled %} <span class="tag">已停用</span>{% endif %}
+    <div class="muted">{{ r.kind_list|join('、') or '所有房间' }}　|　{{ rewards.describe_conds(r.conds) }}</div>
+    <div class="muted">奖励：{{ rewards.describe_rewards(r) }}</div></div></div></div>
+  <details class="panel"><summary class="linkbtn">编辑</summary>{{ rule_form(r) }}
+    <form method="post" action="{{ url_for('rewards_delete', rule_id=r.id) }}" onsubmit="return confirm('删除这条规则？已经发出的奖励不受影响。')">{{ csrf() }}<button class="linkbtn">删除这条规则</button></form></details>
+  {% else %}<p class="empty">还没有规则。新建一条试试，比如「戏文至少 3 段 → 金币 ×10」。</p>{% endfor %}
+</section>
+
+<section>
+  <h2>每一场的情况</h2>
+  <p class="note">只看已经结束的房间。数据来自房间群里的戏文记录；记录不准（比如有人没说在群里）可以手动调整，然后点「补发奖励」。已经发过的不会重复发，之前发失败的会重试。</p>
+  {% if rooms %}
+  <form method="get" class="fields"><div><label for="rm">选一场</label>
+    <select id="rm" name="room" onchange="this.form.submit()">{% for x in rooms %}<option value="{{ x.id }}" {{ 'selected' if x.id == sel }}>R{{ x.id }} {{ x.kind }}{% if x.day %} · 第 {{ x.day }} 天{% endif %}</option>{% endfor %}</select></div></form>
+  <div class="rowlist">
+  {% for s in status %}
+    <div class="row"><div class="nm"><b>{{ s.name }}</b>{% if s.adjusted %} <span class="tag">手动调整过</span>{% endif %}
+      <div class="muted tabular">戏文 {{ s.segs }} 段 · {{ s.chars }} 字 · 平均 {{ s.avg }} 字/段 · 本场 {{ s.mins }} 分钟</div>
+      <div class="muted">{% for x in s.rules %}「{{ x.name }}」{% if x.log and x.log.ok %}✅ 已发（{{ x.log.detail }}）{% elif x.log %}❌ 失败：{{ x.log.detail }}{% else %}⏳ 还没发{% endif %}{{ '；' if not loop.last }}{% else %}没有满足的规则{% endfor %}</div>
+      <form method="post" action="{{ url_for('rewards_adjust', room_id=sel) }}" class="line" style="margin-top:8px">{{ csrf() }}<input type="hidden" name="role_id" value="{{ s.role_id }}">
+        <span>调整为</span><input type="number" min="0" name="segs" value="{{ s.segs }}" aria-label="段数"><span>段</span><input type="number" min="0" name="chars" value="{{ s.chars }}" aria-label="字数"><span>字</span>
+        <button class="btn sm ghost" type="submit">保存调整</button>{% if s.adjusted %}<button class="linkbtn" name="reset" value="1">恢复原数据</button>{% endif %}</form></div></div>
+  {% endfor %}
+  </div>
+  <form method="post" action="{{ url_for('rewards_reissue', room_id=sel) }}" style="margin-top:14px">{{ csrf() }}<button class="btn" type="submit">补发奖励</button></form>
+  {% else %}<p class="empty">还没有结束过的房间。</p>{% endif %}
+</section>
+
+<script>
+document.querySelectorAll('[data-more]').forEach(function (b) {
+  b.addEventListener('click', function () {
+    var box = b.previousElementSibling, last = box.lastElementChild, c = last.cloneNode(true);
+    c.querySelectorAll('select').forEach(function (s) { s.value = ''; });
+    c.querySelectorAll('input').forEach(function (i) { i.value = /_p$/.test(i.name) ? 100 : 1; });
+    var x = c.querySelector('.x'); if (x && c.querySelector('select[name=fx_ref]')) x.textContent = '×';
+    box.appendChild(c);
+  });
+});
+document.addEventListener('click', function (ev) {
+  var lot = ev.target.closest('.addlotto'), no = ev.target.closest('[data-nolotto]');
+  if (lot) { var f0 = lot.closest('form'); f0.querySelector('.luck').hidden = false; lot.hidden = true; }
+  if (no) {
+    var l = no.closest('.luck'), f1 = l.closest('form'); l.hidden = true;
+    l.querySelectorAll('select').forEach(function (s) { s.value = ''; });   // 选项清空，服务器就当没有抽奖
+    f1.querySelector('.addlotto').hidden = false;
+  }
+  var add = ev.target.closest('[data-add]'), rm = ev.target.closest('[data-rm]');
+  if (add) {
+    var f = add.closest('form'); add.hidden = true;
+    var row = f.querySelector('.rgrow[data-m="' + add.dataset.add + '"]'); row.hidden = false;
+    row.querySelector('input').focus();
+  } else if (rm) {
+    var row = rm.closest('.rgrow'), f = row.closest('form');
+    row.hidden = true; row.querySelectorAll('input').forEach(function (i) { i.value = ''; });
+    f.querySelector('[data-add="' + row.dataset.m + '"]').hidden = false;
+  }
+});
+document.addEventListener('change', function (ev) {
+  var el = ev.target;
+  if (el.matches('select[name=fx_ref]')) { el.parentNode.querySelector('.x').textContent = el.value.indexOf('a:') === 0 ? '＋' : '×'; }
+  if (el.matches('[data-all]')) {
+    el.closest('.kinds').querySelectorAll('input[name=kinds]').forEach(function (c) { c.checked = el.checked; });
+  } else if (el.matches('input[name=kinds]')) {
+    var box = el.closest('.kinds');
+    box.querySelector('[data-all]').checked = !box.querySelector('input[name=kinds]:not(:checked)');
+  }
+});
+</script>
+<style>
+.ui .sub{font-size:15px;margin:22px 0 4px}
+.ui .line{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0}
+.ui .line input[type=number]{width:84px}
+.ui .chips{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.ui .chip{display:inline-flex;gap:6px;align-items:center;margin:0}
+.ui .rg{margin:8px 0}
+.ui .rgrow{display:grid;grid-template-columns:200px 120px 120px;gap:8px 10px;align-items:center;margin:8px 0}
+.ui .rgrow[hidden],.ui .addc [hidden]{display:none}
+.ui .rgrow>span{font-size:14px;color:var(--ink)}
+.ui .rgrow .linkbtn{padding:0 0 0 8px;min-height:0;font-size:12.5px}
+.ui .addc{margin:6px 0 0}
+.ui .luck[hidden],.ui .addlotto[hidden]{display:none}
+.ui .luck .sub .linkbtn{margin-left:12px;font-size:12.5px;padding:0;min-height:0}
+.ui .addlotto{margin-top:18px}
+.ui .rl{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:6px 0}
+.ui .rl select{flex:1 1 150px;min-width:0;max-width:280px;font-size:14.5px}
+.ui .rl input[type=number]{flex:none;width:64px;text-align:center}
+.ui .rl .x{color:var(--mute);font-size:14px}
+.ui .rl .x.w{margin-left:4px}
+@media (max-width:720px){
+  .ui .rgrow{grid-template-columns:1fr 1fr;gap:6px 8px}
+  .ui .rgrow>span{grid-column:1/-1;margin-top:8px;font-size:13px;color:var(--mute)}
+  .ui .rl select{font-size:15px;max-width:none}
+  .ui .rl.pool select{flex:1 1 100%}
+  .ui .chip{padding:4px 12px 4px 8px;font-size:14px}
+  .ui .line input[type=number]{width:72px}
+}
+</style>
+{% endblock %}

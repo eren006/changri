@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>安装长日bot</title>
+<style>
+:root{--bg:#f6f5f2;--card:#fff;--ink:#1f2030;--mute:#5d5f72;--line:#e2e1dc;--accent:#b4415f;--accent-ink:#fff;--code:#f0efeb;}
+@media (prefers-color-scheme:dark){:root{--bg:#15161f;--card:#1d1e2a;--ink:#e9e9f1;--mute:#a0a2b6;--line:#2e3042;--accent:#e2799a;--accent-ink:#22101a;--code:#262838;}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.7 system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+main{max-width:760px;margin:0 auto;padding:40px 16px 64px}
+h1{font-size:28px;margin:0 0 4px}
+.sub{color:var(--mute);margin:0 0 32px}
+section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin:0 0 20px}
+h2{font-size:19px;margin:0 0 12px}
+ol{padding-left:22px;margin:8px 0}
+li{margin:6px 0}
+code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:14px}
+code{background:var(--code);padding:1px 6px;border-radius:5px}
+pre{background:var(--code);padding:12px 14px;border-radius:8px;overflow-x:auto;margin:10px 0;white-space:pre-wrap;word-break:break-all}
+.btn{display:inline-block;background:var(--accent);color:var(--accent-ink);text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600;margin:4px 8px 4px 0}
+.note{color:var(--mute);font-size:14px}
+table{border-collapse:collapse;width:100%;font-size:15px}
+td{border-top:1px solid var(--line);padding:8px 6px;vertical-align:top}
+td:first-child{white-space:nowrap;color:var(--mute);width:7em}
+</style>
+</head>
+<body>
+<main>
+<h1>安装长日bot</h1>
+<p class="sub">当前版本 @VERSION@ · 自带运行环境，不用另外装 Python，也不用联网装依赖</p>
+
+<section>
+<h2>准备</h2>
+<ol>
+<li>一台服务器：Linux（Ubuntu / Debian / CentOS 都行）或 Windows，能上外网，有公网 IP。2 核 2G 够用。</li>
+<li>一个 QQ 官方机器人：在 <a href="https://q.qq.com" rel="noopener">QQ 开放平台</a> 创建，记下 AppID 和 AppSecret。</li>
+<li>不需要域名，不需要备案。</li>
+</ol>
+</section>
+
+<section>
+<h2>Linux：一条命令</h2>
+<p>登录服务器（腾讯云可以点「登录」打开网页终端），粘贴这一行，回车：</p>
+<pre>curl -fsSL @BASE@/get.sh | sudo sh</pre>
+<p class="note">会自动下载、校验、装到 /opt/changri-bot、设为开机自启并启动，最后打印设置平台的网址和首次设置验证码。装过老版本的会自动把数据搬过来。</p>
+<p>也可以手动下载：@LINUX_LINKS@</p>
+</section>
+
+<section>
+<h2>Windows：解压就能用</h2>
+<p>@WINDOWS_LINK@</p>
+<ol>
+<li>解压到一个固定的位置，例如 <code>D:\changri-bot</code>。解压完压缩包就可以删了。</li>
+<li>双击 <code>Start-Changri.bat</code>，会自动打开浏览器进入设置平台。</li>
+<li>想开机自动运行：右键 <code>Install-Autostart.bat</code> →「以管理员身份运行」。</li>
+</ol>
+<p class="note">有的杀毒软件会对 .bat 弹提示：这些是普通文本脚本，可以用记事本打开看内容。</p>
+</section>
+
+<section>
+<h2>装好以后</h2>
+<ol>
+<li>到云服务商控制台的「安全组 / 防火墙」放行 TCP <code>5091</code>（设置平台）；以后开小手机再放行 <code>5092</code>。</li>
+<li>浏览器打开 <code>http://服务器公网IP:5091</code>，输入安装时显示的验证码，建管理账号。</li>
+<li>跟着安装向导：填 AppID / AppSecret → 把服务器 IP 加进 QQ 开放平台的 IP 白名单 → 设 QQ 管理员 → 建第一个角色。</li>
+</ol>
+</section>
+
+<section>
+<h2>常见问题</h2>
+<table>
+<tr><td>机器人不在线</td><td>多半是 IP 白名单没加对。在设置平台「机器人接入」点「检查连接」，它会告诉你该加哪个 IP。</td></tr>
+<tr><td>打不开设置平台</td><td>先看安全组有没有放行 5091。再在服务器上运行自检：Linux <code>sudo /opt/changri-bot/changri doctor</code>，Windows 双击 <code>Doctor.bat</code>。</td></tr>
+<tr><td>升级</td><td>设置平台「更新」页一键升级，会先自动备份；新版本起不来会自动退回旧版本。</td></tr>
+<tr><td>备份</td><td>所有数据都在安装目录的 <code>data</code> 文件夹里，复制它就是备份。</td></tr>
+</table>
+</section>
+</main>
+</body>
+</html>

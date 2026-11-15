@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% block title %}R{{ room.id }} 戏录 · {{ brand }}{% endblock %}
+{% block body %}
+  {% include '_form_css.html' %}
+  <header class="bar"><a class="back" href="{{ back }}">{{ back_name }}</a>
+    <div class="title">R{{ room.id }} {{ '多人群聊' if room.kind == '微信' else room.kind }}<small>{{ room.slot }} · {{ room.who }}</small></div><div class="right"></div></header>
+  <div class="scroll bottle-thread">
+    {% include '_flash.html' %}
+    {% if room.status == 'open' %}<div class="notice">这场还在进行，下面是目前记到的。</div>{% endif %}
+    {% if stats %}<div class="notice">{% for x in stats %}{{ x.name }} {{ x.rp or 0 }}条/{{ x.chars or 0 }}字{% if chat and x.chat %}（闲聊 {{ x.chat }}）{% endif %}{% if not loop.last %}　{% endif %}{% endfor %}</div>{% endif %}
+    {% for m in lines %}
+    <div class="msg {{ 'mine' if m.me else 'theirs' }}"><div class="bubble"{% if not m.rp %} style="opacity:.6"{% endif %}>{% if not m.me %}<b>{{ m.name }}</b><br>{% endif %}{{ m.text }}</div><div class="meta">{{ m.time }}{% if not m.rp %} · 闲聊{% endif %}</div></div>
+    {% else %}<div class="empty">这场没有记到戏文。</div>{% endfor %}
+    <div style="padding:10px 16px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+      {% if has_chat %}<a class="linkbtn" href="{{ url_for(view, rid=room.id, chat=(0 if chat else 1)) }}">{{ '只看戏文' if chat else '连闲聊一起看' }}</a>{% endif %}
+      {% if can_send %}<form method="post" action="{{ url_for('archive_send', rid=room.id) }}"><input type="hidden" name="_csrf" value="{{ csrf() }}"><button class="linkbtn" type="submit">发到我的个人群</button></form>{% endif %}
+    </div>
+  </div>
+{% endblock %}

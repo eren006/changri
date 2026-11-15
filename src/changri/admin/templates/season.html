@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}季度与出场{% endblock %}
+{% block body %}
+{% import "_rpg_icons.html" as ic %}
+{% macro cancel() %}<button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button>{% endmacro %}
+<style>
+.ui .nowcard{border:1px solid var(--card-line);box-shadow:var(--shadow-sm);background:var(--surface);border-radius:var(--r-card);padding:6px 20px;max-width:560px}
+.ui .nowcard .top{display:flex;align-items:center;gap:16px;padding:14px 0}
+.ui .nowcard .sl{flex:1;min-width:0}
+.ui .nowcard .snm{font:700 22px var(--serif,Georgia,serif);line-height:1.3;overflow-wrap:anywhere;margin-bottom:4px}
+.ui .nowcard .day{text-align:center;flex:none}
+.ui .nowcard .day b{display:block;font:700 30px var(--serif,Georgia,serif);line-height:1.1}
+.ui .nowcard .day span{color:var(--mute);font-size:12px}
+.ui .nowcard .kv{display:flex;align-items:center;gap:12px;min-height:48px;border-top:1px solid var(--line);margin:0}
+.ui .nowcard .kv>span{color:var(--mute);font-size:14px;flex:1}
+.ui .nowcard .kv>b{font-weight:600;text-align:right;overflow-wrap:anywhere}
+.ui .sw-btn{display:inline-flex;align-items:center;gap:8px;border:0;background:none;padding:6px 0;cursor:pointer;font:inherit;color:var(--mute)}
+.ui .sw-btn i{position:relative;width:44px;height:26px;border-radius:999px;background:var(--line);transition:background .15s}
+.ui .sw-btn i::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .15s}
+.ui .sw-btn.on i{background:var(--ok)}
+.ui .sw-btn.on i::after{transform:translateX(18px)}
+.ui .sw-btn em{font-style:normal;font-size:13px;min-width:1em}
+.ui .nowacts{display:flex;gap:12px;flex-wrap:wrap;margin:16px 0 0;max-width:560px}
+.ui .nowacts details[open]{flex:1 1 100%}
+.ui .btn.danger{color:var(--bad)}
+@media (max-width:720px){
+  .ui .nowacts{display:grid;grid-template-columns:1fr 1fr}
+  .ui .nowacts details[open]{grid-column:1/-1}
+  .ui .nowacts .btn,.ui .nowacts form{width:100%}
+  .ui .nowacts details.panel>summary{white-space:nowrap}
+}
+</style>
+<h1>季度与出场</h1>
+<p class="lede">先预订季度，开始后筹备期玩家创建角色，档期开始日自动进入 D0，之后每天 23:59 自动加一天。</p>
+
+<section>
+  <div class="sec-head keep"><h2>现在</h2></div>
+  {% if running %}
+    <div class="nowcard">
+      <div class="top"><div class="sl"><div class="snm">{{ running.name }}</div><span class="kind {{ 'ok' if phase == 'playing' else 'warn' }}">{{ {'prep':'筹备期','playing':'进行中','over':'档期已过，等着结束'}[phase] }}</span></div>
+        <div class="day"><b class="tabular">{{ day }}</b><span>今天</span></div></div>
+      <div class="kv"><span>档期</span><b class="tabular">{{ running.start_date }} ~ {{ running.end_date }}</b></div>
+      {% if running.supp_end %}<div class="kv"><span>补戏截止</span><b class="tabular">{{ running.supp_end }}</b></div>{% endif %}
+      {% if npcs %}<div class="kv"><span>NPC</span><b>{{ npcs|map(attribute='name')|join('、') }}</b></div>{% endif %}
+      <form class="kv" method="post" action="{{ url_for('season_autoday') }}">{{ csrf() }}<input type="hidden" name="on" value="{{ 0 if auto else 1 }}">
+        <span>每天 23:59 自动加一天</span>
+        <button class="sw-btn {{ 'on' if auto }}" type="submit" aria-pressed="{{ 'true' if auto else 'false' }}" title="点一下{{ '关闭' if auto else '开启' }}"><i></i><em>{{ '开' if auto else '关' }}</em></button></form>
+    </div>
+    <div class="nowacts">
+      <details class="panel"><summary class="btn ghost">{{ ic.sliders() }}手动设置天数</summary>
+        <form class="form" method="post" action="{{ url_for('season_day') }}">{{ csrf() }}
+          <div class="fields"><div><label for="sd">天数</label><input id="sd" name="day" placeholder="D3"></div></div>
+          <div class="actions"><button class="btn" type="submit">设置</button>{{ cancel() }}</div></form></details>
+      <form method="post" action="{{ url_for('season_end') }}" onsubmit="return confirm('结束这个季度？')">{{ csrf() }}<button class="btn ghost danger" type="submit">结束季度</button></form>
+    </div>
+  {% elif phase == 'ended' %}
+    <div class="callout">上一季已结束，还没收尾。收尾会清空：{% for k, v in preview.items() %}{{ k }} {{ v }}{{ '、' if not loop.last }}{% endfor %}。管理员、设置、季度记录保留。</div>
+    <div class="btns"><details class="panel"><summary class="btn">收尾</summary>
+      <form class="form" method="post" action="{{ url_for('season_wipe') }}">{{ csrf() }}
+        <div class="fields"><div><label for="wc">输入「收尾」确认</label><input id="wc" name="confirm" autocomplete="off"></div></div>
+        <div class="actions"><button class="btn" type="submit">收尾</button>{{ cancel() }}</div></form></details></div>
+  {% else %}
+    <p class="empty">现在没有进行中的季度。在下面预订一个，再点「开始」。</p>
+  {% endif %}
+</section>
+
+<section>
+  <div class="sec-head keep"><h2>预订的季度<span class="n">{{ booked|length }} 个</span></h2>
+    <span class="btns"><details class="panel"><summary class="btn">{{ ic.plus() }}预订季度</summary>
+      <form class="form" method="post" action="{{ url_for('season_book') }}">{{ csrf() }}
+        <div class="fields">
+          <div><label for="bn">名字</label><input id="bn" name="name" required maxlength="30"></div>
+          <div><label for="bs">开始日</label><input id="bs" type="date" name="start" required></div>
+          <div><label for="be">结束日</label><input id="be" type="date" name="end" required></div>
+          <div><label for="bp">补戏截止（可空）</label><input id="bp" type="date" name="supp"></div>
+        </div>
+        <div class="actions"><button class="btn" type="submit">预订</button>{{ cancel() }}</div>
+      </form></details></span></div>
+  <div class="rowlist">
+    {% for b in booked %}
+    <div class="row">
+      <div class="nm"><b>{{ b.name }}</b>
+        <div class="muted tabular">{{ b.start_date }} ~ {{ b.end_date }}{% if b.supp_end %} · 补戏到 {{ b.supp_end }}{% endif %}</div></div>
+      <div class="acts">
+        {% if not running %}<form method="post" action="{{ url_for('season_start') }}">{{ csrf() }}<input type="hidden" name="name" value="{{ b.name }}">
+          <label class="muted" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" name="clear" value="1"> 清空旧数据后</label>
+          <button class="btn sm">开始</button></form>{% endif %}
+        <form method="post" action="{{ url_for('season_delete', season_id=b.id) }}" onsubmit="return confirm('删除这个预订？')">{{ csrf() }}<button class="linkbtn">删除</button></form>
+      </div>
+    </div>
+    {% else %}<p class="empty">还没有预订。点上面的「预订季度」。</p>{% endfor %}
+  </div>
+</section>
+
+<section>
+  <div class="sec-head keep"><h2>出场</h2></div>
+  <div class="stats">
+    <div class="stat"><b style="font-size:16px">{% if stage %}<span class="dot ok"></span>已设置{% else %}<span class="dot warn"></span>还没设置{% endif %}</b><span>戏群{% if stage %}（机器人 {{ stage[0] }}）{% else %}：管理员在戏群里发「设为戏群」{% endif %}</span></div>
+    <div class="stat"><b style="font-size:16px">{% if not queue %}还没抽顺序{% elif entrance_on %}进行中{% else %}未开始或已完成{% endif %}</b><span>出场状态</span></div>
+  </div>
+  {% if queue %}
+  <div class="queue">
+    {% for q in queue %}<span class="q {{ 'done' if q.done else ('sub' if q.text) }}"><em>{{ loop.index }}</em>{{ q.name }}<span class="muted">{{ '已出场' if q.done else ('已提交' if q.text else '未提交') }}</span></span>{% endfor %}
+  </div>{% endif %}
+  <p class="note">出场用的指令都在群里发：抽取出场顺序、开始出场、跳过出场、查看出场状态；玩家发「提交出场 角色名 内容」。</p>
+</section>
+
+<section id="npc">
+  <div class="sec-head keep"><h2>NPC<span class="n">{{ npcs|length }} 个</span></h2>
+    <span class="btns"><details class="panel"><summary class="btn">{{ ic.plus() }}添加 NPC</summary>
+      <div class="form">
+        <form method="post" action="{{ url_for('season_npc_create') }}">{{ csrf() }}
+          <div class="fields"><div><label for="nn">创建一个新 NPC（没有个人群）</label><input id="nn" name="name" maxlength="20" placeholder="名字，不带空格"></div></div>
+          <div class="actions"><button class="btn" type="submit">创建</button></div></form>
+        {% if others %}<form method="post" action="{{ url_for('season_npc_flag') }}" style="margin-top:14px">{{ csrf() }}<input type="hidden" name="on" value="1">
+          <div class="fields"><div><label for="ns">或者把已有的角色设为 NPC</label><select id="ns" name="name">{% for o in others %}<option>{{ o.name }}</option>{% endfor %}</select></div></div>
+          <div class="actions"><button class="btn" type="submit">设为 NPC</button>{{ cancel() }}</div></form>{% endif %}
+      </div></details></span></div>
+  {% if npcs %}<div class="rowlist">{% for n in npcs %}
+    <div class="row"><div class="nm"><b>{{ n.name }}</b><div class="muted">{{ '有个人群' if n.groups else '没有个人群' }}</div></div>
+      <div class="acts"><form method="post" action="{{ url_for('season_npc_flag') }}" onsubmit="return confirm('改回普通角色？')">{{ csrf() }}<input type="hidden" name="name" value="{{ n.name }}"><input type="hidden" name="on" value="0"><button class="linkbtn">取消 NPC</button></form></div></div>{% endfor %}</div>
+  {% else %}<p class="empty">还没有 NPC。NPC 不参与出场抽签、漂流瓶、群体闹钟，群里管理员也可以发「设为NPC 角色名」「创建NPC 名字」。</p>{% endif %}
+</section>
+
+{% if past %}
+<section>
+  <div class="sec-head keep"><h2>历史季度<span class="n">{{ past|length }} 个</span></h2></div>
+  <div class="rowlist">
+    {% for p in past %}<div class="row"><div class="nm"><b>{{ p.name }}</b></div><div class="muted tabular">{{ p.start_date }} ~ {{ p.end_date }}</div></div>{% endfor %}
+  </div>
+</section>{% endif %}
+{% endblock %}

@@ -5,13 +5,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 os.environ["QQ_BOTS"] = "[]"                      # 不要把本机 .env 里的机器人导进来
 _tmp = Path(tempfile.mkdtemp())
 os.environ["CHANGRI_DB_PATH"] = str(_tmp / "x.db")      # 先让别的模块能 import；下面再切到多工作区模式
 
-import core.db as db  # noqa: E402
-from core import botconf, roles  # noqa: E402
+import changri.core.db as db  # noqa: E402
+from changri.core import botconf, roles  # noqa: E402
 
 
 class WorkspaceTests(unittest.TestCase):

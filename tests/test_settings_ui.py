@@ -6,20 +6,22 @@ import tempfile
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 os.environ["QQ_BOTS"] = "[]"
 os.environ["ADMIN_PASSWORD"] = ""
 os.environ["CHANGRI_DB_PATH"] = str(Path(tempfile.mkdtemp()) / "s.db")
 
-from admin import SECTIONS, create_app, field_view  # noqa: E402
-from core import webusers  # noqa: E402
-from core.db import get_config, get_conn, init_db  # noqa: E402
+from changri.admin import SECTIONS, create_app, field_view  # noqa: E402
+from changri.core import webusers  # noqa: E402
+from changri.core.db import get_config, get_conn, init_db  # noqa: E402
 
 
 class FieldView(unittest.TestCase):
     def test_kinds(self):
         f = field_view("wish_public_send", "挂心愿时同步发到公告群（1 开 / 0 关）", "0", "1")
         self.assertEqual((f["kind"], f["label"], f["checked"], f["hint"]), ("bool", "挂心愿时同步发到公告群", True, ""))
+        for label in ("要不要通知被看见的人（1 要 / 0 不要，不要就只有看见的人收到）", "已经结束的约会也算（1 算 / 0 不算）"):
+            self.assertEqual(field_view("x", label, "0", "1")["kind"], "bool", label)       # 「要/不要」「算/不算」也是开关
         f = field_view("pool_auto_free", "房间结束后群自动放回池（1 是 / 0 否，否 = 要管理员确认群里的人清空了才放回）", "0", "0")
         self.assertEqual((f["kind"], f["checked"]), ("bool", False))
         self.assertIn("要管理员确认", f["hint"])

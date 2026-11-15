@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 os.environ.setdefault("CHANGRI_DB_PATH", str(Path(tempfile.mkdtemp()) / "e.db"))
 os.environ["QQ_BOTS"] = "[]"
 os.environ.setdefault("DRIVER", "~fastapi+~httpx+~websockets")
@@ -18,8 +18,8 @@ from nonebot.adapters.qq.exception import ActionFailed  # noqa: E402
 from nonebot.drivers import Response  # noqa: E402
 from nonebot.adapters.qq.config import BotInfo  # noqa: E402
 
-from core import roles  # noqa: E402
-from core.db import get_conn, get_config, init_db, set_config  # noqa: E402
+from changri.core import roles  # noqa: E402
+from changri.core.db import get_conn, get_config, init_db, set_config  # noqa: E402
 
 try:
     nonebot.get_driver()
@@ -27,7 +27,7 @@ except ValueError:
     nonebot.init(qq_bots=[], command_start={"/", ".", "。", ""}, log_level="WARNING")
     nonebot.get_driver().register_adapter(Adapter)
     init_db()
-    from core import extensions
+    from changri.core import extensions
     extensions.load_all()
 
 from nonebot.message import handle_event  # noqa: E402
@@ -91,7 +91,7 @@ class DiceE2E(unittest.TestCase):
         self.assertIn("SAN　55", self.say("/属性")[0])
         self.assertNotIn("已写回", self.say("/sc 1/1 40")[0])                   # 自己写的理智数值：不动角色
         self.assertIn("SAN　55", self.say("/属性")[0])
-        with mock.patch("core.dice.random.randint", lambda a, b: b):          # D100 掷 100、成长 +10
+        with mock.patch("changri.core.dice.random.randint", lambda a, b: b):          # D100 掷 100、成长 +10
             out = self.say("/en 侦查")[0]
         self.assertIn("已写回：甲的侦查 5 → 15", out)
         self.assertIn("侦查　15", self.say("/属性")[0])
@@ -143,7 +143,7 @@ class DiceE2E(unittest.TestCase):
         self.assertNotIn("D20 =", "".join(out))
         self.assertIn("发不出去", out[0])                                          # 测试里没有真机器人，投递失败时结果不能露在群里
         self.assertIn("白名单", out[0])                                            # 并且告诉他怎么办：把 KP 加进机器人白名单
-        from plugins import dice as dice_plugin
+        from changri.plugins import dice as dice_plugin
         sent = []
 
         async def fake_push(role_id, text, send, at=True):
@@ -212,7 +212,7 @@ class CardE2E(unittest.TestCase):
         with get_conn() as c:
             for t in ("role_attrs", "role_groups", "roles", "config"):
                 c.execute(f"DELETE FROM {t}")
-        import plugins.dice as pd
+        import changri.plugins.dice as pd
         pd._md_off_until = 0.0
         SENT.clear()
         self.bot = CardBot(nonebot.get_adapter(Adapter), "B1", BotInfo(id="B1", token="", secret="x" * 16))
@@ -248,7 +248,7 @@ class CardE2E(unittest.TestCase):
         self.assertTrue(out[0].startswith("侦查 检定：D100="), out)
 
     def test_falls_back_when_qq_rejects(self):
-        import plugins.dice as pd
+        import changri.plugins.dice as pd
         self.bot.reject = True
         out = self.say("/ra 侦查 70")
         self.assertEqual(len(out), 1)                                              # 只有一条：退回的纯文字
@@ -260,7 +260,7 @@ class CardE2E(unittest.TestCase):
         self.assertTrue(self.say("/ra 侦查 70")[0].startswith("[MD]### "))         # 冷却过了又会试
 
     def test_log_records_plain_text_not_card(self):
-        from core import trpg, trpglog
+        from changri.core import trpg, trpglog
         for t in ("trpg_log_lines", "trpg_logs", "trpg_active", "trpg_card_attrs", "trpg_cards", "trpg_identities", "trpg_players"):
             with get_conn() as c:
                 c.execute(f"DELETE FROM {t}")
@@ -286,7 +286,7 @@ class TrpgE2E(unittest.TestCase):
         SENT.clear()
         self.bot = FakeBot(nonebot.get_adapter(Adapter), "B1", BotInfo(id="B1", token="", secret="x" * 16))
         roles.create_role("甲", "B1", "G9", "M1")
-        from core import trpg
+        from changri.core import trpg
         trpg.set_mode("G1", "trpg")
         self.n = 100
 
@@ -294,7 +294,7 @@ class TrpgE2E(unittest.TestCase):
 
     def test_hidden_roll_in_trpg_group_ignores_romance_role(self):
         """跑团群里的暗骰只走单聊，不碰恋综的角色和个人群；失败提示里也不提绑定角色。"""
-        from plugins import dice as dice_plugin
+        from changri.plugins import dice as dice_plugin
         pushed = []
 
         async def fake_push(role_id, text, send, at=True):
@@ -315,7 +315,7 @@ class TrpgE2E(unittest.TestCase):
             dice_plugin.messaging.push_to_role = orig
 
     def test_sanity_write_back_to_card(self):
-        from core import trpg
+        from changri.core import trpg
         self.say("st 理智60")
         out = self.say("sc 5/5")[0]
         self.assertIn("已写回", out)
@@ -324,7 +324,7 @@ class TrpgE2E(unittest.TestCase):
         self.assertTrue(any(h["source"] == "理智损失" and h["new_value"] == 55 for h in trpg.card_history(card["id"])))
 
     def test_flow(self):
-        from core import trpglog
+        from changri.core import trpglog
         self.assertIn("力量：60", self.say("st 力量60 理智55")[0])
         self.assertIn("力量60", self.say("ra 力量")[0])                                   # 骰子读当前角色卡
         self.assertEqual(self.say("我的角色"), [])                                         # 恋综指令在跑团群里不响应

@@ -7,7 +7,7 @@ import time
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 os.environ.setdefault("CHANGRI_DB_PATH", str(Path(tempfile.mkdtemp()) / "e.db"))
 os.environ["QQ_BOTS"] = "[]"
 os.environ.setdefault("DRIVER", "~fastapi+~httpx+~websockets")
@@ -16,8 +16,8 @@ import nonebot  # noqa: E402
 from nonebot.adapters.qq import Adapter, Bot as QBot, GroupMessageCreateEvent  # noqa: E402
 from nonebot.adapters.qq.config import BotInfo  # noqa: E402
 
-from core import admins, entrance, roles, season  # noqa: E402
-from core.db import get_conn, init_db  # noqa: E402
+from changri.core import admins, entrance, roles, season  # noqa: E402
+from changri.core.db import get_conn, init_db  # noqa: E402
 
 try:
     nonebot.get_driver()
@@ -25,7 +25,7 @@ except ValueError:
     nonebot.init(qq_bots=[], command_start={"/", ".", "。", ""}, log_level="WARNING")
     nonebot.get_driver().register_adapter(Adapter)
     init_db()
-    from core import extensions
+    from changri.core import extensions
     extensions.load_all()
 
 from nonebot.message import handle_event  # noqa: E402
@@ -107,10 +107,11 @@ class SeasonE2E(unittest.TestCase):
         self.assertEqual(season.phase(), "none")
 
     def test_entrance_flow(self):
-        self.say(f"预订季度 甲季 {rng()} 阿林")
+        self.say(f"预订季度 甲季 {rng()}")
         self.say("开始季度")
         for i, n in enumerate(["甲", "乙", "阿林"]):
             roles.create_role(n, "B1", f"P{i}", f"M{i}")
+        self.assertIn("已设为 NPC", self.say("设为NPC 阿林")[0])
         self.assertIn("共 2 人", self.say("抽取出场顺序")[0])
         self.assertIn("还没有戏群", self.say("开始出场")[0])
         self.assertIn("已把这个群设为戏群", self.say("设为戏群", group="STAGE")[0])
@@ -138,7 +139,7 @@ class SeasonE2E(unittest.TestCase):
         self.assertIn("已全部完成", self.say("查看出场状态")[0])
 
     def test_at_uses_markdown_when_allowed(self):
-        import plugins._long as L
+        import changri.core.qqsend as L
         self.say(f"预订季度 甲季 {rng()}")
         self.say("开始季度")
         roles.create_role("甲", "B1", "P0", "M0")

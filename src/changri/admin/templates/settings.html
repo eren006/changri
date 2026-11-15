@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}设置{% endblock %}
+{% block body %}
+<h1>设置</h1>
+<p class="lede">改完点最下面的保存，机器人马上按新设置运行。</p>
+<form method="post">
+  {{ csrf() }}
+  {% for title, items in sections %}
+  <section>
+    <h2>{{ title }}</h2>
+    <div class="fields">
+      {% for it in items %}
+      <div class="{{ 'wide' if it.key == 'daily_tip' }}">
+        <label for="{{ it.key }}">{{ it.label }}</label>
+        <input id="{{ it.key }}" type="text" name="{{ it.key }}" value="{{ it.value }}">
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+  <div class="actions"><button class="btn" type="submit">保存</button></div>
+</form>
+{% endblock %}

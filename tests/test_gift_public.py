@@ -1,9 +1,9 @@
 import asyncio, os, sys, tempfile, unittest
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 os.environ.setdefault("CHANGRI_DB_PATH", str(Path(tempfile.mkdtemp()) / "g.db"))
-from core import messaging, roles  # noqa: E402
-from core.db import get_conn, init_db, set_config  # noqa: E402
+from changri.core import messaging, roles  # noqa: E402
+from changri.core.db import get_conn, init_db, set_config  # noqa: E402
 
 
 class GiftPublic(unittest.TestCase):

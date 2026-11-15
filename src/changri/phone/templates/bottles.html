@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% from '_phone_symbols.html' import phone_symbol %}
+{% from '_phone_icons.html' import admin_app_icon with context %}
+{% block title %}漂流瓶 · {{ brand }}{% endblock %}
+{% block body %}
+  <header class="bar bottle-bar">
+    <a class="back" href="{{ url_for('discover') }}">发现</a>
+    <div class="title">漂流瓶<small>匿名 · 随机送给一位玩家</small></div>
+    <div class="right"></div>
+  </header>
+  <div class="scroll bottle-page">
+    {% for m in get_flashed_messages() %}<div class="bottle-alert" role="status">{{ m }}</div>{% endfor %}
+    <form class="bottle-letter{% if why %} is-disabled{% endif %}" method="post" action="{{ url_for('bottle_throw') }}">
+      <input type="hidden" name="_csrf" value="{{ csrf() }}">
+      <div class="bottle-letter-head">{{ admin_app_icon('bottle') }}<div><label for="bottleText">写一张纸条扔进海里</label><p class="bottle-hint" id="bottlePrivacy">不署名，交给一次偶然。</p></div></div>
+      <textarea id="bottleText" name="text" maxlength="{{ max_msg }}" placeholder="有人能听到我说话吗……" aria-describedby="bottlePrivacy bottleLimit{% if why %} bottleWhy{% endif %}" required{% if why %} disabled{% endif %}></textarea>
+      {% if why %}<p class="bottle-reason" id="bottleWhy">{{ why }}</p>{% endif %}
+      <div class="bottle-letter-foot"><span class="bottle-hint" id="bottleLimit">{{ max_msg }} 字内 · 对方看不到你的名字</span><button type="submit"{% if why %} disabled{% endif %}>扔出去</button></div>
+    </form>
+    <div class="bottle-section"><h2>我的漂流瓶</h2><span>纸短 · 情长</span></div>
+    <div class="bottle-list">
+      {% for t in threads %}
+      {% if t.state == 'pending' or t.state == 'failed' %}
+      <div class="bottle-row is-{{ t.state }}">
+      {% else %}
+      <a class="bottle-row" href="{{ url_for('bottle_thread', bid=t.id) }}">
+      {% endif %}
+        {{ admin_app_icon('bottle') }}
+        <div><div class="bottle-row-head"><strong>{% if t.state == 'pending' or t.state == 'failed' %}扔漂流瓶{% else %}漂流瓶 #{{ t.id }}{% endif %}</strong>{% if t.tag %}<span class="bottle-tag">{{ t.tag }}</span>{% endif %}<span class="phone-operation-state is-{{ 'waiting' if t.state == 'pending' else ('failed' if t.state == 'failed' else 'done') }}">{{ '处理中' if t.state == 'pending' else ('没成功' if t.state == 'failed' else '已完成') }}</span></div>
+          {% if t.state == 'failed' %}<p class="bottle-reason">没扔出去：{{ t.note or '机器人没有接收成功' }}</p>{% endif %}
+          <p class="bottle-preview">{{ t.preview }}</p><time>{{ t.time }}</time>
+        </div>
+      {% if t.state == 'pending' or t.state == 'failed' %}</div>{% else %}</a>{% endif %}
+      {% else %}<div class="bottle-empty">海面还很安静。<br>第一张纸条，就从这里出发。</div>{% endfor %}
+    </div>
+    <p class="bottle-hint bottle-footnote">群里扔的瓶子也会出现在这里，可以接着回信；这里扔的瓶子，群里用「漂流瓶 编号 内容」也能回。</p>
+  </div>
+  
+
+{% endblock %}

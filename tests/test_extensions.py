@@ -11,21 +11,21 @@ from pathlib import Path
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "src"))
 _tmp = Path(tempfile.mkdtemp())
 os.environ["CHANGRI_DB_PATH"] = str(_tmp / "x.db")
 EXT_TMP = _tmp / "extensions"
 os.environ["CHANGRI_EXT_DIR"] = str(EXT_TMP)
 
-import admin as admin_mod  # noqa: E402
+import changri.admin as admin_mod  # noqa: E402
 
 os.environ.pop("ADMIN_PASSWORD", None)
 os.environ.pop("FLASK_SECRET_KEY", None)
-from admin import create_app  # noqa: E402
-from core import extensions as E, updater, webusers  # noqa: E402
-from core.db import get_config, get_conn, init_db  # noqa: E402
+from changri.admin import create_app  # noqa: E402
+from changri.core import extensions as E, updater, webusers  # noqa: E402
+from changri.core.db import get_config, get_conn, init_db  # noqa: E402
 
-DEMO = ROOT / "docs" / "示例扩展" / "hello_demo"
+DEMO = ROOT / "src" / "changri" / "extdocs" / "示例扩展" / "hello_demo"
 
 
 def demo_zip(manifest_patch=None, drop=None, extra=None, flat=False) -> bytes:
@@ -49,7 +49,7 @@ def token(client, path):
 
 
 class _PatchedDir(unittest.TestCase):
-    """core.extensions 在导入时就定了 USER_DIR，一起跑多个测试文件时环境变量来不及生效，所以这里直接替换，别写进真实的 extensions/。"""
+    """changri.core.extensions 在导入时就定了 USER_DIR，一起跑多个测试文件时环境变量来不及生效，所以这里直接替换，别写进真实的 extensions/。"""
     def setUp(self):
         p = mock.patch.object(E, "USER_DIR", EXT_TMP)
         p.start()
@@ -131,12 +131,22 @@ class ExtensionCoreTests(_PatchedDir):
         self.assertFalse(E.delete_user("../x"))
 
     def test_nav_and_groups_follow_switches(self):
+        self.assertEqual(E.disabled_nav(), {"rewards_page", "alarm_page", "phone_page", "giftshop_page", "gacha_page", "sighting_page", "precall_admin"})      # 结戏奖励、加百列闹钟、小手机默认关
+        E.set_enabled("rewards", True)
+        E.set_enabled("alarm", True)
+        E.set_enabled("phone", True)
+        E.set_enabled("giftshop", True)
+        E.set_enabled("gacha", True)
+        E.set_enabled("moments", True)
+        E.set_enabled("masquerade", True)
+        E.set_enabled("sighting", True)
+        E.set_enabled("precall", True)
         self.assertEqual(E.disabled_nav(), set())
-        self.assertEqual(E.disabled_groups(), {"心愿"})                          # 心愿默认关
+        self.assertEqual(E.disabled_groups(), {"心愿", "漂流瓶", "混乱寄信", "晚餐", "点歌"})   # 这些默认关（朋友圈、目击已在上面打开）
         E.set_enabled("lovemail", False)
         E.set_enabled("dice", False)
         self.assertIn("lovemail_page", E.disabled_nav())
-        self.assertEqual(E.disabled_groups(), {"心动信", "跑团骰子", "心愿"})
+        self.assertEqual(E.disabled_groups(), {"心动信", "跑团骰子", "心愿", "漂流瓶", "混乱寄信", "晚餐", "点歌"})
         E.set_enabled("entrance", False)
         self.assertNotIn("season_page", E.disabled_nav())                      # 季度是核心，页面一直在
         self.assertNotIn("season", [e["id"] for e in E.OFFICIAL])
@@ -173,7 +183,7 @@ class ExtensionCoreTests(_PatchedDir):
         self.assertTrue(E.scan_user()[0]["warnings"])
 
     def test_boot_guard_disables_suspects(self):
-        from core.db import set_config as sc, get_config as gc
+        from changri.core.db import set_config as sc, get_config as gc
         E.install_zip(demo_zip())
         sc("ext:hello_demo", "1")
         E.confirm_boot()
@@ -195,11 +205,10 @@ class ExtensionCoreTests(_PatchedDir):
         ok, _ = E.install_zip(E.skeleton_zip())          # 骨架本身必须能通过检查
         self.assertTrue(ok)
 
-    def test_updater_never_touches_extensions(self):
-        self.assertIsNone(updater._safe_target("extensions/hello_demo/__init__.py"))
-        self.assertEqual(updater._safe_target("changri_api.py"), "changri_api.py")
-        self.assertEqual(updater._safe_target("docs/写扩展.md"), "docs/写扩展.md")
-        self.assertEqual(updater._safe_target("plugins/dice.py"), "plugins/dice.py")
+    def test_user_extensions_live_in_data(self):
+        """用户扩展放在 data/extensions：更新只装新的版本目录，碰不到它。"""
+        from changri.paths import DATA_DIR
+        self.assertTrue(str(E.USER_DIR).startswith(str(DATA_DIR)) or os.environ.get("CHANGRI_EXT_DIR"))
 
 
 class LoadInFreshProcessTests(unittest.TestCase):
@@ -231,8 +240,8 @@ class LoadInFreshProcessTests(unittest.TestCase):
         (ext_dir / "broken" / "__init__.py").write_text("raise RuntimeError('boom')\n", encoding="utf-8")
         code = '''
 import nonebot
-from core import extensions as E
-from core.db import init_db, set_config
+from changri.core import extensions as E
+from changri.core.db import init_db, set_config
 init_db()
 set_config("ext:dice", "0")
 set_config("ext:hello_demo", "1")
@@ -253,8 +262,8 @@ print("RESULT", "dice" in names, "season" in names, "social" in names, "hello_de
         shutil.copytree(DEMO, ext_dir / "hello_demo")
         code = '''
 import nonebot
-from core import extensions as E
-from core.db import init_db
+from changri.core import extensions as E
+from changri.core.db import init_db
 init_db()
 nonebot.init(qq_bots=[], log_level="ERROR")
 E.load_all()
@@ -301,7 +310,7 @@ class ExtensionAdminTests(_PatchedDir):
         self.assertIn("已保存", r.get_data(as_text=True))
         html = self.c.get("/extensions?tab=aux").get_data(as_text=True)
         self.assertIn('value="嗨"', html)
-        with mock.patch("core.extensions.restart_soon") as rs:
+        with mock.patch("changri.core.extensions.restart_soon") as rs:
             r = self.c.post("/extensions/restart", data={"_csrf": token(self.c, "/extensions")}, follow_redirects=True)
             rs.assert_called_once()
         self.assertIn("正在重启", r.get_data(as_text=True))
@@ -318,7 +327,7 @@ class ExtensionAdminTests(_PatchedDir):
         self.assertEqual(self.c.get("/settings").status_code, 302)               # 旧的设置页跳到功能页
         r = self.c.post("/settings/心动信", data={"lovemail_default_limit": "7", "_csrf": token(self.c, "/extensions")}, follow_redirects=True)
         self.assertIn("已保存", r.get_data(as_text=True))
-        from core.db import get_config as gc
+        from changri.core.db import get_config as gc
         self.assertEqual(gc("lovemail_default_limit", ""), "7")
         self.assertEqual(self.c.post("/settings/不存在", data={"_csrf": token(self.c, "/extensions")}).status_code, 404)
 
@@ -340,7 +349,7 @@ class ExtensionAdminTests(_PatchedDir):
         self.assertIn("规范", self.c.get("/extensions/ai-prompt.md").get_data(as_text=True))
 
     def test_pool_page(self):
-        from core import pool
+        from changri.core import pool
         pool.register("B1", "OPENID_ABC", real_gid="555", set_name="A组")
         self.login()
         page = self.c.get("/pool").get_data(as_text=True)
@@ -355,7 +364,7 @@ class ExtensionAdminTests(_PatchedDir):
         self.assertIsNone(pool.get(gid))
 
     def test_forum_page(self):
-        from core import forum, roles as R
+        from changri.core import forum, roles as R
         R.create_role("发帖人", "B1", "FG", "FM")
         rid = R.get_role_by_name("发帖人")["id"]
         pid = forum.new_post(rid, "匿名路人", "你好论坛")

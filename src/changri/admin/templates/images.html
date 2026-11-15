@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}图片管理{% endblock %}
+{% block body %}
+<h1>图片管理</h1>
+<p class="lede">机器人存着的图片都在这里：短信和礼物里发的图、公知二表交的图、出场预存的图。可以看、可以删；删掉后，对应的文字还在，图的位置会空出来，QQ 群里已经发出去的图不受影响。</p>
+
+<div class="stats">
+  {% for s, label in sources %}<div class="stat"><b>{{ counts[s] }} 张</b><span>{{ label }} · {{ sizes[s] }} MB</span></div>{% endfor %}
+</div>
+
+<nav class="tabs" aria-label="图片来源">{% for s, label in sources %}<a class="tab{{ ' on' if s == src }}" href="{{ url_for('images_page', src=s) }}">{{ label }}<span class="n">{{ counts[s] }}</span></a>{% endfor %}</nav>
+{% if src == 'sms' and not sms_on %}<div class="callout">现在不允许短信带图片。要打开，到「功能与设置 → 短信」里改「短信/礼物留言可以带图片」（单张最大 {{ max_mb }} MB）。</div>{% endif %}
+
+{% if src == 'moments' %}
+<form class="form" method="post" action="{{ url_for('images_moments_settings') }}" style="margin:0 0 18px">{{ csrf() }}
+  <div class="fields"><div><label for="mq">每人图片额度（张；删图能腾出位置，文字保留）</label><input id="mq" type="number" min="0" name="moment_image_quota" value="{{ mom_quota }}"></div>
+  <div><label for="mm">全部图片总容量上限（MB）</label><input id="mm" type="number" min="1" name="moment_total_mb" value="{{ mom_mb }}"></div></div>
+  <div class="actions"><button class="btn" type="submit">保存</button></div>
+</form>
+{% endif %}
+<section>
+  <div class="sec-head keep"><h2>{% for s, label in sources %}{{ label if s == src }}{% endfor %}<span class="n">{{ counts[src] }} 张</span></h2>
+    {% if counts[src] %}<span class="btns"><details class="panel"><summary class="btn ghost">批量清理</summary>
+      <form class="form" method="post" action="{{ url_for('images_purge') }}">{{ csrf() }}<input type="hidden" name="src" value="{{ src }}">
+        {% if src == 'sms' %}<div class="fields"><div><label for="d">删除多少天前的图片</label><input id="d" type="number" min="1" name="days" placeholder="例如 30"></div></div>{% endif %}
+        <div class="actions">{% if src == 'sms' %}<button class="btn" type="submit">删除这些</button>{% endif %}
+          <button class="btn ghost danger" type="submit" name="all" value="1" onclick="return confirm('删除这里全部 {{ counts[src] }} 张图片？不能撤销。')">全部删除</button>
+          <button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
+      </form></details></span>{% endif %}</div>
+  {% if rows %}
+  <div class="imggrid">{% for r in rows %}
+    <figure class="tile">
+      <a href="{{ url_for('images_raw', src=src, img_id=r.id) }}" target="_blank" rel="noopener"><img src="{{ url_for('images_raw', src=src, img_id=r.id) }}" alt="图片" loading="lazy"></a>
+      <figcaption><b>{{ r.title }}</b>
+        <span class="muted">{% if r.ts %}{{ r.ts|ts }} · {% endif %}{{ r.size_kb }} KB</span>
+        {% if r.sub %}<span class="muted txt">{{ r.sub }}</span>{% endif %}
+        <form method="post" action="{{ url_for('images_delete', src=src, img_id=r.id) }}" onsubmit="return confirm('删除这张图片？不能撤销。')">{{ csrf() }}<input type="hidden" name="page" value="{{ page }}"><button class="linkbtn">删除</button></form></figcaption>
+    </figure>{% endfor %}</div>
+  <nav class="pager">{% if page > 1 %}<a class="btn ghost sm" href="{{ url_for('images_page', src=src, page=page - 1) }}">上一页</a>{% endif %}{% if more %}<a class="btn ghost sm" href="{{ url_for('images_page', src=src, page=page + 1) }}">下一页</a>{% endif %}</nav>
+  {% else %}<p class="empty">这里还没有图片。</p>{% endif %}
+</section>
+<style>
+.ui .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 14px}
+.ui .tab{display:inline-flex;align-items:center;gap:8px;min-height:38px;padding:0 14px;border:1px solid var(--card-line);border-radius:999px;background:var(--surface);color:var(--ink);text-decoration:none;font-size:14.5px}
+.ui .tab.on{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.ui .tab .n{color:inherit;opacity:.65;font-variant-numeric:tabular-nums}
+.ui .imggrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px}
+.ui .tile{margin:0;border:1px solid var(--card-line);background:var(--surface);border-radius:var(--r-card);box-shadow:var(--shadow-sm);overflow:hidden;min-width:0}
+.ui .tile img{display:block;width:100%;aspect-ratio:1/1;object-fit:cover;background:var(--soft)}
+.ui .tile figcaption{padding:10px 12px 8px;font-size:13.5px;display:flex;flex-direction:column;gap:2px}
+.ui .tile .txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ui .pager{display:flex;gap:10px;margin:18px 0}
+@media (max-width:720px){.ui .imggrid{grid-template-columns:repeat(2,1fr);gap:10px}}
+</style>
+{% endblock %}

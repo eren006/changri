@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% block title %}戏录 · {{ brand }}{% endblock %}
+{% block body %}
+  <header class="bar">{% if admin %}<a class="back" href="{{ url_for('admin_home') }}">管理员</a><div class="title">全部房间</div>{% else %}<a class="back" href="{{ url_for('discover') }}">发现</a><div class="title">戏录</div>{% endif %}</header>
+  <div class="scroll list">
+    {% include '_flash.html' %}
+    {% if not admin %}<div class="notice">你参与过的约会的戏文，和机器人里发「复盘」看到的是同一份。</div>{% endif %}
+    {% set ns = namespace(g='') %}
+    {% for x in items %}
+    {% if x.group != ns.g %}{% set ns.g = x.group %}<div class="disc-label">{{ x.group }}</div>{% endif %}
+    <a class="row" href="{{ url_for('admin_room_view' if admin else 'archive_view', rid=x.id) }}"><div class="body"><div class="top"><span class="name">R{{ x.id }} {{ '多人群聊' if x.kind == '微信' else x.kind }} · {{ x.who }}</span><span class="recipient-arrow" aria-hidden="true">›</span></div>
+      <div class="preview">{% if x.rp_n %}戏文 {{ x.rp_n }} 条 / {{ x.rp_chars }} 字{% elif x.all_n %}只有闲聊 {{ x.all_n }} 条{% else %}还没有发言{% endif %}</div></div></a>
+    {% else %}<div class="empty" style="padding:16px 20px">还没有记到戏文。房间里要「角色名：正文」这样写，才会算戏文。</div>{% endfor %}
+  </div>
+{% endblock %}

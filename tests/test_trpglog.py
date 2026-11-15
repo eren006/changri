@@ -7,7 +7,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 os.environ["CHANGRI_DB_PATH"] = str(Path(tempfile.mkdtemp()) / "trpglog.db")
 os.environ["QQ_BOTS"] = "[]"
 os.environ["ADMIN_PASSWORD"] = ""
@@ -15,10 +15,10 @@ os.environ["ADMIN_PASSWORD"] = ""
 from nonebot.adapters.qq import GroupMessageCreateEvent  # noqa: E402
 from nonebot.matcher import current_event  # noqa: E402
 
-from admin import create_app  # noqa: E402
-from core import trpg, trpglog, webusers  # noqa: E402
-from core.db import get_conn, init_db  # noqa: E402
-from plugins import _logtap  # noqa: E402
+from changri.admin import create_app  # noqa: E402
+from changri.core import trpg, trpglog, webusers  # noqa: E402
+from changri.core.db import get_conn, init_db  # noqa: E402
+from changri.plugins import _logtap  # noqa: E402
 
 TABLES = ("trpg_log_members", "trpg_log_lines", "trpg_logs", "trpg_observers", "trpg_attr_history", "trpg_active",
           "trpg_card_attrs", "trpg_cards", "trpg_identities", "trpg_players", "config", "web_users")
@@ -68,7 +68,7 @@ class LogState(unittest.TestCase):
         self.assertTrue(trpglog.should_skip("// 备忘"))
         self.assertFalse(trpglog.should_skip("他说（小声）你好"))              # 括号不在开头不算
         self.assertFalse(trpglog.should_skip("/ra 侦查", is_command=True))      # 默认指令文字也记
-        from core.db import set_config
+        from changri.core.db import set_config
         set_config("trpg_log_skip_cmds", "1")
         self.assertTrue(trpglog.should_skip("/ra 侦查", is_command=True))
         set_config("trpg_log_skip_brackets", "0")
@@ -87,7 +87,7 @@ class LogRecording(unittest.TestCase):
             _logtap.record_incoming(ev(t))
         texts = [l["text"] for l in trpglog.lines(log["id"])]
         self.assertEqual(texts, ["大家好", "/ra 侦查 50", "ra 侦查 50"])             # 默认不带前缀也算指令，管理类的不记
-        from core.db import set_config
+        from changri.core.db import set_config
         set_config("require_prefix", "1")                                        # 打开「必须带前缀」后，不带前缀的就是普通发言
         _logtap.record_incoming(ev("log 一下就是聊天"))
         self.assertEqual(trpglog.lines(log["id"])[-1]["text"], "log 一下就是聊天")
@@ -166,7 +166,7 @@ class LogRender(unittest.TestCase):
         return trpglog.get(log["id"])
 
     def test_render_escapes_and_colors(self):
-        from core import trpgrender
+        from changri.core import trpgrender
         log = self._log()
         out = trpgrender.render_html(log, trpglog.lines(log["id"]))
         self.assertNotIn("<script>alert(1)", out)
@@ -189,13 +189,13 @@ class LogRender(unittest.TestCase):
         self.assertEqual(trpglog.by_token(log["token"])["id"], log["id"])
         self.assertIsNone(trpglog.by_token("../../etc"))
         self.assertEqual(trpglog.share_url(log), "")
-        from core.db import set_config
+        from changri.core.db import set_config
         set_config("phone_base_url", "http://x.test:5092/")
         self.assertEqual(trpglog.share_url(log), f"http://x.test:5092/l/{log['token']}")
 
     def test_phone_share_route(self):
-        from phone.app import create_phone_app
-        from core.db import set_config
+        from changri.phone.app import create_phone_app
+        from changri.core.db import set_config
         log = self._log()
         c = create_phone_app("k").test_client()
         set_config("phone_enabled", "1")
@@ -221,7 +221,7 @@ class LogRender(unittest.TestCase):
         self.assertNotIn("<script>alert(1)", page)
         t = tok(f"/trpglog/{log['id']}")
         c.post(f"/trpglog/{log['id']}/style", data={"_csrf": t, "theme": "dark", "color_0": "#abcdef", "color_1": "#b5401f", "dice_hl": "1"})
-        from core import trpgrender
+        from changri.core import trpgrender
         st = trpgrender.parse_style(trpglog.get(log["id"])["palette"])
         self.assertEqual((st["theme"], st["colors"], st["dice_hl"], st["dim_bot"]), ("dark", {"小明": "#abcdef"}, True, False))
         c.post(f"/trpglog/{log['id']}/share", data={"_csrf": t, "on": "1"})
@@ -248,7 +248,7 @@ class LogExportImport(unittest.TestCase):
         return trpglog.get(log["id"])
 
     def test_verdict_prefers_after_dash(self):
-        from core.trpgrender import verdict
+        from changri.core.trpgrender import verdict
         self.assertEqual(verdict("成功率检定：D100=99/60 —— 大失败。")[:2], ("大失败", "fumble"))
         self.assertEqual(verdict("力量 检定：D100=50/60 —— 困难失败。")[:2], ("困难失败", "bad"))
         self.assertEqual(verdict("攻击 检定：D20=15 vs DC15 —— 未通过")[:2], ("未通过", "bad"))
@@ -259,7 +259,7 @@ class LogExportImport(unittest.TestCase):
         import io
         import json as _json
         import zipfile
-        from core import trpgexport
+        from changri.core import trpgexport
         log = self._log()
         sm = trpgexport.summary(log, trpglog.lines(log["id"]))
         self.assertEqual(sm["people"]["小明"], {"n": 2, "ok": 2, "bad": 0, "crit": 0, "fumble": 0})
@@ -277,7 +277,7 @@ class LogExportImport(unittest.TestCase):
         self.assertEqual(trpgexport.build(log, "txt")[2], "text/plain; charset=utf-8")
 
     def test_import_formats_dedup_and_merge(self):
-        from core import trpgimport
+        from changri.core import trpgimport
         log, _ = trpglog.new_log("G1", "雾港", "M1")
         base = int(__import__("time").mktime((2026, 11, 14, 21, 0, 0, 0, 0, -1)))
         trpglog.add_line(log["id"], "", "骰子", "dice", "侦查 检定：D100=12/50 —— 成功")
@@ -299,8 +299,8 @@ class LogExportImport(unittest.TestCase):
         self.assertEqual(trpgimport.decode("你好".encode("gb18030")), "你好")
 
     def test_admin_download_and_import_and_phone_zip(self):
-        from phone.app import create_phone_app
-        from core.db import set_config
+        from changri.phone.app import create_phone_app
+        from changri.core.db import set_config
         webusers.create_user("boss", "longenough1", "owner")
         log = self._log()
         c = create_app().test_client()
@@ -326,7 +326,7 @@ class LogExportImport(unittest.TestCase):
 class LogMigration(unittest.TestCase):
     def test_old_table_gets_shared_column(self):
         import sqlite3
-        from core import db
+        from changri.core import db
         path = Path(tempfile.mkdtemp()) / "old.db"
         conn = sqlite3.connect(path)
         conn.execute("CREATE TABLE trpg_logs (id INTEGER PRIMARY KEY, scope TEXT, name TEXT, status TEXT, token TEXT, started_by TEXT, started_ts INTEGER, ended_ts INTEGER, palette TEXT)")

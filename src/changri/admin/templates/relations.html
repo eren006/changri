@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}公知、二表与关系线{% endblock %}
+{% block body %}
+{% import "_rpg_icons.html" as ic %}
+<style>
+.ui details.fold{border:1px solid var(--card-line);box-shadow:var(--shadow-sm);background:var(--surface);border-radius:var(--r-card);margin:0 0 16px}
+.ui details.fold>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 18px;min-height:52px}
+.ui details.fold>summary::-webkit-details-marker{display:none}
+.ui details.fold>summary::after{content:"";margin-left:auto;width:9px;height:9px;border-right:2px solid var(--mute);border-bottom:2px solid var(--mute);transform:rotate(45deg) translateY(-2px);transition:transform .15s}
+.ui details.fold[open]>summary::after{transform:rotate(-135deg)}
+.ui details.fold>summary h2{margin:0;font-size:18px}
+.ui details.fold>.body{padding:2px 18px 16px;border-top:1px solid var(--line)}
+.ui .rl{border-bottom:1px solid var(--line)} .ui .rl:last-child{border-bottom:0}
+.ui .rl>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:11px 0;min-height:46px}
+.ui .rl>summary::-webkit-details-marker{display:none}
+.ui .rl>summary::before{content:"";width:7px;height:7px;border-right:2px solid var(--mute);border-bottom:2px solid var(--mute);transform:rotate(-45deg);transition:transform .15s;flex:none}
+.ui .rl[open]>summary::before{transform:rotate(45deg)}
+.ui .rl .sub{margin:0 0 10px 17px}
+.ui .rl .ln{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center;padding:9px 0;border-top:1px dashed var(--line)}
+.ui .rl .ln .w{grid-column:1;font-size:13px}
+.ui .rl .ln .a{grid-column:2;grid-row:2;display:flex;align-items:center;gap:6px;justify-self:end}
+.ui .rl .ln .a form{margin:0}
+.ui .rl .ln .a .linkbtn{padding:6px 8px;min-height:36px}
+.ui .pill{display:inline-flex;align-items:center;gap:5px;min-height:36px;padding:4px 13px;border:1px solid var(--line);border-radius:999px;background:var(--paper);color:var(--ink);font:inherit;font-size:14px;cursor:pointer}
+.ui .pill:hover{border-color:var(--dusk);color:var(--dusk)}
+.ui table td{vertical-align:middle}
+.ui .shl{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));column-gap:28px;margin-top:6px}
+.ui .shl .sr{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);min-height:52px}
+.ui .shl .sr b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ui .shl .pill{min-height:34px;padding:3px 12px;font-size:13.5px;flex:none}
+.ui .shl .pill.off{cursor:default;color:var(--mute);background:transparent;border-style:dashed}
+.ui .shl .pill.off:hover{border-color:var(--line);color:var(--mute)}
+.ui .ck{color:var(--ok);font-weight:700} .ui .no{color:var(--mute)}
+.ui dialog.dlg{border:1px solid var(--line);border-radius:12px;background:var(--paper);color:var(--ink);padding:20px 22px;width:min(640px,calc(100vw - 24px));max-height:86vh;overflow:auto}
+.ui dialog.dlg::backdrop{background:rgba(20,20,40,.5)}
+.ui dialog .dh{display:flex;align-items:baseline;gap:10px;margin:0 0 10px}.ui dialog .dh h3{margin:0;font:700 18px var(--serif);flex:1}
+.ui dialog .txt{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.75}
+.ui dialog img{max-width:100%;border-radius:6px;margin:10px 0 0;display:block}
+.ui dialog .msg{border-top:1px dashed var(--line);padding:8px 0}.ui dialog .msg:first-of-type{border-top:0}
+.ui h1+details.fold{margin-top:32px}
+</style>
+<h1>公知、二表与关系线</h1>
+<nav class="tabs" aria-label="公知二表与关系线">
+  <a class="tab{{ ' on' if view == 'sheets' }}" href="{{ url_for('relations_page', view='sheets') }}">公知与二表</a>
+  <a class="tab{{ ' on' if view == 'relations' }}" href="{{ url_for('relations_page', view='relations') }}">关系线{% if late %} <span class="kind bad">{{ late|length }}</span>{% endif %}</a>
+</nav>
+<style>
+.ui .tab{display:inline-flex;align-items:center;gap:6px;min-height:38px;padding:0 18px;border:1px solid var(--card-line);border-radius:999px;background:var(--surface);color:var(--ink);text-decoration:none;font-size:14.5px}
+.ui .tab.on{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.ui .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 18px}
+</style>
+
+{% if view == 'sheets' %}
+<details class="fold" open>
+  <summary><h2>公知与二表</h2><span class="chip">公知 {{ n_gz }}/{{ sheets|length }} · 二表 {{ n_eb }}/{{ sheets|length }}</span></summary>
+  <div class="body">
+    <div class="sec-head keep" style="margin-top:12px"><span class="muted">玩家在群里发「提交公知」「提交二表」（文字和图片都行，重复提交会覆盖）。</span>
+      <form method="post" action="{{ url_for('sheets_public') }}">{{ csrf() }}<input type="hidden" name="on" value="{{ 0 if sheets_public else 1 }}">
+        <button class="btn sm ghost" type="submit"><span class="dot {{ 'ok' if sheets_public else 'bad' }}"></span>展示公知：{{ '开' if sheets_public else '关' }}</button></form></div>
+    <p class="note" style="margin:0 0 6px">关着：玩家只能「查看公知」看自己的；开着：「查看公知」看到所有人的，「查看公知 角色名」只看这一个人（都做成长图）。二表只有本人和管理员能看。</p>
+    <div class="shl">
+      {% for x in sheets %}
+      <div class="sr"><b>{{ x.name }}</b>
+        {% if x.gongzhi %}<button class="pill on" type="button" data-sheet="gongzhi/{{ x.id }}"><span class="ck">✓</span>公知</button>{% else %}<span class="pill off">公知未交</span>{% endif %}
+        {% if x.erbiao %}<button class="pill on" type="button" data-sheet="erbiao/{{ x.id }}"><span class="ck">✓</span>二表</button>{% else %}<span class="pill off">二表未交</span>{% endif %}</div>
+      {% else %}<p class="empty">还没有角色。</p>{% endfor %}
+    </div>
+    {% if sheets %}<p class="note" style="margin:8px 0 0">点「✓ 公知」「✓ 二表」查看内容。</p>{% endif %}
+  </div>
+</details>
+{% else %}
+<details class="fold" open>
+  <summary><h2>关系线</h2><span class="chip">{{ rels|length }} 条</span>{% if late %}<span class="kind bad">{{ late|length }} 条超时没回</span>{% endif %}</summary>
+  <div class="body">
+    <div class="sec-head keep" style="margin-top:12px"><span class="muted">每个角色发起了几条、收到几条；点名字展开看是和谁的线。</span>
+      <details class="panel"><summary class="btn sm ghost">{{ ic.sliders() }}{{ ('超过 ' ~ ('%g' % limit) ~ ' 小时提醒') if limit else '提醒已关闭' }}</summary>
+        <form class="form" method="post" action="{{ url_for('relations_alert') }}">{{ csrf() }}
+          <div class="fields"><div><label for="rh">超过多少小时没人回就提醒（0 = 不提醒）</label><input id="rh" name="hours" value="{{ '%g' % limit }}" inputmode="decimal"></div></div>
+          <p class="note">从对方最后一段细节发出的时间算起；已确认完成的不算。提醒会出现在这里和「总览」的待办里。</p>
+          <div class="actions"><button class="btn" type="submit">保存</button><button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
+        </form></details></div>
+    {% if late %}<div class="callout bad" style="margin-top:10px"><b>{{ late|length }} 条超时没回复</b>
+      {% for w in late %}<div class="muted">{{ w.a_name }} ⇄ {{ w.b_name }} · 在等 {{ w.waiting_on }} · 已等 {{ '%.0f' % w.hours }} 小时</div>{% endfor %}</div>{% endif %}
+    {% for p in people %}
+    <details class="rl">
+      <summary><b>{{ p.name }}</b><span class="muted">发起 {{ p.sent }} 条 · 收到 {{ p.got }} 条</span></summary>
+      <div class="sub">
+        {% for l in p.lines %}
+        <div class="ln">
+          <div class="t"><span class="muted">{{ '发给' if l.sent else '收自' }}</span> <b>{{ l.other }}</b></div>
+          <span class="kind {{ 'ok' if l.confirmed }}">{{ '已确认' if l.confirmed else '进行中' }}</span>
+          <div class="w muted tabular">{{ l.n }} 段 / {{ l.chars }} 字{% if l.wait %} · 等 {{ l.wait.waiting_on }} · {{ '%.0f' % l.wait.hours }} 小时{% endif %}</div>
+          <div class="a"><button class="pill" type="button" data-rel="{{ l.id }}">查看</button>
+            <form method="post" action="{{ url_for('relations_delete', rel_id=l.id) }}" onsubmit="return confirm('删除这条关系线及全部细节？')">{{ csrf() }}<button class="linkbtn">删除</button></form></div></div>
+        {% endfor %}
+      </div>
+    </details>
+    {% else %}<p class="empty">还没有关系线。</p>{% endfor %}
+  </div>
+</details>
+{% endif %}
+
+<dialog class="dlg" id="dlg"><div class="dh"><h3 id="dt"></h3><span class="muted" id="ds"></span><button class="btn sm ghost" type="button" onclick="document.getElementById('dlg').close()">关闭</button></div><div id="db"></div></dialog>
+<script>
+(function(){
+var dlg=document.getElementById('dlg'),dt=document.getElementById('dt'),ds=document.getElementById('ds'),db=document.getElementById('db');
+function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!==undefined)e.textContent=x;return e}
+function open(url,fill){fetch(url,{credentials:'same-origin'}).then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(d){
+  db.textContent='';dt.textContent=d.title;ds.textContent='';fill(d);dlg.showModal()}).catch(function(){alert('打不开，刷新页面再试')})}
+var base={{ (request.script_root ~ '') | tojson }};
+document.querySelectorAll('[data-sheet]').forEach(function(b){b.addEventListener('click',function(){
+  open(base+'/sheets/view/'+b.dataset.sheet,function(d){ds.textContent='更新于 '+d.ts;
+    if(d.text)db.appendChild(el('div','txt',d.text));
+    d.images.forEach(function(u){var i=el('img');i.src=u;i.loading='lazy';i.alt='';db.appendChild(i)});})})});
+document.querySelectorAll('[data-rel]').forEach(function(b){b.addEventListener('click',function(){
+  open(base+'/relations/'+b.dataset.rel+'/view',function(d){ds.textContent=d.confirmed?'已确认完成':'进行中';
+    if(!d.details.length)db.appendChild(el('p','empty','还没有细节。'));
+    d.details.forEach(function(m){var w=el('div','msg');w.appendChild(el('div','muted',m.from+' · '+m.ts));w.appendChild(el('div','txt',m.text));db.appendChild(w)});})})});
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}匿名舞会{% endblock %}
+{% block body %}
+<h1>匿名舞会</h1>
+<p class="lede">小手机「发现」里的特别群聊：玩家抽面具、起昵称，戴着面具发言、回应、邀请跳舞（两人临时私聊，合计最多 20 句）。真名只在这一页出现。NPC 不戴面具，只能用真名在舞厅说话。下面的所有操作都不会发到 QQ。</p>
+
+<section>
+  <div class="sec-head keep"><h2>开场与音乐</h2></div>
+  <p>现在：<b>{{ '开场中' if v.on else '已打烊' }}</b>{% if v.mute %}　<b>（全员禁言中）</b>{% endif %}</p>
+  <form class="form" method="post" action="{{ url_for('masq_admin_op') }}" style="margin-bottom:10px">{{ csrf() }}
+    <div class="fields"><div><label for="mq-m">背景音乐</label><select id="mq-m" name="music">{% for k, t in v.tracks.items() %}<option value="{{ k }}"{% if v.music.key == k %} selected{% endif %}>{{ t.label }}：{{ t.title }}</option>{% endfor %}</select></div></div>
+    <div class="actions">
+      {% if v.on %}<button class="btn ghost" name="action" value="off" type="submit">打烊</button>{% else %}<button class="btn" name="action" value="on" type="submit">{{ '开场（接着上一场）' if v.has_data else '开场' }}</button>{% endif %}
+      <button class="btn ghost" name="action" value="new" type="submit" onclick="return confirm('新开一场？上一场连真名对照存进往期，面具、昵称、记录清空，大家重新选面具。')">新开一场</button>
+      <button class="btn ghost" name="action" value="music" type="submit">只换音乐</button>
+    </div>
+  </form>
+  <form method="post" action="{{ url_for('masq_admin_op') }}" style="display:flex;gap:8px">{{ csrf() }}
+    {% if v.mute %}<button class="btn" name="action" value="unmute" type="submit">解除全员禁言</button>{% else %}<button class="btn ghost" name="action" value="mute" type="submit">全员禁言</button>{% endif %}</form>
+</section>
+
+<section>
+  <div class="sec-head keep"><h2>旁白与定时</h2></div>
+  <form class="form" method="post" action="{{ url_for('masq_admin_op') }}">{{ csrf() }}<input type="hidden" name="action" value="narrate">
+    <div class="fields"><div><label for="nt">现在发一条旁白（最多 {{ v.narr_max }} 字）</label><input id="nt" name="text" maxlength="{{ v.narr_max }}"></div></div>
+    <div class="actions"><button class="btn" type="submit">发到舞厅</button></div></form>
+  <form class="form" method="post" action="{{ url_for('masq_admin_op') }}">{{ csrf() }}<input type="hidden" name="action" value="sched_add">
+    <div class="fields"><div><label for="sa">定时旁白：时间</label><input id="sa" type="datetime-local" name="at"></div><div><label for="st">内容</label><input id="st" name="text" maxlength="{{ v.narr_max }}"></div></div>
+    <div class="actions"><button class="btn ghost" type="submit">添加定时旁白</button></div></form>
+  {% for s in v.sched %}<form method="post" action="{{ url_for('masq_admin_op') }}" style="display:flex;gap:8px;align-items:center">{{ csrf() }}<input type="hidden" name="action" value="sched_del"><input type="hidden" name="id" value="{{ s.id }}"><span>{{ s.at.replace('T', ' ') }}　{{ s.text }}</span><button class="btn ghost" type="submit">取消</button></form>{% endfor %}
+  <form class="form" method="post" action="{{ url_for('masq_admin_op') }}">{{ csrf() }}<input type="hidden" name="action" value="auto">
+    <div class="fields"><div><label for="ao">自动开场（留空 = 不自动）</label><input id="ao" type="datetime-local" name="open" value="{{ v.open_at }}"></div>
+      <div><label for="ac">自动打烊</label><input id="ac" type="datetime-local" name="close" value="{{ v.close_at }}"></div>
+      <div><label for="am">自动开场时</label><select id="am" name="open_mode"><option value="continue"{% if v.open_mode != 'new' %} selected{% endif %}>继续上一场</option><option value="new"{% if v.open_mode == 'new' %} selected{% endif %}>新开一场</option></select></div></div>
+    <div class="actions"><button class="btn ghost" type="submit">保存自动开关场</button></div></form>
+</section>
+
+<section>
+  <div class="sec-head keep"><h2>客人对照<span class="n">{{ v.members|length }} 人</span></h2></div>
+  {% for m in v.members %}<form method="post" action="{{ url_for('masq_admin_op') }}" style="display:flex;gap:8px;align-items:center;margin-bottom:4px">{{ csrf() }}<input type="hidden" name="action" value="nick"><input type="hidden" name="role_id" value="{{ m.role_id }}">
+    <span style="min-width:6em"><b>{{ m.name }}</b></span><span>{{ m.mask or '（没选面具）' }}</span><input name="nick" value="{{ m.nick }}" maxlength="10" placeholder="昵称" style="width:9em"><button class="btn ghost" type="submit">改昵称</button></form>
+  {% else %}<p class="muted">还没有人入场。</p>{% endfor %}
+</section>
+
+<section>
+  <div class="sec-head keep"><h2>舞厅记录（最近 100 条）</h2></div>
+  {% for m in v.msgs %}<form method="post" action="{{ url_for('masq_admin_op') }}" style="display:flex;gap:8px;align-items:baseline">{{ csrf() }}<input type="hidden" name="action" value="del_msg"><input type="hidden" name="id" value="{{ m.id }}">
+    <span class="muted">{{ m.time }}</span><span>{% if m.narr %}—— {{ m.text }} ——{% else %}<b>{{ m.name }}</b>（{{ m.who }}）：{{ m.text }}{% if m.reacts %}　<span class="muted">{{ m.reacts }}</span>{% endif %}{% endif %}</span>
+    <button class="btn ghost" type="submit" onclick="return confirm('删除这条？')">删除</button></form>
+  {% else %}<p class="muted">还没有记录。</p>{% endfor %}
+</section>
+
+<section>
+  <div class="sec-head keep"><h2>邀请与私聊</h2></div>
+  {% for d in v.dances %}<div class="card" style="margin-bottom:8px">
+    <form method="post" action="{{ url_for('masq_admin_op') }}" style="display:flex;gap:8px;align-items:center">{{ csrf() }}<input type="hidden" name="action" value="del_invite"><input type="hidden" name="id" value="{{ d.id }}">
+      <span><b>{{ d.from }}</b>（{{ d.from_tag }}）→ <b>{{ d.to }}</b>（{{ d.to_tag }}）　{{ {'pending':'等回应','accepted':'共舞','declined':'婉拒','ended':'舞曲终了'}.get(d.status, d.status) }}　{{ d.cnt }} 句　<span class="muted">{{ d.time }}</span></span>
+      <button class="btn ghost" type="submit" onclick="return confirm('移除这段邀请和里面的私聊？发起方名额退回。')">移除</button></form>
+    {% for m in d.msgs %}<form method="post" action="{{ url_for('masq_admin_op') }}" style="display:flex;gap:8px;align-items:baseline;margin-left:1em">{{ csrf() }}<input type="hidden" name="action" value="del_dance_msg"><input type="hidden" name="id" value="{{ m.id }}"><span class="muted">{{ m.time }}</span><span><b>{{ m.name }}</b>：{{ m.text }}</span><button class="btn ghost" type="submit">删除</button></form>{% endfor %}
+  </div>{% else %}<p class="muted">还没有邀请。</p>{% endfor %}
+</section>
+
+<section>
+  <div class="sec-head keep"><h2>场次与回放</h2></div>
+  {% for s in v.sessions %}<p>第 {{ s.no }} 场{% if s.current %}（进行中 / 最近一场）{% endif %}　{{ s.label }}　{{ s.guests }} 位客人、{{ s.msgs }} 句　<a class="btn ghost" href="{{ url_for('masq_admin_export', no=s.no) }}">下载回放（含真名）</a></p>
+  {% else %}<p class="muted">还没有场次。</p>{% endfor %}
+</section>
+{% endblock %}

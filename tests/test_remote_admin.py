@@ -1,9 +1,9 @@
 import os, sys, tempfile, unittest
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 os.environ.setdefault("CHANGRI_DB_PATH", str(Path(tempfile.mkdtemp()) / "r.db"))
-from admin.remote import RemoteGuard, allowed, is_blocked_path, parse_allow  # noqa: E402
-from core.db import init_db, set_config  # noqa: E402
+from changri.admin.remote import RemoteGuard, allowed, is_blocked_path, parse_allow  # noqa: E402
+from changri.core.db import init_db, set_config  # noqa: E402
 
 
 def call(guard, ip, path):

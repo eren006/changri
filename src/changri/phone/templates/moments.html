@@ -1,0 +1,223 @@
+{% extends 'base.html' %}
+{% block title %}{{ skin.words.moments }} · {{ brand }}{% endblock %}
+{% block body %}
+  {% if mine_only %}
+  <header class="bar">
+    <a class="back" href="{{ url_for('moments_feed') }}">{{ skin.words.moments }}</a>
+    <div class="title">我的朋友圈</div>
+    <div class="right">{% if not why %}<button class="icon-btn" id="mcOpen" type="button" aria-haspopup="dialog" aria-label="发朋友圈"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>{% endif %}</div>
+  </header>
+  {% else %}
+  <header class="bar">
+    <a class="back" href="{{ url_for('discover') }}">发现</a>
+    <div class="title">{{ skin.words.moments }}</div>
+    <div class="right">
+      <a class="icon-btn" href="{{ url_for('moments_feed', mine=1) }}" aria-label="我的朋友圈" title="我的朋友圈"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg></a>
+      {% if not why %}<button class="icon-btn" id="mcOpen" type="button" aria-haspopup="dialog" aria-label="发朋友圈" title="发朋友圈"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>{% endif %}
+    </div>
+  </header>
+  {% endif %}
+  <div class="scroll moments-scroll">
+    <div class="chat moments-feed">
+      {% if mine_only or why %}
+      <div class="moments-top">
+        {% if why %}{{ why }}<br>{% endif %}
+        {% if mine_only %}本季图片 <b>{{ img_used }}/{{ img_quota }}</b> 张。用满后可以删掉以前的图片腾出位置，那条朋友圈的文字会保留。{% endif %}
+      </div>
+      {% endif %}
+      {% for p in posts %}
+      <article class="moment" id="m{{ p.id }}" data-id="{{ p.id }}">
+        <div class="avatar" data-name="{{ p.role_name }}">{{ p.role_name[:1] }}</div>
+        <div class="mbody">
+          <div class="mname">{{ disp(p.role_name) }}</div>
+          {% if p.content %}<div class="mtext">{{ p.content }}</div>{% endif %}
+          {% if p.images %}
+          <div class="mimgs n{{ p.images|length }}">
+            {% for im in p.images %}
+            <div class="mimg">
+              {% if im.deleted_at %}<div class="img-gone">图片已删除</div>
+              {% else %}<img src="{{ url_for('moments_image', image_id=im.id, s='thumb') }}" data-full="{{ url_for('moments_image', image_id=im.id) }}" loading="lazy" alt="{{ p.role_name }}的图片">
+                {% if mine_only and p.mine %}<button class="img-del" type="button" data-img="{{ im.id }}" aria-label="删除这张图片">×</button>{% endif %}
+              {% endif %}
+            </div>
+            {% endfor %}
+          </div>
+          {% endif %}
+          <div class="mmeta">
+            <span>{{ p.day_label }} {{ p.time }}</span>
+            {% if p.mine %}<button type="button" class="m-del">删除</button>{% endif %}
+            <span class="grow"></span>
+            {% if not why %}<button type="button" class="m-like{{ ' liked' if p.liked }}" aria-pressed="{{ 'true' if p.liked else 'false' }}">{{ phone_symbol('heart') }} {{ '已赞' if p.liked else '赞' }}</button>
+            <button type="button" class="m-cmt">评论</button>{% endif %}
+          </div>
+          <div class="msocial"{% if not p.likes and not p.comments %} hidden{% endif %}>{% if p.likes %}<div class="mlikes">{{ phone_symbol('heart') }} {% for n in p.likes %}{{ disp(n) }}{% if not loop.last %}，{% endif %}{% endfor %}</div>{% endif %}<div class="mcomments">{% for c in p.comments %}<div class="cm" data-role="{{ c.role_name }}"><b>{{ disp(c.role_name) }}</b>{% if c.reply_to %} 回复 <b>{{ disp(c.reply_to) }}</b>{% endif %}：{{ c.content }}{% if c.mine or p.mine %}<button type="button" class="cdel" data-cid="{{ c.id }}">删除</button>{% endif %}</div>{% endfor %}</div></div>
+          {% if not why %}
+          <form class="cform" hidden><input name="content" maxlength="{{ max_comment }}" placeholder="评论" autocomplete="off"><input type="hidden" name="reply_to" value=""><button type="submit">发送</button></form>
+          {% endif %}
+        </div>
+      </article>
+      {% else %}
+      <div class="empty">{{ '你还没有发过朋友圈' if mine_only else '还没有人发朋友圈' }}{% if not why %}<br>点下方「发朋友圈」留下这一刻{% endif %}</div>
+      {% endfor %}
+      {% if more %}<a class="more-link" href="{{ url_for('moments_feed', before=posts[-1].id, mine=1 if mine_only else None) }}">更早的朋友圈</a>{% endif %}
+    </div>
+  </div>
+  {% if not why %}
+  <dialog class="mc-dialog" id="mcDialog" aria-label="发朋友圈">
+    <textarea id="mcText" maxlength="{{ max_text }}" placeholder="这一刻的想法……"></textarea>
+    <input type="file" id="mcFiles" accept="image/*" multiple hidden>
+    <div class="mc-previews" id="mcPreviews"><button type="button" class="mc-add" id="mcAdd" aria-label="添加图片">＋</button></div>
+    <div class="mc-err" id="mcErr" hidden></div>
+    <div class="mc-foot">
+      <span>图片 {{ img_used }}/{{ img_quota }}{% if tenant_full %} · 存档空间已满，暂时不能发图{% endif %}</span>
+      <span class="grow"></span>
+      <button type="button" class="mc-cancel" id="mcCancel">取消</button>
+      <button type="button" class="mc-submit" id="mcSubmit" disabled>发表</button>
+    </div>
+  </dialog>
+  {% endif %}
+  <dialog class="viewer" id="viewer"><img alt="大图"></dialog>
+  <script>
+  (function () {
+    var CSRF = {{ csrf()|tojson }};
+    function post(url, data) {
+      data = data || new FormData(); data.append('_csrf', CSRF);
+      return fetch(url, {method: 'POST', body: data})
+        .then(function (r) { return r.json().catch(function () { return {ok: false, msg: '出错了，稍后再试'}; }); })
+        .catch(function () { return {ok: false, msg: '网络不太稳，没发出去，再试一次'}; });   // 断网/超时：以前按钮会一直停在「发送中…」
+    }
+    function reloadKeep() {
+      try { sessionStorage.setItem('moments:y', String(window.scrollY)); } catch (_) {}
+      location.reload();
+    }
+    try { var y = sessionStorage.getItem('moments:y'); if (y) { sessionStorage.removeItem('moments:y'); window.scrollTo(0, Number(y)); } } catch (_) {}
+
+    // 看大图
+    var viewer = document.getElementById('viewer');
+    document.addEventListener('click', function (e) {
+      var img = e.target.closest('.mimg img[data-full]');
+      if (img) { viewer.querySelector('img').src = img.dataset.full; viewer.showModal(); }
+    });
+    viewer.addEventListener('click', function () { viewer.close(); });
+
+    document.querySelectorAll('.moment').forEach(function (art) {
+      var id = art.dataset.id, form = art.querySelector('.cform');
+      var like = art.querySelector('.m-like');
+      if (like) like.addEventListener('click', function () {
+        post('/p/me/moments/' + id + '/like').then(function (r) { if (r.ok) reloadKeep(); else alert(r.msg); });
+      });
+      var cmt = art.querySelector('.m-cmt');
+      function openReply(who) {
+        if (!form) return;
+        form.hidden = false;
+        form.reply_to.value = who || '';
+        form.content.placeholder = who ? '回复 ' + who : '评论';
+        form.content.focus();
+      }
+      if (cmt) cmt.addEventListener('click', function () { openReply(''); });
+      art.querySelectorAll('.cm').forEach(function (c) {
+        c.addEventListener('click', function (e) { if (!e.target.closest('.cdel')) openReply(c.dataset.role); });
+      });
+      if (form) form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        if (!form.content.value.trim()) return;
+        var fd = new FormData(form);
+        form.querySelector('button').disabled = true;
+        post('/p/me/moments/' + id + '/comment', fd).then(function (r) {
+          if (r.ok) reloadKeep(); else { alert(r.msg); form.querySelector('button').disabled = false; }
+        });
+      });
+      art.querySelectorAll('.cdel').forEach(function (b) {
+        b.addEventListener('click', function () {
+          if (!confirm('删除这条评论？')) return;
+          post('/p/me/moments/comment/' + b.dataset.cid + '/delete').then(function (r) { if (r.ok) reloadKeep(); else alert(r.msg); });
+        });
+      });
+      var del = art.querySelector('.m-del');
+      if (del) del.addEventListener('click', function () {
+        if (!confirm('删除这条朋友圈？图片也会一起删掉。')) return;
+        post('/p/me/moments/' + id + '/delete').then(function (r) { if (r.ok) reloadKeep(); else alert(r.msg); });
+      });
+      art.querySelectorAll('.img-del').forEach(function (b) {
+        b.addEventListener('click', function () {
+          if (!confirm('删除这张图片？这条朋友圈的文字会保留，删掉后腾出一张额度。')) return;
+          post('/p/me/moments/image/' + b.dataset.img + '/delete').then(function (r) { if (r.ok) reloadKeep(); else alert(r.msg); });
+        });
+      });
+    });
+
+    // 发朋友圈：浏览器先压缩（长边 1600、JPEG），服务端还会再处理一遍
+    var dlg = document.getElementById('mcDialog');
+    if (!dlg) return;
+    var MAX = {{ max_images }}, files = [], text = document.getElementById('mcText'),
+        input = document.getElementById('mcFiles'), box = document.getElementById('mcPreviews'),
+        add = document.getElementById('mcAdd'), submit = document.getElementById('mcSubmit'), err = document.getElementById('mcErr');
+    // 返回压缩后的 Blob；解不开返回 null（调用方提示用户，不再悄悄把原文件塞给服务端）
+    function compress(file) {
+      return new Promise(function (resolve) {
+        if (!file || !file.size) { resolve(null); return; }   // 部分安卓内置浏览器读不到文件内容时是 0 字节
+        var heic = /heic|heif/i.test(file.type || '') || /\.(heic|heif)$/i.test(file.name || '');
+        var url = URL.createObjectURL(file), img = new Image();
+        img.onload = function () {
+          var s = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
+          var c = document.createElement('canvas');
+          c.width = Math.round(img.naturalWidth * s); c.height = Math.round(img.naturalHeight * s);
+          var ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+          ctx.drawImage(img, 0, 0, c.width, c.height);
+          URL.revokeObjectURL(url);
+          c.toBlob(function (b) {
+            if (b && b.size) resolve(b.size < file.size ? b : file);
+            else resolve(file.size <= 15 * 1024 * 1024 ? file : null);   // 画布出不来图（内存不够等）：原图不太大就原样交给服务端
+          }, 'image/jpeg', 0.82);
+        };
+        img.onerror = function () {
+          URL.revokeObjectURL(url);
+          resolve(heic ? null : (file.size <= 15 * 1024 * 1024 ? file : null));   // HEIC 浏览器和服务端都解不了；其他格式交给服务端判断
+        };
+        img.src = url;
+      });
+    }
+    function render() {
+      box.querySelectorAll('.mimg').forEach(function (n) { n.remove(); });
+      files.forEach(function (f, i) {
+        var d = document.createElement('div'); d.className = 'mimg';
+        var im = document.createElement('img'); im.src = URL.createObjectURL(f); d.appendChild(im);
+        var x = document.createElement('button'); x.type = 'button'; x.className = 'img-del'; x.textContent = '×';
+        x.setAttribute('aria-label', '移除这张');
+        x.addEventListener('click', function () { files.splice(i, 1); render(); });
+        d.appendChild(x); box.insertBefore(d, add);
+      });
+      add.hidden = files.length >= MAX;
+      submit.disabled = !text.value.trim() && !files.length;
+    }
+    document.getElementById('mcOpen').addEventListener('click', function () { if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', ''); text.focus(); });
+    document.getElementById('mcCancel').addEventListener('click', function () { if (dlg.close) dlg.close(); else dlg.removeAttribute('open'); });
+    add.addEventListener('click', function () { input.click(); });
+    input.addEventListener('change', async function () {
+      var picked = Array.from(input.files).slice(0, MAX - files.length), bad = 0;
+      err.hidden = true;
+      for (var i = 0; i < picked.length; i++) {
+        var b = await compress(picked[i]);
+        if (b) files.push(b); else bad++;
+      }
+      input.value = '';   // 压缩完再清空：部分安卓内置浏览器一清空，已选文件就读不到了
+      if (bad) {
+        err.textContent = bad + ' 张图片没法处理（可能是 HEIC 格式或文件读不出来）。可以把相机格式改成「兼容性最佳/JPEG」，或截图后再传。';
+        err.hidden = false;
+      }
+      render();
+    });
+    text.addEventListener('input', render);
+    submit.addEventListener('click', function () {
+      var fd = new FormData();
+      fd.append('content', text.value);
+      files.forEach(function (f, i) { fd.append('images', f, 'img' + i + '.jpg'); });
+      submit.disabled = true; submit.textContent = '发送中…'; err.hidden = true;
+      post('/p/me/moments/post', fd).then(function (r) {
+        if (r.ok) { if (dlg.close) dlg.close(); location.href = {{ url_for('moments_feed')|tojson }}; return; }
+        err.textContent = r.msg; err.hidden = false; submit.disabled = false; submit.textContent = '发表';
+      });
+    });
+  })();
+  </script>
+{% endblock %}

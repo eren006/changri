@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% from '_phone_symbols.html' import phone_symbol %}
+{% from '_phone_icons.html' import admin_app_icon with context %}
+{% block title %}角色 · {{ brand }}{% endblock %}
+{% block body %}
+  <header class="bar">
+    <a class="back" href="{{ url_for('discover') }}">发现</a>
+    <div class="title">RPG<small>{{ role['name'] }}</small></div>
+    <div class="right"></div>
+  </header>
+  <div class="scroll ch-page">
+    <nav class="song-tabs lm-tabs" aria-label="角色">
+      <a href="{{ url_for('char_page') }}"{% if view == 'bag' %} aria-current="page"{% endif %}>背包</a>
+      <a href="{{ url_for('char_page', view='attrs') }}"{% if view == 'attrs' %} aria-current="page"{% endif %}>属性</a>
+      {% if draw_on %}<a href="{{ url_for('char_page', view='draw') }}"{% if view == 'draw' %} aria-current="page"{% endif %}>抽卡</a>{% endif %}
+    </nav>
+    {% for m in get_flashed_messages() %}<div class="ch-flash">{{ m }}</div>{% endfor %}
+    {% if view == 'draw' %}{% include '_phone_draw.html' %}
+    {% elif view == 'bag' %}
+      {% if rpg.currencies %}<div class="ch-cur">{% for c in rpg.currencies %}<div><b>{{ c.count }}</b><span>{{ c.name }}</span></div>{% endfor %}</div>{% endif %}
+      {% if rpg['items'] %}
+      <h3 class="ch-h">物品（{{ rpg['items']|length }}）</h3>
+      <div class="ch-list">{% for it in rpg['items'] %}
+        <div class="ch-item"><div class="top"><span class="nm">{{ it.name }}</span><span class="ct">×{{ it.count }}</span></div>
+          {% if it.desc %}<div class="ds">{{ it.desc }}</div>{% endif %}
+          {% if it.effect or it.uses is not none %}<div class="ef">{% if it.effect %}{{ it.effect }}{% endif %}{% if it.uses is not none %}{% if it.effect %} · {% endif %}剩余 {{ it.uses }} 次{% endif %}</div>{% endif %}
+        </div>{% endfor %}</div>
+      {% else %}<div class="gm-empty ch-empty">背包里还没有道具和物品</div>{% endif %}
+    {% else %}
+      {% if rpg.attrs %}
+      <div class="ch-list">{% for a in rpg.attrs %}
+        <div class="ch-item"><div class="top"><span class="nm">{{ a.name }}</span><span class="ct">{{ a.value }}{% if a.max is not none %} / {{ a.max }}{% endif %}</span></div>
+          {% if a.max is not none %}{% set lo = a.min if a.min is not none else 0 %}{% set span = (a.max - lo) or 1 %}<div class="ch-bar"><i style="width: {{ [0, [100, ((a.value - lo) * 100 / span)]|min]|max|round|int }}%"></i></div>{% endif %}
+          {% if a.desc %}<div class="ds">{{ a.desc }}</div>{% endif %}
+        </div>{% endfor %}</div>
+      {% else %}<div class="gm-empty ch-empty">还没有注册任何属性</div>{% endif %}
+    {% endif %}
+  </div>
+{% endblock %}

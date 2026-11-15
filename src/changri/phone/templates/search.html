@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block title %}搜索与收藏 · {{ brand }}{% endblock %}
+{% block body %}
+  {% include '_form_css.html' %}
+  <header class="bar"><a class="back" href="{{ url_for('discover') }}">发现</a><div class="title">搜索与收藏</div></header>
+  <div class="scroll list">
+    <form class="inline" method="get" action="{{ url_for('search_page') }}" style="padding:12px 20px">
+      <input name="q" value="{{ q }}" maxlength="30" placeholder="搜联系人、短信、功能…" aria-label="搜索" autocomplete="off"><button class="send" type="submit">搜索</button>
+    </form>
+    {% if q %}
+      {% for g in groups %}
+      <div class="disc-label">{{ g.label }}</div>
+      {% for it in g['items'] %}
+      <a class="row" href="{{ it.url }}"><div class="body"><div class="top"><span class="name">{{ it.title }}</span></div>
+        <div class="preview">{% if it.pre is defined %}{{ it.pre }}<mark>{{ it.hit }}</mark>{{ it.post }} · {% endif %}{{ it.sub }}</div></div></a>
+      {% endfor %}
+      {% else %}<div class="empty">没有找到「{{ q }}」。</div>{% endfor %}
+    {% else %}
+      <div class="disc-label">我的收藏</div>
+      {% for f in favs %}
+      <div style="padding:12px 20px;border-bottom:1px solid var(--line)">
+        <div style="color:var(--mute);font-size:13px">{{ f.who }} · 与 {{ f.with }} · {{ f.time }}</div>
+        <div style="margin:4px 0;white-space:pre-wrap">{{ f.text }}</div>
+        <div style="display:flex;gap:16px;font-size:14px"><a href="{{ f.url }}">去对话</a>
+          <form method="post" action="{{ url_for('fav_toggle') }}"><input type="hidden" name="_csrf" value="{{ csrf() }}"><input type="hidden" name="id" value="{{ f.id }}"><button class="linkbtn" type="submit">取消收藏</button></form></div>
+      </div>
+      {% else %}<div class="empty">还没有收藏。在对话里点消息旁边的 ☆ 就能收藏。</div>{% endfor %}
+    {% endif %}
+  </div>
+{% endblock %}

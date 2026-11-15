@@ -1,0 +1,9 @@
+<nav class="tabs" aria-label="官约、收集与复盘">
+  <a class="tab{{ ' on' if request.endpoint == 'official_page' }}" href="{{ url_for('official_page') }}">官约</a>
+  <a class="tab{{ ' on' if request.endpoint == 'collect_page' }}" href="{{ url_for('collect_page') }}">收集</a>
+  <a class="tab{{ ' on' if request.endpoint in ('reviews_page', 'review_day', 'review_view') }}" href="{{ url_for('reviews_page') }}">弧长与复盘</a>
+</nav>
+<style>
+.ui .tab{display:inline-flex;align-items:center;min-height:38px;padding:0 18px;border:1px solid var(--card-line);border-radius:999px;background:var(--surface);color:var(--ink);text-decoration:none;font-size:14.5px}
+.ui .tab.on{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+</style>

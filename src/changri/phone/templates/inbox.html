@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% block title %}{{ skin.words.messages }} · {{ brand }}{% endblock %}
+{% block body %}
+  <header class="bar tab-bar">
+    <div class="tab-head"><h1>{{ skin.words.messages }}</h1></div>
+    <div class="tab-sub keep">{% include '_quota.html' %}</div>
+  </header>
+  <div class="scroll list" id="inbox">
+    <div class="find-row">
+      <label class="search-pill" for="phoneSearch"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg><input id="phoneSearch" type="search" placeholder="搜索联系人、消息" autocomplete="off" enterkeyhint="search" maxlength="40" aria-label="搜索"></label>
+    </div>
+    {% include '_flash.html' %}
+    <a class="row public-row" data-find="{{ skin.words.public }} {{ pub_last }}" href="{{ url_for('public_page') }}">
+      <div class="avatar public-avatar" aria-hidden="true">📢</div>
+      <div class="body">
+        <div class="top"><span class="name">{{ skin.words.public }}</span></div>
+        <div class="preview">{{ pub_last or '机器人在公告群发的内容会留在这里' }}</div>
+      </div>
+    </a>
+    {% if ball %}<a class="row{% if ball.unread %} unread{% endif %}" data-find="匿名舞会 {{ ball.preview }}" href="{{ url_for('masq_page') }}">
+      <div class="avatar public-avatar" aria-hidden="true">🎭</div>
+      <div class="body">
+        <div class="top"><span class="name">匿名舞会<small style="margin-left:6px;font-size:11px;font-weight:400;color:var(--muted)">群 · {{ ball.n }}人</small></span><span class="time">{{ ball.time }}</span></div>
+        <div class="preview">{{ ball.preview }}</div>
+      </div>
+    </a>{% endif %}
+    {% for t in threads %}
+    <a class="row" data-find="{{ disp(t.name) }} {{ t.name }} {{ t.preview }}" href="{{ url_for('thread', other=t.id) }}">
+      <div class="avatar" data-name="{{ t.name }}">{{ t.name[:1] }}</div>
+      <div class="body">
+        <div class="top"><span class="name">{{ disp(t.name) }}</span><span class="time">{{ t.time }}</span></div>
+        <div class="preview">{{ t.preview }}</div>
+      </div>
+    </a>
+    {% else %}
+    <div class="empty">{{ skin.words.empty }}<br>也可以点下方「{{ skin.words.new }}」开始对话。</div>
+    {% endfor %}
+  </div>
+  <script>
+    (function () {
+      var q = document.getElementById('phoneSearch');
+      q.addEventListener('input', function () {
+        var v = q.value.trim().toLowerCase();
+        document.querySelectorAll('#inbox .row[data-find]').forEach(function (r) { r.hidden = v && r.dataset.find.toLowerCase().indexOf(v) < 0; });
+      });
+    })();
+  </script>
+{% endblock %}

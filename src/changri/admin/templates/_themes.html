@@ -1,0 +1,129 @@
+{#- 后台外观主题。base.html 和 auth.html 都在 <style> 里引用 theme_css()，<body> 末尾引用 theme_js()。
+    主题只重新定义颜色变量（各页面都用变量，不用改），外加侧栏背景 --rail-bg、侧栏选中色 --rail-accent、页底纹理 --page-bg。
+    选了主题就固定用这一套，不再跟着系统深色模式变；「默认」照旧跟随系统。对比度：正文/次要文字/强调色 ≥4.5:1，输入框边线 ≥3:1。 -#}
+{% macro theme_css() %}
+/* ---------- 睡莲：莫奈《睡莲》——明亮的蓝紫色池水，倒映着天光；花和叶只在边角轻轻晕开 ---------- */
+/* 侧栏是浅色的蓝紫，和页面柔和地连在一起；字用深色，晕染都放在没有文字的边角，不压字。 */
+:root[data-theme="lily"]{
+  --paper:#eef0f7; --surface:#fafbfe; --ink:#1f2238; --mute:#4f536f; --line:#d8dbec; --soft:#e4e6f3;
+  --field:#7f84a3; --card-line:#dcdfee; --shadow-sm:0 1px 3px 0 rgb(50 50 110 / .07),0 1px 2px -1px rgb(50 50 110 / .07);
+  --night:#dfe1f3; --night-ink:#242844; --night-mute:#4a4f72; --night-line:#c9cde6;
+  --dusk:#5b4c9e; --dusk-ink:#fff; --ok:#2b6e57; --warn:#88591a; --bad:#b0343a;
+  --rail-accent:#5b4c9e; --rail-hover:rgb(70 70 140 / .06); --rail-active:rgb(70 70 140 / .10);
+  --rail-bg:
+    radial-gradient(80% 10% at 100% 0%, rgb(236 206 222 / .60), transparent 100%),
+    radial-gradient(70% 8% at 0% 100%, rgb(186 210 196 / .55), transparent 100%),
+    radial-gradient(16% 2.4% at 86% 97%, rgb(236 184 204 / .55), transparent 100%),
+    linear-gradient(180deg, #e9e6f3 0%, #dfe1f3 50%, #d3d9f0 100%);
+  --page-bg:
+    radial-gradient(45% 30% at 100% 0%, rgb(222 214 242 / .45), transparent 70%),
+    radial-gradient(40% 26% at 35% 100%, rgb(206 222 236 / .40), transparent 70%),
+    var(--paper);
+}
+/* ---------- 芭蕾：德加的粉彩舞者——粉蜡笔纸、舞裙的珊瑚粉、后台的炭灰与舞台脚灯 ---------- */
+:root[data-theme="ballet"]{
+  --paper:#f6ece8; --surface:#fffaf8; --ink:#2b2228; --mute:#6a5862; --line:#ead8d2; --soft:#f1e1dc;
+  --field:#957f86; --card-line:#ecdcd6; --shadow-sm:0 1px 3px 0 rgb(73 44 52 / .08),0 1px 2px -1px rgb(73 44 52 / .08);
+  --night:#2b2630; --night-ink:#f2e9ea; --night-mute:#b9a8ae; --night-line:#463c48;
+  --dusk:#a8445a; --dusk-ink:#fff; --ok:#2f6e5c; --warn:#8f5a17; --bad:#b02f3a;
+  --rail-accent:#eba7b4;
+  --rail-bg:
+    radial-gradient(130% 24% at 50% 106%, rgb(250 196 140 / .62), transparent 70%),
+    linear-gradient(to top, rgb(236 172 112 / .26), transparent 30%),
+    radial-gradient(34% 9% at 74% 30%, rgb(236 168 184 / .30), transparent 100%),
+    radial-gradient(26% 7% at 62% 33%, rgb(246 196 176 / .22), transparent 100%),
+    radial-gradient(30% 8% at 22% 52%, rgb(160 186 206 / .20), transparent 100%),
+    radial-gradient(22% 6% at 34% 56%, rgb(232 160 178 / .22), transparent 100%),
+    radial-gradient(28% 7% at 80% 68%, rgb(240 188 196 / .16), transparent 100%),
+    #2b2630;
+  --page-bg:
+    radial-gradient(50% 32% at 100% 0%, rgb(240 196 204 / .40), transparent 70%),
+    radial-gradient(42% 28% at 0% 100%, rgb(196 212 226 / .30), transparent 70%),
+    var(--paper);
+}
+/* 手机上的弹出菜单是宽的：舞裙晕染会跑到文字底下，只留脚灯 */
+@media (max-width:860px){
+  :root[data-theme="ballet"] .msheet{background:
+    radial-gradient(130% 30% at 50% 108%, rgb(250 196 140 / .55), transparent 70%),
+    #2b2630}
+}
+/* ---------- 圣诞：冷杉、蔓越莓、一点金色；页面上会飘雪 ---------- */
+:root[data-theme="xmas"]{
+  --paper:#f1f5f3; --surface:#fbfdfc; --ink:#182520; --mute:#4b5c55; --line:#d3dfd9; --soft:#e2ece7;
+  --field:#7a8c84; --card-line:#d9e4de; --shadow-sm:0 1px 3px 0 rgb(21 48 31 / .08),0 1px 2px -1px rgb(21 48 31 / .08);
+  --night:#15301f; --night-ink:#eef3ef; --night-mute:#a9bfb1; --night-line:#2a4a35;
+  --dusk:#a8233a; --dusk-ink:#fff; --ok:#23704a; --warn:#8a6110; --bad:#b3361e;
+  --rail-accent:#d9b44a;
+  --rail-bg:
+    radial-gradient(90% 18% at 50% 0%, rgb(217 180 74 / .14), transparent 70%),
+    linear-gradient(180deg, #1a3826 0%, #15301f 55%, #10261a 100%);
+  --page-bg:
+    radial-gradient(60% 40% at 50% -10%, rgb(168 35 58 / .06), transparent 70%),
+    var(--paper);
+}
+/* 选主题的小圆点 */
+.themes{margin:18px 8px 0;display:flex;align-items:center;gap:10px;font-size:13px;color:var(--night-mute)}
+.themes form{display:flex;gap:8px;margin:0}
+.themes button{width:22px;height:22px;border-radius:50%;padding:0;cursor:pointer;border:2px solid var(--night-line);background:var(--sw);
+  transition:transform .12s ease}
+.themes button:hover{transform:scale(1.12)}
+.themes button[aria-pressed="true"]{border-color:var(--night-ink)}
+@media (prefers-reduced-motion: reduce){.themes button{transition:none}.themes button:hover{transform:none}}
+#snow{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:60}
+{% endmacro %}
+
+{% macro theme_picker(current) %}
+{%- set opts = [("", "默认", "conic-gradient(#1d1f33 0 50%, #c43a63 0)"),
+                ("lily", "睡莲", "conic-gradient(#d3d9f0 0 33%, #5b4c9e 0 66%, #e2a9bc 0)"),
+                ("ballet", "芭蕾", "conic-gradient(#2b2630 0 33%, #f4ba84 0 66%, #e8a4b4 0)"),
+                ("xmas", "圣诞", "conic-gradient(#15301f 0 33%, #a8233a 0 66%, #d9b44a 0)")] -%}
+<div class="themes"><span id="themes-label">外观</span>
+  <form method="post" action="{{ url_for('theme_set') }}" aria-labelledby="themes-label">{{ csrf() }}
+    {%- for key, name, sw in opts %}
+    <button type="submit" name="theme" value="{{ key }}" style="--sw:{{ sw }}" title="{{ name }}" aria-label="{{ name }}" aria-pressed="{{ 'true' if current == key else 'false' }}"></button>
+    {%- endfor %}
+  </form>
+</div>
+{% endmacro %}
+
+{% macro theme_js(current) %}
+{%- if current == "xmas" %}
+<canvas id="snow" aria-hidden="true"></canvas>
+<script>
+/* 圣诞主题的飘雪：稀疏、慢、半透明，不挡点击；系统设了「减少动态效果」就不飘；标签页切走时暂停。 */
+(function(){
+  if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  var cv = document.getElementById('snow'); if (!cv || !cv.getContext) return;
+  var cx = cv.getContext('2d'), flakes = [], w = 0, h = 0, dpr = 1, run = true, t = 0;
+  function size(){
+    dpr = Math.min(window.devicePixelRatio || 1, 2); w = innerWidth; h = innerHeight;
+    cv.width = w * dpr; cv.height = h * dpr; cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var want = Math.min(90, Math.round(w * h / 20000));
+    while (flakes.length < want) flakes.push(make(Math.random() * h));
+    flakes.length = want;
+  }
+  function make(y){
+    var r = 1 + Math.random() * 2.4;
+    return {x: Math.random() * w, y: y, r: r, vy: .25 + r * .22, ph: Math.random() * 6.28, sway: .3 + Math.random() * .6, a: .45 + Math.random() * .4};
+  }
+  function draw(){
+    if (!run) return;
+    t += 1; cx.clearRect(0, 0, w, h);
+    for (var i = 0; i < flakes.length; i++){
+      var f = flakes[i];
+      f.y += f.vy; f.x += Math.sin(t / 90 + f.ph) * f.sway * .5;
+      if (f.y > h + 4) { flakes[i] = make(-4); continue; }
+      var g = cx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.r);
+      g.addColorStop(0, 'rgba(255,255,255,' + f.a + ')');
+      g.addColorStop(1, 'rgba(150,175,190,' + (f.a * .55) + ')');      /* 边缘带一点灰蓝：浅色页底上也看得见 */
+      cx.fillStyle = g; cx.beginPath(); cx.arc(f.x, f.y, f.r, 0, 6.2832); cx.fill();
+    }
+    requestAnimationFrame(draw);
+  }
+  document.addEventListener('visibilitychange', function(){ var was = run; run = !document.hidden; if (run && !was) requestAnimationFrame(draw); });
+  addEventListener('resize', size);
+  size(); requestAnimationFrame(draw);
+})();
+</script>
+{%- endif %}
+{% endmacro %}

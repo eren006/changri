@@ -3,8 +3,8 @@
 venv/
 runtime/
 __pycache__/
-data/*.db*
-data/.secret_key
+data/
 release_out/
 extensions/
 tests/_ext_*/
+src/*.egg-info/

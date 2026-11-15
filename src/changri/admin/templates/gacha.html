@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}抽取池{% endblock %}
+{% block body %}
+{% import "_rpg_icons.html" as ic %}
+{% macro cancel() %}<button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button>{% endmacro %}
+<h1>抽取池</h1>
+<p class="lede">池子里放物品库里的物品（先到「物品与商城」建好），每件有数量、权重（越大越容易抽到）、是否稀有。池子可以设「N 抽保底」：连续 N-1 次没出稀有，第 N 次一定从稀有里出。玩家发「抽取」消耗抽取次数，次数在下面「发放」，也会显示在角色卡上。群里管理员也能「发放抽取 角色名 次数」。</p>
+
+<section>
+  <div class="sec-head keep"><h2>池子<span class="n">{{ pools|length }} 个</span></h2>
+    <span class="btns"><details class="panel"><summary class="btn">{{ ic.plus() }}新建池子</summary>
+      <form class="form" method="post" action="{{ url_for('gacha_pool_save') }}">{{ csrf() }}
+        <div class="fields">
+          <div><label for="pn">池子名</label><input id="pn" name="name" maxlength="20" required></div>
+          <div><label for="pt">说明（可空）</label><input id="pt" name="note" maxlength="200"></div>
+          <div><label for="pp">保底：几抽必出稀有（0 = 没有）</label><input id="pp" name="pity_n" type="number" min="0" value="0"></div>
+        </div>
+        <div class="actions"><button class="btn" type="submit">创建</button>{{ cancel() }}</div></form></details>
+      <details class="panel"><summary class="btn ghost">发放抽取次数</summary>
+        <form class="form" method="post" action="{{ url_for('gacha_grant') }}">{{ csrf() }}
+          <div class="fields">
+            <div><label for="gr">发给</label><select id="gr" name="role"><option value="all">所有玩家（NPC 除外）</option>{% for p in people %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select></div>
+            <div><label for="gp">哪个池子</label><select id="gp" name="pool_id">{% for p in pools %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select></div>
+            <div><label for="gn">次数（负数 = 扣）</label><input id="gn" name="n" type="number" value="1"></div>
+          </div>
+          <div class="actions"><button class="btn" type="submit">发放</button>{{ cancel() }}</div></form></details>
+    </span></div>
+  {% for p in pools %}
+  {% set total = p.prizes|sum(attribute='weight') %}
+  <details class="panel" open style="margin-bottom:14px">
+    <summary><b>{{ p.id }}. {{ p.name }}</b>{% if not p.enabled %} <span class="chip">已停用</span>{% endif %} <span class="tag">{{ p.prizes|length }} 种奖品{% if p.pity_n %} · {{ p.pity_n }} 抽保底{% endif %}</span></summary>
+    {% if p.prizes %}<div class="rowlist">{% for z in p.prizes %}
+      <div class="row"><div class="nm"><b>{{ '✨ ' if z.rare }}{{ z.name }} ×{{ z.n }}</b><div class="muted">权重 {{ z.weight }} · 约 {{ '%.1f'|format(z.weight * 100 / total) }}%{% if z.rare %} · 稀有{% endif %}</div></div>
+        <div class="acts"><form method="post" action="{{ url_for('gacha_prize_delete', prize_id=z.id) }}">{{ csrf() }}<button class="linkbtn">移除</button></form></div></div>{% endfor %}</div>
+    {% else %}<p class="empty">还没有奖品。</p>{% endif %}
+    <form class="form" method="post" action="{{ url_for('gacha_prize_add') }}">{{ csrf() }}<input type="hidden" name="pool_id" value="{{ p.id }}">
+      <div class="fields">
+        <div><label for="pi{{ p.id }}">奖品</label><select id="pi{{ p.id }}" name="item">{% for x in items %}<option value="{{ x.code }}">{{ x.name }}</option>{% endfor %}</select></div>
+        <div><label for="pz{{ p.id }}">数量</label><input id="pz{{ p.id }}" name="n" type="number" min="1" value="1"></div>
+        <div><label for="pw{{ p.id }}">权重</label><input id="pw{{ p.id }}" name="weight" type="number" min="1" value="10"></div>
+        <div><label><input type="checkbox" name="rare" value="1"> 稀有（保底从这些里出）</label></div>
+      </div>
+      <div class="actions"><button class="btn" type="submit">加入奖品</button></div></form>
+    <form class="form" method="post" action="{{ url_for('gacha_pool_save') }}">{{ csrf() }}<input type="hidden" name="pool_id" value="{{ p.id }}">
+      <div class="fields">
+        <div><label for="en{{ p.id }}">池子名</label><input id="en{{ p.id }}" name="name" maxlength="20" value="{{ p.name }}" required></div>
+        <div><label for="et{{ p.id }}">说明</label><input id="et{{ p.id }}" name="note" maxlength="200" value="{{ p.note }}"></div>
+        <div><label for="ep{{ p.id }}">保底（0 = 没有）</label><input id="ep{{ p.id }}" name="pity_n" type="number" min="0" value="{{ p.pity_n }}"></div>
+        <div><label for="ee{{ p.id }}">状态</label><select id="ee{{ p.id }}" name="enabled"><option value="1" {{ 'selected' if p.enabled }}>开放</option><option value="0" {{ 'selected' if not p.enabled }}>停用</option></select></div>
+      </div>
+      <div class="actions"><button class="btn ghost" type="submit">保存池子设置</button></div></form>
+    <form method="post" action="{{ url_for('gacha_pool_delete', pool_id=p.id) }}" onsubmit="return confirm('删除这个池子？玩家在里面的次数和保底进度也会清掉。')">{{ csrf() }}<button class="btn ghost danger" type="submit">删除池子</button></form>
+  </details>
+  {% else %}<p class="empty">还没有池子。点「新建池子」。</p>{% endfor %}
+</section>
+
+{% if log %}
+<section>
+  <div class="sec-head keep"><h2>最近抽取<span class="n">{{ log|length }} 条</span></h2></div>
+  <div class="rowlist">{% for l in log %}<div class="row"><div class="nm"><b>{{ l.role_name }}</b> 在「{{ l.pool_name }}」抽到 {{ l.item_name }}×{{ l.n }}{% if l.pity %}（保底）{% endif %}<div class="muted">{{ l.ts|ts }}</div></div></div>{% endfor %}</div>
+</section>
+{% endif %}
+{% endblock %}

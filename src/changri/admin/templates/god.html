@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block title %}上帝模式{% endblock %}
+{% block body %}
+{% macro tabs_nav() %}
+<nav class="tabs godtabs" aria-label="分类">
+  {% for k, label, n in [('perm','功能', perms|length), ('bag','背包', 0), ('time','时间', (locks|length)), ('count','次数', 0), ('rel','关系线', rels|length)] %}
+  <a href="{{ url_for('god_page', role=role.id, tab=k) }}" {% if tab == k %}aria-current="page"{% endif %}>{{ label }}{% if n %}<span class="n">{{ n }}</span>{% endif %}</a>
+  {% endfor %}
+</nav>
+{% endmacro %}
+
+{% if everyone %}
+<p class="back"><a href="{{ url_for('god_page') }}">← 所有角色</a></p>
+<h1>全体</h1>
+<p class="lede">对<b>所有人</b>一起生效。比如临时关掉所有人的短信，或者把某个时段对所有人封住。个人的设置在各自的页面里，两边只要有一边关着就用不了。</p>
+<section>
+  <div class="sec-head keep"><h2>功能开关</h2></div>
+  <p class="note" style="margin-top:0">取消勾选 = 所有人都用不了这个功能。点一下立刻生效。</p>
+  <form method="post" action="{{ url_for('god_all_perm') }}" class="swgrid">{{ csrf() }}
+    {% for k, label in god.FEATURES.items() %}
+    <label class="check"><span class="sw"><input type="checkbox" name="on" value="{{ k }}" {{ 'checked' if k not in g_off }} onchange="this.form.submit()"><i></i></span>{{ label }}</label>
+    {% endfor %}
+  </form>
+</section>
+<section>
+  <div class="sec-head keep"><h2>封禁时间<span class="n">{{ g_locks|length }}</span></h2>
+    <span class="btns"><details class="panel"><summary class="btn">封一段时间</summary>
+      <form class="form" method="post" action="{{ url_for('god_all_lock') }}">{{ csrf() }}
+        <div class="fields">
+          <div><label for="gd">第几天（不填 = 每天）</label><input id="gd" type="number" min="0" name="day"></div>
+          <div><label for="gt">时间</label><input id="gt" type="text" name="time" placeholder="1400-1500" required></div>
+          <div class="wide"><label for="gn">备注（可不写）</label><input id="gn" type="text" name="note"></div>
+        </div>
+        <p class="note">这段时间，所有人都不能约，也不能被约。</p>
+        <div class="actions"><button class="btn" type="submit">封禁</button><button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
+      </form></details></span></div>
+  <div class="rowlist">{% for l in g_locks %}
+    <div class="row"><div class="nm"><b class="tabular">{{ ('D' ~ l.day) if l.day is not none else '每天' }} {{ l.start_hm }}–{{ l.end_hm }}</b>{% if l.note %}<div class="muted">{{ l.note }}</div>{% endif %}</div>
+      <form method="post" action="{{ url_for('god_all_unlock', lock_id=l.id) }}">{{ csrf() }}<button class="linkbtn">解封</button></form></div>
+  {% else %}<p class="empty">没有封禁。</p>{% endfor %}</div>
+</section>
+
+{% elif not role %}
+<h1>上帝模式</h1>
+<p class="lede">管理员对玩家和 NPC 的干预都在这里。点一个人，进去就只看 TA 的设置：功能开关、时间、今天的次数、关系线。</p>
+<div class="godfind"><input type="search" id="find" placeholder="找角色…" autocomplete="off" aria-label="找角色"></div>
+<div class="godgrid" id="grid">
+  <a class="gp all" href="{{ url_for('god_page', role='all') }}" data-n="全体"><span class="av">全</span><span class="nm">全体（所有人）</span>{% if any_global %}<span class="dot bad" title="有全体设置生效中"></span>{% endif %}</a>
+  {% for p in people %}
+  <a class="gp" href="{{ url_for('god_page', role=p.id) }}" data-n="{{ p.name }}"><span class="av">{{ p.name[:1] }}</span><span class="nm">{{ p.name }}</span>
+    {% if p.closed %}<span class="dot bad" title="有功能被关"></span>{% endif %}{% if p.locked %}<span class="dot warn" title="有锁定的时间"></span>{% endif %}</a>
+  {% else %}<p class="empty">还没有角色。</p>{% endfor %}
+</div>
+<p class="note">这里的操作都不会通知玩家。</p>
+<script>
+document.getElementById('find').addEventListener('input', function () {
+  var q = this.value.trim();
+  document.querySelectorAll('#grid .gp').forEach(function (a) { a.hidden = q && a.dataset.n.indexOf(q) < 0; });
+});
+</script>
+
+{% else %}
+<p class="back"><a href="{{ url_for('god_page') }}">← 所有角色</a></p>
+<div class="godhead">
+  <span class="av big">{{ role.name[:1] }}</span>
+  <div><h1>{{ role.name }}</h1>
+    <p class="muted">{% if perms %}{{ perms|length }} 项功能被关　{% endif %}{% if locks %}{{ locks|length }} 段时间被锁　{% endif %}{% if not perms and not locks %}没有被干预{% endif %}</p></div>
+  <form method="get" class="swap"><input type="hidden" name="tab" value="{{ tab }}"><select name="role" onchange="this.form.submit()" aria-label="换一个人">{% for p in people %}<option value="{{ p.id }}" {{ 'selected' if p.id == role.id }}>{{ p.name }}</option>{% endfor %}</select></form>
+</div>
+{{ tabs_nav() }}
+
+{% if tab == 'perm' %}
+<p class="note" style="margin-top:0">关着的功能，这个人就用不了。私约、电话、微信关了，既不能发起，也不能被别人邀请。点一下立刻生效。标着「全体已关」的，是在「全体」里对所有人关掉了：个人这里开着也用不了，要先在「全体」里打开。</p>
+<form method="post" action="{{ url_for('god_perm', role_id=role.id) }}" class="swgrid">{{ csrf() }}<input type="hidden" name="tab" value="perm">
+  {% for k, label in god.FEATURES.items() %}
+  <label class="check"><span class="sw"><input type="checkbox" name="on" value="{{ k }}" {{ 'checked' if k not in perms }} onchange="this.form.submit()"><i></i></span>{{ label }}{% if god.global_off(k) %}<span class="tag" title="全体关着时，这里开着也用不了">全体已关</span>{% endif %}</label>
+  {% endfor %}
+</form>
+
+{% elif tab == 'bag' %}
+<section>
+  <div class="sec-head keep"><h2>属性<span class="n">{{ my_attrs|length }}</span></h2></div>
+  <div class="rowlist">{% for a in my_attrs %}
+    <div class="row"><div class="nm"><b>{{ a.name }}</b> <span class="tabular">{{ a.value }}</span></div>
+      <form method="post" action="{{ url_for('god_attr', role_id=role.id) }}" class="mini">{{ csrf() }}<input type="hidden" name="tab" value="bag"><input type="hidden" name="name" value="{{ a.name }}">
+        <input type="number" name="value" aria-label="数值" required><button class="btn sm ghost" name="act" value="add">加减</button><button class="btn sm ghost" name="act" value="set">设为</button></form></div>
+  {% else %}<p class="empty">还没有属性。</p>{% endfor %}</div>
+  {% if attr_defs %}
+  <form method="post" action="{{ url_for('god_attr', role_id=role.id) }}" class="mini addrow">{{ csrf() }}<input type="hidden" name="tab" value="bag">
+    <select name="name" aria-label="属性">{% for d in attr_defs %}<option>{{ d.name }}</option>{% endfor %}</select>
+    <input type="number" name="value" aria-label="数值" placeholder="数值" required><button class="btn sm" name="act" value="add">加减</button><button class="btn sm ghost" name="act" value="set">设为</button></form>
+  <p class="note">加减：正数加、负数扣（比如 -5）。设为：直接改成这个数。超出属性上下限会自动截到边界。</p>
+  {% endif %}
+</section>
+<section>
+  <div class="sec-head keep"><h2>背包<span class="n">{{ bag|length }}</span></h2></div>
+  <div class="rowlist">{% for b in bag %}
+    <div class="row"><div class="nm"><b>{{ b.name }}</b> <span class="kind tabular">×{{ b.count }}</span>
+      <div class="muted">{{ {'currency': '货币', 'item': '物品'}.get(b.kind, b.kind) }}{% if b.max_uses and b.max_uses > 0 %} · 剩 {{ b.remaining_uses }}/{{ b.max_uses }} 次{% endif %}</div></div>
+      <form method="post" action="{{ url_for('god_item', role_id=role.id) }}" class="mini">{{ csrf() }}<input type="hidden" name="tab" value="bag"><input type="hidden" name="item" value="{{ b.item_code }}">
+        <input type="number" min="1" name="n" value="1" aria-label="数量" required><button class="btn sm ghost" name="act" value="take" onclick="return confirm('扣除 {{ b.name }}？')">扣除</button></form></div>
+  {% else %}<p class="empty">背包是空的。</p>{% endfor %}</div>
+  <h3 class="sub">发放 / 扣除</h3>
+  <form method="post" action="{{ url_for('god_item', role_id=role.id) }}" class="mini addrow">{{ csrf() }}<input type="hidden" name="tab" value="bag">
+    <select name="item" aria-label="物品或货币" required><option value="">（选物品或货币）</option>{% for i in all_items %}<option value="{{ i.code }}">{{ i.name }}{{ '（货币）' if i.kind == 'currency' }}</option>{% endfor %}</select>
+    <input type="number" min="1" name="n" value="1" aria-label="数量" required><button class="btn sm" name="act" value="give">发放</button><button class="btn sm ghost" name="act" value="take">扣除</button></form>
+  <p class="note">金币等货币和道具都在这里。操作不会通知玩家。</p>
+</section>
+
+{% elif tab == 'time' %}
+<section>
+  <div class="sec-head keep"><h2>已有的安排<span class="n">{{ timeline|length }}</span></h2></div>
+  <div class="rowlist">{% for r in timeline %}
+    <div class="row"><div class="nm"><b class="tabular">D{{ r.day }} {{ r.start_hm }}–{{ r.end_hm }}</b>
+      <div class="muted">{{ r.kind }}{{ ' · ' ~ r.place if r.place }} · R{{ r.id }}{{ ' · 已结束' if r.status == 'ended' }}</div></div>
+      <div class="acts"><form method="post" action="{{ url_for('god_slot_delete', role_id=role.id, room_id=r.id) }}" onsubmit="return confirm('删除这个时段？这场房间里所有人的时间线和复盘记录都会一起删掉，不能撤销。')">{{ csrf() }}<input type="hidden" name="tab" value="time"><button class="linkbtn">删除</button></form></div></div>
+  {% else %}<p class="empty">还没有约会安排。</p>{% endfor %}</div>
+</section>
+<section>
+  <div class="sec-head keep"><h2>锁定的时间<span class="n">{{ locks|length }}</span></h2>
+    <span class="btns"><details class="panel"><summary class="btn">锁定一段时间</summary>
+      <form class="form" method="post" action="{{ url_for('god_lock', role_id=role.id) }}">{{ csrf() }}<input type="hidden" name="tab" value="time">
+        <div class="fields">
+          <div><label for="ld">第几天（不填 = 每天）</label><input id="ld" type="number" min="0" name="day"></div>
+          <div><label for="lt">时间</label><input id="lt" type="text" name="time" placeholder="1400-1500" required></div>
+          <div class="wide"><label for="ln">备注（可不写）</label><input id="ln" type="text" name="note"></div>
+        </div>
+        <p class="note">锁住的时间，{{ role.name }} 不能约，别人也不能约 TA。</p>
+        <div class="actions"><button class="btn" type="submit">锁定</button><button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
+      </form></details></span></div>
+  <div class="rowlist">{% for l in locks %}
+    <div class="row"><div class="nm"><b class="tabular">{{ ('D' ~ l.day) if l.day is not none else '每天' }} {{ l.start_hm }}–{{ l.end_hm }}</b>{% if l.note %}<div class="muted">{{ l.note }}</div>{% endif %}</div>
+      <form method="post" action="{{ url_for('god_unlock', role_id=role.id, lock_id=l.id) }}">{{ csrf() }}<input type="hidden" name="tab" value="time"><button class="linkbtn">解锁</button></form></div>
+  {% else %}<p class="empty">没有锁定。</p>{% endfor %}</div>
+</section>
+
+{% elif tab == 'count' %}
+<p class="note" style="margin-top:0">今天已经用掉的次数。玩家用完了、你想多给几次，就清零（只影响今天，明天照旧）。</p>
+<div class="stats">
+  {% for k, label in god.RESET_KINDS.items() %}
+  <form method="post" action="{{ url_for('god_reset', role_id=role.id) }}" class="stat">{{ csrf() }}<input type="hidden" name="tab" value="count"><input type="hidden" name="kind" value="{{ k }}">
+    <b>{{ counts[k] }}</b><span>{{ label }}</span>{% if counts[k] %}<button class="linkbtn" type="submit">清零</button>{% endif %}</form>
+  {% endfor %}
+</div>
+
+{% elif tab == 'rel' %}
+<section>
+  <div class="sec-head keep"><h2>关系线<span class="n">{{ rels|length }}</span></h2>
+</div>
+  <div class="rowlist">{% for r in rels %}
+    <div class="row"><div class="nm"><b>{{ r.other_name }}</b>
+      <div class="muted">{{ r.count }} 段 · {{ r.chars }} 字 · {{ '已确认' if r.confirmed else '未确认' }} · {{ '本人发起' if r.mine else 'TA 发起' }}</div></div>
+      <form method="post" action="{{ url_for('god_rel_delete', role_id=role.id, other_id=r.other_id) }}" onsubmit="return confirm('删除和 {{ r.other_name }} 的关系线？不能撤销。')">{{ csrf() }}<input type="hidden" name="tab" value="rel"><button class="linkbtn">删除</button></form></div>
+  {% else %}<p class="empty">没有关系线。</p>{% endfor %}</div>
+  {% if rels|length > 1 %}<form method="post" action="{{ url_for('god_rel_clear', role_id=role.id) }}" onsubmit="return confirm('清空 {{ role.name }} 的全部 {{ rels|length }} 条关系线？不能撤销。')">{{ csrf() }}<input type="hidden" name="tab" value="rel"><button class="linkbtn">清空全部</button></form>{% endif %}
+</section>
+{% endif %}
+{% endif %}
+
+<style>
+.ui .godfind{margin:0 0 18px;max-width:360px}
+.ui .godgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:12px;margin:0 0 20px}
+.ui .gp{display:flex;align-items:center;gap:12px;padding:12px 14px;min-height:44px;border:1px solid var(--card-line);background:var(--surface);border-radius:var(--r-card);box-shadow:var(--shadow-sm);text-decoration:none;color:var(--ink)}
+.ui .gp.all{border-color:var(--dusk)}
+.ui .gp:hover{border-color:var(--dusk)}
+.ui .gp[hidden]{display:none}
+.ui .gp .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.ui .av{flex:none;width:34px;height:34px;border-radius:50%;background:var(--soft);display:grid;place-items:center;font:700 15px var(--serif,Georgia,serif);color:var(--dusk)}
+.ui .av.big{width:56px;height:56px;font-size:24px}
+.ui .back{margin:0 0 14px;font-size:14px}
+.ui .godhead{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:0 0 22px}
+.ui .godhead h1{margin:0;font-size:32px}
+.ui .godhead .muted{margin:2px 0 0}
+.ui .godhead .swap{margin-left:auto;min-width:150px}
+.ui .godtabs{gap:4px;border-bottom:1px solid var(--line)}
+.ui .godtabs a{padding:10px 18px;min-height:44px;box-sizing:border-box;text-decoration:none;color:var(--ink);border-bottom:2px solid transparent;margin-bottom:-1px}
+.ui .godtabs a[aria-current="page"]{color:var(--dusk);border-bottom-color:var(--dusk);font-weight:600}
+.ui .godtabs a .n{margin-left:6px;font-size:12px;color:var(--mute)}
+.ui .swgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:2px 18px;max-width:640px}
+.ui .swgrid .check{min-height:48px}
+.ui .stat button{margin-top:6px}
+.ui .mini{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.ui .mini input[type=number]{width:84px;flex:none}
+.ui .mini select{flex:1 1 150px;min-width:0;max-width:260px}
+.ui .addrow{margin:12px 0 0}
+.ui form.stat{display:block}
+</style>
+{% endblock %}

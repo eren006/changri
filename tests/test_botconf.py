@@ -6,15 +6,15 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 _tmp = Path(tempfile.mkdtemp())
 os.environ["CHANGRI_DB_PATH"] = str(_tmp / "b.db")
 os.environ["QQ_BOTS"] = json.dumps([{"id": "111111111", "secret": "oldsecretoldsecret1", "token": ""}])
-import admin as admin_mod  # noqa: E402
+import changri.admin as admin_mod  # noqa: E402
 
 os.environ.pop("ADMIN_PASSWORD", None)
-from core import botconf, webusers  # noqa: E402
-from core.db import get_conn, init_db  # noqa: E402
+from changri.core import botconf, webusers  # noqa: E402
+from changri.core.db import get_conn, init_db  # noqa: E402
 from tests.test_admin import token  # noqa: E402
 
 GOOD = "A" * 32
@@ -111,7 +111,7 @@ class BotPageTests(unittest.TestCase):
         self.assertIsNone(botconf.get_account("222222222"))
 
     def test_update_pages_owner_only(self):
-        from core import updater
+        from changri.core import updater
         c = self.client("boss", "longenough1")
         a = self.client(self.admin_name, self.admin_pw)
         self.assertEqual(a.get("/update").status_code, 403)

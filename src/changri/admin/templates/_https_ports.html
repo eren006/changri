@@ -1,0 +1,21 @@
+{# 80 / 443 被别的程序占着时的提示（HTTPS 页第 3 步）。st 来自 core/httpsproxy.status() #}
+{% set busy80 = st.port80 in ('nginx', 'other') %}
+{% if busy80 and st.port443 != 'other' %}
+<div class="callout"><b>80 端口被{{ 'nginx' if st.port80 == 'nginx' else '别的程序' }}占着，不要紧。</b>证书会改走 443 端口验证，安全组放行 443 就行{% if st.port80 == 'nginx' %}；想更稳的话也可以让 nginx 转发（见下面）{% endif %}。</div>
+{% elif st.blocked %}
+<div class="callout bad"><b>80 和 443 都被{{ 'nginx' if st.port80 == 'nginx' else '别的程序' }}占着。</b>Let's Encrypt 只来这两个端口验证，Caddy 一个都用不上，证书申请不下来。
+  {% if st.port80 == 'nginx' %}照下面的步骤让 nginx 把验证请求转给 Caddy，就能拿到证书，nginx 上原来的网站不受影响。
+  {% else %}要让占着 80 端口的程序把 <code>/.well-known/acme-challenge/</code> 开头的请求转发到 <code>127.0.0.1:{{ st.alt_port }}</code>，或者停掉它。{% endif %}</div>
+{% endif %}
+{% if st.port80 == 'nginx' %}
+<details class="panel" style="margin:0 0 24px"{{ ' open' if st.blocked }}><summary class="btn ghost">让 nginx 转发验证请求</summary>
+  <div class="form">
+    <p>1. 找到 nginx 里<b>监听 80 端口的默认站点</b>（带 <code>default_server</code> 的那个 <code>server { }</code>，{{ '在 nginx 文件夹的 conf\\nginx.conf 里' if st.windows else '常在 /etc/nginx/sites-enabled/default' }}），把下面几行加进去：</p>
+    <div class="cmd"><code id="ngx" class="pre">{{ st.snippet }}</code><button class="btn ghost" type="button" onclick="navigator.clipboard.writeText(document.getElementById('ngx').textContent).then(()=>{this.textContent='已复制'})">复制</button></div>
+    <p class="note">那个 server 里如果直接写了 <code>return 301 …</code>（全部跳到 https），要把它挪进 <code>location / { }</code> 里，不然验证请求也会被跳走。</p>
+    <p style="margin-top:18px">2. 检查并重新加载 nginx：</p>
+    <div class="cmd"><code id="ngr">{{ st.reload_cmd }}</code><button class="btn ghost" type="button" onclick="navigator.clipboard.writeText(document.getElementById('ngr').textContent).then(()=>{this.textContent='已复制'})">复制</button></div>
+    <p class="note">之后 Let's Encrypt 照样来 80 端口，nginx 把这一类请求交给 Caddy（本机 {{ st.alt_port }} 端口），其余请求还是 nginx 自己处理。{% if st.enabled %}改好后不用再点什么，Caddy 会自己重试。{% endif %}</p>
+  </div>
+</details>
+{% endif %}

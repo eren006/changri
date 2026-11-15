@@ -5,13 +5,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 os.environ["QQ_BOTS"] = "[]"
 os.environ["ADMIN_PASSWORD"] = ""
 os.environ["CHANGRI_DB_PATH"] = str(Path(tempfile.mkdtemp()) / "ar.db")
 
-from core import autoreply as A  # noqa: E402
-from core.db import get_conn, init_db  # noqa: E402
+from changri.core import autoreply as A  # noqa: E402
+from changri.core.db import get_conn, init_db  # noqa: E402
 
 
 def rule(**kw):
@@ -85,7 +85,7 @@ class AutoReply(unittest.TestCase):
         c = sqlite3.connect(d)
         c.execute("CREATE TABLE autoreplies (id INTEGER PRIMARY KEY, name TEXT)")
         c.commit(); c.close()
-        from core import db
+        from changri.core import db
         db._migrate(d)
         c = sqlite3.connect(d)
         self.assertIn("send_mode", [r[1] for r in c.execute("PRAGMA table_info(autoreplies)")])
@@ -102,8 +102,8 @@ class AutoReplyAdmin(unittest.TestCase):
     def test_page_and_crud(self):
         import re
 
-        from admin import create_app
-        from core import webusers
+        from changri.admin import create_app
+        from changri.core import webusers
         init_db()
         with get_conn() as c:
             c.execute("DELETE FROM autoreplies")

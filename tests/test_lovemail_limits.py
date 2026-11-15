@@ -5,11 +5,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 os.environ.setdefault("CHANGRI_DB_PATH", str(Path(tempfile.mkdtemp()) / "l.db"))
 
-from core import lovemail  # noqa: E402
-from core.db import init_db, set_config  # noqa: E402
+from changri.core import lovemail  # noqa: E402
+from changri.core.db import init_db, set_config  # noqa: E402
 
 
 class DayLimits(unittest.TestCase):

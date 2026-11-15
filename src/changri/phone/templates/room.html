@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% block title %}R{{ room.id }} · {{ brand }}{% endblock %}
+{% block body %}
+  <style>#sayForm button{flex:none;height:40px;padding:0 18px;border:0;border-radius:20px;background:var(--mine);color:#fff;font:inherit;font-size:15px;font-weight:600;cursor:pointer}</style>
+  <header class="bar">{% if room.outage %}<a class="back" href="{{ url_for('inbox') }}">信息</a>{% else %}<a class="back" href="{{ url_for('appoint_page') }}">邀约</a>{% endif %}
+    <div class="title">R{{ room.id }} {{ '多人群聊' if room.kind == '微信' else room.kind }}<small>{{ room.slot }} · {{ room.who }}</small></div><div class="right"></div></header>
+  <div class="scroll bottle-thread" id="scroll">
+    {% include '_flash.html' %}
+    {% if room.outage %}<div class="notice">拉群用的 QQ 号掉线了：先在这里接着写，之前在 QQ 群里的发言都在下面。恢复后会通知你回 QQ 群，从这里的进度接着来。</div>{% endif %}
+    {% if not room.web %}
+    <div class="notice">{% if room.grp %}这场约会在 QQ 群里聊：群号 {{ room.grp[2] }}。这里只显示机器人在群里听到的发言。{% else %}还在排队等群，轮到会在个人群通知你们。{% endif %}</div>
+    {% endif %}
+    <div id="lines">
+    {% for m in lines %}
+    <div class="msg {{ 'mine' if m.role_id == me_id else 'theirs' }}" data-id="{{ m.id }}"><div class="bubble">{% if m.role_id != me_id %}<b>{{ m.name }}</b><br>{% endif %}{{ m.text }}</div><div class="meta">{{ m.time }}</div></div>
+    {% else %}<div class="empty">还没有发言。</div>{% endfor %}
+    </div>
+    {% if room.status != 'open' %}<div class="notice">这场约会已经结束了。</div>{% endif %}
+  </div>
+  {% if room.status == 'open' %}
+  {% if room.web %}
+  <form class="compose" id="sayForm" method="post" action="{{ url_for('room_say', rid=room.id) }}">
+    <input type="hidden" name="_csrf" value="{{ csrf() }}">
+    <textarea aria-label="发言" name="text" maxlength="2000" placeholder="用「角色名：正文」写戏，其余算闲聊" rows="1" required></textarea>
+    <button type="submit">发送</button>
+  </form>
+  {% endif %}
+  <form method="post" action="{{ url_for('room_end', rid=room.id) }}" onsubmit="return confirm('结束这场约会？')" style="padding:6px 16px;text-align:center">
+    <input type="hidden" name="_csrf" value="{{ csrf() }}"><button class="linkbtn" type="submit">{{ '结束这个群聊' if room.kind == '微信' else '结束这场' ~ room.kind }}</button></form>
+  {% endif %}
+  <script>
+  (function () {
+    var sc = document.getElementById('scroll'), box = document.getElementById('lines'), last = 0, WEB = {{ room.web|tojson }};
+    [].forEach.call(box.querySelectorAll('[data-id]'), function (e) { last = Math.max(last, +e.dataset.id); });
+    sc.scrollTop = sc.scrollHeight;
+    function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    function poll() {
+      fetch('{{ url_for("room_lines", rid=room.id) }}?after=' + last, { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (d) {
+        if (!d.ok) return;
+        if (d.lines.length) { var e0 = box.querySelector('.empty'); if (e0) e0.remove(); }
+        d.lines.forEach(function (m) {
+          last = Math.max(last, m.id);
+          var mine = m.role_id === {{ me_id }};
+          var div = document.createElement('div'); div.className = 'msg ' + (mine ? 'mine' : 'theirs'); div.dataset.id = m.id;
+          div.innerHTML = '<div class="bubble">' + (mine ? '' : '<b>' + esc(m.name) + '</b><br>') + esc(m.text) + '</div><div class="meta">' + m.time + '</div>';
+          box.appendChild(div); sc.scrollTop = sc.scrollHeight;
+        });
+      }).catch(function () {});
+    }
+    setInterval(poll, 4000);
+    var f = document.getElementById('sayForm');
+    if (f) f.addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var ta = f.querySelector('textarea'), body = new URLSearchParams(new FormData(f));
+      if (!ta.value.trim()) return;
+      fetch(f.action, { method: 'POST', credentials: 'same-origin', body: body }).then(function (r) { return r.json(); }).then(function (d) {
+        if (d.ok) { ta.value = ''; poll(); } else alert(d.msg || '没发出去');
+      });
+    });
+  })();
+  </script>
+{% endblock %}

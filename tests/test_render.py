@@ -6,15 +6,15 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 os.environ.setdefault("CHANGRI_DB_PATH", str(Path(tempfile.mkdtemp()) / "r.db"))
-from core.db import init_db, set_config  # noqa: E402
-from core.render import forward_image as F  # noqa: E402
+from changri.core.db import init_db, set_config  # noqa: E402
+from changri.core.render import forward_image as F  # noqa: E402
 
 
 class RenderTests(unittest.TestCase):
     def test_bundled_fonts_exist_and_draw_names(self):
-        fonts = Path(__file__).resolve().parent.parent / "assets" / "fonts"
+        fonts = Path(__file__).resolve().parent.parent / "src" / "changri" / "assets" / "fonts"
         for n in ("SansSC-Regular.otf", "SansSC-Bold.otf", "SerifSC-Regular.otf"):
             self.assertTrue((fonts / n).exists(), n)
         pngs, cut = F.render_forward([{"name": "长日将尽", "text": "【关系线】\n曦玥 ↔ 昱珩\n1. 初见：雨里借了一把伞"}])
@@ -32,7 +32,7 @@ class LongReplyTests(unittest.TestCase):
     def setUp(self):
         init_db()
         set_config("long_as_image", "1"); set_config("image_min_chars", "50")
-        from plugins import _long
+        from changri.core import qqsend as _long
         self.long = _long
 
     class Matcher:

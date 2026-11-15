@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}目击{% endblock %}
+{% block body %}
+<h1>目击</h1>
+<p class="lede">建好私约/官约/心愿后，同一天、同一地点、时间重叠够多的其他约会，双方成员各按概率「看见」对方。看见的人收到点名提示，被看见的人收到匿名或点名提示。概率、每天上限、重叠比例和匿名方式在「功能与设置」的「目击」里改；这个功能不依赖小手机。</p>
+<section>
+  <div class="sec-head keep"><h2>概况</h2>
+    {% if st.n %}<span class="btns"><form method="post" action="{{ url_for('sighting_clear') }}" onsubmit="return confirm('清空全部目击记录？不能撤销。')">{{ csrf() }}<button class="btn ghost danger" type="submit">清空记录</button></form></span>{% endif %}</div>
+  <p>共 {{ st.n }} 条：看见 {{ st.saw }}、被看见 {{ st.seen }}；等待发送 {{ st.pending }}，发送失败 {{ st.failed }}。</p>
+</section>
+<section>
+  <div class="sec-head keep"><h2>最近记录</h2></div>
+  {% for r in rows %}
+  <div class="card" style="margin-bottom:10px">
+    <div><b>{{ r.role_name }}</b> <span class="muted">{{ '看见别人' if r.kind == 'saw' else ('被匿名看见' if r.anon else '被点名看见') }} · D{{ r.day }} {{ r.hm }} · {{ r.place }} · {{ r.created_ts|ts }}</span>
+      <span class="muted">{{ {'pending':'待发送','sent':'已发送','failed':'失败'}[r.status] }}{% if r.error %}（{{ r.error }}）{% endif %}</span></div>
+    <div style="white-space:pre-wrap;margin-top:4px">{{ r.text }}</div>
+  </div>
+  {% else %}<p class="muted">还没有目击记录。</p>{% endfor %}
+</section>
+{% endblock %}

@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+{% block title %}小工具{% endblock %}
+{% block body %}
+<style>
+.ui .grp{border:1px solid var(--card-line);border-radius:var(--r-card);background:var(--surface);padding:12px 14px;margin:0 0 12px}
+.ui .grp h3{margin:0 0 8px;font-size:15px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ui .grp h3 .n{font-weight:400;color:var(--mute);font-size:12.5px}
+.ui .grp h3 .sp{flex:1}
+.ui .pp{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:999px;background:var(--soft);font-size:13px;margin:0 6px 6px 0;cursor:pointer;user-select:none}
+.ui .pp input{margin:0}
+.ui .pp.sel{outline:2px solid var(--dusk)}
+.ui .pp .npc{color:var(--mute);font-size:11.5px}
+.ui .none{color:var(--mute);font-size:13px;margin:0}
+.ui .moverow{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0 14px}
+.ui .drawrow{display:flex;gap:12px;flex-wrap:wrap;align-items:end}
+.ui .drawrow label{display:block;font-size:13px;margin-bottom:4px}
+.ui .drawrow input[type=number]{width:90px}
+.ui .res{margin-top:14px}
+.ui .res .grp b{font-size:14px}
+.ui .tg{color:var(--dusk);font-size:11.5px;font-weight:600}
+.ui .tagbox{display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin:6px 0}
+.ui .tagbox label{display:block;font-size:13px;margin-bottom:4px}
+.ui .cat{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:6px 0;font-size:14px}
+</style>
+<h1>小工具</h1>
+<p class="lede">随机分组：只在这个页面里算，不会改动任何角色、房间或数据。一开始所有人都在「未分组」里，先建好分组，勾选人移进去；每个人同一时间只会在一个分组里，不会重复。分好以后可以每组抽几人，或者随机抽几个组。分组结果会记在这台浏览器里。</p>
+
+<section>
+  <div class="sec-head keep"><h2>分组<span class="n" id="cnt"></span></h2>
+    <span class="btns"><button class="btn ghost" type="button" id="reset">全部放回未分组</button></span></div>
+  <div class="moverow">
+    <input id="gname" maxlength="20" placeholder="分组名，例如 分组 A" aria-label="新分组名">
+    <button class="btn" type="button" id="gadd">新建分组</button>
+  </div>
+  <div id="pool"></div>
+  <div class="moverow" id="mover" hidden>
+    <span class="tag">已选 <b id="selcnt">0</b> 人 →</span>
+    <select id="target" aria-label="移入哪个分组"></select>
+    <button class="btn" type="button" id="move">移入</button>
+    <button class="btn ghost" type="button" id="unsel">取消选择</button>
+  </div>
+  <div id="groups"></div>
+</section>
+
+<section>
+  <div class="sec-head keep"><h2>标签</h2></div>
+  <p class="note">给人打标签（比如「性别：男 / 女」），再用下面的「按标签配对」把人分成若干组，同一个标签的人不会被分进同一组（或限制每组最多几个）。标签也只记在这台浏览器里。</p>
+  <div class="tagbox">
+    <div><label for="catname">标签类别</label><input id="catname" maxlength="10" placeholder="例如 性别"></div>
+    <div><label for="catvals">有哪几种（用逗号隔开）</label><input id="catvals" maxlength="60" placeholder="例如 男,女"></div>
+    <button class="btn" type="button" id="catadd">添加类别</button>
+  </div>
+  <div id="cats"></div>
+  <div class="tagbox" id="tagbar" hidden>
+    <span class="tag">给已勾选的 <b id="tagcnt">0</b> 人打标签：</span>
+    <select id="tagcat" aria-label="标签类别"></select>
+    <select id="tagval" aria-label="标签值"></select>
+    <button class="btn" type="button" id="tagapply">打上</button>
+    <button class="btn ghost" type="button" id="tagclear">清除这个类别的标签</button>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head keep"><h2>自动分组 / 配对</h2></div>
+  <p class="note">一键把所有人随机分成若干组，替换上面现有的分组。例如 10 男 10 女、分 10 组、每组同标签最多 1 人 = 随机配成 10 对男女。</p>
+  <div class="tagbox">
+    <div><label for="acat">按哪个标签避开同类</label><select id="acat"></select></div>
+    <div><label for="aK">分成几组</label><input id="aK" type="number" min="1" value="5" style="width:90px"></div>
+    <div><label for="aM">每组同标签最多</label><input id="aM" type="number" min="1" value="1" style="width:90px"></div>
+    <div><label><input id="anpc" type="checkbox"> 也包含 NPC</label></div>
+    <button class="btn" type="button" id="apair">随机分组</button>
+    <button class="btn ghost" type="button" id="ainner">组内再两两配对</button>
+  </div>
+  <p class="note" id="ahint" aria-live="polite"></p>
+  <div id="pairres" aria-live="polite"></div>
+</section>
+
+<section>
+  <div class="sec-head keep"><h2>抽取</h2></div>
+  <div class="drawrow">
+    <div><label for="mode">方式</label>
+      <select id="mode"><option value="per">每组抽几人</option><option value="groups">抽几个组</option></select></div>
+    <div><label for="num" id="numlbl">每组抽</label><input id="num" type="number" min="1" value="1"></div>
+    <button class="btn" type="button" id="draw">抽取</button>
+    <button class="btn ghost" type="button" id="copy" hidden>复制结果</button>
+  </div>
+  <p class="note" id="hint"></p>
+  <div class="res" id="res" aria-live="polite"></div>
+</section>
+
+<script>
+(function(){
+  var PEOPLE = {{ people|tojson }};
+  var NAMES = PEOPLE.map(function(p){return p.name});
+  var NPC = {}; PEOPLE.forEach(function(p){NPC[p.name]=p.npc});
+  var KEY = 'changri_tools_groups_{{ bot_id or "" }}';
+  var state = {groups: [], selected: {}, tags: []};   // tags: [{name, values:[], of:{人名:值}}]   // groups: [{name, members:[]}]；不在任何组里的就是「未分组」
+  var $ = function(id){return document.getElementById(id)};
+  function load(){
+    try{
+      var d = JSON.parse(localStorage.getItem(KEY) || 'null');
+      if(d && d.tags){
+        d.tags.forEach(function(t){
+          var of = {}; Object.keys(t.of||{}).forEach(function(n){ if(NAMES.indexOf(n)>=0 && (t.values||[]).indexOf(t.of[n])>=0) of[n]=t.of[n]; });
+          state.tags.push({name:String(t.name), values:(t.values||[]).map(String), of:of});
+        });
+      }
+      if(d && d.groups){
+        var seen = {};
+        d.groups.forEach(function(g){
+          var m = (g.members||[]).filter(function(n){ if(NAMES.indexOf(n)<0 || seen[n]) return false; seen[n]=1; return true; });
+          state.groups.push({name:String(g.name), members:m});
+        });
+      }
+    }catch(e){}
+  }
+  function save(){ try{ localStorage.setItem(KEY, JSON.stringify({groups: state.groups, tags: state.tags})); }catch(e){} }
+  function grouped(){ var s={}; state.groups.forEach(function(g){g.members.forEach(function(n){s[n]=1})}); return s; }
+  function el(tag, cls, txt){ var e=document.createElement(tag); if(cls) e.className=cls; if(txt!=null) e.textContent=txt; return e; }
+  function chip(n, withBox, groupIdx){
+    var l = el('label','pp'+(state.selected[n]?' sel':''));
+    if(withBox){
+      var c = el('input'); c.type='checkbox'; c.checked=!!state.selected[n];
+      c.onchange=function(){ if(c.checked) state.selected[n]=1; else delete state.selected[n]; render(); };
+      l.appendChild(c);
+    }
+    l.appendChild(document.createTextNode(n));
+    state.tags.forEach(function(t){ if(t.of[n]) l.appendChild(el('span','tg',t.of[n])); });
+    if(NPC[n]) l.appendChild(el('span','npc','NPC'));
+    if(groupIdx!=null){
+      var x = el('button','linkbtn','×'); x.type='button'; x.title='放回未分组'; x.setAttribute('aria-label','把 '+n+' 放回未分组');
+      x.onclick=function(ev){ ev.preventDefault(); var g=state.groups[groupIdx]; g.members.splice(g.members.indexOf(n),1); render(); };
+      l.appendChild(x);
+    }
+    return l;
+  }
+  function render(){
+    var gs = grouped(), free = NAMES.filter(function(n){return !gs[n]});
+    Object.keys(state.selected).forEach(function(n){ if(!free.length || free.indexOf(n)<0) delete state.selected[n]; });
+    $('cnt').textContent = NAMES.length + ' 人，' + state.groups.length + ' 个分组，' + free.length + ' 人未分组';
+    var pool = $('pool'); pool.innerHTML='';
+    var box = el('div','grp'); var h = el('h3'); h.appendChild(document.createTextNode('未分组'));
+    h.appendChild(el('span','n', free.length+' 人'));
+    h.appendChild(el('span','sp'));
+    if(free.length){
+      var all = el('button','linkbtn','全选'); all.type='button'; all.onclick=function(){ free.forEach(function(n){state.selected[n]=1}); render(); }; h.appendChild(all);
+    }
+    box.appendChild(h);
+    if(free.length) free.forEach(function(n){ box.appendChild(chip(n,true)); }); else box.appendChild(el('p','none','所有人都已分好组。'));
+    pool.appendChild(box);
+    var sel = Object.keys(state.selected).length;
+    renderTags(sel);
+    $('mover').hidden = !sel || !state.groups.length; $('selcnt').textContent = sel;
+    var t = $('target'), old = t.value; t.innerHTML='';
+    state.groups.forEach(function(g,i){ var o=el('option',null,g.name+'（'+g.members.length+'）'); o.value=i; t.appendChild(o); });
+    if(old && t.options[old]) t.value = old;
+    var gl = $('groups'); gl.innerHTML='';
+    state.groups.forEach(function(g,i){
+      var b = el('div','grp'); var hh = el('h3'); hh.appendChild(document.createTextNode(g.name)); hh.appendChild(el('span','n',g.members.length+' 人')); hh.appendChild(el('span','sp'));
+      var rn = el('button','linkbtn','改名'); rn.type='button'; rn.onclick=function(){ var v=prompt('分组名', g.name); if(v!==null && v.trim()){ g.name=v.trim().slice(0,20); render(); } }; hh.appendChild(rn);
+      var dl = el('button','linkbtn','删除分组'); dl.type='button'; dl.onclick=function(){ if(!g.members.length || confirm('删除「'+g.name+'」？里面的人会回到未分组。')){ state.groups.splice(i,1); render(); } }; hh.appendChild(dl);
+      b.appendChild(hh);
+      if(g.members.length) g.members.forEach(function(n){ b.appendChild(chip(n,false,i)); }); else b.appendChild(el('p','none','还没有人。在上面勾选人，选这个分组后点「移入」。'));
+      gl.appendChild(b);
+    });
+    var mode = $('mode').value;
+    $('numlbl').textContent = mode==='per' ? '每组抽' : '抽';
+    $('hint').textContent = state.groups.length ? '' : '先新建至少一个分组。';
+    save();
+  }
+  function renderTags(sel){
+    var cats = $('cats'); cats.innerHTML='';
+    state.tags.forEach(function(t,i){
+      var row = el('div','cat'); row.appendChild(el('b',null,t.name+'：'));
+      var cnt = {}; var none = 0;
+      NAMES.forEach(function(n){ if(t.of[n]) cnt[t.of[n]]=(cnt[t.of[n]]||0)+1; else none++; });
+      t.values.forEach(function(v){ row.appendChild(el('span','pp',v+' '+(cnt[v]||0)+' 人')); });
+      if(none) row.appendChild(el('span','npc','未标 '+none+' 人'));
+      var dl = el('button','linkbtn','删除类别'); dl.type='button'; dl.onclick=function(){ if(confirm('删除标签类别「'+t.name+'」？')){ state.tags.splice(i,1); render(); } }; row.appendChild(dl);
+      cats.appendChild(row);
+    });
+    var tc = $('tagcat'), oc = tc.value; tc.innerHTML='';
+    state.tags.forEach(function(t,i){ var o=el('option',null,t.name); o.value=i; tc.appendChild(o); });
+    if(oc && tc.options[oc]) tc.value = oc;
+    fillVals();
+    $('tagbar').hidden = !sel || !state.tags.length; $('tagcnt').textContent = sel;
+    var ac = $('acat'), oa = ac.value; ac.innerHTML=''; var o0=el('option',null,'（不按标签，纯随机）'); o0.value=''; ac.appendChild(o0);
+    state.tags.forEach(function(t,i){ var o=el('option',null,t.name); o.value=i; ac.appendChild(o); });
+    ac.value = (oa!=='' && ac.querySelector('option[value="'+oa+'"]')) ? oa : (state.tags.length ? '0' : '');
+  }
+  function fillVals(){
+    var t = state.tags[+$('tagcat').value], tv = $('tagval'); tv.innerHTML='';
+    if(t) t.values.forEach(function(v){ var o=el('option',null,v); o.value=v; tv.appendChild(o); });
+  }
+  $('tagcat').onchange=fillVals;
+  $('catadd').onclick=function(){
+    var n=$('catname').value.trim(), vs=$('catvals').value.split(/[,，、\s]+/).map(function(x){return x.trim()}).filter(Boolean);
+    vs = vs.filter(function(v,i){return vs.indexOf(v)===i});
+    if(!n || vs.length<2){ alert('类别名要填，至少写两种取值，比如 男,女。'); return; }
+    if(state.tags.some(function(t){return t.name===n})){ alert('已经有「'+n+'」这个类别了。'); return; }
+    state.tags.push({name:n, values:vs, of:{}}); $('catname').value=''; $('catvals').value=''; render();
+  };
+  $('tagapply').onclick=function(){
+    var t = state.tags[+$('tagcat').value], v = $('tagval').value; if(!t||!v) return;
+    Object.keys(state.selected).forEach(function(n){ t.of[n]=v; });
+    state.selected={}; render();
+  };
+  $('tagclear').onclick=function(){
+    var t = state.tags[+$('tagcat').value]; if(!t) return;
+    Object.keys(state.selected).forEach(function(n){ delete t.of[n]; });
+    state.selected={}; render();
+  };
+  $('apair').onclick=function(){
+    var K = Math.max(1, parseInt($('aK').value,10)||1), M = Math.max(1, parseInt($('aM').value,10)||1);
+    var t = $('acat').value==='' ? null : state.tags[+$('acat').value];
+    var people = NAMES.filter(function(n){ return $('anpc').checked || !NPC[n]; });
+    if(!people.length){ $('ahint').textContent='没有可分的人。'; return; }
+    if(state.groups.some(function(g){return g.members.length}) && !confirm('这会替换现有的分组，确定吗？')) return;
+    var groups = []; for(var i=0;i<K;i++) groups.push({name:'组 '+(i+1), members:[], cnt:{}});
+    // 人数最多的标签值先分，同一个值的人打乱；每个人放进「当前最少人、且这个标签还没满」的组（同样少的随机选）
+    var by = {};
+    shuffle(people).forEach(function(n){ var v = t ? (t.of[n]||'') : ''; (by[v]=by[v]||[]).push(n); });
+    var order = Object.keys(by).sort(function(a,b){ return by[b].length-by[a].length; });
+    var left = [];
+    order.forEach(function(v){
+      by[v].forEach(function(n){
+        var ok = groups.filter(function(g){ return !t || v==='' || (g.cnt[v]||0) < M; });
+        if(!ok.length){ left.push(n); return; }
+        var min = Math.min.apply(null, ok.map(function(g){return g.members.length}));
+        var cand = ok.filter(function(g){return g.members.length===min});
+        var g = cand[Math.floor(Math.random()*cand.length)];
+        g.members.push(n); g.cnt[v]=(g.cnt[v]||0)+1;
+      });
+    });
+    state.groups = groups.map(function(g){ return {name:g.name, members:g.members}; });
+    state.selected = {};
+    var msg = '已分成 '+K+' 组';
+    if(t) msg += '，每组「'+t.name+'」相同的最多 '+M+' 人';
+    if(left.length) msg += '。⚠️ 有 '+left.length+' 人没分进去（'+left.join('、')+'）：某个标签的人比「组数 × '+M+'」还多，加大组数或每组上限再试。';
+    $('ahint').textContent = msg; render();
+  };
+  // 组内两两配对：同一组里把人配成对，尽量不同标签配一起（男配女）；配不上的（比如某个标签多出来的）单列
+  $('ainner').onclick=function(){
+    var t = $('acat').value==='' ? null : state.tags[+$('acat').value], out = $('pairres'); out.innerHTML='';
+    var gs = state.groups.filter(function(g){return g.members.length});
+    if(!gs.length){ $('ahint').textContent='先分好组（上面的「随机分组」，或自己手动分）。'; return; }
+    var lines=[];
+    gs.forEach(function(g){
+      var by = {}; shuffle(g.members).forEach(function(n){ var v = t ? (t.of[n]||'') : ''; (by[v]=by[v]||[]).push(n); });
+      var vals = Object.keys(by).sort(function(a,b){return by[b].length-by[a].length}), pairs=[], rest=[];
+      while(true){
+        vals.sort(function(a,b){return by[b].length-by[a].length});
+        if(vals.length>=2 && by[vals[0]].length && by[vals[1]].length){ pairs.push([by[vals[0]].pop(), by[vals[1]].pop()]); }
+        else break;
+      }
+      vals.forEach(function(v){ rest = rest.concat(by[v]); });
+      if(!t){ rest=[]; var all = shuffle(g.members); pairs=[]; for(var i=0;i+1<all.length;i+=2) pairs.push([all[i],all[i+1]]); if(all.length%2) rest=[all[all.length-1]]; }
+      var b=el('div','grp'); var h=el('h3'); h.appendChild(document.createTextNode(g.name)); b.appendChild(h);
+      pairs.forEach(function(pr){ b.appendChild(el('span','chip',pr[0]+' ＋ '+pr[1])); });
+      if(rest.length) b.appendChild(el('span','chip','落单：'+rest.join('、')));
+      out.appendChild(b);
+      lines.push(g.name+'：'+pairs.map(function(pr){return pr[0]+'＋'+pr[1]}).join('，')+(rest.length?'（落单：'+rest.join('、')+'）':''));
+    });
+    lastText = lines.join('\n'); $('copy').hidden=false;
+  };
+  function shuffle(a){ a=a.slice(); for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
+  var lastText = '';
+  $('gadd').onclick=function(){
+    var v=$('gname').value.trim();
+    if(!v){ v='分组 '+String.fromCharCode(65+state.groups.length%26); }
+    if(state.groups.some(function(g){return g.name===v})){ alert('已经有叫「'+v+'」的分组了。'); return; }
+    state.groups.push({name:v, members:[]}); $('gname').value=''; render();
+    $('target').value = state.groups.length-1;
+  };
+  $('gname').addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); $('gadd').click(); } });
+  $('move').onclick=function(){
+    var g = state.groups[+$('target').value]; if(!g) return;
+    var gs = grouped();
+    Object.keys(state.selected).forEach(function(n){ if(!gs[n]) g.members.push(n); });   // 已经在某个组里的不会被再放一次
+    state.selected={}; render();
+  };
+  $('unsel').onclick=function(){ state.selected={}; render(); };
+  $('reset').onclick=function(){ if(confirm('把所有人放回未分组？（分组本身保留）')){ state.groups.forEach(function(g){g.members=[]}); state.selected={}; render(); } };
+  $('mode').onchange=render;
+  $('draw').onclick=function(){
+    var n = Math.max(1, parseInt($('num').value,10)||1), res = $('res'); res.innerHTML=''; lastText='';
+    var gs = state.groups.filter(function(g){return g.members.length});
+    if(!gs.length){ $('hint').textContent='还没有分好人的分组。'; $('copy').hidden=true; return; }
+    var lines=[], notes=[];
+    if($('mode').value==='per'){
+      gs.forEach(function(g){
+        var pick = shuffle(g.members).slice(0,n);
+        if(g.members.length<n) notes.push('「'+g.name+'」只有 '+g.members.length+' 人，全部选中');
+        add(g.name, pick, g.members.length);
+      });
+    }else{
+      if(gs.length<n) notes.push('只有 '+gs.length+' 个有人的分组，全部选中');
+      shuffle(gs).slice(0,n).forEach(function(g){ add(g.name, g.members, g.members.length); });
+    }
+    function add(name, pick, total){
+      var b=el('div','grp'); var h=el('h3'); h.appendChild(document.createTextNode(name)); h.appendChild(el('span','n','抽中 '+pick.length+' / '+total+' 人')); b.appendChild(h);
+      pick.forEach(function(p){ var c=el('span','chip',p); b.appendChild(c); }); res.appendChild(b);
+      lines.push(name+'：'+pick.join('、'));
+    }
+    $('hint').textContent = notes.join('；'); lastText = lines.join('\n'); $('copy').hidden = false;
+  };
+  $('copy').onclick=function(){ if(navigator.clipboard) navigator.clipboard.writeText(lastText).then(function(){ $('copy').textContent='已复制'; setTimeout(function(){$('copy').textContent='复制结果'},1500); }); };
+  load(); render();
+})();
+</script>
+{% endblock %}

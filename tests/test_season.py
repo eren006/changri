@@ -6,11 +6,11 @@ import time
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 os.environ["CHANGRI_DB_PATH"] = str(Path(tempfile.mkdtemp()) / "s.db")
 
-from core import entrance, lovemail, roles, season  # noqa: E402
-from core.db import get_config, get_conn, init_db, set_config  # noqa: E402
+from changri.core import entrance, lovemail, roles, season  # noqa: E402
+from changri.core.db import get_config, get_conn, init_db, set_config  # noqa: E402
 
 
 def at(date: str, hm: str = "12:00") -> time.struct_time:
@@ -73,6 +73,55 @@ class SeasonTests(unittest.TestCase):
         self.assertTrue(season.end()[0])
         self.assertEqual(season.phase(), "ended")
 
+    def _prep_stuff(self):
+        """筹备期里攒下的东西：短信、心动信、关系线、悬赏心愿、已结束和进行中的房间。"""
+        with get_conn() as c:
+            for t in ("rooms", "wishes"):
+                c.execute(f"DELETE FROM {t}")
+        roles.create_role("甲", "B1", "P0", "M0")
+        roles.create_role("乙", "B1", "P1", "M1")
+        a, b = roles.get_role_by_name("甲")["id"], roles.get_role_by_name("乙")["id"]
+        now = int(time.time())
+        with get_conn() as c:
+            c.execute("INSERT INTO messages(kind, from_role_id, to_role_id, content, created_ts) VALUES('sms',?,?,?,?)", (a, b, "筹备期的短信", now))
+            c.execute("INSERT INTO lovemails(from_role_id, to_role_id, content, day, created_ts) VALUES(?,?,?,?,?)", (a, b, "信", "2026-11-14", now))
+            rid = c.execute("INSERT INTO relations(role_lo, role_hi, initiator_id, created_ts) VALUES(?,?,?,?)", (a, b, a, now)).lastrowid
+            c.execute("INSERT INTO rel_details(rel_id, from_role_id, text, created_ts) VALUES(?,?,?,?)", (rid, a, "细节", now))
+            c.execute("INSERT INTO wishes(poster_id, content, created_ts) VALUES(?,?,?)", (a, "心愿", now))
+            done = c.execute("INSERT INTO rooms(kind, creator_id, status, created_ts) VALUES('微信',?,'ended',?)", (a, now)).lastrowid
+            c.execute("INSERT INTO room_members(room_id, role_id) VALUES(?,?)", (done, b))
+            c.execute("INSERT INTO rooms(kind, creator_id, status, created_ts) VALUES('微信',?,'open',?)", (a, now))
+
+    def _counts(self):
+        with get_conn() as c:
+            return {t: c.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] for t in ("messages", "lovemails", "relations", "rel_details", "wishes", "rooms", "room_members", "roles")}
+
+    def test_prep_interactions_cleared_at_d0(self):
+        season.book("甲季", "2026-11-15", "2026-11-20")
+        self.assertTrue(season.start(now="2026-11-14")[0])
+        self._prep_stuff()
+        self.assertEqual(self._counts()["messages"], 1)
+        self.run_tick("2026-11-14", "12:00")                                       # 筹备期里的定时检查不清
+        self.assertEqual(self._counts()["messages"], 1)
+        r, sent = self.run_tick("2026-11-15", "00:05")
+        self.assertEqual(r, "d0")
+        n = self._counts()
+        self.assertEqual((n["messages"], n["lovemails"], n["relations"], n["rel_details"], n["wishes"]), (0, 0, 0, 0, 0))
+        self.assertEqual((n["rooms"], n["room_members"]), (1, 0))                  # 已结束的房间清了，进行中的留着
+        self.assertEqual(n["roles"], 2)                                            # 角色不动
+        self.assertIn("清零", sent[0][2])
+
+    def test_manual_set_day_from_prep_also_clears(self):
+        season.book("甲季", "2026-11-20", "2026-11-25")
+        self.assertTrue(season.start(now="2026-11-14")[0])
+        self._prep_stuff()
+        season.set_day(0)
+        self.assertEqual(self._counts()["messages"], 0)
+        with get_conn() as c:
+            c.execute("INSERT INTO messages(kind, from_role_id, to_role_id, content, created_ts) SELECT 'sms', id, id, 'x', 1 FROM roles LIMIT 1")
+        season.set_day(1)                                                          # 已经在进行中，不再清
+        self.assertEqual(self._counts()["messages"], 1)
+
     def test_start_inside_schedule_goes_d0(self):
         season.book("甲季", "2026-11-10", "2026-11-20")
         self.assertTrue(season.start(now="2026-11-12")[0])
@@ -122,6 +171,8 @@ class EntranceTests(unittest.TestCase):
         season.start(clear=True, now="2026-11-12")
         for i, n in enumerate(["甲", "乙", "丙", "阿林"]):
             roles.create_role(n, "B", f"G{i}", f"M{i}")
+        from changri.core import npc
+        npc.set_flag("阿林", True)
         entrance.set_stage("B", "STAGE")
         self.sent = Sent()
 

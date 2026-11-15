@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#f6f5f9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0c0c0f" media="(prefers-color-scheme: dark)">
+<title>{% if mode == 'line' %}与{{ other }}的关系线{% else %}关系线{% endif %}</title>
+<style>
+:root {
+  --bg: #f6f5f9; --card: #ffffff; --line: #e3e2ea; --text: #17161c; --muted: #7a7985;
+  --accent: #6854bc; --accent-text: #fff; --theirs: #ecebf3; --warn: #b42318; --ok: #1a7f4b;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0c0c0f; --card: #17171c; --line: #2a2a31; --text: #f1f1f4; --muted: #8e8e98;
+          --accent: #8a78e0; --accent-text: #0c0c0f; --theirs: #24242b; --warn: #f0936b; --ok: #5fcf93; }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+       font-size: 15px; line-height: 1.6; -webkit-text-size-adjust: 100%; }
+a { color: var(--accent); text-decoration: none; }
+.wrap { max-width: 720px; margin: 0 auto; padding: calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 40px); }
+.top { display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+.top h1 { font-size: 20px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.top a, .top small { flex-shrink: 0; white-space: nowrap; }
+.top small { color: var(--muted); font-size: 12.5px; }
+.top-full { color: var(--muted); font-size: 13px; margin: -6px 0 12px; word-break: break-all; }
+.flash { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; }
+.warn-bar { background: var(--card); border: 1px dashed var(--warn); color: var(--warn); border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; font-size: 14px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; }
+.card h2 { font-size: 15px; margin-bottom: 8px; }
+.hint { color: var(--muted); font-size: 12.5px; }
+.row { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-top: .5px solid var(--line); color: inherit; }
+.row:first-child { border-top: 0; }
+.row .nm { font-weight: 600; }
+.row .meta { color: var(--muted); font-size: 12.5px; }
+.row .main { flex: 1; min-width: 0; }
+.row .main .meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tag { display: inline-block; font-size: 11px; padding: 0 7px; border-radius: 8px; background: var(--theirs); color: var(--muted); margin-left: 6px; vertical-align: 1px; }
+.tag.red { background: var(--warn); color: #fff; }
+.tag.ok { color: var(--ok); }
+label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+input[type=text], select, textarea { width: 100%; font: inherit; font-size: 16px; /* iOS 小于 16px 会在聚焦时自动放大页面 */ color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; }
+textarea { min-height: 84px; resize: vertical; }
+button { font: inherit; border: 0; border-radius: 10px; padding: 9px 16px; background: var(--accent); color: var(--accent-text); cursor: pointer; }
+button.ghost { background: var(--theirs); color: var(--text); }
+button.sm { padding: 6px 14px; font-size: 13.5px; }
+button, .tabs a, .row, details.edit summary { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+button { min-height: 44px; }
+button.sm { min-height: 36px; }
+details.edit summary { display: inline-block; padding: 8px 0; font-size: 13.5px; }
+.tabs a { padding: 10px 4px; }
+.row { padding: 14px 0; }
+@media (max-width: 480px) {
+  .wrap { padding-left: 12px; padding-right: 12px; min-height: 100dvh; display: flex; flex-direction: column; }
+  .wrap > .chat { margin-bottom: 12px; }
+  .top { position: sticky; top: 0; z-index: 3; background: var(--bg); padding: calc(env(safe-area-inset-top) + 8px) 0 8px; margin-top: calc(-1 * (env(safe-area-inset-top) + 14px)); }
+  .b { max-width: 88%; font-size: 16px; }
+  .card { padding: 12px 14px; }
+  form.card.compose { margin-top: auto; position: sticky; bottom: 0; z-index: 3; margin-left: -12px; margin-right: -12px; margin-bottom: 0; border-radius: 14px 14px 0 0; padding-bottom: calc(env(safe-area-inset-bottom) + 12px); box-shadow: 0 -4px 14px rgba(0,0,0,.08); }
+}
+button:disabled { opacity: .5; cursor: default; }
+.tabs { display: flex; gap: 6px; background: var(--theirs); border-radius: 12px; padding: 4px; margin-bottom: 14px; }
+.tabs a { flex: 1; text-align: center; padding: 7px 4px; border-radius: 9px; color: var(--muted); font-size: 14px; }
+.tabs a.on { background: var(--card); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.chat { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.b { max-width: 82%; padding: 8px 13px; border-radius: 18px; word-break: break-word; white-space: pre-wrap; }
+.b.in { align-self: flex-start; background: var(--theirs); border-bottom-left-radius: 5px; }
+.b.out { align-self: flex-end; background: var(--accent); color: var(--accent-text); border-bottom-right-radius: 5px; }
+.b time { display: block; font-size: 11px; line-height: 1.2; opacity: .5; margin-top: 4px; text-align: right; font-variant-numeric: tabular-nums; }
+.item { padding: 12px 0; border-top: .5px solid var(--line); }
+.item:first-child { border-top: 0; }
+.item .who { font-size: 12.5px; color: var(--muted); margin-bottom: 3px; }
+.item .body { white-space: pre-wrap; word-break: break-word; }
+.item .acts { margin-top: 6px; display: flex; gap: 8px; }
+.item.mine .who b { color: var(--accent); }
+.gz-row { width: 100%; background: transparent; color: inherit; border-radius: 0; text-align: left; min-height: 48px; padding: 12px 0; }
+.gz-row.off { opacity: .55; cursor: default; }
+.gz-row .main { display: flex; flex-direction: column; }
+.gz-dialog { margin: auto; width: min(92vw, 460px); max-height: 80vh; border: 0; border-radius: 16px; padding: 0; background: var(--card); color: var(--text); box-shadow: 0 12px 40px rgba(0,0,0,.35); }
+.gz-dialog::backdrop { background: rgba(0,0,0,.5); }
+.gz-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: .5px solid var(--line); }
+.gz-head b { font-size: 17px; }
+.gz-body { padding: 14px 16px 18px; white-space: pre-wrap; word-break: break-word; overflow-y: auto; max-height: calc(80vh - 64px); line-height: 1.8; }
+.time-label { display: inline-block; font-weight: 600; color: var(--accent); margin-right: 6px; }
+details.edit { margin-top: 6px; }
+details.edit summary { cursor: pointer; font-size: 12.5px; color: var(--accent); list-style: none; }
+.empty { color: var(--muted); text-align: center; padding: 22px 0; }
+.counter { text-align: right; font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+{% if mode == 'list' %}
+  <div class="top"><a href="{{ url_for('discover') }}">‹ 发现</a><h1>关系线</h1><small>{{ owner }}</small></div>
+  {% for m in get_flashed_messages() %}<div class="flash">{{ m }}</div>{% endfor %}
+  <div class="tabs">
+    <a class="{{ 'on' if tab != 'gongzhi' }}" href="{{ url_for('rel_page') }}">关系线</a>
+    <a class="{{ 'on' if tab == 'gongzhi' }}" href="{{ url_for('rel_page', tab='gongzhi') }}">公知 {{ gongzhi_n }}</a>
+  </div>
+  {% if tab == 'gongzhi' %}
+  <div class="card">
+    <h2>公知</h2>
+    <div class="hint" style="margin-bottom:6px">大家交上来的公开资料，点名字查看。在群里发「提交公知 内容」就会出现在这里。</div>
+    {% for g in gongzhi %}
+    {% if g.text %}
+    <button type="button" class="row gz-row" data-gz="{{ loop.index0 }}"><span class="main"><span class="nm">{{ g.role }}</span><span class="meta">{{ g.time }}</span></span><span class="meta">›</span></button>
+    {% else %}
+    <div class="row gz-row off"><span class="main"><span class="nm">{{ g.role }}</span><span class="meta">还没有提交</span></span></div>
+    {% endif %}
+    {% else %}<div class="empty">{{ '管理员还没有开放公知展示。' if gz_closed else '还没有人提交公知。' }}</div>{% endfor %}
+  </div>
+  <dialog class="gz-dialog" id="gzDialog" aria-labelledby="gzTitle">
+    <div class="gz-head"><b id="gzTitle"></b><button type="button" class="ghost sm" id="gzClose">关闭</button></div>
+    <div class="gz-body" id="gzBody"></div>
+  </dialog>
+  <script>
+  (function () {
+    var data = {{ gongzhi|tojson }}, names = {{ gongzhi_names|tojson }};
+    var d = document.getElementById('gzDialog');
+    document.querySelectorAll('.gz-row[data-gz]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var g = data[Number(b.dataset.gz)];
+        document.getElementById('gzTitle').textContent = names[g.role] || g.role;
+        document.getElementById('gzBody').textContent = g.text;
+        if (d.showModal) d.showModal(); else d.setAttribute('open', '');
+      });
+    });
+    document.getElementById('gzClose').addEventListener('click', function () { d.close ? d.close() : d.removeAttribute('open'); });
+    d.addEventListener('click', function (e) { if (e.target === d) d.close(); });
+  })();
+  </script>
+  {% elif not rel_on %}
+  <div class="card"><h2>关系线</h2><div class="hint">管理员还没有打开关系线。打开后你可以在这里和别人建立关系线、写补充内容和交流；这之前，公知已经可以看了。</div></div>
+  {% else %}
+  {% if not can %}<div class="warn-bar">现在不能操作：{{ why }}。已有内容照常能看。</div>{% endif %}
+  <div class="card">
+    <h2>我的关系线</h2>
+    <div class="quota" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+      <span class="tag{{ ' red' if used >= rule.max_rel else '' }}">发起额度 已用 {{ used }}/{{ rule.max_rel }}</span>
+      {% if rule.max_total_rel %}<span class="tag{{ ' red' if total_used >= rule.max_total_rel else '' }}">关系线总数 {{ total_used }}/{{ rule.max_total_rel }}</span>{% endif %}
+    </div>
+    {% for l in lines %}
+    <a class="row" href="{{ url_for('rel_line', other=l.other, tab='detail' if l.unread_detail and not l.unread_chat else 'chat') }}">
+      <div class="main">
+        <div class="nm">{{ l.other }}
+          <span class="tag">{{ '强制' if l.system else ('发起' if l.mine else '收到') }}</span>
+          {% if l.confirmed %}<span class="tag ok">已完成</span>{% endif %}
+          {% if l.pending %}<span class="tag red">待回</span>{% endif %}
+          {% if l.unread_chat %}<span class="tag red">{{ l.unread_chat }} 条新留言</span>{% endif %}
+          {% if l.unread_detail %}<span class="tag red">{{ l.unread_detail }} 条新补充</span>{% endif %}
+        </div>
+        <div class="meta">补充 {{ l.n_detail }}/{{ rule.max_count }} 段 · {{ l.n_chars }}/{{ rule.max_total }} 字 · 交流 {{ l.n_chat }} · 时间点 {{ l.n_time }}{% if l.last_chat %} · {{ '我：' if l.last_chat_mine else '' }}{{ l.last_chat }}{% endif %}</div>
+      </div>
+      <span class="meta">›</span>
+    </a>
+    {% else %}<div class="empty">还没有关系线，在下面发起第一条吧。</div>{% endfor %}
+  </div>
+  {% if can %}
+  <div class="card">
+    <h2>向某人发起关系线</h2>
+    {% if new_paused %}<div class="hint">管理员暂时停止了发起新的关系线；已有的关系线照常交流、补充内容。</div>
+    {% elif contacts %}
+    <form method="post" action="{{ url_for('rel_new') }}">
+      <input type="hidden" name="_csrf" value="{{ csrf() }}">
+      <label for="to">对象</label>
+      <select id="to" name="to" required>{% for c in contacts %}<option value="{{ c }}">{{ c }}</option>{% endfor %}</select>
+      <label>开头方式</label>
+      <div style="display:flex;gap:14px;flex-wrap:wrap">
+        <label style="display:inline-flex;align-items:center;gap:6px;margin:0;color:var(--text)"><input type="radio" name="kind" value="detail" checked> 正式的补充内容</label>
+        <label style="display:inline-flex;align-items:center;gap:6px;margin:0;color:var(--text)"><input type="radio" name="kind" value="chat"> 先闲聊问候</label>
+      </div>
+      <label for="t" id="tLabel">第一段补充内容（最多 {{ rule.max_chars }} 字）</label>
+      <textarea id="t" name="text" maxlength="{{ rule.max_chars }}" required></textarea>
+      <script>
+      (function () {
+        var t = document.getElementById('t'), l = document.getElementById('tLabel');
+        function sync() {
+          var chat = document.querySelector('input[name=kind]:checked').value === 'chat';
+          l.textContent = chat ? '打个招呼（最多 {{ 200 }} 字，之后可以再补充正式内容）' : '第一段补充内容（最多 {{ rule.max_chars }} 字）';
+          t.maxLength = chat ? 200 : {{ rule.max_chars }};
+          t.minLength = 0;
+        }
+        document.querySelectorAll('input[name=kind]').forEach(function (r) { r.addEventListener('change', sync); });
+      })();
+      </script>
+      <div style="margin-top:10px"><button type="submit">发起并通知对方</button></div>
+    </form>
+    {% else %}<div class="hint">已经跟名单里的所有人都有关系线了。</div>{% endif %}
+  </div>
+  {% endif %}
+  {% endif %}
+
+{% else %}
+  <div class="top"><a href="{{ url_for('rel_page') }}">‹ 关系线</a><h1>{{ other }}</h1>
+    <small>{{ '强制' if line.system else ('我发起' if line.initiator == owner else '对方发起') }}{% if line.confirmed %} · 已完成{% endif %}</small></div>
+  {% for m in get_flashed_messages() %}<div class="flash">{{ m }}</div>{% endfor %}
+  {% if not can %}<div class="warn-bar">现在不能操作：{{ why }}。已有内容照常能看。</div>{% endif %}
+  <div class="tabs">
+    <a class="{{ 'on' if tab == 'chat' }}" href="{{ url_for('rel_line', other=other, tab='chat') }}">闲谈 {{ chats|length }}</a>
+    <a class="{{ 'on' if tab == 'detail' }}" href="{{ url_for('rel_line', other=other, tab='detail') }}">关系线内容 {{ details|length }}</a>
+    <a class="{{ 'on' if tab == 'time' }}" href="{{ url_for('rel_line', other=other, tab='time') }}">时间点 {{ times|length }}</a>
+  </div>
+
+  {% if tab == 'chat' %}
+    <div class="chat" id="chat">
+      {% for c in chats %}<div class="b {{ 'out' if c.from_role == owner else 'in' }}">{{ c.text }}<time>{{ c.created_at | rel_time_short }}</time></div>
+      {% else %}<div class="empty">还没有聊过，说点什么吧。</div>{% endfor %}
+    </div>
+    {% if can %}
+    <form class="card compose" method="post" action="{{ url_for('rel_chat', other=other) }}">
+      <input type="hidden" name="_csrf" value="{{ csrf() }}">
+      <textarea name="text" maxlength="{{ chat_max }}" style="min-height:60px" placeholder="像发短信一样，最多 {{ chat_max }} 字" required>{{ draft or '' }}</textarea>
+      <div style="margin-top:8px;display:flex;justify-content:flex-end"><button type="submit">发送</button></div>
+    </form>
+    {% endif %}
+    <script>window.scrollTo(0, document.body.scrollHeight);</script>
+
+  {% elif tab == 'detail' %}
+    <div class="card">
+      {% for d in details %}
+      <div class="item {{ 'mine' if d.from_role == owner }}">
+        <div class="who"><b>{{ '我' if d.from_role == owner else d.from_role }}</b> · 第 {{ loop.index }} 段{% if d.edited_at %} · 已修改{% endif %}</div>
+        <div class="body">{{ d.text }}</div>
+        {% if d.from_role == owner and can %}
+        <details class="edit"><summary>修改 / 删除这一段</summary>
+          <form method="post" action="{{ url_for('rel_detail_edit', iid=d.id) }}">
+            <input type="hidden" name="_csrf" value="{{ csrf() }}">
+            <textarea name="text" maxlength="{{ rule.max_chars }}" required>{{ d.text }}</textarea>
+            <div style="margin-top:6px"><button class="sm" type="submit">保存修改</button></div>
+          </form>
+          <form method="post" action="{{ url_for('rel_detail_delete', iid=d.id) }}" onsubmit="return confirm('删除这一段？')" style="margin-top:6px">
+            <input type="hidden" name="_csrf" value="{{ csrf() }}"><button class="ghost sm" type="submit">删除这一段</button>
+          </form>
+        </details>
+        {% endif %}
+      </div>
+      {% else %}<div class="empty">还没有补充内容。</div>{% endfor %}
+      <div class="hint" style="margin-top:8px">{{ n_det }}/{{ rule.max_count }} 段 · {{ total }}/{{ rule.max_total }} 字</div>
+    </div>
+    {% if can %}
+    <form class="card" method="post" action="{{ url_for('rel_detail_add', other=other) }}">
+      <input type="hidden" name="_csrf" value="{{ csrf() }}">
+      <h2>再补充一段</h2>
+      <textarea name="text" maxlength="{{ rule.max_chars }}" placeholder="最多 {{ rule.max_chars }} 字" required></textarea>
+      <div style="margin-top:8px"><button type="submit">发送</button></div>
+    </form>
+    {% if not line.system and not line.confirmed %}
+    <form method="post" action="{{ url_for('rel_confirm', other=other) }}" onsubmit="return confirm('确认后这条关系线标为完成状态，确定吗？')">
+      <input type="hidden" name="_csrf" value="{{ csrf() }}">
+      <button class="ghost" type="submit">确定关系线</button>
+    </form>
+    {% endif %}
+    {% endif %}
+
+  {% else %}
+    <div class="card">
+      {% for t in times %}
+      <div class="item {{ 'mine' if t.from_role == owner }}">
+        <div class="who"><b>{{ '我' if t.from_role == owner else t.from_role }}</b> 记下{% if t.edited_at %} · 已修改{% endif %}</div>
+        <div class="body"><span class="time-label">{{ t.label }}</span>{{ t.text }}</div>
+        {% if t.from_role == owner and can %}
+        <details class="edit"><summary>修改 / 删除（会通知对方）</summary>
+          <form method="post" action="{{ url_for('rel_time_edit', iid=t.id) }}">
+            <input type="hidden" name="_csrf" value="{{ csrf() }}">
+            <label>时间</label><input type="text" name="label" maxlength="{{ label_max }}" value="{{ t.label }}" required>
+            <label>内容</label><textarea name="text" maxlength="{{ time_max }}" required>{{ t.text }}</textarea>
+            <div style="margin-top:6px"><button class="sm" type="submit">保存修改</button></div>
+          </form>
+          <form method="post" action="{{ url_for('rel_time_delete', iid=t.id) }}" onsubmit="return confirm('删除这个时间点？')" style="margin-top:6px">
+            <input type="hidden" name="_csrf" value="{{ csrf() }}"><button class="ghost sm" type="submit">删除</button>
+          </form>
+        </details>
+        {% endif %}
+      </div>
+      {% else %}<div class="empty">还没有重要时间点。</div>{% endfor %}
+    </div>
+    {% if can %}
+    <form class="card" method="post" action="{{ url_for('rel_time_add', other=other) }}">
+      <input type="hidden" name="_csrf" value="{{ csrf() }}">
+      <h2>记一个重要时间点</h2>
+      <label>时间（自己填，想怎么写怎么写，比如「D3 夜里」「雨夜」）</label>
+      <input type="text" name="label" maxlength="{{ label_max }}" required>
+      <label>发生了什么</label>
+      <textarea name="text" maxlength="{{ time_max }}" required></textarea>
+      <div style="margin-top:8px"><button type="submit">发送</button></div>
+    </form>
+    {% endif %}
+  {% endif %}
+{% endif %}
+</div>
+</body>
+</html>

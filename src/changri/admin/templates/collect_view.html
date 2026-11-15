@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}{{ col.title }}{% endblock %}
+{% block body %}
+<h1>{{ col.title }}</h1>
+<p class="lede">{{ col.prompt or '（没有写说明）' }}<br>{{ col.start_ts|ts }} ~ {{ "不限" if col.end_ts >= 4102444800 else col.end_ts|ts }}{% if col.repeat_days > 1 %}，每天一轮，共 {{ col.repeat_days }} 天{% endif %} · 状态：<b>{{ label }}</b></p>
+<div class="stats"><div class="stat"><b>{{ items|length }}</b><span>已交</span></div><div class="stat"><b>{{ missing|length }}</b><span>还没交的玩家</span></div></div>
+<section>
+  <div class="sec-head keep"><h2>{% if col.repeat_days > 1 %}第 {{ k + 1 }} 天{% else %}内容{% endif %}<span class="n">{{ win[0]|ts }} ~ {{ win[1]|ts }}</span></h2>
+    <span class="btns">
+      <form method="post" action="{{ url_for('collect_close', cid=col.id) }}">{{ csrf() }}{% if col.closed %}<input type="hidden" name="reopen" value="1"><button class="btn ghost" type="submit">重新开放</button>{% else %}<button class="btn ghost" type="submit" onclick="return confirm('关闭后不再收新内容（已收到的保留）。')">关闭收集</button>{% endif %}</form>
+      <form method="post" action="{{ url_for('collect_delete', cid=col.id) }}" onsubmit="return confirm('删除这个收集和它收到的全部内容？')">{{ csrf() }}<button class="btn ghost danger" type="submit">删除</button></form>
+      {% if items %}<button class="btn ghost" type="button" id="cp">复制全部</button>{% endif %}
+    </span></div>
+  {% if rounds|length > 1 %}<p>{% for r in rounds %}<a class="chip {{ 'up' if r.k == k }}" href="{{ url_for('collect_view', cid=col.id, round=r.k) }}">第 {{ r.k + 1 }} 天 · {{ r.n }}</a>{% endfor %}</p>{% endif %}
+  {% if items %}<div class="rowlist">{% for i in items %}
+    <div class="row"><div class="nm"><b>{{ i.role_name }}{% if i.is_npc %} <span class="tag">NPC</span>{% endif %}</b> <span class="tag">{{ i.ts|ts }}</span><div style="white-space:pre-wrap">{{ i.content }}</div></div></div>{% endfor %}</div>
+  {% else %}<p class="empty">这一轮还没有人交。</p>{% endif %}
+  {% if missing %}<p class="note">还没交：{{ missing|join('、') }}</p>{% endif %}
+</section>
+<textarea id="ctext" hidden>{{ text }}</textarea>
+<script>var b=document.getElementById('cp');if(b)b.onclick=function(){var t=document.getElementById('ctext').value;if(navigator.clipboard)navigator.clipboard.writeText(t).then(function(){b.textContent='已复制';setTimeout(function(){b.textContent='复制全部'},1500)})}</script>
+{% endblock %}

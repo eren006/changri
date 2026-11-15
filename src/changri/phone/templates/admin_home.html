@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block title %}管理员手机 · {{ brand }}{% endblock %}
+{% block body %}
+  {% include '_form_css.html' %}
+  <header class="bar"><div class="title">管理员手机</div></header>
+  <div class="scroll list">
+    <div class="disc-label">通讯</div>
+    <form method="post" action="{{ url_for('admin_pause') }}" style="padding:12px 20px">
+      <input type="hidden" name="_csrf" value="{{ csrf() }}">
+      <p style="margin:0 0 10px">现在：<b>{{ '已暂停，玩家发不了短信和礼物' if paused else '正常' }}</b></p>
+      <button class="send" type="submit">{{ '恢复通讯' if paused else '暂停通讯' }}</button>
+    </form>
+    <div class="disc-label">房间</div>
+    <a class="row" href="{{ url_for('admin_rooms') }}"><div class="body"><div class="top"><span class="name">全部房间戏录</span><span class="recipient-arrow" aria-hidden="true">›</span></div><div class="preview">{{ n_open }} 个进行中</div></div></a>
+    <div class="disc-label">以角色身份进入手机</div>
+    {% for r in roles %}
+    <form method="post" action="{{ url_for('admin_as', rid=r.id) }}" class="row" style="display:flex;align-items:center;justify-content:space-between;padding:10px 20px">
+      <input type="hidden" name="_csrf" value="{{ csrf() }}"><span class="name">{{ r.name }}</span><button class="linkbtn" type="submit">进入</button>
+    </form>
+    {% else %}<div class="empty" style="padding:16px 20px">还没有角色。</div>{% endfor %}
+    <form method="post" action="{{ url_for('admin_logout') }}" style="padding:16px;text-align:center"><input type="hidden" name="_csrf" value="{{ csrf() }}"><button class="linkbtn" type="submit">退出管理员手机</button></form>
+  </div>
+{% endblock %}

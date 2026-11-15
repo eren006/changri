@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}收集{% endblock %}
+{% block body %}
+{% import "_rpg_icons.html" as ic %}
+{% macro cancel() %}<button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button>{% endmacro %}
+<h1>收集</h1>
+{% include "_collect_tabs.html" %}
+<p class="lede">默认是普通收集：创建就开始收，点「关闭」才停；需要到点自动开关时勾「定时」，会多出开始、结束两个选时间的框。玩家在群里发「收集」看现在在收什么，发「收集 内容」提交（有多个同时进行时写编号：收集 2 内容）。窗口里再交一次会覆盖自己上一份。创建、关闭、查看内容都在这里，群里没有对应指令。</p>
+<section>
+  <div class="sec-head keep"><h2>全部收集<span class="n">{{ rows|length }} 个</span></h2>
+    <span class="btns"><details class="panel"><summary class="btn">{{ ic.plus() }}新建收集</summary>
+      <form class="form" method="post" action="{{ url_for('collect_add') }}">{{ csrf() }}
+        <div class="fields">
+          <div><label for="ct">标题</label><input id="ct" name="title" maxlength="40" required></div>
+          <div><label for="cp">给玩家看的说明（可空）</label><input id="cp" name="prompt" maxlength="300" placeholder="例如：今晚想对谁说的一句话"></div>
+          <div class="wide"><label style="display:inline-flex;gap:8px;align-items:center"><input type="checkbox" name="timed" value="1" id="ctimed" onchange="document.getElementById('ctimes').hidden=!this.checked">定时（到点自动开始、自动结束）</label></div>
+          <div id="ctimes" hidden class="fields" style="grid-column:1/-1">
+            <div><label for="cs">开始时间（可不填 = 现在就开始）</label><input id="cs" name="start" type="datetime-local"></div>
+            <div><label for="ce">结束时间（可不填 = 不限，手动关闭）</label><input id="ce" name="end" type="datetime-local"></div>
+          </div>
+        </div>
+        <p class="note">不勾「定时」就是普通收集：创建后立刻开始收，在列表里点「关闭」就不再接收。</p>
+        <div class="actions"><button class="btn" type="submit">创建</button>{{ cancel() }}</div></form></details></span></div>
+  {% if rows %}<div class="rowlist">{% for r in rows %}
+    <div class="row"><div class="nm"><b><a href="{{ url_for('collect_view', cid=r.id) }}">{{ r.id }}. {{ r.title }}</a></b>
+      <div class="muted">{% if r.end_ts >= 4102444800 %}{{ r.start_ts|ts }} 起，不限时{% else %}{{ r.start_ts|ts }} ~ {{ r.end_ts|ts }}{% endif %}{% if r.repeat_days > 1 %}，重复 {{ r.repeat_days }} 天{% endif %} · 共收到 {{ r.total }} 份</div></div>
+      <div class="acts"><span class="chip {{ 'up' if r.live }}">{{ r.label }}</span>
+        {% if not r.closed and r.label != '已结束' %}<form class="i" method="post" action="{{ url_for('collect_close', cid=r.id) }}" onsubmit="return confirm('关闭「{{ r.title }}」？关闭后不再接收新的内容。')">{{ csrf() }}<button class="btn ghost sm" type="submit">关闭</button></form>{% endif %}</div></div>{% endfor %}</div>
+  {% else %}<p class="empty">还没有收集。点「新建收集」。</p>{% endif %}
+</section>
+{% endblock %}

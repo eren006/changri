@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}HTTPS{% endblock %}
+{% block body %}
+<h1>HTTPS</h1>
+<p class="lede">给设置平台和小手机加上 https：浏览器不再提示「不安全」，登录和激活码也不再明文传输。不需要域名，用这台服务器的公网 IP 就能申请免费证书（Let's Encrypt），证书 6 天一续，全自动。</p>
+
+{% if not st.supported %}
+<div class="callout"><b>这台服务器的系统还不支持一键 HTTPS</b>（支持 Linux 和 Windows）。可以先继续用 http。</div>
+{% else %}
+
+<section>
+  <div class="sec-head keep"><h2>第 1 步 · 装 Caddy</h2>
+    <span>{% if st.api and st.version_ok %}<span class="dot ok"></span>已装好 {{ st.version }}{% elif st.installed %}<span class="dot warn"></span>要更新{% else %}<span class="dot bad"></span>还没装{% endif %}</span></div>
+  {% if st.api and st.version_ok %}
+  <p class="note">Caddy 在前面接 https，再转给设置平台和小手机。它已经在运行。</p>
+  {% elif st.windows %}
+  <p>用远程桌面登录这台服务器，在长日bot 的文件夹里找到下面这个文件，<b>右键 → 以管理员身份运行</b>：</p>
+  <div class="cmd"><code id="cmd">{{ st.install }}</code><button class="btn ghost" type="button" onclick="navigator.clipboard.writeText(document.getElementById('cmd').textContent).then(()=>{this.textContent='已复制'})">复制路径</button></div>
+  <p class="note">
+    {% if st.installed and not st.version_ok %}现在装的 Caddy 是 {{ st.version or '旧版' }}，要 2.10 以上才能申请 IP 证书，再运行一次会升级。
+    {% elif st.installed and not st.api %}Caddy 装了，但服务没在运行。再运行一次这个文件会把它启动。
+    {% else %}它会下载 Caddy、注册成开机自启的 Windows 服务「ChangriCaddy」，并在 Windows 防火墙放行要用的端口。{% endif %}
+    装完回到这页刷新一下。
+  </p>
+  {% else %}
+  <p>用 SSH 或云服务商网页上的「登录」打开这台服务器的终端，粘贴下面这一行回车（会要你的服务器密码）：</p>
+  <div class="cmd"><code id="cmd">{{ st.install }}</code><button class="btn ghost" type="button" onclick="navigator.clipboard.writeText(document.getElementById('cmd').textContent).then(()=>{this.textContent='已复制'})">复制</button></div>
+  <p class="note">
+    {% if st.installed and not st.version_ok %}现在装的 Caddy 是 {{ st.version or '旧版' }}，要 2.10 以上才能申请 IP 证书，运行这一行会升级。
+    {% elif st.installed and not st.api %}Caddy 装了，但没有按长日bot 要的方式运行（本机 2019 端口收配置）。运行这一行会把它调好；如果这台服务器上的 Caddy 已经在跑你自己的网站，脚本会停下来，不会动它。
+    {% else %}脚本会装好 Caddy、设成开机自启，并在本机防火墙放行要用的端口。{% endif %}
+    装完回到这页刷新一下。
+  </p>
+  {% endif %}
+</section>
+
+<section>
+  <h2>第 2 步 · 安全组放行端口</h2>
+  <p>到云服务商控制台的「安全组」（腾讯云轻量服务器叫「防火墙」）放行这些 TCP 端口：</p>
+  <div class="rowlist">
+    <div class="row"><div class="nm"><b class="tabular">80 和 443</b><div class="muted">Let's Encrypt 只来这两个端口验证（有一个能通就行，两个都放行最稳）。证书每 6 天续一次，<b>要一直开着</b>，关了证书就续不上。Caddy 平时<b>不占用</b> 80 和 443，只在申请、续期的几秒里借用空着的那个；以后这台服务器要装别的网站用这两个端口也没关系。</div></div></div>
+    {% for s in st.sites %}
+    <div class="row"><div class="nm"><b class="tabular">{{ s.listen }}</b><div class="muted">{{ s.label }}的 https（原来的 http 端口 {{ s.upstream }} 照常能用）</div></div></div>
+    {% endfor %}
+  </div>
+  {% if st.sites|length == 1 %}<p class="note">还没有机器人开小手机，开了以后它的 https 端口会出现在这里（http 端口 + 1000，比如 5092 → 6092）。</p>{% endif %}
+</section>
+
+<section>
+  <h2>第 3 步 · 开通</h2>
+  {% if not st.cert %}{% include "_https_ports.html" %}{% endif %}
+  {% if not st.enabled %}
+  <form method="post" action="{{ url_for('https_enable') }}" onsubmit="this.querySelector('button[type=submit]').disabled=true">{{ csrf() }}
+    <p>证书写在 <b class="tabular">{{ st.subject or '（查不到公网 IP）' }}</b> 上。</p>
+    <details class="panel"><summary class="btn ghost">我有自己的域名</summary>
+      <div class="form"><div class="fields">
+        <div class="wide"><label for="hd">域名（先把它解析到这台服务器的公网 IP）</label><input id="hd" type="text" name="domain" placeholder="例如 bot.example.com" autocomplete="off"></div>
+      </div>
+      <p class="note">服务器在中国大陆的话，域名要先<b>备案</b>，否则云服务商会拦掉 80 端口，证书申请不下来。没备案就别填，用 IP 就好。</p></div>
+    </details>
+    <div class="actions" style="margin-top:14px"><button class="btn" type="submit" {{ 'disabled' if not (st.api and st.version_ok) }}>开通 HTTPS</button></div>
+    {% if not (st.api and st.version_ok) %}<p class="note">先完成第 1 步。</p>{% endif %}
+  </form>
+
+  {% elif st.cert %}
+  <p><span class="dot ok"></span>证书已生效（{{ st.subject }}）。小手机网址已换成 https，玩家发「手机码」拿到的就是新地址。</p>
+  <div class="rowlist">
+    {% for s in st.sites %}
+    <div class="row"><div class="nm"><b>{{ s.label }}</b><div class="muted"><a href="{{ s.url }}" target="_blank" rel="noopener" class="tabular">{{ s.url }}</a></div></div></div>
+    {% endfor %}
+  </div>
+  <p class="note">已经登录过小手机的玩家要用新地址重新输一次激活码。打开旧的 http 地址会自动跳到 https。</p>
+
+  {% else %}
+  <div id="waiting">
+    <p><span class="dot warn"></span><span id="wmsg">正在为 {{ st.subject }} 申请证书……</span></p>
+    <p class="note">一般半分钟内就好。一直不好的话，几乎都是<b>安全组没放行 80 和 443</b>；放行后不用做别的，Caddy 会自己重试（失败后会等一会儿再试，最多几分钟）。</p>
+  </div>
+  {% endif %}
+
+  {% if st.enabled %}
+  <form method="post" action="{{ url_for('https_disable') }}" onsubmit="return confirm('关闭 HTTPS？小手机网址会改回 http，https 端口停止服务。可以随时再开。')" style="margin-top:18px">{{ csrf() }}
+    <button class="linkbtn" type="submit">关闭 HTTPS</button></form>
+  {% endif %}
+</section>
+
+{% if st.enabled and not st.cert %}
+<script>
+(function () {
+  var n = 0, msg = document.getElementById("wmsg"), blocked = {{ 'true' if st.blocked else 'false' }}, changed = 0;
+  function poll() {
+    n++;
+    fetch("{{ url_for('https_status') }}", {cache: "no-store"}).then(function (r) { return r.json(); }).then(function (d) {
+      if (d.ready) { location.href = "{{ url_for('https_page') }}"; return; }
+      // 端口占用情况变了（比如刚配好 nginx 转发）就刷新一下提示；连续两次都变了才算，Caddy 验证时会临时占用 443
+      changed = d.blocked !== blocked ? changed + 1 : 0;
+      if (changed >= 2) { location.reload(); return; }
+      if (n === 20) msg.textContent = "还在申请……超过一分钟了，先看看安全组有没有放行 80 和 443。";
+      setTimeout(poll, n < 20 ? 3000 : 10000);
+    }).catch(function () { setTimeout(poll, 5000); });
+  }
+  setTimeout(poll, 3000);
+})();
+</script>
+{% endif %}
+{% endif %}
+<style>
+.ui .cmd{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--soft);border:1px solid var(--line);border-radius:var(--r-ctl);padding:10px 12px;margin:10px 0}
+.ui .cmd{min-width:0;max-width:100%}
+.ui .cmd code{flex:1 1 240px;min-width:0;overflow-wrap:anywhere;font-size:13px}
+.ui .cmd code.pre{white-space:pre-wrap;overflow-x:auto}
+</style>
+{% endblock %}

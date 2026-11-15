@@ -1,0 +1,34 @@
+#!/bin/sh
+# 长日bot 命令入口（Linux）。
+#   ./changri run                   前台运行（崩了自动拉起；Ctrl+C 结束）
+#   sudo ./changri service install  设为开机自启并启动；uninstall 取消；status 查看
+#   ./changri doctor                自检      ./changri backup  备份数据库      ./changri version
+ROOT="$(cd "$(dirname "$0")" && pwd -P)"
+cd "$ROOT" || exit 1
+
+resolve() {
+  VER="$(head -n1 "$ROOT/current" 2>/dev/null | tr -d '\r\n ')"
+  RT="$(head -n1 "$ROOT/versions/$VER/RUNTIME" 2>/dev/null | tr -d '\r\n ')"
+  PY="$ROOT/runtime/$RT/bin/python3"
+  if [ -z "$VER" ] || [ ! -x "$PY" ]; then
+    echo "找不到程序文件（$PY），安装可能不完整。请重新下载安装包。" >&2
+    exit 1
+  fi
+  PYTHONPATH="$ROOT/versions/$VER"; PYTHONNOUSERSITE=1; PYTHONUTF8=1
+  export PYTHONPATH PYTHONNOUSERSITE PYTHONUTF8
+}
+
+if [ "${1:-run}" = "run" ]; then
+  trap 'exit 0' INT TERM
+  while :; do
+    resolve
+    "$PY" -m changri supervise
+    code=$?
+    [ "$code" -eq 10 ] && continue          # 装了新版本：按新的 current 重新起
+    [ "$code" -eq 0 ] && exit 0
+    echo "长日bot 退出了（$code），5 秒后重新启动。按 Ctrl+C 结束。"
+    sleep 5
+  done
+fi
+resolve
+exec "$PY" -m changri "$@"

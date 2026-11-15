@@ -4,11 +4,11 @@ import sys
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 import websockets  # noqa: E402
 
-from core.qqlink import QQLink, QQLinkError, parse_group_message, segments_to_text  # noqa: E402
+from changri.core.qqlink import QQLink, QQLinkError, parse_group_message, segments_to_text  # noqa: E402
 
 
 def gev(text="你好", group=111, user=222, **kw):

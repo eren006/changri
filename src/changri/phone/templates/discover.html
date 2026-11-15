@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% from '_phone_icons.html' import admin_app_icon with context %}
+{% block title %}发现 · {{ brand }}{% endblock %}
+{% block body %}
+  <header class="bar tab-bar"><div class="tab-head"><h1>发现</h1></div></header>
+  <div class="scroll list" id="discoverList">
+    <div class="disc-label">我的</div>
+    <div class="disc-group">
+      <a class="row" href="{{ url_for('search_page') }}">{{ admin_app_icon('guide') }}<span class="name">搜索与收藏</span><span class="chev" aria-hidden="true">›</span></a>
+      <a class="row" href="{{ url_for('char_page') }}">{{ admin_app_icon('rpg') }}<span class="name">RPG</span><span class="chev" aria-hidden="true">›</span></a>
+      {% if on.relations %}<a class="row{% if rel_unread %} unread{% endif %}" href="{{ url_for('rel_page') }}">{{ admin_app_icon('rel') }}<span class="name">关系线</span><span class="chev" aria-hidden="true">›</span></a>{% endif %}
+      {% if on.precall %}<a class="row" href="{{ url_for('precall_page') }}">{{ admin_app_icon('precall') }}<span class="name">前置电话</span><span class="chev" aria-hidden="true">›</span></a>{% endif %}
+      {% if on.chatroom or on.groupchat %}<a class="row" href="{{ url_for('appoint_page') }}">{{ admin_app_icon('appt') }}<span class="name">邀约</span><span class="chev" aria-hidden="true">›</span></a>{% endif %}
+      <a class="row" href="{{ url_for('timeline_page') }}">{{ admin_app_icon('appt') }}<span class="name">时间线与统计</span><span class="chev" aria-hidden="true">›</span></a>
+      <a class="row" href="{{ url_for('todo_page') }}">{{ admin_app_icon('urge') }}<span class="name">我的待回</span><span class="chev" aria-hidden="true">›</span></a>
+    </div>
+    <div class="disc-label">互动</div>
+    <div class="disc-group">
+      {% if on.song %}<a class="row" href="{{ url_for('songs_page') }}">{{ admin_app_icon('song') }}<span class="name">点歌台</span><span class="chev" aria-hidden="true">›</span></a>{% endif %}
+      {% if on.moments %}<a class="row" href="{{ url_for('moments_feed') }}">{{ admin_app_icon('moments') }}<span class="name">{{ skin.words.moments }}</span>{% if moments_latest %}<span class="detail">{{ disp(moments_latest.name) }}：{{ (moments_latest.content or '［图片］')[:12] }}</span>{% endif %}<span class="chev" aria-hidden="true">›</span></a>{% endif %}
+      <a class="row" href="{{ url_for('archive_page') }}">{{ admin_app_icon('guide') }}<span class="name">戏录</span><span class="chev" aria-hidden="true">›</span></a>
+      <a class="row" href="{{ url_for('collect_page') }}">{{ admin_app_icon('grant') }}<span class="name">收集</span>{% if collecting %}<span class="detail">{{ collecting }} 个进行中</span>{% endif %}<span class="chev" aria-hidden="true">›</span></a>
+      {% if on.masquerade and masq_on %}<a class="row" href="{{ url_for('masq_page') }}">{{ admin_app_icon('ball') }}<span class="name">匿名舞会</span><span class="detail">正在开场</span><span class="chev" aria-hidden="true">›</span></a>{% endif %}
+      {% if on.lovemail %}<a class="row" href="{{ url_for('lovemail_page') }}">{{ admin_app_icon('lovemail') }}<span class="name">心动信箱</span><span class="chev" aria-hidden="true">›</span></a>{% endif %}
+      {% if on.wishes %}<a class="row wish-entry" href="{{ url_for('wishes_page') }}">{{ admin_app_icon('wish') }}<span class="name">心愿</span><span class="chev" aria-hidden="true">›</span></a>{% endif %}
+      {% if on.bottle %}<a class="row bottle-entry" href="{{ url_for('bottle_page') }}">{{ admin_app_icon('bottle') }}<span class="name">漂流瓶</span><span class="chev" aria-hidden="true">›</span></a>{% endif %}
+    </div>
+    <div class="disc-label">其他</div>
+    <div class="disc-group">
+      {% if on.games %}<a class="row" href="{{ url_for('games_page') }}">{{ admin_app_icon('games') }}<span class="name">小游戏</span><span class="chev" aria-hidden="true">›</span></a>{% endif %}
+      <a class="row" href="{{ url_for('guide') }}">{{ admin_app_icon('guide') }}<span class="name">使用指南</span><span class="chev" aria-hidden="true">›</span></a>
+    </div>
+  </div>
+{% endblock %}

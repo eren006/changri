@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block title %}收集 · {{ brand }}{% endblock %}
+{% block body %}
+  <header class="bar"><a class="back" href="{{ url_for('discover') }}">发现</a><div class="title">收集</div></header>
+  <div class="scroll list">
+    {% include '_flash.html' %}
+    {% for r in rows %}
+    <form method="post" action="{{ url_for('collect_submit') }}" style="padding:14px 20px;border-bottom:1px solid var(--line)">
+      <input type="hidden" name="_csrf" value="{{ csrf() }}"><input type="hidden" name="cid" value="{{ r.id }}">
+      <b>{{ r.title }}</b>{% if r.day %} <small>第 {{ r.day }} 天</small>{% endif %}
+      <div style="color:var(--mute);font-size:13px;margin:4px 0 8px">{{ r.prompt }}{% if r.prompt %}　{% endif %}截止前可以再改</div>
+      <textarea name="text" rows="4" maxlength="1000" required style="width:100%" placeholder="写在这里">{{ r.mine }}</textarea>
+      <button class="btn" type="submit" style="margin-top:8px">{{ '更新' if r.mine else '提交' }}</button>
+    </form>
+    {% else %}<div class="empty">现在没有正在进行的收集。</div>{% endfor %}
+  </div>
+{% endblock %}

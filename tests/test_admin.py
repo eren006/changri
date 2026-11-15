@@ -6,16 +6,17 @@ import time
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 _tmp = Path(tempfile.mkdtemp())
 os.environ["CHANGRI_DB_PATH"] = str(_tmp / "a.db")
-import admin as admin_mod  # noqa: E402   导入时会读本机 .env，所以环境变量要在导入之后再清
+os.environ["QQ_BOTS"] = "[]"          # 不读开发机 .env 里的真实机器人（单独跑这个文件时会被导入测试库）
+import changri.admin as admin_mod  # noqa: E402   导入时会读本机 .env，所以环境变量要在导入之后再清
 
 os.environ.pop("ADMIN_PASSWORD", None)
 os.environ.pop("FLASK_SECRET_KEY", None)
-from admin import create_app  # noqa: E402
-from core import lovemail, roles, webusers  # noqa: E402
-from core.db import get_conn, init_db  # noqa: E402
+from changri.admin import create_app  # noqa: E402
+from changri.core import lovemail, roles, webusers  # noqa: E402
+from changri.core.db import get_conn, init_db  # noqa: E402
 
 
 def token(client, path="/login"):
@@ -41,12 +42,39 @@ class AdminTests(unittest.TestCase):
     def post(self, path, **data):
         return self.c.post(path, data={**data, "_csrf": token(self.c, "/accounts")}, follow_redirects=True)
 
+    def test_theme_switch(self):
+        """后台外观：睡莲 / 芭蕾 / 圣诞 / 默认，记在 cookie 里，回到刚才的页面；圣诞会飘雪。"""
+        self.login()
+        html = self.c.get("/season").get_data(as_text=True)
+        self.assertIn('aria-label="睡莲"', html)
+        self.assertIn('<html lang="zh-CN">', html)                              # 默认：<html> 上没有主题
+        tok = token(self.c, "/season")
+        r = self.c.post("/theme", data={"theme": "xmas", "_csrf": tok}, headers={"Referer": "http://localhost/season?x=1"})
+        self.assertEqual(r.status_code, 302)
+        self.assertTrue(r.headers["Location"].endswith("/season?x=1"))
+        html = self.c.get("/season").get_data(as_text=True)
+        self.assertIn('data-theme="xmas"', html)
+        self.assertIn('id="snow"', html)
+        self.assertIn('aria-label="圣诞" aria-pressed="true"', html)
+        r = self.c.post("/theme", data={"theme": "lily", "_csrf": tok}, headers={"Referer": "http://evil.example/x"})
+        self.assertEqual(r.headers["Location"].rsplit("localhost", 1)[-1], "/")       # 别的网站来的：回首页，不跳出去
+        html = self.c.get("/season").get_data(as_text=True)
+        self.assertIn('data-theme="lily"', html)
+        self.assertNotIn('id="snow"', html)
+        self.c.post("/theme", data={"theme": "<script>", "_csrf": tok})                # 不认识的值 = 恢复默认
+        self.assertIn('<html lang="zh-CN">', self.c.get("/season").get_data(as_text=True))
+        self.c.set_cookie("admin_theme", "ballet")
+        self.assertIn('data-theme="ballet"', self.c.get("/login").get_data(as_text=True))   # 登录页也跟着变
+
     def test_phone_admin_page(self):
         from unittest import mock
-        from core import phonecodes
-        from core.db import get_config
+        from changri.core import phonecodes
+        from changri.core.db import get_config
         roles.create_role("甲", "B1", "P0", "M0")
         self.login()
+        self.assertEqual(self.c.get("/phone").status_code, 404)           # 小手机是可选的「额外」，默认没开
+        from changri.core import extensions
+        extensions.set_enabled("phone", True)
         html = self.c.get("/phone").get_data(as_text=True)
         self.assertIn("开启小手机", html)                                # 没开过：先走初始化
         self.assertNotIn("网络体检", html)
@@ -56,9 +84,9 @@ class AdminTests(unittest.TestCase):
         with socket.socket() as k:
             k.bind(("127.0.0.1", 0))
             free = k.getsockname()[1]
-        with mock.patch("core.netcheck.public_ip", return_value="9.9.9.9"):
+        with mock.patch("changri.core.netcheck.public_ip", return_value="9.9.9.9"):
             r = self.post("/phone/enable", phone_port=str(free))
-        from core import phoneserver
+        from changri.core import phoneserver
         phoneserver.stop()
         self.assertIn("放行", r.get_data(as_text=True))
         self.assertEqual(get_config("phone_enabled"), "1")
@@ -76,12 +104,12 @@ class AdminTests(unittest.TestCase):
         old = phonecodes.code_for_role(rid)
         self.post(f"/phone/codes/{rid}/reset")
         self.assertNotEqual(phonecodes.code_for_role(rid), old)
-        with mock.patch("core.netcheck._http", return_value=(200, '{"state": "timeout"}')):
+        with mock.patch("changri.core.netcheck._http", return_value=(200, '{"state": "timeout"}')):
             r = self.post("/phone/check")
         self.assertIn("安全组", r.get_data(as_text=True))
 
     def test_setup_needs_code_when_remote(self):
-        from core import setupcode
+        from changri.core import setupcode
         setupcode.clear()
         t = token(self.c, "/setup")
         data = {"username": "站长01", "password": "longenough1", "again": "longenough1", "_csrf": t}
@@ -106,7 +134,7 @@ class AdminTests(unittest.TestCase):
         self.assertEqual(admin_mod._fails["127.0.0.1|*"][0], 5)
 
     def test_login_lock_survives_restart(self):
-        from core.lockstore import FailStore
+        from changri.core.lockstore import FailStore
         webusers.create_user("boss", "longenough1", "owner")
         t = token(self.c)
         for i in range(5):

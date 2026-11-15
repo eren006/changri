@@ -61,7 +61,7 @@ class ErrorsService(unittest.TestCase):
 
     def test_real_sender(self):
         """长日bot 自己的发送函数 → 本服务，发完标记为已发。"""
-        from core import errlog, db
+        from changri.core import errlog, db
         old = db.DB_PATH
         db.DB_PATH = Path(self.tmp.name) / "x.db"      # 本机错误文件写到临时目录，不污染 data/
         self.addCleanup(setattr, db, "DB_PATH", old)

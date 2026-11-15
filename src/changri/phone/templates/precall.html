@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block title %}前置电话 · {{ brand }}{% endblock %}
+{% block body %}
+  {% include '_form_css.html' %}
+  <style>textarea.pc{width:100%;box-sizing:border-box;min-height:100px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--text,inherit);font:inherit;font-size:15px}
+  .pc-item{padding:12px 20px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:flex-start}.pc-no{font-weight:700;min-width:3.2em}.pc-tx{flex:1;min-width:0;white-space:pre-wrap;line-height:1.55}
+  .pc-item form{margin:0}.pc-dial{height:34px;padding:0 14px;border:0;border-radius:17px;background:var(--mine);color:#fff;font:inherit;font-size:14px;cursor:pointer}</style>
+  <header class="bar"><a class="back" href="{{ url_for('discover') }}">发现</a><div class="title">前置电话</div></header>
+  <div class="scroll list">
+    {% include '_flash.html' %}
+    <div class="disc-label">我的前置电话{% if mine %} · #{{ mine.no }}（{{ mine.grp or '未分组' }}）{% endif %}</div>
+    <form method="post" action="{{ url_for('precall_submit') }}" style="padding:6px 20px 12px">
+      <input type="hidden" name="_csrf" value="{{ csrf() }}">
+      <textarea class="pc" name="text" maxlength="{{ text_max }}" placeholder="写一段自我介绍，最多 {{ text_max }} 字" required>{{ mine.text if mine else '' }}</textarea>
+      <p style="color:var(--mute);font-size:13px">提交后是「未分组」，管理员分好组并开放后，别人才看得到。{{ usage }}。</p>
+      <button class="send" type="submit">{{ '修改' if mine else '提交' }}</button>
+    </form>
+    {% if mine %}<form method="post" action="{{ url_for('precall_withdraw') }}" onsubmit="return confirm('撤回你的前置电话？编号会作废。')" style="padding:0 20px 8px;text-align:center">
+      <input type="hidden" name="_csrf" value="{{ csrf() }}"><button class="linkbtn" type="submit">撤回我的前置电话</button></form>{% endif %}
+
+    {% if calls %}<div class="disc-label">进行中的电话</div>
+    {% for r in calls %}<a class="row" href="{{ url_for('room_page', rid=r.id) }}"><div class="body"><div class="top"><span class="name">R{{ r.id }} 前置电话</span><span class="recipient-arrow" aria-hidden="true">›</span></div><div class="preview">{{ r.who }}</div></div></a>{% endfor %}{% endif %}
+
+    <div class="disc-label">可以拨打的前置电话</div>
+    {% set ns = namespace(g=None) %}
+    {% for it in items %}
+      {% if it.grp != ns.g %}{% set ns.g = it.grp %}<div style="padding:10px 20px 2px;color:var(--mute);font-size:13px">【{{ it.grp }}】</div>{% endif %}
+      <div class="pc-item"><span class="pc-no">#{{ it.no }}</span><span class="pc-tx">{{ it.text }}</span>
+        {% if not mine or it.no != mine.no %}<form method="post" action="{{ url_for('precall_dial') }}" onsubmit="return confirm('拨打 #{{ it.no }}？')"><input type="hidden" name="_csrf" value="{{ csrf() }}"><input type="hidden" name="no" value="{{ it.no }}"><button class="pc-dial" type="submit">拨打</button></form>{% else %}<span style="color:var(--mute);font-size:13px">（你）</span>{% endif %}
+      </div>
+    {% else %}<div class="empty" style="padding:16px 20px">现在没有开放选择的前置电话，等管理员分好组。</div>{% endfor %}
+  </div>
+{% endblock %}

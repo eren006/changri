@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 os.environ.setdefault("CHANGRI_DB_PATH", str(Path(tempfile.mkdtemp()) / "e.db"))
 os.environ["QQ_BOTS"] = "[]"
 os.environ.setdefault("DRIVER", "~fastapi+~httpx+~websockets")
@@ -17,8 +17,8 @@ import nonebot  # noqa: E402
 from nonebot.adapters.qq import Adapter, Bot as QBot, GroupAddRobotEvent, GroupMessageCreateEvent  # noqa: E402
 from nonebot.adapters.qq.config import BotInfo  # noqa: E402
 
-from core import admins, roles  # noqa: E402
-from core.db import get_conn, init_db, set_config  # noqa: E402
+from changri.core import admins, roles  # noqa: E402
+from changri.core.db import get_conn, init_db, set_config  # noqa: E402
 
 try:
     nonebot.get_driver()
@@ -26,8 +26,10 @@ except ValueError:
     nonebot.init(qq_bots=[], command_start={"/", ".", "。", ""}, log_level="WARNING")
     nonebot.get_driver().register_adapter(Adapter)
     init_db()
-    from core import extensions
+    from changri.core import extensions
     extensions.load_all()
+
+nonebot.load_plugin("changri.plugins.giftshop")      # 礼品店是可选扩展，这里要它的指令加载进来（别的测试先初始化过也一样）
 
 from nonebot.message import handle_event  # noqa: E402
 
@@ -57,7 +59,7 @@ class SocialE2E(unittest.TestCase):
     def setUp(self):
         init_db()
         with get_conn() as c:
-            for t in ("seasons", "entrance", "messages", "blocks", "role_attrs", "role_groups", "roles", "admins", "admin_codes", "config"):
+            for t in ("gift_shop", "seasons", "entrance", "messages", "blocks", "role_attrs", "role_groups", "roles", "admins", "admin_codes", "config"):
                 c.execute(f"DELETE FROM {t}")
         SENT.clear(); DELETED.clear()
         FakeBot.fail_delete = False
@@ -116,12 +118,17 @@ class SocialE2E(unittest.TestCase):
 
     def test_catalog_and_only_preset(self):
         self.assertIn("还没有上架", self.say("礼品店")[0])
-        set_config("gift_catalog", "玫瑰、巧克力")
-        self.assertIn("玫瑰、巧克力", self.say("礼品店")[0])
+        set_config("gift_catalog", "玫瑰、巧克力")           # 升级前的老格式：第一次用时搬进礼品店表，编号 1、2
+        shop = self.say("礼品店")[0]
+        self.assertIn("1. 玫瑰", shop)
+        self.assertIn("2. 巧克力", shop)
         self.assertTrue(any("[GB]" in o for o in self.say("送礼 乙 随便什么")))
+        self.assertTrue(any("玫瑰" in o and "[GB]" in o for o in self.say("送礼 乙 1")))      # 写编号 = 送对应的礼物
         set_config("gift_only_preset", "1")
-        self.assertIn("要从礼品店里选", self.say("送礼 乙 随便什么")[0])
-        self.assertTrue(any("[GB]" in o for o in self.say("送礼 乙 玫瑰")))
+        self.assertIn("只能送礼品店里的礼物", self.say("送礼 乙 随便什么")[0])
+        self.assertIn("只能送礼品店里的礼物", self.say("送礼 乙 玫瑰")[0])                    # 开了「只能送礼品店」：名字也不行，只认编号
+        self.assertIn("没有 9 号", self.say("送礼 乙 9")[0])
+        self.assertTrue(any("巧克力" in o and "[GB]" in o for o in self.say("送礼 乙 2")))
 
     def test_daily_limit_and_recall_refund(self):
         set_config("sms_daily_limit", "2")

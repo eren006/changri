@@ -4,11 +4,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 os.environ["CHANGRI_DB_PATH"] = str(Path(tempfile.mkdtemp()) / "rpg.db")
 
-from core import attrs, roles, rpg  # noqa: E402
-from core.db import get_conn, init_db, set_config  # noqa: E402
+from changri.core import attrs, roles, rpg  # noqa: E402
+from changri.core.db import get_conn, init_db, set_config  # noqa: E402
 
 
 class RPGTests(unittest.TestCase):

@@ -6,13 +6,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 os.environ.setdefault("CHANGRI_DB_PATH", str(Path(tempfile.mkdtemp()) / "m.db"))
 
-import core.db as db  # noqa: E402
-from core import admins, messaging, roles  # noqa: E402
-from core.announce import get_announce, set_announce  # noqa: E402
-from core.db import get_conn, init_db, set_config  # noqa: E402
+import changri.core.db as db  # noqa: E402
+from changri.core import admins, messaging, roles  # noqa: E402
+from changri.core.announce import get_announce, set_announce  # noqa: E402
+from changri.core.db import get_conn, init_db, set_config  # noqa: E402
 
 
 class MultiBotTests(unittest.TestCase):

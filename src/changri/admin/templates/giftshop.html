@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}礼品店{% endblock %}
+{% block body %}
+{% import "_rpg_icons.html" as ic %}
+{% macro cancel() %}<button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button>{% endmacro %}
+<h1>礼品店</h1>
+<p class="lede">上架的礼物每件有一个编号。玩家发「礼品店」看列表，送礼时可以直接写编号（送礼 乙 3）。{% if only %}现在<b>只能送礼品店里的东西</b>：玩家只能写编号，不能自定义。{% else %}想限制玩家只能送这里的礼物，到「功能与设置 → 礼品店」里打开「只能送礼品店里的东西」。{% endif %}</p>
+<section>
+  <div class="sec-head keep"><h2>已上架<span class="n">{{ items|length }} 件</span></h2>
+    <span class="btns">
+      <details class="panel"><summary class="btn">{{ ic.plus() }}上架</summary>
+        <form class="form" method="post" action="{{ url_for('giftshop_add') }}">{{ csrf() }}
+          <div class="fields"><div><label for="gn">礼物名</label><input id="gn" name="name" maxlength="30" required></div>
+            <div><label for="gt">说明（可空）</label><input id="gt" name="note" maxlength="100"></div></div>
+          <div class="actions"><button class="btn" type="submit">上架</button>{{ cancel() }}</div></form></details>
+      <details class="panel"><summary class="btn ghost">批量导入</summary>
+        <form class="form" method="post" action="{{ url_for('giftshop_import') }}">{{ csrf() }}
+          <div class="fields"><div><label for="gl">一行一件：名字，或「名字｜说明」</label><textarea id="gl" name="lines" rows="5" placeholder="一束玫瑰｜红色的&#10;手写信"></textarea></div></div>
+          <p class="note">导出的文件可以原样粘回这里（编号会重新排，已有的名字自动跳过）。</p>
+          <div class="actions"><button class="btn" type="submit">导入</button>{{ cancel() }}</div></form></details>
+      {% if items %}<a class="btn ghost" href="{{ url_for('giftshop_export') }}">导出</a>
+      <form method="post" action="{{ url_for('giftshop_clear') }}" onsubmit="return confirm('下架全部礼物？')">{{ csrf() }}<button class="btn ghost danger" type="submit">全部下架</button></form>{% endif %}
+    </span></div>
+  {% if items %}<div class="rowlist">{% for g in items %}
+    <div class="row"><div class="nm"><b><span class="tabular">{{ g.id }}.</span> {{ g.name }}</b>{% if g.note %}<div class="muted">{{ g.note }}</div>{% endif %}</div>
+      <div class="acts"><form method="post" action="{{ url_for('giftshop_delete', item_id=g.id) }}" onsubmit="return confirm('下架这件礼物？')">{{ csrf() }}<button class="linkbtn">下架</button></form></div></div>{% endfor %}</div>
+  {% else %}<p class="empty">还没有上架礼物。上架后，玩家送礼可以写编号。</p>{% endif %}
+</section>
+{% endblock %}

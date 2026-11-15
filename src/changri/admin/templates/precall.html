@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}前置电话{% endblock %}
+{% block body %}
+<h1>前置电话</h1>
+<p class="lede">玩家用「提交前置电话 内容」（或小手机里的表单）交自我介绍，每条一个全局唯一的编号。刚交的都是<b>未分组</b>：在下面勾选、归成组，再把组设成<b>可选</b>，玩家才能在「查看前置电话」里看到，并用「拨打前置电话 编号」开一通电话。群里也能分组：「前置电话分组 A组 3 5 8」、「可选 A组」、「不可选 A组」。这个扩展平时是关的，在「扩展」页打开。</p>
+<section>
+  <div class="sec-head keep"><h2>规则</h2></div>
+  <p>每人最多主动拨出 <b>{{ k.dial_limit or '不限' }}</b> 次 · 每人一共最多通 <b>{{ k.total_limit or '不限' }}</b> 次 · 双方共同选择才接通：<b>{{ '开' if k.mutual else '关' }}</b>。到「设置 → 前置电话」里改。</p>
+</section>
+<section>
+  <div class="sec-head keep"><h2>分组</h2></div>
+  {% for g in groups %}
+  <div class="card" style="margin-bottom:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <b>{{ g.name }}</b><span class="muted">{{ g.n }} 条 · {{ '可选（玩家看得到）' if g.open else '未开放' }}</span>
+    <form method="post" action="{{ url_for('precall_group_op', name=g.name) }}">{{ csrf() }}<input type="hidden" name="op" value="{{ 'close' if g.open else 'open' }}"><button class="btn {{ 'ghost' if g.open }}" type="submit">{{ '不可选' if g.open else '设为可选' }}</button></form>
+    <form method="post" action="{{ url_for('precall_group_op', name=g.name) }}" onsubmit="return confirm('删除这个组？里面的前置电话回到未分组。')">{{ csrf() }}<input type="hidden" name="op" value="delete"><button class="btn ghost" type="submit">删除组</button></form>
+  </div>
+  {% else %}<p class="muted">还没有分组。在下面勾选前置电话，写一个组名就建好了。</p>{% endfor %}
+</section>
+<section>
+  <div class="sec-head keep"><h2>提交的前置电话（{{ entries|length }}）</h2></div>
+  <form method="post" action="{{ url_for('precall_assign') }}">{{ csrf() }}
+    <div class="card" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+      <span>勾选的</span>
+      <select name="group"><option value="">选已有的组…</option>{% for g in groups %}<option>{{ g.name }}</option>{% endfor %}</select>
+      <input type="text" name="new_group" placeholder="或写新组名" maxlength="12" style="width:9em">
+      <button class="btn" type="submit">归入这个组</button>
+      <button class="btn ghost" type="submit" name="ungroup" value="1">移回未分组</button>
+    </div>
+    {% for e in entries %}
+    <div class="card" style="margin-bottom:8px;display:flex;gap:10px;align-items:flex-start">
+      <input type="checkbox" name="no" value="{{ e.no }}" aria-label="选中 #{{ e.no }}" style="margin-top:4px">
+      <div style="flex:1;min-width:0"><b>#{{ e.no }}</b> {{ e.name }} · {% if e.grp %}{{ e.grp }}{% else %}<span class="muted">未分组</span>{% endif %}{% if e.hidden %} · <span class="muted">已隐藏</span>{% endif %}
+        <div style="white-space:pre-wrap;margin-top:4px">{{ e.text }}</div></div>
+      <button class="btn ghost" type="submit" formmethod="post" formaction="{{ url_for('precall_entry_op', no=e.no) }}" name="op" value="{{ 'show' if e.hidden else 'hide' }}">{{ '取消隐藏' if e.hidden else '隐藏' }}</button>
+      <button class="btn ghost" type="submit" formmethod="post" formaction="{{ url_for('precall_entry_op', no=e.no) }}" name="op" value="delete" onclick="return confirm('删除 #{{ e.no }}？')">删除</button>
+    </div>
+    {% else %}<p class="muted">还没有人提交。</p>{% endfor %}
+  </form>
+</section>
+<section>
+  <div class="sec-head keep"><h2>拨打记录（{{ calls|length }}）</h2></div>
+  {% for c in calls %}<div>{{ c.an }} → {{ c.bn }}（#{{ c.entry_no }}）· R{{ c.room_id }} · {{ '通话中' if c.status == 'open' else '已结束' }}</div>{% else %}<p class="muted">还没有人拨打。</p>{% endfor %}
+</section>
+<section>
+  <div class="sec-head keep"><h2>关闭与清空</h2></div>
+  <form method="post" action="{{ url_for('precall_off') }}" style="margin-bottom:10px">{{ csrf() }}<button class="btn ghost" type="submit">关闭前置电话</button></form>
+  <form method="post" action="{{ url_for('precall_clear') }}" class="card">{{ csrf() }}
+    <p class="muted">删掉所有提交、分组和拨打记录（通话房间不动）。无法恢复。</p>
+    <input type="text" name="confirm" placeholder="写「清空」确认"><button class="btn ghost" type="submit">清空</button></form>
+</section>
+{% endblock %}

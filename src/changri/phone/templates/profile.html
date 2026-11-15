@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% block title %}我的 · {{ brand }}{% endblock %}
+{% block body %}
+  <header class="bar tab-bar"><div class="tab-head"><h1>我的</h1></div></header>
+  <div class="scroll profile-page">
+    <section class="pf-card">
+      <button type="button" class="pf-avatar" id="avatarTap" aria-label="更换头像"><span class="avatar big" data-name="{{ role['name'] }}">{{ role['name'][:1] }}</span></button>
+      <div class="pf-who"><h1>{{ my_nick or role['name'] }}</h1>{% if my_nick %}<p>{{ role['name'] }}</p>{% elif season %}<p>{{ season['name'] }}</p>{% endif %}</div>
+    </section>
+    {% include '_flash.html' %}
+    <form class="pf-group pf-nick" method="post" action="{{ url_for('set_nickname') }}">
+      <input type="hidden" name="_csrf" value="{{ csrf() }}">
+      <label for="nickInput">微信名</label>
+      <input id="nickInput" name="nick" maxlength="{{ nick_max }}" value="{{ my_nick }}" placeholder="不填就显示「{{ role['name'] }}」" autocomplete="off">
+      <button type="submit" class="quiet-button">保存</button>
+    </form>
+    <p style="margin:8px 22px 14px;font-size:12px;line-height:1.7;color:var(--muted)"><span id="avatarMsg">点头像可换图片，会自动裁成正方形，所有人都能看到。</span> <button type="button" class="quiet-button" id="avatarRemove"{% if not phone_avatars.get(role['name']) %} hidden{% endif %}>换回名字头像</button></p>
+    <input type="file" id="avatarFile" accept="image/*" hidden>
+    <form class="pf-group" method="post" action="{{ url_for('set_skin') }}" style="padding:14px 16px">
+      <input type="hidden" name="_csrf" value="{{ csrf() }}">
+      <div style="font-size:15px;font-weight:600;margin-bottom:10px">主题风格</div>
+      <div class="choices" style="display:flex;flex-wrap:wrap;gap:8px">
+        <button class="choice" name="skin" value="" aria-pressed="{{ 'false' if skin.picked else 'true' }}">跟随本季</button>
+        {% for key, t in phone_themes.items() %}<button class="choice" name="skin" value="{{ key }}" aria-pressed="{{ 'true' if skin.picked == key else 'false' }}">{{ t.name }}</button>{% endfor %}
+      </div>
+      <p style="margin:10px 0 0;font-size:13px;line-height:1.7;color:var(--muted)">只换外观，保存在这台设备；页面用语跟随本季设置。</p>
+    </form>
+    <div class="pf-group">
+      <a class="pf-row" href="{{ url_for('guide') }}"><span class="tile">{{ phone_symbol('book') }}</span><span class="name">使用指南</span><span class="chev" aria-hidden="true">›</span></a>
+    </div>
+    {% if not https %}<p style="margin:14px 22px 0;font-size:12px;line-height:1.7;color:var(--muted)">当前是 http 连接。别在这里填任何密码；想更安全可以请管理员开通 HTTPS。</p>{% endif %}
+    <form class="pf-group" method="post" action="{{ url_for('logout') }}"><input type="hidden" name="_csrf" value="{{ csrf() }}"><button class="pf-row pf-out" type="submit">退出这部手机</button></form>
+  </div>
+<script>
+  (function () {
+    var file = document.getElementById('avatarFile'), msg = document.getElementById('avatarMsg'), rm = document.getElementById('avatarRemove'),
+        me = {{ role['name']|tojson }}, CSRF = {{ csrf()|tojson }};
+    function post(url, body) {
+      body = body || new FormData(); body.append('_csrf', CSRF);
+      return fetch(url, {method: 'POST', body: body}).then(function (r) { return r.json().catch(function () { return {ok: false, msg: '出错了，稍后再试'}; }); });
+    }
+    // 浏览器先缩到 512 再传，服务端裁成 256 正方形
+    function shrink(f) {
+      return new Promise(function (resolve) {
+        var url = URL.createObjectURL(f), im = new Image();
+        im.onload = function () {
+          var k = Math.min(1, 512 / Math.min(im.naturalWidth, im.naturalHeight)), c = document.createElement('canvas');
+          c.width = Math.round(im.naturalWidth * k); c.height = Math.round(im.naturalHeight * k);
+          var x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(im, 0, 0, c.width, c.height);
+          URL.revokeObjectURL(url);
+          c.toBlob(function (b) { resolve(b || f); }, 'image/jpeg', 0.88);
+        };
+        im.onerror = function () { URL.revokeObjectURL(url); resolve(f); };
+        im.src = url;
+      });
+    }
+    document.getElementById('avatarTap').addEventListener('click', function () { file.click(); });
+    file.addEventListener('change', async function () {
+      var f = file.files[0]; file.value = '';
+      if (!f) return;
+      msg.textContent = '上传中…';
+      var fd = new FormData(); fd.append('avatar', await shrink(f), 'avatar.jpg');
+      var r = await post({{ url_for('avatar_upload')|tojson }}, fd);
+      msg.textContent = r.msg || '';
+      if (r.ok) { window.PHONE_AVATARS[me] = r.v; rm.hidden = false; applyAvatars(); }
+    });
+    rm.addEventListener('click', async function () {
+      if (!confirm('换回名字头像？')) return;
+      var r = await post({{ url_for('avatar_delete')|tojson }});
+      msg.textContent = r.msg || '';
+      if (r.ok) { delete window.PHONE_AVATARS[me]; rm.hidden = true; applyAvatars(); }
+    });
+  })();
+</script>
+{% endblock %}

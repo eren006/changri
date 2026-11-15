@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}发起官约{% endblock %}
+{% block body %}
+<h1>发起官约</h1>
+{% include "_collect_tabs.html" %}
+<p class="lede">管理员直接安排官约 / 官电，和群里发「发起官约」是同一套：占一个群池里的群，通知每位参与者（两条消息：时间地点人物 + 群号），时间线冲突会拒绝。地点可以不写；日期不写就是今天。</p>
+{% if not running %}<div class="callout">现在不是进行中的季度，发起会被拒绝（筹备期 / 没有季度不能约）。</div>{% endif %}
+<section>
+  <div class="sec-head keep"><h2>新建</h2></div>
+  <form class="form" method="post" action="{{ url_for('official_launch') }}">{{ csrf() }}
+    <div class="fields">
+      <div><label for="ok">类型</label><select id="ok" name="kind"><option>官约</option><option>官电</option></select></div>
+      <div><label for="od">第几天（D几）</label><input id="od" type="number" min="1" name="day" value="{{ today }}"></div>
+      <div><label for="ot">时间</label><input id="ot" name="time" placeholder="1400-1500" required></div>
+      <div><label for="op">地点（可不写；官电没有地点）</label><input id="op" name="place" maxlength="40" placeholder="留空 = 没有地点"></div>
+    </div>
+    <fieldset style="border:0;padding:0;margin:12px 0"><legend class="note">参与者（至少两位；第一位算发起人）</legend>
+      <div style="display:flex;flex-wrap:wrap;gap:8px 16px">
+        {% for r in roles %}<label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" name="role" value="{{ r.id }}">{{ r.name }}</label>{% else %}<span class="muted">还没有角色。</span>{% endfor %}
+      </div></fieldset>
+    <div class="actions"><button class="btn" type="submit">发起并通知</button></div>
+  </form>
+</section>
+<section>
+  <div class="sec-head keep"><h2>最近的官约 / 官电</h2></div>
+  {% for r in rows %}
+  <div class="card" style="margin-bottom:8px"><b>R{{ r.id }} {{ r.kind }}</b> <span class="muted">{{ r.slot }} · {{ {'open':'进行中','ended':'已结束','cancelled':'已取消'}[r.status] }}</span><div>{{ r.who }}</div></div>
+  {% else %}<p class="muted">还没有。</p>{% endfor %}
+  <p class="note">结束 / 取消：总览页的房间列表里点「结束」，或在群里发「取消官约 R号」。</p>
+</section>
+{% endblock %}

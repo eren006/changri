@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% block title %}邀约 · {{ brand }}{% endblock %}
+{% block body %}
+  {% include '_form_css.html' %}
+  <style>.pickrow{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 10px}.pick input{position:absolute;opacity:0;pointer-events:none}.pick span{display:inline-block;padding:7px 14px;border-radius:999px;border:1px solid var(--line);font-size:14px;cursor:pointer}.pick input:checked+span{background:var(--mine,#7a5cff);color:#fff;border-color:transparent}.pick input:focus-visible+span{outline:2px solid var(--mine,#7a5cff)}</style>
+  <header class="bar"><a class="back" href="{{ url_for('discover') }}">发现</a><div class="title">邀约</div></header>
+  <div class="scroll list">
+    {% include '_flash.html' %}
+    {% if reqs %}
+    <div class="disc-label">想加入你的约会</div>
+    {% for q in reqs %}
+    <div style="padding:12px 20px;border-bottom:1px solid var(--line)">
+      <div><b>{{ q.applicant }}</b> 想加入 R{{ q.room_id }} {{ q.kind }}（D{{ q.day }} {{ q.start_hm }}-{{ q.end_hm }}）</div>
+      <form method="post" action="{{ url_for('appoint_answer') }}" style="display:flex;gap:10px;margin-top:8px">
+        <input type="hidden" name="_csrf" value="{{ csrf() }}"><input type="hidden" name="qid" value="{{ q.id }}">
+        <button class="send" name="accept" value="1" type="submit">同意</button><button class="send" name="accept" value="0" type="submit" style="background:var(--field,#999)">拒绝</button>
+      </form>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <div class="disc-label">进行中的约会</div>
+    {% for r in rooms %}
+    <a class="row" href="{{ url_for('room_page', rid=r.id) }}"><div class="body"><div class="top"><span class="name">R{{ r.id }} {{ '多人群聊' if r.kind == '微信' else r.kind }}</span><span class="recipient-arrow" aria-hidden="true">›</span></div>
+      <div class="preview">{{ r.slot }} · {{ r.who }}{% if r.web %} · 网页聊天室{% endif %}</div></div></a>
+    {% else %}<div class="empty" style="padding:16px 20px">现在没有进行中的约会。</div>{% endfor %}
+
+    {% if chat_on %}
+    <div class="disc-label">发起约会</div>
+    <form method="post" action="{{ url_for('appoint_new') }}" style="padding:12px 20px">
+      <input type="hidden" name="_csrf" value="{{ csrf() }}">
+      <label for="apKind">类型</label>
+      <select id="apKind" name="kind" onchange="document.getElementById('apPlaceBox').hidden=this.value!=='私约'">
+        <option>私约</option><option>电话</option></select>
+      <div><label for="apTime">时间（游戏里的几点，今天 D{{ today or '—' }}）</label><input id="apTime" name="time" placeholder="1400-1500"></div>
+      <div id="apPlaceBox"><label for="apPlace">地点</label><input id="apPlace" name="place" maxlength="30" placeholder="可不填"></div>
+      <div class="wish-label">对象（可多选）</div>
+      <div class="pickrow">{% for o in others %}<label class="pick"><input type="checkbox" name="to" value="{{ o.id }}"><span>{{ o.name }}</span></label>{% endfor %}</div>
+      <p style="color:var(--mute);font-size:13px">发起后对方会收到通知，约会在网页聊天室里进行。</p>
+      <button class="send" type="submit">发起</button>
+    </form>
+    {% endif %}
+
+    {% if gc_on %}
+    <div class="disc-label">多人群聊</div>
+    <form method="post" action="{{ url_for('appoint_new') }}" style="padding:12px 20px">
+      <input type="hidden" name="_csrf" value="{{ csrf() }}"><input type="hidden" name="kind" value="微信">
+      <div class="wish-label">拉谁进群（至少选一位）</div>
+      <div class="pickrow">{% for o in others %}<label class="pick"><input type="checkbox" name="to" value="{{ o.id }}"><span>{{ o.name }}</span></label>{% endfor %}</div>
+      <p style="color:var(--mute);font-size:13px">不占时间线，没有时间地点；进去直接聊，聊完谁都可以结束。</p>
+      <button class="send" type="submit">建群聊</button>
+    </form>
+    {% endif %}
+
+    {% if chat_on %}<div class="disc-label">申请加入别人的约会</div>
+    <form method="post" action="{{ url_for('appoint_join') }}" style="padding:12px 20px">
+      <input type="hidden" name="_csrf" value="{{ csrf() }}">
+      <label for="jTo">想加入谁的约会</label>
+      <select id="jTo" name="to">{% for o in others %}<option value="{{ o.id }}">{{ o.name }}</option>{% endfor %}</select>
+      <label for="jStart">开始时间（对方有好几场时才要填，如 14:00）</label><input id="jStart" name="start" placeholder="可不填">
+      <button class="send" type="submit" style="margin-top:10px">申请加入</button>
+    </form>
+    {% endif %}
+  </div>
+{% endblock %}

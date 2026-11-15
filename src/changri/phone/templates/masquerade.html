@@ -1,0 +1,662 @@
+{% extends 'base.html' %}
+{% block title %}匿名舞会 · {{ brand }}{% endblock %}
+{% block body %}
+{# 匿名舞会（玩家端）：一个页面里完成选面具 → 起昵称 → 舞厅聊天 → 邀请跳舞 → 临时私聊，音乐不会因为换层而中断。
+   真名绝不出现在这个页面里；所有内容靠 /p/me/ball/state 轮询。 #}
+<header class="bar mq-bar">
+  <a class="back" href="{{ url_for('discover') }}">发现</a>
+  <img class="mq-ornament" src="{{ url_for('static', filename='masquerade/mask-ornament-v1.png') }}" alt="" aria-hidden="true" width="76" height="51">
+  <div class="title">匿名舞会<small id="mqSub">戴上面具，别暴露身份</small></div>
+  <div class="right"><button type="button" class="mq-dance-btn" id="mqDanceBtn" hidden aria-label="舞伴与邀请"><svg viewBox="0 0 32 24" aria-hidden="true"><path d="M3 5c4-3 8-3 13 0 5-3 9-3 13 0l-2 9c-3 5-7 6-11 2-4 4-8 3-11-2Z"/><path d="M7 9c2-1 4-1 6 1l-1 3-5-1Zm18 0c-2-1-4-1-6 1l1 3 5-1Z"/></svg><span class="mq-dance-label">舞伴</span><span class="mq-badge" id="mqBadge" hidden></span></button></div>
+</header>
+
+<div class="mq-player" id="mqPlayer">
+  <button type="button" class="mq-play" id="mqPlay" aria-label="播放音乐"><span class="mq-play-glyph" aria-hidden="true"></span></button>
+  <div class="mq-track">
+    <div class="mq-track-label">舞厅乐章 <span id="mqMusicLabel"> · {{ masq_music.label }}</span></div>
+    <div class="mq-title" id="mqMusicTitle">{{ masq_music.title }}</div>
+    <input type="range" id="mqSeek" min="0" max="1000" value="0" step="1" aria-label="播放进度">
+  </div>
+  <span class="mq-time" id="mqTime">0:00</span>
+  <audio id="mqAudio" src="{{ masq_music.url }}" preload="none" loop></audio>
+</div>
+
+<div class="scroll mq-page" id="mqStage"></div>
+
+<div class="mq-room" id="mqRoom" hidden>
+  <div class="mq-room-note"><span></span>今夜，以面具相识<span></span></div>
+  <details class="mq-help" id="mqHelp">
+    <summary><span>点对方名字，就能 @ TA</span><span class="mq-help-more">玩法说明</span></summary>
+    <div class="mq-help-body">
+      <p><b>提到某个人</b>：点对方消息上方带虚线的面具名／昵称，输入框会自动填入 @；接着写内容并发送。对方会看到「@了你」提示。</p>
+      <p><b>回应一句话</b>：点消息下方的笑脸，选择心动、鼓掌、欢笑、赠花或赞叹。再点自己选过的回应，就能取消。</p>
+      <p><b>邀请跳舞</b>：点右上角「舞伴」，选择一位客人发出邀请；对方接受后，即可匿名私聊。</p>
+      <a href="{{ url_for('guide') }}">查看使用指南</a>
+    </div>
+  </details>
+  <div class="scroll mq-chat" id="mqChat" aria-live="polite"></div>
+  <form class="mq-compose" id="mqForm" autocomplete="off">
+    <input id="mqText" maxlength="{{ masq_state.limits.msg }}" placeholder="隔着面具，说句真心话…" enterkeyhint="send">
+    <button type="submit" id="mqSend">发送</button>
+  </form>
+  <div class="mq-why" id="mqWhy" hidden></div>
+</div>
+
+{# 舞伴面板：邀请别人 + 我的舞 #}
+<div class="mq-sheet" id="mqSheet" hidden>
+  <div class="mq-sheet-head"><button type="button" class="mq-x" id="mqSheetClose" aria-label="关闭">‹ 返回</button><b>舞伴</b><span></span></div>
+  <div class="mq-sheet-body">
+    <div class="mq-h">我的舞 <small>每段最多 {{ masq_state.limits.dance }} 句</small></div>
+    <div id="mqDances"></div>
+    <div class="mq-h">邀请跳舞 <small id="mqLeft"></small></div>
+    <div id="mqMembers"></div>
+  </div>
+</div>
+
+{# 一段舞的临时对话 #}
+<div class="mq-sheet mq-dance" id="mqDance" hidden>
+  <div class="mq-sheet-head"><button type="button" class="mq-x" id="mqDanceClose" aria-label="返回">‹ 返回</button><b id="mqDanceWho"></b><span id="mqDanceCnt" class="mq-cnt"></span></div>
+  <div class="mq-sheet-body mq-chat" id="mqDanceChat"></div>
+  <form class="mq-compose" id="mqDanceForm" autocomplete="off">
+    <input id="mqDanceText" maxlength="{{ masq_state.limits.msg }}" placeholder="悄悄说…" enterkeyhint="send">
+    <button type="submit" id="mqDanceSend">发送</button>
+  </form>
+  <div class="mq-why" id="mqDanceWhy" hidden></div>
+</div>
+
+{# 收到邀请的弹窗 #}
+<div class="mq-modal" id="mqInvite" hidden role="dialog" aria-modal="true" aria-labelledby="mqInviteText">
+  <div class="mq-card">
+    <div class="mq-big" id="mqInviteIcon"></div>
+    <p id="mqInviteText"></p>
+    <div class="mq-card-btns"><button type="button" id="mqInviteNo" class="ghost">婉拒</button><button type="button" id="mqInviteYes">接受邀请</button></div>
+  </div>
+</div>
+
+<div class="mq-toast" id="mqToast" hidden></div>
+
+<style>
+.mq-bar .title small { display: block; }
+.mq-dance-btn { position: relative; border: 0; background: transparent; font-size: 24px; line-height: 1; padding: 4px 6px; cursor: pointer; }
+.mq-badge { position: absolute; top: -2px; right: -2px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: #d64545; color: #fff; font-size: 11px; line-height: 16px; text-align: center; }
+.mq-player { flex: none; display: flex; align-items: center; gap: 10px; padding: 8px var(--gutter, 18px); border-bottom: .5px solid var(--line); background: var(--theirs); }
+.mq-play { width: 38px; height: 38px; min-width: 38px; border-radius: 50%; border: 0; background: var(--mine); color: var(--mine-text, #fff); font-size: 15px; cursor: pointer; }
+.mq-track { flex: 1; min-width: 0; }
+.mq-title { font-size: 13px; font-weight: 600; letter-spacing: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mq-track input[type=range] { width: 100%; margin: 2px 0 0; accent-color: var(--mine); }
+.mq-time { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.mq-page { padding: 18px var(--gutter, 18px) 28px; }
+.mq-room { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.mq-room[hidden], .mq-sheet[hidden], .mq-modal[hidden], .mq-toast[hidden] { display: none; }
+.mq-chat { flex: 1; min-height: 0; overflow-y: auto; padding: 12px var(--gutter, 18px); display: flex; flex-direction: column; gap: 12px; }
+.mq-intro { text-align: center; color: var(--muted); font-size: 14px; line-height: 1.7; padding: 6px 4px 18px; }
+.mq-intro h2 { font-size: 20px; color: var(--text); margin-bottom: 6px; letter-spacing: .06em; }
+.mq-masks { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.mq-mask { border: 1px solid var(--line); background: var(--bg); color: var(--text); border-radius: 16px; padding: 18px 8px 14px; font-size: 15px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.mq-mask:active, .mq-mask:focus-visible { border-color: var(--mine); box-shadow: 0 0 0 3px color-mix(in srgb, var(--mine) 25%, transparent); outline: none; }
+.mq-mask { padding: 18px 12px 16px; gap: 6px; }
+.mq-mask .mq-n { font-size: 17px; font-weight: 600; letter-spacing: .06em; }
+.mq-mask .mq-d { font-size: 12px; line-height: 1.6; color: var(--muted); }
+.mq-form label { display: block; font-size: 14px; margin: 14px 0 6px; }
+.mq-form input { width: 100%; padding: 12px; font-size: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--text); }
+.mq-form .hint { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.6; }
+.mq-wear { text-align: center; font-size: 26px; font-weight: 700; letter-spacing: .1em; margin: 8px 0 2px; }
+.mq-big-btn { margin-top: 16px; width: 100%; padding: 13px; border: 0; border-radius: 12px; background: var(--mine); color: var(--mine-text, #fff); font-size: 16px; cursor: pointer; }
+.mq-big-btn:disabled { opacity: .5; }
+.mq-msg { display: flex; gap: 8px; align-items: flex-start; max-width: 100%; }
+.mq-msg.mine { flex-direction: row-reverse; }
+.mq-av { flex: none; width: 36px; height: 36px; border-radius: 50%; background: var(--theirs); color: var(--theirs-text); display: grid; place-items: center; font-size: 16px; font-weight: 600; }
+.mq-bub { max-width: 76%; }
+.mq-name { font-size: 12px; color: var(--muted); margin: 0 2px 2px; }
+.mq-msg.mine .mq-name { text-align: right; }
+.mq-text { display: inline-block; padding: 8px 12px; border-radius: 14px; background: var(--theirs); color: var(--theirs-text); word-break: break-word; white-space: pre-wrap; text-align: left; }
+.mq-msg.mine .mq-text { background: var(--mine); color: var(--mine-text, #fff); }
+.mq-compose { flex: none; display: flex; gap: 8px; padding: 10px var(--gutter, 18px) calc(10px + env(safe-area-inset-bottom)); border-top: .5px solid var(--line); background: var(--bg); }
+.mq-compose input { flex: 1; min-width: 0; padding: 10px 12px; font-size: 16px; border: 1px solid var(--line); border-radius: 20px; background: var(--bg); color: var(--text); }
+.mq-compose button { border: 0; border-radius: 20px; padding: 0 16px; background: var(--mine); color: var(--mine-text, #fff); font-size: 15px; cursor: pointer; }
+.mq-compose button:disabled, .mq-compose input:disabled { opacity: .5; }
+.mq-why { flex: none; text-align: center; font-size: 12px; color: var(--muted); padding: 0 16px 10px; }
+.mq-narr { align-self: center; max-width: 86%; text-align: center; font-size: 13px; font-style: italic; color: var(--muted); padding: 6px 12px; border-top: .5px solid var(--line); border-bottom: .5px solid var(--line); letter-spacing: .04em; }
+.mq-name.click { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+.mq-tome .mq-text { box-shadow: 0 0 0 2px var(--mine); }
+.mq-tag { font-size: 11px; color: var(--mine); margin: 0 2px 2px; }
+.mq-msg.mine .mq-tag { text-align: right; }
+.mq-reacts { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.mq-msg.mine .mq-reacts { justify-content: flex-end; }
+.mq-chip { border: 1px solid var(--line); background: var(--bg); color: var(--text); border-radius: 12px; padding: 1px 8px; font-size: 13px; line-height: 1.6; cursor: pointer; }
+.mq-chip.on { border-color: var(--mine); background: color-mix(in srgb, var(--mine) 14%, var(--bg)); }
+.mq-rby { margin-top: 4px; font-size: 12px; color: var(--muted); line-height: 1.6; text-align: right; }
+.mq-rby-line { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
+.mq-rby-ic { display: inline-flex; color: var(--mine); }
+.mq-rby-ic .phone-symbol { width: 14px; height: 14px; }
+.mq-chip.mq-more { color: var(--muted); }
+.mq-chip { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 34px; min-height: 32px; padding: 4px 9px; border-radius: 11px; color: var(--muted); }
+.mq-chip.on { color: var(--mine); }
+.mq-chip .phone-symbol { width: 17px; height: 17px; }
+.mq-chip.pick { padding: 5px 8px; }
+.mq-picks { display: flex; flex-basis: 100%; gap: 5px; padding-top: 2px; }
+.mq-react-count { font-size: 11px; font-variant-numeric: tabular-nums; }
+.mq-chip:focus-visible { outline: 2px solid var(--mine); outline-offset: 2px; }
+.mq-sys { text-align: center; font-size: 12px; color: var(--muted); padding: 2px 8px; }
+.mq-sheet { position: fixed; z-index: 30; top: 0; bottom: 0; left: 50%; width: 100%; max-width: 480px; transform: translateX(-50%); background: var(--bg); display: flex; flex-direction: column; }
+.mq-sheet-head { flex: none; display: flex; align-items: center; justify-content: space-between; padding: 12px var(--gutter, 18px); border-bottom: .5px solid var(--line); background: var(--bar, var(--bg)); }
+.mq-sheet-head b { font-size: 16px; }
+.mq-sheet-head > span { min-width: 56px; text-align: right; }
+.mq-x { border: 0; background: transparent; color: var(--text); font-size: 15px; cursor: pointer; min-width: 56px; text-align: left; padding: 4px 0; }
+.mq-cnt { font-size: 12px; color: var(--muted); }
+.mq-sheet-body { flex: 1; min-height: 0; overflow-y: auto; padding: 8px var(--gutter, 18px) 24px; }
+.mq-sheet-body.mq-chat { padding-top: 12px; }
+.mq-h { margin: 16px 2px 8px; font-size: 13px; color: var(--muted); letter-spacing: .08em; }
+.mq-h small { font-weight: 400; letter-spacing: 0; margin-left: 6px; }
+.mq-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; margin-bottom: 8px; background: var(--bg); }
+.mq-row .mq-av { background: var(--theirs); }
+.mq-row .who { flex: 1; min-width: 0; }
+.mq-row .who b { display: block; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mq-row .who small { color: var(--muted); font-size: 12px; }
+.mq-row button { border: 0; border-radius: 16px; padding: 7px 14px; background: var(--mine); color: var(--mine-text, #fff); font-size: 14px; cursor: pointer; }
+.mq-row button:disabled { opacity: .45; }
+.mq-row.click { cursor: pointer; }
+.mq-dot { width: 8px; height: 8px; border-radius: 50%; background: #d64545; display: inline-block; margin-left: 6px; }
+.mq-empty { color: var(--muted); font-size: 13px; padding: 6px 4px; }
+.mq-modal { position: fixed; z-index: 40; inset: 0; background: rgba(0,0,0,.45); display: grid; place-items: center; padding: 24px; }
+.mq-card { background: var(--bg); color: var(--text); border-radius: 20px; padding: 26px 22px 20px; width: 100%; max-width: 340px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,.3); }
+.mq-big { width: 64px; height: 64px; margin: 0 auto 12px; border-radius: 50%; background: var(--theirs); display: grid; place-items: center; font-size: 28px; font-weight: 600; }
+.mq-card p { font-size: 16px; line-height: 1.7; }
+.mq-card-btns { display: flex; gap: 10px; margin-top: 18px; }
+.mq-card-btns button { flex: 1; padding: 11px; border: 0; border-radius: 12px; background: var(--mine); color: var(--mine-text, #fff); font-size: 15px; cursor: pointer; }
+.mq-card-btns button.ghost { background: var(--theirs); color: var(--theirs-text); }
+.mq-toast { position: fixed; z-index: 50; left: 50%; bottom: 90px; transform: translateX(-50%); background: rgba(30,30,34,.92); color: #fff; padding: 9px 16px; border-radius: 18px; font-size: 14px; max-width: 86%; text-align: center; }
+
+/* 舞会自己的排版与材质；颜色随手机外观切换。 */
+.phone[data-mode="masq"] {
+  --mq-ink: var(--text);
+  --mq-soft: color-mix(in srgb, var(--text) 5%, var(--bg));
+  --mq-edge: color-mix(in srgb, var(--text) 18%, var(--bg));
+  --mq-serif: "Songti SC", "Noto Serif SC", "STSong", Georgia, serif;
+  height: 100dvh; min-height: 0;
+}
+.phone[data-mode="masq"] .mq-bar {
+  padding: calc(env(safe-area-inset-top) + 8px) 22px 20px;
+  background: var(--bg); border-bottom: 0; backdrop-filter: none; position: relative;
+}
+.phone[data-mode="masq"] .mq-bar .back { font-size: 13px; color: var(--muted); }
+.phone[data-mode="masq"] .mq-bar .title {
+  display: block; padding-top: 8px; font: 400 30px/1.3 var(--mq-serif);
+  letter-spacing: .12em; white-space: normal;
+}
+.phone[data-mode="masq"] .mq-bar .title small {
+  display: block; margin-top: 8px; font: 400 11px/1.6 -apple-system, "PingFang SC", sans-serif;
+  letter-spacing: .08em; white-space: nowrap; color: var(--muted);
+}
+.mq-ornament { position: absolute; right: 22px; bottom: 20px; width: 76px; height: 51px; object-fit: contain; opacity: .55; filter: grayscale(1); pointer-events: none; }
+.phone[data-mode="masq"] .mq-bar .title { padding-right: 80px; }
+@media (prefers-color-scheme: dark) { .mq-ornament { filter: grayscale(1) invert(1); opacity: .45; } }
+.mq-dance-btn { display: flex; align-items: center; gap: 6px; min-height: 44px; color: var(--text); }
+.mq-dance-btn[hidden] { display: none; }
+.mq-dance-btn svg { width: 26px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.2; stroke-linejoin: round; }
+.mq-dance-label { font-size: 12px; letter-spacing: .08em; }
+.mq-player {
+  margin: 0 22px 14px; padding: 14px; gap: 12px; border: 1px solid var(--mq-edge);
+  border-radius: 12px; background: var(--mq-soft); box-shadow: 0 3px 12px color-mix(in srgb, var(--text) 3%, transparent);
+}
+.mq-play { width: 42px; height: 42px; min-width: 42px; background: var(--mq-ink); color: var(--bg); display: grid; place-items: center; }
+.mq-play-glyph { width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-left: 9px solid currentColor; margin-left: 3px; }
+.is-playing .mq-play-glyph { width: 10px; height: 12px; margin-left: 0; border: 0; border-left: 3px solid currentColor; border-right: 3px solid currentColor; }
+.mq-track-label { font-size: 9px; color: var(--muted); letter-spacing: .16em; margin-bottom: 3px; }
+.mq-track-label span { letter-spacing: .12em; }
+.mq-title { font: 400 16px/1.4 Georgia, serif; letter-spacing: .01em; }
+.mq-time { align-self: flex-end; padding-bottom: 4px; font-size: 10px; }
+.mq-track input[type=range] { appearance: none; -webkit-appearance: none; display: block; height: 16px; background: transparent; cursor: pointer; accent-color: var(--text); }
+.mq-track input[type=range]::-webkit-slider-runnable-track { height: 2px; background: var(--mq-edge); border-radius: 2px; }
+.mq-track input[type=range]::-webkit-slider-thumb { appearance: none; -webkit-appearance: none; width: 8px; height: 8px; margin-top: -3px; border-radius: 50%; background: var(--text); }
+.mq-track input[type=range]::-moz-range-track { height: 2px; background: var(--mq-edge); }
+.mq-track input[type=range]::-moz-range-thumb { width: 8px; height: 8px; border: 0; background: var(--text); }
+.mq-room-note { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 4px 22px 12px; color: var(--muted); font: 11px/1.5 var(--mq-serif); letter-spacing: .15em; }
+.mq-help { flex: none; margin: 0 22px 4px; border-bottom: 1px solid var(--mq-edge); color: var(--muted); font-size: 11px; line-height: 1.7; }
+.mq-help summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0 10px; cursor: pointer; list-style: none; }
+.mq-help summary::-webkit-details-marker { display: none; }
+.mq-help-more { flex: none; color: var(--text); }
+.mq-help-more::after { content: "＋"; margin-left: 4px; }
+.mq-help[open] .mq-help-more::after { content: "−"; }
+.mq-help-body { padding: 0 0 12px; font-size: 12px; max-height: 190px; overflow-y: auto; }
+.mq-help-body p + p { margin-top: 8px; }
+.mq-help-body b { color: var(--text); font-weight: 500; }
+.mq-help-body a { display: inline-block; color: var(--text); margin-top: 8px; text-decoration: underline; text-underline-offset: 3px; }
+.mq-help summary:focus-visible { outline: 2px solid var(--muted); outline-offset: 3px; border-radius: 4px; }
+.mq-room-note span { height: 1px; width: 26px; background: var(--mq-edge); }
+.mq-chat { padding: 16px 22px 24px; gap: 20px; }
+.mq-msg { gap: 10px; }
+.mq-av { width: 34px; height: 34px; border: 1px solid var(--mq-edge); border-radius: 12px 12px 14px 14px; background: var(--mq-soft); color: var(--text); font: 16px var(--mq-serif); }
+.mq-name { font-size: 10px; line-height: 1.6; margin: 0 2px 6px; }
+.mq-text { border: 1px solid var(--mq-edge); padding: 10px 14px; border-radius: 2px 14px 14px; background: var(--mq-soft); color: var(--text); font-size: 14px; line-height: 1.65; }
+.mq-msg.mine .mq-text { background: var(--mq-ink); color: var(--bg); border-color: var(--mq-ink); border-radius: 14px 2px 14px 14px; }
+.mq-compose { padding: 14px 22px calc(14px + env(safe-area-inset-bottom)); gap: 10px; border-color: var(--mq-edge); }
+.mq-compose input { border-radius: 12px; font-size: 16px; padding: 11px 13px; background: var(--mq-soft); border-color: var(--mq-edge); }
+.mq-compose input::placeholder { font-size: 13px; color: var(--muted); }
+.mq-compose button { border-radius: 12px; font-size: 13px; padding: 0 17px; background: var(--mq-ink); color: var(--bg); }
+.mq-intro { padding: 12px 4px 24px; font-size: 13px; }
+.mq-intro h2 { font: 23px/1.5 var(--mq-serif); letter-spacing: .08em; margin-bottom: 12px; }
+.mq-mask { background: var(--mq-soft); border-color: var(--mq-edge); padding: 24px 12px; border-radius: 12px; }
+.mq-mask .mq-n { font: 20px/1.5 var(--mq-serif); }
+.mq-mask .mq-d { font-size: 11px; }
+.mq-wear { font-family: var(--mq-serif); font-weight: 400; padding-top: 16px; }
+.mq-big-btn, .mq-row button, .mq-card-btns button:not(.ghost) { background: var(--mq-ink); color: var(--bg); }
+.mq-row { background: var(--mq-soft); border-color: var(--mq-edge); }
+.mq-sheet-head b { font-family: var(--mq-serif); font-weight: 400; letter-spacing: .1em; }
+.mq-compose input:focus-visible, .mq-form input:focus-visible { outline: 2px solid var(--muted); outline-offset: 2px; }
+.mq-play:focus-visible, .mq-dance-btn:focus-visible, .mq-compose button:focus-visible { outline: 2px solid var(--muted); outline-offset: 3px; }
+@media (min-width: 600px) { .phone[data-mode="masq"] { height: calc(100dvh - 56px); } }
+@media (max-width: 360px) {
+  .phone[data-mode="masq"] .mq-bar { padding-left: 16px; padding-right: 16px; }
+  .mq-player { margin-left: 16px; margin-right: 16px; padding: 12px; gap: 9px; }
+  .mq-title { font-size: 14px; }
+  .mq-chat, .mq-compose { padding-left: 16px; padding-right: 16px; }
+}
+
+</style>
+
+<script>
+(function () {
+  var CSRF = {{ csrf()|tojson }}, INIT = {{ masq_state|tojson }}, WHY0 = {{ (why or '')|tojson }}, OPEN_DANCE = {{ open_dance|tojson }}, RO = {{ (share_ro or false)|tojson }}, NPC = !!(INIT && INIT.npc);   // NPC：能在舞厅发言，但只能用真名，不戴面具、不邀请、不回应
+  var $ = function (id) { return document.getElementById(id); };
+  var st = INIT, stage = null, why = WHY0, openDance = 0, seen = {}, lastMsgSig = '', lastDanceSig = '', asked = {};
+  try { seen = JSON.parse(sessionStorage.getItem('mq:seen') || '{}'); } catch (_) {}
+
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function toast(t) { var n = $('mqToast'); n.textContent = t; n.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(function () { n.hidden = true; }, 2600); }
+  function post(url, data) {
+    var body = new URLSearchParams(data || {}); body.append('_csrf', CSRF);
+    return fetch(url, { method: 'POST', body: body, credentials: 'same-origin' })
+      .then(function (r) { return r.json().catch(function () { return { ok: false, msg: '出错了，稍后再试' }; }); })
+      .catch(function () { return { ok: false, msg: '网络不通，稍后再试' }; });
+  }
+  function who(w) { return w.mask ? w.mask + (w.nick ? '「' + w.nick + '」' : '') : w.nick; }
+  function hhmm(ts) { var d = new Date(ts); return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
+
+  /* ── 音乐 ── */
+  var audio = $('mqAudio'), playBtn = $('mqPlay'), seek = $('mqSeek'), timeEl = $('mqTime'), dragging = false;
+  function fmt(s) { s = Math.max(0, Math.floor(s || 0)); return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2); }
+  playBtn.addEventListener('click', function () {
+    if (audio.paused) { audio.play().catch(function () { toast('播放被浏览器拦住了，再点一次'); }); } else { audio.pause(); }
+  });
+  audio.addEventListener('play', function () { playBtn.classList.add('is-playing'); playBtn.setAttribute('aria-label', '暂停音乐'); });
+  audio.addEventListener('pause', function () { playBtn.classList.remove('is-playing'); playBtn.setAttribute('aria-label', '播放音乐'); });
+  audio.addEventListener('timeupdate', function () {
+    if (!dragging && audio.duration) seek.value = Math.round(audio.currentTime / audio.duration * 1000);
+    timeEl.textContent = fmt(audio.currentTime);
+  });
+  seek.addEventListener('input', function () { dragging = true; });
+  seek.addEventListener('change', function () {
+    dragging = false;
+    if (audio.duration) audio.currentTime = seek.value / 1000 * audio.duration;
+  });
+
+  var musicKey = INIT.music.key;
+  function syncMusic(music) {
+    if (!music || music.key === musicKey) return;
+    musicKey = music.key;
+    var resume = !audio.paused;
+    audio.pause(); audio.src = music.url; audio.load();
+    seek.value = 0; timeEl.textContent = '0:00';
+    $('mqMusicTitle').textContent = music.title;
+    $('mqMusicLabel').textContent = ' · ' + music.label;
+    if (resume) audio.play().catch(function () { toast('音乐已更换，点播放继续听'); });
+  }
+
+  /* ── 阶段：选面具 / 起昵称 / 舞厅 ── */
+  function showStage(name) {
+    var room = name === 'room';
+    $('mqRoom').hidden = !room;
+    $('mqStage').hidden = room;
+    $('mqDanceBtn').hidden = !room || RO || NPC;
+    $('mqSub').textContent = room ? (NPC ? who(st.me) + '（实名旁听）' : who(st.me)) : '戴上面具，别暴露身份';
+    stage = name;
+  }
+  function renderNone() {
+    var box = $('mqStage'); box.textContent = '';
+    var intro = el('div', 'mq-intro'); intro.appendChild(el('h2', null, '舞会正在进行……'));
+    intro.appendChild(el('div', null, 'TA 还没有戴上面具入场，等 TA 入场后这里就能看到舞厅里的对话。'));
+    box.appendChild(intro);
+  }
+  function renderMask() {
+    var box = $('mqStage'); box.textContent = '';
+    var intro = el('div', 'mq-intro'); intro.appendChild(el('h2', null, '选择你的面具……'));
+    intro.appendChild(el('div', null, '今晚的舞会，所有人都戴着面具。四副里挑一副，别人选走的就没有了。'));
+    box.appendChild(intro);
+    var grid = el('div', 'mq-masks');
+    (st.offers || []).forEach(function (o) {
+      var b = el('button', 'mq-mask'); b.type = 'button';
+      b.appendChild(el('span', 'mq-n', o.mask)); b.appendChild(el('span', 'mq-d', o.desc));
+      b.addEventListener('click', function () {
+        grid.querySelectorAll('button').forEach(function (x) { x.disabled = true; });
+        post('/p/me/ball/mask', { mask: o.mask }).then(function (r) {
+          if (!r.ok) toast(r.msg || '没选上');
+          poll();
+        });
+      });
+      grid.appendChild(b);
+    });
+    box.appendChild(grid);
+    if (!(st.offers || []).length) box.appendChild(el('div', 'mq-empty', '面具已经被抢光了，等管理员加新的吧。'));
+  }
+  function renderNick() {
+    var box = $('mqStage'); box.textContent = '';
+    box.appendChild(el('div', 'mq-wear', st.me.mask));
+    var intro = el('div', 'mq-intro'); intro.appendChild(el('div', null, st.me.desc));
+    box.appendChild(intro);
+    var f = el('form', 'mq-form');
+    f.appendChild(el('label', null, '起一个你在蒙面舞会的昵称……'));
+    var inp = el('input'); inp.maxLength = st.limits.nick; inp.placeholder = '但是不要暴露你的身份'; inp.autocomplete = 'off';
+    f.appendChild(inp);
+    f.appendChild(el('div', 'hint', '最多 ' + st.limits.nick + ' 个字。别用真名、别用能认出你的外号；进场后自己不能改，暴露了会被管理员直接改掉。'));
+    var go = el('button', 'mq-big-btn', '入场'); go.type = 'submit';
+    f.appendChild(go);
+    f.addEventListener('submit', function (e) {
+      e.preventDefault(); go.disabled = true;
+      post('/p/me/ball/nick', { nick: inp.value }).then(function (r) {
+        go.disabled = false;
+        if (!r.ok) { toast(r.msg || '这个昵称不行'); return; }
+        poll();
+      });
+    });
+    box.appendChild(f);
+  }
+
+  /* ── 舞厅 ── */
+  function bubble(m, mine, name, avatar, big) {
+    var row = el('div', 'mq-msg' + (mine ? ' mine' : ''));
+    if (avatar) row.appendChild(el('div', 'mq-av', avatar));
+    var b = el('div', 'mq-bub');
+    if (name) b.appendChild(el('div', 'mq-name', name));
+    b.appendChild(el('div', 'mq-text', m.text));
+    row.appendChild(b);
+    return row;
+  }
+  function stick(box, build) {
+    var near = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+    build();
+    if (near) box.scrollTop = box.scrollHeight;
+  }
+  var pickerFor = 0, seenMention = {};
+  var reactionIcons = {
+    '❤️': ['heart', '心动'], '👏': ['clap', '鼓掌'], '😂': ['laugh', '欢笑'],
+    '🌹': ['rose', '赠花'], '✨': ['sparkle', '赞叹']
+  };
+  function reactionButton(emoji, cls, count, selected) {
+    var spec = reactionIcons[emoji] || ['smile', '回应'];
+    var button = el('button', cls); button.type = 'button';
+    button.appendChild(window.PhoneSymbol(spec[0]));
+    if (count != null) button.appendChild(el('span', 'mq-react-count', String(count)));
+    button.setAttribute('aria-label', spec[1] + (count != null ? '，' + count + ' 人回应' : ''));
+    button.setAttribute('aria-pressed', String(!!selected)); button.title = spec[1];
+    return button;
+  }
+  function reactRow(m) {
+    var row = el('div', 'mq-reacts');
+    Object.keys(m.react || {}).forEach(function (e) {
+      var c = reactionButton(e, 'mq-chip' + (m.my_react === e ? ' on' : ''), m.react[e], m.my_react === e);
+      if (RO || NPC) c.disabled = true; else c.addEventListener('click', function () { sendReact(m.id, e); });
+      row.appendChild(c);
+    });
+    if (RO || NPC) return row;
+    var more = el('button', 'mq-chip mq-more'); more.type = 'button';
+    more.appendChild(window.PhoneSymbol(pickerFor === m.id ? 'close' : 'smile'));
+    more.setAttribute('aria-expanded', String(pickerFor === m.id));
+    more.setAttribute('aria-label', '回应一下');
+    more.addEventListener('click', function () { pickerFor = pickerFor === m.id ? 0 : m.id; lastMsgSig = ''; renderRoom(); });
+    row.appendChild(more);
+    if (pickerFor === m.id) {
+      var picks = el('div', 'mq-picks'); picks.setAttribute('role', 'group'); picks.setAttribute('aria-label', '选择回应方式');
+      (st.reactions || []).forEach(function (e) {
+        var c = reactionButton(e, 'mq-chip pick', null, m.my_react === e);
+        c.addEventListener('click', function () { pickerFor = 0; sendReact(m.id, e); });
+        picks.appendChild(c);
+      });
+      row.appendChild(picks);
+    }
+    return row;
+  }
+  function sendReact(id, emoji) {
+    post('/p/me/ball/react', { id: id, emoji: emoji }).then(function (r) { if (!r.ok) toast(r.msg || '没回应成'); poll(); });
+  }
+  function msgNode(m) {
+    if (m.kind === 'narr') return el('div', 'mq-narr', m.text);
+    var nm = m.mine ? '' : who(m.who) + ' · ' + hhmm(m.ts);
+    var row = bubble(m, m.mine, nm, m.mine ? '' : m.who.ch);
+    var bub = row.querySelector('.mq-bub');
+    if (m.to_me) { row.classList.add('mq-tome'); bub.insertBefore(el('div', 'mq-tag', '@了你'), bub.firstChild); }
+    var nameEl = bub.querySelector('.mq-name');
+    if (nameEl && !m.mine) {   // 点名字 = 在输入框里 @ 这副面具
+      nameEl.classList.add('click'); nameEl.title = '点名字，在输入框中 @ 这位客人';
+      nameEl.addEventListener('click', function () {
+        var inp = $('mqText'); if (RO || inp.disabled) return;
+        inp.value = (inp.value ? inp.value + ' ' : '') + '@' + (m.who.mask || m.who.nick) + ' '; inp.focus();
+      });
+    }
+    bub.appendChild(reactRow(m));
+    if (m.mine && m.react_by && m.react_by.length) {   // 只有被贴的人看得到是谁贴的
+      var by = el('div', 'mq-rby');
+      m.react_by.forEach(function (x) {
+        var spec = reactionIcons[x.emoji] || ['smile', '回应'];
+        var line = el('div', 'mq-rby-line');
+        line.appendChild(el('span', null, who(x.who) + ' 给你贴了'));
+        var ic = el('span', 'mq-rby-ic'); ic.title = spec[1];
+        ic.appendChild(window.PhoneSymbol(spec[0]));
+        line.appendChild(ic);
+        by.appendChild(line);
+      });
+      bub.appendChild(by);
+    }
+    return row;
+  }
+  function renderRoom() {
+    var sig = st.msgs.map(function (m) { return m.id + ':' + JSON.stringify(m.react || '') + (m.my_react || '') + (m.react_by ? m.react_by.length : ''); }).join('|') + '#' + pickerFor;
+    if (sig !== lastMsgSig) {
+      var first = lastMsgSig === '';
+      lastMsgSig = sig;
+      var box = $('mqChat');
+      stick(box, function () {
+        box.textContent = '';
+        if (!st.msgs.length) box.appendChild(el('div', 'mq-sys', '舞厅里还很安静，说点什么吧。'));
+        st.msgs.forEach(function (m) { box.appendChild(msgNode(m)); });
+      });
+      if (first) box.scrollTop = box.scrollHeight;
+    }
+    // 有人 @ 了我：页面开着时弹一个小提示（第一次渲染只记下，不重复提示旧的）
+    var firstPass = !renderRoom.done; renderRoom.done = true;
+    st.msgs.forEach(function (m) {
+      if (m.kind !== 'narr' && m.to_me && !m.mine && !seenMention[m.id]) {
+        seenMention[m.id] = 1;
+        if (!firstPass) toast((m.who.mask || '有人') + ' @ 了你');
+      }
+    });
+    var stop = RO ? '亲友只读，不能发言' : (why || (st.muted ? st.muted.text : ''));   // 暂停通讯/档期的原因，或管理员全员禁言
+    var blocked = !!stop;
+    $('mqText').disabled = blocked; $('mqSend').disabled = blocked;
+    $('mqWhy').hidden = !blocked; $('mqWhy').textContent = stop || '';
+  }
+
+  /* ── 舞伴面板 ── */
+  function dStatusText(d) {
+    if (d.status === 'pending') return d.dir === 'out' ? '等待回应…' : '邀请你跳舞';
+    if (d.status === 'declined') return d.dir === 'out' ? '对方婉拒了' : '你婉拒了';
+    if (d.status === 'ended') return '舞曲终了 · ' + d.cnt + ' 句';
+    return '正在共舞 · ' + d.cnt + '/' + st.limits.dance + ' 句';
+  }
+  function unread(d) {
+    var theirs = d.msgs.filter(function (m) { return !m.mine; }).length;
+    return Math.max(0, theirs - (seen[d.id] || 0));
+  }
+  function renderSheet() {
+    var box = $('mqDances'); box.textContent = '';
+    var shown = 0;
+    st.dances.forEach(function (d) {
+      if (d.status === 'declined' && d.dir === 'in') return;
+      shown++;
+      var row = el('div', 'mq-row click'); row.setAttribute('role', 'button'); row.tabIndex = 0;
+      row.appendChild(el('div', 'mq-av', d.with.ch));
+      var w = el('div', 'who'); var b = el('b', null, d.with.mask + (d.with.nick ? '「' + d.with.nick + '」' : ''));
+      if (unread(d) > 0) b.appendChild(el('span', 'mq-dot'));
+      w.appendChild(b); w.appendChild(el('small', null, dStatusText(d)));
+      row.appendChild(w);
+      var go = function () { if (d.status === 'accepted' || d.status === 'ended') openDanceSheet(d.id); else if (d.status === 'pending' && d.dir === 'in') askInvite(d, true); else toast(dStatusText(d)); };
+      row.addEventListener('click', go);
+      row.addEventListener('keydown', function (e) { if (e.key === 'Enter') go(); });
+      box.appendChild(row);
+    });
+    if (!shown) box.appendChild(el('div', 'mq-empty', '还没有舞伴。向下选一位发出邀请吧。'));
+    $('mqLeft').textContent = '还能邀请 ' + st.invites_left + ' 位';
+    var mb = $('mqMembers'); mb.textContent = '';
+    var busy = {};
+    st.dances.forEach(function (d) { if (d.status !== 'declined' || d.dir === 'out') busy[d.with.id] = true; });
+    st.members.forEach(function (m) {
+      var row = el('div', 'mq-row');
+      row.appendChild(el('div', 'mq-av', m.ch));
+      var w = el('div', 'who'); w.appendChild(el('b', null, m.mask)); w.appendChild(el('small', null, '「' + m.nick + '」'));
+      row.appendChild(w);
+      var btn = el('button', null, busy[m.id] ? '已邀请' : '邀请'); btn.type = 'button';
+      btn.disabled = !!busy[m.id] || st.invites_left <= 0 || !!why || !!st.muted;
+      btn.addEventListener('click', function () {
+        btn.disabled = true;
+        post('/p/me/ball/invite', { to: m.id }).then(function (r) {
+          toast(r.ok ? '邀请已送出，等对方回应' : (r.msg || '没发出去'));
+          poll();
+        });
+      });
+      row.appendChild(btn); mb.appendChild(row);
+    });
+    if (!st.members.length) mb.appendChild(el('div', 'mq-empty', '舞厅里还没有别的客人。'));
+  }
+  function badge() {
+    var n = st.dances.filter(function (d) { return d.status === 'pending' && d.dir === 'in'; }).length;
+    st.dances.forEach(function (d) { if (unread(d) > 0 && d.id !== openDance) n++; });
+    $('mqBadge').hidden = n === 0; $('mqBadge').textContent = n;
+  }
+  $('mqDanceBtn').addEventListener('click', function () { renderSheet(); $('mqSheet').hidden = false; });
+  $('mqSheetClose').addEventListener('click', function () { $('mqSheet').hidden = true; });
+
+  /* ── 舞的对话 ── */
+  function findDance(id) { for (var i = 0; i < st.dances.length; i++) if (st.dances[i].id === id) return st.dances[i]; return null; }
+  function openDanceSheet(id) { openDance = id; lastDanceSig = ''; $('mqDance').hidden = false; renderDance(); }
+  function renderDance() {
+    var d = findDance(openDance);
+    if (!d) { $('mqDance').hidden = true; openDance = 0; return; }
+    $('mqDanceWho').textContent = who(d.with);
+    $('mqDanceCnt').textContent = d.cnt + '/' + st.limits.dance;
+    var sig = d.id + ':' + d.msgs.length + ':' + d.status;
+    if (sig !== lastDanceSig) {
+      lastDanceSig = sig;
+      var box = $('mqDanceChat');
+      stick(box, function () {
+        box.textContent = '';
+        box.appendChild(el('div', 'mq-sys', '你们只看得到彼此的面具。最多聊 ' + st.limits.dance + ' 句，一支舞的时间。'));
+        d.msgs.forEach(function (m) { box.appendChild(bubble(m, m.mine, '', m.mine ? '' : d.with.ch)); });
+        if (d.status === 'ended') box.appendChild(el('div', 'mq-sys', '— 舞曲终了 —'));
+      });
+      box.scrollTop = box.scrollHeight;
+    }
+    seen[d.id] = d.msgs.filter(function (m) { return !m.mine; }).length;
+    try { sessionStorage.setItem('mq:seen', JSON.stringify(seen)); } catch (_) {}
+    var closed = d.status !== 'accepted';
+    var stop2 = why || (st.muted ? st.muted.text : '');
+    var msg = closed ? '舞曲终了，这段对话到此为止' : stop2;
+    $('mqDanceText').disabled = closed || !!stop2; $('mqDanceSend').disabled = closed || !!stop2;
+    $('mqDanceWhy').hidden = !msg; $('mqDanceWhy').textContent = msg;
+  }
+  $('mqDanceClose').addEventListener('click', function () { $('mqDance').hidden = true; openDance = 0; renderSheet(); badge(); });
+
+  /* ── 发言 ── */
+  function bindSend(form, input, btn, url) {
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var text = input.value.trim();
+      if (!text) return;
+      btn.disabled = true;
+      post(url(), { text: text }).then(function (r) {
+        btn.disabled = false;
+        if (!r.ok) { toast(r.msg || '没发出去'); return; }
+        input.value = '';
+        poll();
+      });
+    });
+  }
+  bindSend($('mqForm'), $('mqText'), $('mqSend'), function () { return '/p/me/ball/say'; });
+  bindSend($('mqDanceForm'), $('mqDanceText'), $('mqDanceSend'), function () { return '/p/me/ball/dance/' + openDance + '/say'; });
+
+  /* ── 收到邀请 ── */
+  var inviteShowing = 0;
+  function askInvite(d, force) {
+    if (inviteShowing) return;
+    inviteShowing = d.id;
+    $('mqInviteIcon').textContent = d.with.ch;
+    $('mqInviteText').textContent = d.with.mask + '「' + d.with.nick + '」邀请你跳一支舞';
+    $('mqInvite').hidden = false;
+  }
+  function answer(yes) {
+    var id = inviteShowing;
+    if (!id) return;
+    $('mqInvite').hidden = true; inviteShowing = 0; asked[id] = true;
+    post('/p/me/ball/invite/' + id + '/answer', { accept: yes ? '1' : '0' }).then(function (r) {
+      if (!r.ok) toast(r.msg || '没处理成功');
+      poll().then(function () { if (yes && r.ok) openDanceSheet(id); });
+    });
+  }
+  $('mqInviteYes').addEventListener('click', function () { answer(true); });
+  $('mqInviteNo').addEventListener('click', function () { answer(false); });
+  // 点背景 = 先放一放（面板里还能看到，不会丢）
+  $('mqInvite').addEventListener('click', function (e) { if (e.target === this) { asked[inviteShowing] = true; inviteShowing = 0; this.hidden = true; } });
+
+  /* ── 轮询 ── */
+  function markRead(now) {}
+  function apply(data) {
+    st = data;
+    if (!RO) markRead(data.now);
+    why = data.why || '';
+    if (data.stage !== stage) { lastMsgSig = ''; showStage(data.stage); }
+    if (data.stage === 'none') renderNone();
+    else if (data.stage === 'mask') renderMask();
+    else if (data.stage === 'nick') renderNick();
+    else {
+      $('mqSub').textContent = who(st.me);
+      renderRoom(); badge();
+      if (!$('mqSheet').hidden) renderSheet();
+      if (openDance) renderDance();
+      if (!inviteShowing) {
+        for (var i = 0; i < st.dances.length; i++) {
+          var d = st.dances[i];
+          if (d.status === 'pending' && d.dir === 'in' && !asked[d.id]) { askInvite(d); break; }
+        }
+      }
+    }
+  }
+  var inflight = null;
+  function poll() {
+    if (inflight) return inflight;
+    inflight = fetch('/p/me/ball/state', { credentials: 'same-origin', cache: 'no-store' })
+      .then(function (r) { return r.json().then(function (j) { return { s: r.status, j: j }; }); })
+      .then(function (x) {
+        if (x.s === 401) { location.href = '/p'; return; }
+        if (!x.j.ok) {
+          if (x.j.closed) { toast('舞会已经打烊，谢谢你的参与'); setTimeout(function () { location.href = {{ url_for('inbox')|tojson }}; }, 1800); }
+          else location.href = {{ url_for('inbox')|tojson }};
+          return;
+        }
+        syncMusic(x.j.music);
+        // 选面具阶段别因为每 4 秒重抽/重绘把按钮盖掉：只有阶段或备选变了才重绘
+        if (x.j.stage === 'mask' && stage === 'mask' && JSON.stringify(x.j.offers) === JSON.stringify(st.offers)) { st = x.j; return; }
+        if (x.j.stage === 'nick' && stage === 'nick') { st = x.j; return; }
+        apply(x.j);
+      })
+      .catch(function () {})
+      .then(function () { inflight = null; });
+    return inflight;
+  }
+  st.why = WHY0;
+  apply(INIT);
+  if (OPEN_DANCE && st.stage === 'room' && findDance(OPEN_DANCE)) { var _d = findDance(OPEN_DANCE); if (_d.status === 'accepted' || _d.status === 'ended') openDanceSheet(OPEN_DANCE); }
+  setInterval(function () { if (!document.hidden) poll(); }, 4000);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });
+})();
+</script>
+
+{% endblock %}

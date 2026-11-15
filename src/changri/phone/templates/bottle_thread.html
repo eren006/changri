@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% from '_phone_symbols.html' import phone_symbol %}
+{% from '_phone_icons.html' import admin_app_icon with context %}
+{% block title %}漂流瓶 · {{ brand }}{% endblock %}
+{% block body %}
+  <header class="bar bottle-bar">
+    <a class="back" href="{{ url_for('bottle_page') }}">漂流瓶</a>
+    <div class="title">漂流瓶 #{{ bottle_id }}<small>{% if not tag_known %}抛瓶人匿名{% elif i_threw %}你扔出的 · 对方是捡到的人{% else %}你捡到的 · 抛瓶人匿名{% endif %}</small></div>
+    <div class="right"></div>
+  </header>
+  <div class="scroll bottle-thread" id="scroll">
+    {% for m in get_flashed_messages() %}<div class="bottle-alert" role="status">{{ m }}</div>{% endfor %}
+    {% if failed %}<div class="bottle-alert" role="status"><span class="phone-operation-state is-failed">没成功</span> 上一条没有发出去：{{ failed }}</div>{% endif %}
+    {% for m in msgs %}
+    <div class="msg {{ 'mine' if m.mine else 'theirs' }}{% if m.pending %} is-pending{% endif %}"><div class="bubble">{{ m.text }}</div><div class="meta">{% if m.mine or m.pending %}<span class="phone-operation-state is-{{ 'waiting' if m.pending else 'done' }}">{{ '处理中' if m.pending else '已完成' }}</span>{% endif %}{% if not m.pending %} {{ m.time }}{% endif %}</div></div>
+    {% endfor %}
+  </div>
+  <form class="compose bottle-compose" method="post" action="{{ url_for('bottle_reply', bid=bottle_id) }}">
+    <input type="hidden" name="_csrf" value="{{ csrf() }}">
+    <textarea aria-label="回信" name="text" maxlength="{{ max_msg }}" placeholder="{{ why or '回信……' }}" rows="1" required{% if why %} disabled{% endif %}></textarea>
+    <button type="submit"{% if why %} disabled{% endif %}>发送</button>
+  </form>
+  
+{% endblock %}

@@ -5,13 +5,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 os.environ["CHANGRI_DB_PATH"] = str(Path(tempfile.mkdtemp()) / "sheets.db")
 
 from PIL import Image  # noqa: E402
 
-from core import roles, sheets  # noqa: E402
-from core.db import get_conn, init_db, set_config  # noqa: E402
+from changri.core import roles, sheets  # noqa: E402
+from changri.core.db import get_conn, init_db, set_config  # noqa: E402
 
 
 def png(w=40, h=30, color=(200, 30, 30)) -> bytes:

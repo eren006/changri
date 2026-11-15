@@ -1,0 +1,52 @@
+{% extends "base.html" %}{% block title %}弧长与复盘{% endblock %}
+{% block body %}
+<style>
+.daylist{border:1px solid var(--card-line);box-shadow:var(--shadow-sm);border-radius:var(--r-card);background:var(--surface);overflow:hidden;max-width:560px}
+.daylist .dl{display:flex;align-items:center;gap:14px;padding:0 18px;min-height:52px;color:var(--ink);text-decoration:none;border-top:1px solid var(--line)}
+.daylist .dl:first-child{border-top:0}
+.daylist .dl:hover{background:var(--soft)}
+.daylist .dl b{min-width:3em;font-size:16px}
+.daylist .dl .ct{flex:1;color:var(--mute);font-size:14px}
+.daylist .go{width:8px;height:8px;border-right:2px solid var(--mute);border-top:2px solid var(--mute);transform:rotate(45deg);flex:none}
+.ui .arc .nm small{color:var(--mute);font-weight:400}
+.ui .arc .row.over{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 7%,transparent)}
+.ui .arc .over b,.ui .arc .over .v{color:var(--bad)}
+.ui .arc .v{font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right}
+.ui .arc .v small{display:block;color:var(--mute);font-size:12.5px}
+.ui .arc .flag{display:inline-block;margin-left:6px;padding:0 7px;border-radius:999px;border:1px solid var(--bad);color:var(--bad);font-size:12px;font-weight:600}
+</style>
+<h1>弧长与复盘</h1>
+{% include "_collect_tabs.html" %}
+<p class="lede">私约、官约、电话、微信、心愿（都是房间）和短信/礼物分开看，都按「第几天」整理。点进某一天，里面的事按发生的先后从上往下排；每个私约点编号可以单独打开，看里面的全部发言。上面的筛选可以只看某个人参与的。房间的聊天是房间群里监听的 QQ 号听到的，发言人靠绑定的 QQ 认出来。季度「收尾」会清空这些记录，要留的先导出。</p>
+<section class="arc">
+  <div class="sec-head keep"><h2>弧长<span class="n">回复间隔</span></h2></div>
+  <p class="note">弧长 = 对方说完之后，你隔了多久才回。按房间群里的发言算，NPC 不计。{% if arc.limit %}超过 {{ fmt_h(arc.limit) }} 的标红；{% else %}还没设「最长弧长」，不标红；{% endif %}上限在「功能与设置 → 约会」里改。</p>
+  {% if arc.limit and (arc.over_people or arc.over_waits) %}<div class="callout bad">{{ arc.over_people }} 人的回复间隔超标，{{ arc.over_waits }} 个房间正在超时等回复。</div>{% endif %}
+  {% if arc.waits %}
+  <h3 class="sub">正在等回复的房间</h3>
+  <div class="rowlist">{% for w in arc.waits %}
+    <div class="row{{ ' over' if w.over }}"><div class="nm"><b>R{{ w.room_id }} · {{ w.kind }}{% if w.over %}<span class="flag">超时</span>{% endif %}</b>
+      <div class="muted">{{ '在等 ' ~ w.who ~ ' 回复' if w.started else '还没人开口，等 ' ~ w.who }}</div></div>
+      <div class="v">{{ fmt_h(w.hours) }}</div></div>{% endfor %}</div>
+  {% endif %}
+  {% if arc.people %}
+  <h3 class="sub">每个人的平均回复时间</h3>
+  <div class="rowlist">{% for p in arc.people %}
+    <div class="row{{ ' over' if p.over }}"><div class="nm"><b>{{ p.name }}{% if p.over %}<span class="flag">{{ '平均超标' if p.avg_over else '有一次超标' }}</span>{% endif %}</b>
+      <div class="muted">回过 {{ p.replies }} 次</div></div>
+      <div class="v">平均 {{ fmt_h(p.avg) }}<small>最长 {{ fmt_h(p.longest) }}</small></div></div>{% endfor %}</div>
+  {% elif not arc.waits %}<p class="empty">还没有记到房间里的对话，等有人在房间群里说话就会出现。</p>{% endif %}
+</section>
+<section>
+  {% include "_review_filter.html" %}
+  {% if days %}
+  <p class="note">{{ f.role or '所有人' }}　共 {{ total }} {{ '个私约/房间' if f.tab == 'room' else '条短信和礼物' }}，分在 {{ days|length }} 天。<a href="{{ url_for('review_day', label='all', role=f.role, kind=f.kind, q=f.q, tab=f.tab) }}">不分天，全部列出来</a></p>
+  <div class="daylist">
+    {% for d in days %}<a class="dl" href="{{ url_for('review_day', label=d.label, role=f.role, kind=f.kind, q=f.q, tab=f.tab) }}">
+      <b>{{ d.label }}</b>
+      <span class="ct">{% if f.tab == 'room' %}{{ d.room }} 个私约/房间{% else %}短信 {{ d.sms }} · 礼物 {{ d.gift }}{% endif %}</span>
+      <i class="go" aria-hidden="true"></i></a>{% endfor %}
+  </div>
+  {% else %}<p class="empty">没有符合的记录。</p>{% endif %}
+</section>
+{% endblock %}

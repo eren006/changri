@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% block title %}{{ skin.words.public }} · {{ brand }}{% endblock %}
+{% block body %}
+  <header class="bar">
+    <a class="back" href="{{ url_for('inbox') }}">{{ skin.words.messages }}</a>
+    <div class="title">{{ skin.words.public }}</div>
+    <div class="right"></div>
+  </header>
+  <div class="scroll" id="scroll">
+    <div class="chat public-feed">
+      {% for it in items %}
+        {% if loop.first or it.time[:5] != items[loop.index0 - 1].time[:5] %}<div class="stamp"><b>{{ it.time[:5] }}</b></div>{% endif %}
+        <div class="broadcast">
+          {% if it.kind == 'song' %}
+          <div class="bc-head">{{ phone_symbol('music') }} {{ it.head }}<span class="bc-time">{{ it.time[6:] }}</span></div>
+          <div class="song-card"><div class="song-info"><b>{{ it.song.title }}</b>{% if it.song.artist %} · {{ it.song.artist }}{% endif %}</div>{% if it.song.url %}<a class="song-link" href="{{ it.song.url }}" target="_blank" rel="noopener noreferrer">打开</a>{% endif %}</div>
+          {% else %}
+          <div class="bc-head">{{ phone_symbol('gift' if it.kind == 'gift' else 'mail') }} {{ {'gift':'礼物','wish':'心愿','lovemail':'心动信'}.get(it.kind, '播报') }}<span class="bc-time">{{ it.time[6:] }}</span></div>
+          {% endif %}
+          {% if it.text %}<div class="bc-text">{{ it.text }}</div>{% endif %}
+        </div>
+      {% else %}
+        <div class="empty">还没有公开播报</div>
+      {% endfor %}
+    </div>
+  </div>
+  <script>
+    var sc = document.getElementById('scroll');
+    sc.scrollTop = sc.scrollHeight;
+    if (window.innerWidth < 600) window.scrollTo(0, document.body.scrollHeight);
+  </script>
+{% endblock %}

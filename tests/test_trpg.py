@@ -5,14 +5,14 @@ import tempfile
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 os.environ["CHANGRI_DB_PATH"] = str(Path(tempfile.mkdtemp()) / "trpg.db")
 os.environ["QQ_BOTS"] = "[]"
 os.environ["ADMIN_PASSWORD"] = ""
 
-from admin import create_app  # noqa: E402
-from core import trpg, webusers  # noqa: E402
-from core.db import get_conn, init_db  # noqa: E402
+from changri.admin import create_app  # noqa: E402
+from changri.core import trpg, webusers  # noqa: E402
+from changri.core.db import get_conn, init_db  # noqa: E402
 
 
 class TrpgCore(unittest.TestCase):
@@ -70,7 +70,7 @@ class TrpgCore(unittest.TestCase):
         self.assertIsNone(trpg.new_card(pid, "有 空格")[0])
 
     def test_romance_attrs_untouched(self):
-        from core import attrs, roles
+        from changri.core import attrs, roles
         roles.create_role("甲", "B", "G1", "M9")
         rid = roles.get_role_by_name("甲")["id"]
         attrs.set_attrs(rid, [("力量", 40)])

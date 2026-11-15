@@ -1,0 +1,100 @@
+{% from '_phone_symbols.html' import phone_symbol %}
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="robots" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+{% if mode != 'entry' %}<link rel="manifest" href="/p/manifest.json">
+<link rel="apple-touch-icon" href="/p/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="小手机">
+{% endif %}
+<meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<title>{% block title %}{{ brand }}{% endblock %}</title>
+{% include '_phone_base_css.html' %}
+{% include '_phone_skin.html' %}
+{% include '_phone_kit.html' %}
+{% include '_phone_tools_css.html' %}
+{% include '_phone_profile_css.html' %}
+{% include '_phone_discover_css.html' %}
+</head>
+<body>
+{% include '_phone_symbol_runtime.html' %}
+<div class="phone" data-mode="{{ mode }}" data-visual="{{ skin.visual }}">
+{% if comm_paused %}<div class="pause-banner" role="status">通讯暂时关闭了，稍后开放。已有的内容还能看。</div>{% endif %}
+{% if outage_rooms %}<div class="pause-banner" role="status">拉群用的 QQ 号掉线了，进行中的戏先在这里接着写：{% for r in outage_rooms %}<a href="{{ url_for('room_page', rid=r.id) }}">R{{ r.id }} {{ r.kind }}</a>{% if not loop.last %}、{% endif %}{% endfor %}</div>{% endif %}
+{% block body %}{% endblock %}
+{% if mode in ('inbox', 'discover', 'profile', 'moments') %}
+<div class="bottom-dock">
+  {% if mode == 'inbox' %}<a class="shop-fab" href="{{ url_for('shop') }}" aria-label="礼品店" title="礼品店">{{ phone_symbol('gift') }}{% if skin.visual == 'medici' %}<span class="md-cherub" aria-hidden="true"><i class="md-angel-body"></i><i class="md-wing-left"></i><i class="md-wing-right"></i></span>{% endif %}</a>{% endif %}
+  <nav class="phone-nav" aria-label="手机导航">
+    <a href="{{ url_for('inbox') }}"{% if mode == 'inbox' %} aria-current="page"{% endif %}><span aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" focusable="false"><path d="M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-5 3v-3a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/><path d="M7 9h10M7 13h7"/></svg></span>{{ skin.words.messages }}</a>
+    <a href="{{ url_for('discover') }}"{% if rel_unread and mode not in ('discover', 'moments') %} class="unread"{% endif %}{% if mode in ('discover', 'moments') %} aria-current="page"{% endif %}><span aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5 5-2Z"/></svg></span>发现</a>
+    <a class="dock-plus" id="dockPlus" href="{{ url_for('new_chat') }}" aria-label="{{ '发朋友圈' if mode == 'moments' and not why else skin.words.new }}" data-moments="{{ 1 if mode == 'moments' and not why else 0 }}"><svg width="24" height="24" viewBox="0 0 24 24" focusable="false"><path d="M12 5v14M5 12h14"/></svg></a>
+    <a href="{{ url_for('profile') }}"{% if mode == 'profile' %} aria-current="page"{% endif %}><span aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg></span>我的</a>
+  </nav>
+</div>
+{% endif %}
+</div>
+{% if skin.visual == 'cloudpost' %}<script>
+(function () {
+  var f = document.querySelector('.shop-fab');
+  if (!f) return;
+  f.addEventListener('click', function (e) {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
+    e.preventDefault(); f.classList.add('pulled');
+    setTimeout(function () { location.href = f.href; }, 380);
+  });
+})();
+</script>{% endif %}
+{% if skin.visual == 'medici' %}<script>
+(function () {
+  var f = document.querySelector('.shop-fab');
+  if (!f) return;
+  var image = new Image();
+  image.onload = function () { f.classList.add('md-angel-ready'); };
+  image.src = {{ url_for('static', filename='themes/medici/cherub.webp')|tojson }};
+  var opening = false;
+  f.addEventListener('click', function (e) {
+    if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !f.classList.contains('md-angel-ready')) return;
+    e.preventDefault();
+    if (opening) return;
+    opening = true; f.classList.add('md-flutter');
+    setTimeout(function () { location.assign(f.href); }, 520);
+  });
+})();
+</script>{% endif %}
+<script>
+  // 头像底色按名字固定，同一个人每次颜色一样
+  (function () {
+    var palette = ['#8b7cf6','#e0719b','#e89a4a','#4fb38a','#4a9fe0','#b07cd8','#d4636b','#5aa9a3'];
+    document.querySelectorAll('.avatar[data-name]').forEach(function (el) {
+      var s = el.dataset.name, h = 0;
+      for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+      el.style.background = palette[h % palette.length];
+    });
+  })();
+  // 朋友圈页：底栏中间的「+」就是发朋友圈
+  (function () {
+    var plus = document.getElementById('dockPlus'), open = document.getElementById('mcOpen');
+    if (plus && plus.dataset.moments === '1' && open) plus.addEventListener('click', function (e) { e.preventDefault(); open.click(); });
+  })();
+  // 头像：{名字: 版本号}，有图的把名字头像换成图片；版本号变了地址就变，缓存不会拿到旧图
+  window.PHONE_AVATARS = {{ (phone_avatars or {})|tojson }};
+  window.applyAvatars = function () {
+    document.querySelectorAll('.avatar[data-name]').forEach(function (el) {
+      var v = window.PHONE_AVATARS[el.dataset.name], img = el.querySelector('img.av');
+      if (!v) { if (img) img.remove(); return; }
+      var src = {{ url_for('avatar_image', name='_X_')|tojson }}.replace('_X_', encodeURIComponent(el.dataset.name)) + '?v=' + v;
+      if (img && img.getAttribute('src') === src) return;
+      if (!img) { img = document.createElement('img'); img.className = 'av'; img.alt = ''; el.appendChild(img); }
+      img.src = src;
+    });
+  };
+  applyAvatars();
+</script>
+</body>
+</html>

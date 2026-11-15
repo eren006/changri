@@ -1,0 +1,54 @@
+<section id="lines">
+  <h2>全部发言</h2>
+  <details class="addline panel"><summary class="btn sm ghost">＋ 添加一条</summary>
+    <form method="post" action="{{ url_for('review_line_add', rid=room.id) }}">{{ csrf() }}
+      <label>谁说的<select name="role">{% for m in members %}<option value="{{ m.role_id }}">{{ m.name }}</option>{% endfor %}</select></label>
+      <label>时间（不填 = 现在）<input type="datetime-local" name="when"></label>
+      <label>内容<textarea name="text" required></textarea></label>
+      <p class="muted">写成「角色名：内容」或「角色名「内容」」这类戏文格式，会算进戏文字数。</p>
+      <div><button class="btn sm" type="submit">添加</button></div>
+    </form></details>
+  {% for l in lines %}<div class="ln {{ '' if l.is_rp else 'chat' }}"><span class="t">{{ l.ts|ts }}</span><span class="w">{{ l.name }}</span><span class="x">{{ l.text }}</span>
+    <span class="acts"><form method="post" action="{{ url_for('review_line_delete', rid=room.id, line_id=l.id) }}" onsubmit="return confirm('删除这条发言？')" style="margin:0">{{ csrf() }}<button class="linkbtn">删除</button></form></span>
+    <details class="ed"><summary>编辑</summary>
+      <form method="post" action="{{ url_for('review_line_edit', rid=room.id, line_id=l.id) }}">{{ csrf() }}
+        <label>谁说的<select name="role">{% for m in members %}<option value="{{ m.role_id }}" {{ 'selected' if m.role_id == l.role_id }}>{{ m.name }}</option>{% endfor %}{% if not l.role_id %}<option value="" selected>{{ l.name }}（未绑定）</option>{% endif %}</select></label>
+        <label>内容<textarea name="text" required>{{ l.text }}</textarea></label>
+        <div><button class="btn sm" type="submit">保存</button></div>
+      </form></details></div>
+  {% else %}<p class="empty">没有记录。</p>{% endfor %}
+</section>
+{% extends "base.html" %}{% block title %}R{{ room.id }} 复盘{% endblock %}
+{% block body %}
+<style>
+.ln{display:grid;grid-template-columns:48px 110px 1fr;gap:10px;padding:5px 0;border-bottom:1px solid var(--line);align-items:baseline}
+.ln .t{color:var(--mute);font-size:12.5px} .ln .w{font-weight:600} .ln.chat .x{color:var(--mute)} .ln .x{white-space:pre-wrap;word-break:break-word}
+@media (max-width:560px){.ln{grid-template-columns:44px 1fr}.ln .x{grid-column:1 / -1}}
+.ln{grid-template-columns:48px 110px 1fr auto}
+.ln .acts{display:flex;gap:10px;align-items:baseline}
+.ln details.ed{grid-column:1 / -1}
+.ln details.ed summary{cursor:pointer;color:var(--mute);font-size:13px;list-style:none;display:inline}
+.ln details.ed form{display:grid;gap:8px;margin-top:8px;max-width:560px}
+.ln details.ed textarea,.addline textarea{width:100%;min-height:70px}
+.addline{margin:0 0 12px}
+.addline summary{cursor:pointer}
+.addline form{display:grid;gap:8px;margin-top:10px;max-width:560px}
+@media (max-width:560px){.ln{grid-template-columns:44px 1fr auto}}
+</style>
+<p><a href="{{ url_for('reviews_page') }}">← 复盘</a></p>
+<h1>R{{ room.id }} {{ room.kind }}</h1>
+<p class="lede">{{ slot }}　·　参与者：{{ who|join('、') }}　·　{{ status_text }}　<a class="btn sm ghost" href="{{ url_for('review_export', rid=room.id) }}">导出文本</a></p>
+
+<section>
+  <h2>每个人说了多少</h2>
+  {% if stats %}<table class="rt"><tr><th>谁</th><th>戏文</th><th>戏文字数</th><th>闲聊</th></tr>
+    {% for s in stats %}<tr><td>{{ s.name }}</td><td class="tabular">{{ s.rp or 0 }} 条</td><td class="tabular">{{ s.chars or 0 }}</td><td class="tabular">{{ s.chat or 0 }} 条</td></tr>{% endfor %}</table>
+  {% else %}<p class="empty">还没有记到发言。要房间群里有监听的 QQ 号、说话的人绑定过 QQ，才会存下来。</p>{% endif %}
+</section>
+
+<section>
+  <h2>全部发言</h2>
+  {% for l in lines %}<div class="ln {{ '' if l.is_rp else 'chat' }}"><span class="t">{{ l.ts|ts }}</span><span class="w">{{ l.name }}</span><span class="x">{{ l.text }}</span></div>
+  {% else %}<p class="empty">没有记录。</p>{% endfor %}
+</section>
+{% endblock %}

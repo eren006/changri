@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block title %}点歌台 · {{ brand }}{% endblock %}
+{% block body %}
+  {% include '_form_css.html' %}
+  <header class="bar"><a class="back" href="{{ url_for('discover') }}">发现</a><div class="title">点歌台</div></header>
+  <div class="scroll list">
+    {% include '_flash.html' %}
+    <form method="post" action="{{ url_for('songs_pick') }}" style="padding:12px 20px">
+      <input type="hidden" name="_csrf" value="{{ csrf() }}">
+      <label for="sgKw">歌名（可加歌手），或 B 站链接 / BV 号</label>
+      <input id="sgKw" name="keyword" maxlength="80" placeholder="例：晴天 周杰伦" autocomplete="off">
+      <label for="sgPf">平台</label>
+      <select id="sgPf" name="platform"><option value="">自动</option><option value="qq">QQ 音乐</option><option value="163">网易云</option></select>
+      <label for="sgTo">送给</label>
+      <select id="sgTo" name="to"><option value="0">大家</option>{% for o in others %}<option value="{{ o.id }}">{{ o.name }}</option>{% endfor %}</select>
+      <label for="sgMsg">寄语（可不写）</label>
+      <input id="sgMsg" name="message" maxlength="60" autocomplete="off">
+      <p style="color:var(--mute);font-size:13px">歌会以卡片的形式发到公告群。今天已点 {{ used }}/{{ cap if cap > 0 else '不限' }}。{% if not has_ann %}（管理员还没设置公告群）{% endif %}</p>
+      <button class="send" type="submit">点歌</button>
+    </form>
+    <div class="disc-label">最近大家点的歌</div>
+    {% for r in recent %}
+    <div style="padding:10px 20px;border-bottom:1px solid var(--line)">
+      <div><b>{{ r.title }}</b>{% if r.artist %} · {{ r.artist }}{% endif %}</div>
+      <div style="color:var(--mute);font-size:13px">{{ r.from_name or '—' }} → {{ r.to_name or '大家' }}{% if r.message %} · {{ r.message }}{% endif %}{% if r.url %} · <a href="{{ r.url }}" target="_blank" rel="noopener">听</a>{% endif %}</div>
+    </div>
+    {% else %}<div class="empty">还没有人点歌。</div>{% endfor %}
+  </div>
+{% endblock %}

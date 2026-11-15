@@ -7,16 +7,16 @@ import tempfile
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 os.environ["CHANGRI_DB_PATH"] = str(Path(tempfile.mkdtemp()) / "qqpool.db")
 os.environ["QQ_BOTS"] = "[]"
 os.environ["ADMIN_PASSWORD"] = ""
 
 import websockets  # noqa: E402
 
-from admin import create_app  # noqa: E402
-from core import qqmanager, qqpool, webusers  # noqa: E402
-from core.db import get_conn, init_db, set_config  # noqa: E402
+from changri.admin import create_app  # noqa: E402
+from changri.core import qqmanager, qqpool, webusers  # noqa: E402
+from changri.core.db import get_conn, init_db, set_config  # noqa: E402
 from tests._linkup import links_up  # noqa: E402
 
 
@@ -31,6 +31,22 @@ def clear():
 class Pool(unittest.TestCase):
     def setUp(self):
         clear()
+
+    def test_autolink(self):
+        """同一句话：QQ 号在真实群里听到（带 @机器人）、官方机器人收到 → 自动填上关联群编号；先后顺序都行，有歧义不填。"""
+        qqpool._heard.clear(); qqpool._seen.clear()
+        qqpool.add_group("111111", "", "bot"); qqpool.add_group("222222", "", "bot")
+        self.assertEqual(qqpool.note_heard("111111", "@卡拉 /r 1d100 侦查"), "")
+        self.assertEqual(qqpool.note_official("OPENID_A", "/r 1d100 侦查"), "111111")
+        self.assertEqual(qqpool.openid_of("111111"), "OPENID_A")
+        self.assertEqual(qqpool.note_official("OPENID_B", "你好呀"), "")      # 官方机器人先收到也行
+        self.assertEqual(qqpool.note_heard("222222", "@卡拉 你好呀"), "222222")
+        self.assertEqual(qqpool.openid_of("222222"), "OPENID_B")
+        qqpool.add_group("333333", "", "bot"); qqpool.add_group("444444", "", "bot")
+        qqpool.note_heard("333333", "/r d20"); qqpool.note_heard("444444", "/r d20")
+        self.assertEqual(qqpool.note_official("OPENID_C", "/r d20"), "")      # 两个群都说了这句，不知道是哪个
+        self.assertEqual(qqpool.openid_of("333333"), ""); self.assertEqual(qqpool.openid_of("444444"), "")
+        self.assertEqual(qqpool.note_official("OPENID_A", "/r d20"), "")      # 已关联过的 openid 不会再关联别的群
 
     def test_pool_rules(self):
         self.assertEqual(qqpool.add_group("123456", "备用一"), "")
@@ -123,7 +139,7 @@ if __name__ == "__main__":
 class Listen(unittest.TestCase):
     def setUp(self):
         clear()
-        from core import trpg, trpglog
+        from changri.core import trpg, trpglog
         self.trpg, self.trpglog = trpg, trpglog
         qqpool.add_group("123456", "跑团群", "bot")
         qqpool.update_group("123456", "跑团群", "bot", "G1")
@@ -131,14 +147,14 @@ class Listen(unittest.TestCase):
         self.log, _ = trpglog.new_log("G1", "战役", "M1")
 
     def msg(self, text, user="777777", nick="小明"):
-        from core.qqlink import GroupMsg
+        from changri.core.qqlink import GroupMsg
         return GroupMsg("9", "123456", user, nick, text, 1700000000, "1")
 
     def lines(self):
         return [(x["speaker_key"], x["speaker_name"], x["text"]) for x in self.trpglog.lines(self.log["id"])]
 
     def test_records_and_filters(self):
-        from plugins import _logtap
+        from changri.plugins import _logtap
         _logtap.record_listened("", self.msg("我推开门"))
         _logtap.record_listened("", self.msg("（场外话）"))                       # 括号开头不记
         _logtap.record_listened("", self.msg("/log off"))                          # 管理指令不记
@@ -148,7 +164,7 @@ class Listen(unittest.TestCase):
         self.assertEqual(len(self.lines()), 1)
 
     def test_unmapped_or_romance_group_ignored(self):
-        from plugins import _logtap
+        from changri.plugins import _logtap
         qqpool.update_group("123456", "", "bot", "")                              # 没填关联群编号
         _logtap.record_listened("", self.msg("没人听见"))
         qqpool.update_group("123456", "", "bot", "G1")
@@ -159,7 +175,7 @@ class Listen(unittest.TestCase):
     def test_dedup_between_two_paths(self):
         from types import SimpleNamespace
 
-        from plugins import _logtap
+        from changri.plugins import _logtap
         _logtap.record_listened("", self.msg("@卡拉 我要侦查"))
         ev = SimpleNamespace(group_openid="G1", author=SimpleNamespace(member_openid="M1"), get_plaintext=lambda: " 我要侦查")
         _logtap.record_incoming(ev)                                                # 卡拉也收到同一句：不重复记
@@ -170,7 +186,7 @@ class Listen(unittest.TestCase):
         self.assertEqual(len(self.lines()), 3)
 
     def test_bind_qq_uses_own_card(self):
-        from plugins import _logtap
+        from changri.plugins import _logtap
         pid = self.trpg.player_for("M1", "G1")
         card, _ = self.trpg.new_card(pid, "阿红")
         self.assertEqual(self.trpg.bind_qq(pid, "777777"), "")
@@ -189,7 +205,7 @@ class RoomGroups(unittest.TestCase):
                 c.execute(f"DELETE FROM {t}")
 
     def test_bulk_add_and_allocate(self):
-        from core import pool
+        from changri.core import pool
         ok, bad = qqpool.add_rooms("", "100001\n100002, 100003\nabc")
         self.assertEqual(ok, 3)
         self.assertEqual(len(bad), 1)
@@ -203,19 +219,19 @@ class RoomGroups(unittest.TestCase):
         self.assertEqual(pool.counts()["occupied"], 1)
 
     def test_room_name_template(self):
-        self.assertEqual(qqpool.room_name({"kind": "私约", "id": 7, "day": 3, "start_hm": "20:00", "end_hm": "21:00", "place": "咖啡馆"}, ["小明", "小红"]), "私约 D3 20:00-21:00 咖啡馆 小明、小红")
-        self.assertEqual(qqpool.room_name({"kind": "私约", "id": 7, "day": 3, "start_hm": "20:00", "end_hm": "21:00", "place": "海边的小咖啡馆旁边"}, ["莱昂内利", "卢克雷齐娅"]), "私约 D3 20:00-21:00 咖啡馆 莱昂内利、卢克雷齐娅"[:0] or qqpool.room_name({"kind": "私约", "id": 7, "day": 3, "start_hm": "20:00", "end_hm": "21:00", "place": "海边的小咖啡馆旁边"}, ["莱昂内利", "卢克雷齐娅"]))
+        self.assertEqual(qqpool.room_name({"kind": "私约", "id": 7, "day": 3, "start_hm": "20:00", "end_hm": "21:00", "place": "咖啡馆"}, ["小明", "小红"]), "约会 D3 20:00-21:00 咖啡馆 小明、小红")     # 私约在群名上写成「约会」
+        self.assertEqual(qqpool.room_name({"kind": "私约", "id": 7, "day": 3, "start_hm": "20:00", "end_hm": "21:00", "place": "海边的小咖啡馆旁边"}, ["莱昂内利", "卢克雷齐娅"]), "约会 D3 20:00-21:00 咖啡馆 莱昂内利、卢克雷齐娅"[:0] or qqpool.room_name({"kind": "私约", "id": 7, "day": 3, "start_hm": "20:00", "end_hm": "21:00", "place": "海边的小咖啡馆旁边"}, ["莱昂内利", "卢克雷齐娅"]))
         self.assertLessEqual(len(qqpool.room_name({"kind": "私约", "id": 7, "day": 3, "start_hm": "20:00", "end_hm": "21:00", "place": "海边的小咖啡馆旁边"}, ["莱昂内利", "卢克雷齐娅"])), 30)
         self.assertEqual(qqpool.fmt_names(["甲", "乙", "丙", "丁", "戊"]), "甲×乙等5人")
         set_config("qqlink_room_name", "R{id} {kind}")
         self.assertEqual(qqpool.room_name({"kind": "电话", "id": 7}, ["x"]), "R7 电话")
-        self.assertEqual(qqpool.free_name(), "空房间")
+        self.assertEqual(qqpool.free_name(), "长日备用")
 
 
 class RoomEntry(unittest.TestCase):
     def test_qq_speech_marks_entered(self):
         clear()
-        from core import pool, roles, rooms
+        from changri.core import pool, roles, rooms
         with get_conn() as c:
             for t in ("room_members", "rooms", "pool_groups", "person_qq", "roles"):
                 c.execute(f"DELETE FROM {t}")
@@ -245,7 +261,7 @@ class RoomEntry(unittest.TestCase):
 
     def test_presence_marks_entered_without_speaking(self):
         clear()
-        from core import pool, roles, rooms
+        from changri.core import pool, roles, rooms
         with get_conn() as c:
             for t in ("room_members", "rooms", "pool_groups", "person_qq", "roles"):
                 c.execute(f"DELETE FROM {t}")
@@ -266,7 +282,7 @@ class RoomEntry(unittest.TestCase):
         self.assertIsNone(rooms.note_presence(room, {"999999"}))
 
     def test_binding_covers_new_roles_and_is_listed(self):
-        from core import roles
+        from changri.core import roles
         with get_conn() as c:
             c.execute("DELETE FROM person_qq")
             c.execute("DELETE FROM roles")
@@ -281,7 +297,7 @@ class RoomEntry(unittest.TestCase):
         self.assertEqual(roles.roles_by_qq("555555"), [])
 
     def test_admin_lists_bindings(self):
-        from core import roles
+        from changri.core import roles
         with get_conn() as c:
             c.execute("DELETE FROM person_qq")
             c.execute("DELETE FROM roles")
@@ -310,7 +326,7 @@ class Watch(unittest.TestCase):
         qqmanager._down.clear()
 
     def test_alert_once_then_recover(self):
-        from core.qqlink import QQLink
+        from changri.core.qqlink import QQLink
         self.assertIsNone(qqmanager.watch("b", 0))                         # 没启用：什么都不提醒
         link = QQLink("ws://x")
         qqmanager._links[("b", 0)] = link
@@ -327,7 +343,7 @@ class Watch(unittest.TestCase):
     def test_short_blip_no_alert_and_qq_offline(self):
         import asyncio
 
-        from core.qqlink import QQLink
+        from changri.core.qqlink import QQLink
         link = QQLink("ws://x")
         qqmanager._links[("b", 0)] = link
         qqmanager.watch("b", 0)
@@ -348,7 +364,7 @@ class GroupSets(unittest.IsolatedAsyncioTestCase):
                 c.execute(f"DELETE FROM {t}")
 
     def test_join_leave_and_sets(self):
-        from core import pool
+        from changri.core import pool
         self.assertEqual(qqpool.join_set("", "100001", "A组"), "")
         self.assertEqual(qqpool.join_set("", "100002", "A组"), "")
         self.assertEqual(qqpool.join_set("", "100003", "B组"), "")
@@ -365,7 +381,7 @@ class GroupSets(unittest.IsolatedAsyncioTestCase):
         self.assertIn("不在", qqpool.leave_set("", free_gid))
 
     def test_set_switch(self):
-        from core import pool
+        from changri.core import pool
         qqpool.join_set("", "100001", "A组")
         qqpool.join_set("", "100002", "A组")
         self.assertEqual(qqpool.set_enabled("", "A组", False), "")                      # 都空闲，随时能关
@@ -396,7 +412,7 @@ class GroupSets(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(qqmanager.parse_command("我想加入群号组 A 组"))
 
     async def test_command_needs_auth_and_works_outside_pool(self):
-        from core.qqlink import GroupMsg
+        from changri.core.qqlink import GroupMsg
         notes = []
         qqmanager._notifiers.append(lambda app, text: notes.append(text))
         try:
@@ -433,7 +449,7 @@ class GroupSetsPage(unittest.TestCase):
         self.assertIn("A组", html)
         self.assertIn("100001", html)
         c.post("/qqlink/roomname", data={"_csrf": tok("/qqlink"), "preset": "【{kind}】{names}", "free_name": "{set}·空房间"})
-        self.assertIn("【私约】小明×小红", c.get("/qqlink").get_data(as_text=True))
+        self.assertIn("【约会】小明×小红", c.get("/qqlink").get_data(as_text=True))
         c.post("/qqlink/auth", data={"_csrf": tok("/qqlink"), "auth": "111111, 222222"})
         self.assertEqual(qqpool.auth_qqs(), {"111111", "222222"})
         c.post("/qqlink/sets/remove/100001", data={"_csrf": tok("/qqlink")})
@@ -456,7 +472,7 @@ class MultiLink(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(qqpool.links()[0]["token"], "tk")
 
     def test_link_crud_and_delete_protection(self):
-        from core import pool
+        from changri.core import pool
         a, _ = qqpool.add_link("主号", "ws://127.0.0.1:3001", "", True)
         b, _ = qqpool.add_link("备用号", "ws://127.0.0.1:3002", "", True)
         self.assertIn("ws://", qqpool.add_link("x", "http://x")[1])
@@ -473,7 +489,7 @@ class MultiLink(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len([g for g in pool.all_groups() if pool.is_qq_only(g)]), 1)
 
     async def test_owner_link_only_handles_group(self):
-        from core.qqlink import GroupMsg
+        from changri.core.qqlink import GroupMsg
         a, _ = qqpool.add_link("A", "ws://127.0.0.1:3001")
         b, _ = qqpool.add_link("B", "ws://127.0.0.1:3002")
         qqpool.add_group("111111", "", "listen", a)
@@ -502,8 +518,8 @@ class MultiLink(unittest.IsolatedAsyncioTestCase):
 class Review(unittest.TestCase):
     def test_record_and_pages(self):
         clear()
-        from core import pool, roles, roomlog, rooms
-        from core.qqlink import GroupMsg
+        from changri.core import pool, roles, roomlog, rooms
+        from changri.core.qqlink import GroupMsg
         with get_conn() as c:
             for t in ("room_lines", "room_members", "rooms", "pool_groups", "person_qq", "roles"):
                 c.execute(f"DELETE FROM {t}")
@@ -544,7 +560,7 @@ class Review(unittest.TestCase):
         c = create_app().test_client()
         tok = lambda p: re.search(r'name="_csrf" value="([^"]+)"', c.get(p).get_data(as_text=True)).group(1)   # noqa: E731
         c.post("/login", data={"username": "boss4", "password": "longenough1", "_csrf": tok("/login")})
-        self.assertIn("看这一天", c.get("/reviews?role=甲").get_data(as_text=True))
+        self.assertIn("个私约/房间", c.get("/reviews?role=甲").get_data(as_text=True))
         lab = roomlog.day_summary(roomlog.events())[0]["label"]
         self.assertIn("今天天气真好", c.get(f"/reviews/day/{lab}?role=甲").get_data(as_text=True))
         self.assertIn("R%d" % rid, c.get("/reviews/day/all").get_data(as_text=True))

@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+{% from '_phone_symbols.html' import phone_symbol %}
+{% from '_phone_icons.html' import admin_app_icon with context %}
+{% block title %}心动信箱 · {{ brand }}{% endblock %}
+{% block body %}
+  <header class="bar">
+    <a class="back" href="{{ url_for('discover') }}">发现</a>
+    <div class="title">心动信箱</div>
+    <div class="right"></div>
+  </header>
+  <div class="scroll lm-page">
+    <nav class="song-tabs lm-tabs" aria-label="心动信箱">
+      <a href="{{ url_for('lovemail_page') }}"{% if view == 'inbox' %} aria-current="page"{% endif %}>收到的 {{ recv|length }}</a>
+      <a href="{{ url_for('lovemail_page', view='sent') }}"{% if view == 'sent' %} aria-current="page"{% endif %}>寄出的 {{ sent|length + lm.pending|length }}</a>
+      {% if true %}<a href="{{ url_for('lovemail_page', view='write') }}"{% if view == 'write' %} aria-current="page"{% endif %}>写信</a>{% endif %}
+    </nav>
+    <div class="lm-note">{% if lm.ready %}{{ lm.game_day }} 已投 {{ lm.used }}/{{ lm.limit }}{% if lm.delivery_time %} · {{ lm.delivery_time }} 派送{% endif %}{% else %}匿名来信{% endif %}</div>
+    {% for m in get_flashed_messages() %}<div class="notice lm-flash" role="status">{{ m }}</div>{% endfor %}
+
+    {% if view == 'inbox' %}
+      {% for m in recv %}
+      {% if loop.first or m.game_day != recv[loop.index0 - 1].game_day %}<div class="stamp"><b>{{ m.game_day or '往期' }}</b></div>{% endif %}
+      <article class="lm-letter">
+        <div class="lm-body">{{ m.content }}</div>
+        <div class="lm-sig">—— {{ m.signature }}</div>
+        {% if m.public %}<div class="tag">{{ phone_symbol('megaphone') }} 派送途中飘落到了公告区</div>{% endif %}
+      </article>
+      {% else %}
+      <div class="empty">信箱还是空的。每晚{{ ' ' ~ lm.delivery_time if lm.delivery_time }} 邮差会统一派送当天的心动信，来信只署名、不写是谁。</div>
+      {% endfor %}
+
+    {% elif view == 'sent' %}
+      {% if lm.pending %}
+      <div class="stamp"><b>等待派送</b></div>
+      {% for p in lm.pending %}
+      <article class="lm-letter lm-pending">
+        <div class="lm-to">寄给 {{ p.to }}{% if p.game_day %} · {{ p.game_day }}{% endif %}</div>
+        <div class="lm-body">{{ p.content }}</div>
+        <div class="lm-sig">—— {{ p.signature }}</div>
+        {% if true %}
+        <form method="post" action="{{ url_for('lovemail_post') }}" onsubmit="return confirm('撤回这封寄给 {{ p.to }} 的信？')">
+          <input type="hidden" name="_csrf" value="{{ csrf() }}"><input type="hidden" name="action" value="revoke">
+          <input type="hidden" name="mail" value="{{ p.id }}">
+          <button type="submit" class="quiet-button lm-revoke">撤回</button>
+        </form>
+        {% endif %}
+      </article>
+      {% endfor %}
+      {% endif %}
+      {% for m in sent %}
+      {% if loop.first or m.game_day != sent[loop.index0 - 1].game_day %}<div class="stamp"><b>{{ m.game_day or '往期' }}</b> 已派送</div>{% endif %}
+      <article class="lm-letter lm-sent">
+        <div class="lm-to">寄给 {{ m.to }}</div>
+        <div class="lm-body">{{ m.content }}</div>
+        <div class="lm-sig">—— {{ m.signature }}</div>
+        {% if m.public %}<div class="tag">{{ phone_symbol('megaphone') }} 派送途中飘落到了公告区</div>{% endif %}
+      </article>
+      {% else %}
+      {% if not lm.pending %}<div class="empty">还没有寄出过心动信</div>{% endif %}
+      {% endfor %}
+
+    {% else %}
+      {% if lm.why %}<div class="song-note">{{ lm.why }}</div>{% endif %}
+      {% set d = draft or {} %}
+      <form class="song-form" method="post" action="{{ url_for('lovemail_post') }}">
+        <input type="hidden" name="_csrf" value="{{ csrf() }}">
+        <label for="lmTo">寄给</label>
+        <select id="lmTo" name="to" required>
+          <option value="">选一个人</option>
+          {% for n in contacts %}<option value="{{ n }}"{% if n == (d.to or preset_to) %} selected{% endif %}>{{ n }}</option>{% endfor %}
+        </select>
+        <label for="lmContent">想说的话（{{ max_len }} 字内）</label>
+        <textarea id="lmContent" name="content" maxlength="{{ max_len }}" required rows="6">{{ d.content }}</textarea>
+        <label for="lmSig">署名（选填，{{ sig_max }} 字内，不写就是「匿名」）</label>
+        <input id="lmSig" name="signature" maxlength="{{ sig_max }}" autocomplete="off" placeholder="匿名" value="{{ d.signature }}">
+        <button type="submit" class="song-submit"{% if not lm.can %} disabled{% endif %}>投进信箱</button>
+      </form>
+      <p class="song-note">对方只会看到署名，不会知道是你。信会在{{ ' ' ~ lm.delivery_time if lm.delivery_time else '每晚' }} 统一派送，派送前可以在「寄出的」里撤回。群里「发送心动信」和这里共用每天的次数。</p>
+    {% endif %}
+  </div>
+
+{% endblock %}

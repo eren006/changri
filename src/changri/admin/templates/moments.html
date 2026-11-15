@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}朋友圈{% endblock %}
+{% block body %}
+<h1>朋友圈</h1>
+<p class="lede">玩家在小手机里发的朋友圈。这里能看全部，删帖子（图片和评论一起删）、删单条评论、删单张图片（帖子文字保留，腾出图片额度）。每人的图片额度、每天发帖上限和总容量在「功能与设置」的「朋友圈」里改。</p>
+<section>
+  <div class="sec-head keep"><h2>概况</h2></div>
+  <p>共 {{ st.posts }} 条帖子、{{ st.comments }} 条评论、{{ st.images }} 张图，图片占用 {{ '%.1f'|format(st.bytes / 1048576) }} / {{ (st.limit / 1048576)|int }} MB。</p>
+</section>
+<section>
+  <div class="sec-head keep"><h2>帖子</h2></div>
+  {% for p in posts %}
+  <div class="card" style="margin-bottom:12px">
+    <div><b>{{ p.role_name }}</b> <span class="muted">{{ p.day_label }} {{ p.time }} · #{{ p.id }}</span></div>
+    {% if p.content %}<div style="white-space:pre-wrap;margin:6px 0">{{ p.content }}</div>{% endif %}
+    {% if p.images %}<div style="display:flex;flex-wrap:wrap;gap:8px;margin:6px 0">
+      {% for im in p.images %}{% if im.deleted %}<span class="muted">（图片已删除）</span>{% else %}
+      <form method="post" action="{{ url_for('moments_image_delete', img_id=im.id) }}" onsubmit="return confirm('删除这张图片？帖子文字会保留。')" style="position:relative">{{ csrf() }}
+        <a href="{{ url_for('moments_image', img_id=im.id) }}" target="_blank"><img src="{{ url_for('moments_image', img_id=im.id, s='thumb') }}" alt="" style="width:96px;height:96px;object-fit:cover;border-radius:6px"></a>
+        <button class="btn ghost" type="submit" style="position:absolute;right:2px;top:2px;padding:0 6px" aria-label="删除这张图片">×</button></form>{% endif %}{% endfor %}
+    </div>{% endif %}
+    {% if p.likes %}<div class="muted">♥ {{ p.likes|join('，') }}</div>{% endif %}
+    {% for c in p.comments %}
+    <form method="post" action="{{ url_for('moments_comment_delete', cid=c.id) }}" style="display:flex;gap:8px;align-items:center;margin-top:4px">{{ csrf() }}
+      <span><b>{{ c.role_name }}</b>{% if c.reply_to %} 回复 <b>{{ c.reply_to }}</b>{% endif %}：{{ c.content }}</span>
+      <button class="btn ghost" type="submit" onclick="return confirm('删除这条评论？')">删除评论</button></form>
+    {% endfor %}
+    <form method="post" action="{{ url_for('moments_delete', mid=p.id) }}" onsubmit="return confirm('删除这条朋友圈？图片和评论一起删，无法恢复。')" style="margin-top:8px">{{ csrf() }}<button class="btn ghost" type="submit">删除这条朋友圈</button></form>
+  </div>
+  {% else %}<p class="muted">还没有人发朋友圈。</p>{% endfor %}
+  {% if more %}<p><a class="btn ghost" href="{{ url_for('moments_page', before=posts[-1].id) }}">更早的</a></p>{% endif %}
+</section>
+{% endblock %}

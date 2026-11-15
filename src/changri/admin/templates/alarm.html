@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}群体闹钟{% endblock %}
+{% block body %}
+{% import "_rpg_icons.html" as ic %}
+{% macro cancel() %}<button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button>{% endmacro %}
+<h1>群体闹钟</h1>
+<p class="lede">到点后，机器人逐个往每位玩家的个人群 @ 本人发提醒（NPC 不发）。收件人在触发那一刻才算，所以设完以后新建的角色也会收到。机器人停机错过超过 1 小时的不补发。这里只能在后台设，群里没有对应指令。</p>
+<div class="stats"><div class="stat"><b>{{ rows|length }}</b><span>条待发（最多 {{ max }}）</span></div><div class="stat"><b>{{ players }}</b><span>位玩家会收到</span></div></div>
+
+<section>
+  <div class="sec-head keep"><h2>待发的闹钟<span class="n">{{ rows|length }} 条</span></h2>
+    <span class="btns"><details class="panel"><summary class="btn">{{ ic.plus() }}添加</summary>
+      <form class="form" method="post" action="{{ url_for('alarm_add') }}">{{ csrf() }}
+        <div class="fields"><div><label for="al">一行一条：日期 时间 内容</label>
+          <textarea id="al" name="lines" rows="4" placeholder="9月12日 20:00 记得交日报&#10;明天 21:30 今晚的戏开始了"></textarea></div></div>
+        <p class="note">日期：今天 / 明天 / 后天 / 9月12日 / 9.12 / 2026-9-12；时间：20:00 或 20点30。</p>
+        <div class="actions"><button class="btn" type="submit">添加</button>{{ cancel() }}</div>
+      </form></details>
+      {% if rows %}<form method="post" action="{{ url_for('alarm_clear') }}" onsubmit="return confirm('撤销全部待发闹钟？')">{{ csrf() }}<button class="btn ghost danger" type="submit">全部撤销</button></form>{% endif %}</span></div>
+  {% if rows %}<div class="rowlist">{% for r in rows %}
+    <div class="row"><div class="nm"><b>{{ r.trigger_ts|ts }}</b><div class="muted">{{ r.content }}</div></div>
+      <div class="acts"><form method="post" action="{{ url_for('alarm_delete', alarm_id=r.id) }}">{{ csrf() }}<button class="linkbtn">撤销</button></form></div></div>{% endfor %}</div>
+  {% else %}<p class="empty">没有待发的群体闹钟。</p>{% endif %}
+</section>
+{% endblock %}

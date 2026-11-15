@@ -1,0 +1,18 @@
+{
+  "phone/static/masquerade/deep_space_masquerade.m4a": {
+    "sha256": "c07bdb2e130bb9d62c2d2882f41cf4ade9f48caae181f6bed295b75eb174ecf1",
+    "size": 3291371
+  },
+  "phone/static/masquerade/gong_yan_yu_yun.m4a": {
+    "sha256": "ab617072004b831a5ef78c994542b789678a5a1e94d9578727df9a4c8ffe9413",
+    "size": 3308467
+  },
+  "phone/static/masquerade/maschera_di_roma.m4a": {
+    "sha256": "ae3a05d7dc1fdeff561e540e68a61982c64278213447a4cef5847376549cd33b",
+    "size": 2895952
+  },
+  "phone/static/masquerade/masquerade_at_the_academy.m4a": {
+    "sha256": "9235767473cb87511a570b38461f5522917cff3179f20b1898a6d9dd7e39c729",
+    "size": 3036847
+  }
+}

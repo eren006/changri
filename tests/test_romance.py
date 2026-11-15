@@ -6,13 +6,13 @@ import time
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 _tmp = tempfile.mkdtemp()
 os.environ["CHANGRI_DB_PATH"] = str(Path(_tmp) / "r.db")
 
-from core import admins, blocks, lovemail, messaging, relations, roles  # noqa: E402
-from core.db import get_config, get_conn, init_db, set_config  # noqa: E402
-from core.schedule import run_lovemail_tick  # noqa: E402
+from changri.core import admins, blocks, lovemail, messaging, relations, roles  # noqa: E402
+from changri.core.db import get_config, get_conn, init_db, set_config  # noqa: E402
+from changri.core.schedule import run_lovemail_tick  # noqa: E402
 
 
 def run(coro):

@@ -1,0 +1,54 @@
+# 安装包里的依赖，版本全部钉死（由 pyproject.toml 的 dependencies 解析出来）。
+# 改了这里，运行环境编号就会变，已安装的机器下次更新会多下载一个新的运行环境（约 20–35MB）。
+# 分号后面的条件由 packaging/build.py 按「目标平台」判断（pip 交叉下载时只会按本机判断，所以不交给 pip）。
+a2wsgi==1.10.10
+annotated-doc==0.0.6
+annotated-types==0.8.0
+anyio==4.16.0
+apscheduler==3.11.3
+blinker==1.9.0
+certifi==2026.10.23
+cffi==2.1.1
+click==8.5.1
+colorama==0.4.6 ; sys_platform == "win32"
+cryptography==48.0.1
+exceptiongroup==1.3.1
+fastapi==0.162.5
+flask==3.1.3
+h11==0.16.0
+h2==4.4.1
+hpack==4.2.0
+httpcore==1.0.9
+httptools==0.9.0
+httpx==0.28.1
+hyperframe==6.1.0
+idna==3.20
+itsdangerous==2.2.0
+jinja2==3.1.6
+loguru==0.8.0
+markupsafe==3.0.4
+multidict==7.2.1
+nonebot-adapter-qq==1.7.1
+nonebot-plugin-apscheduler==0.5.0
+nonebot2==2.5.0
+opentelemetry-api==1.45.2
+pillow==13.0.0
+propcache==0.5.4
+pycparser==3.12
+pydantic==2.14.3
+pydantic-core==2.50.4
+pygtrie==2.6.2
+python-dotenv==1.2.2
+pyyaml==6.0.3
+starlette==1.10.0
+typing-extensions==4.16.0
+typing-inspection==0.4.5
+tzdata==2026.6 ; platform_system == "Windows"
+tzlocal==5.4.5
+uvicorn==0.54.0
+uvloop==0.23.0 ; sys_platform != "win32"
+watchfiles==1.3.0
+websockets==17.4
+werkzeug==3.1.9
+win32-setctime==1.2.1 ; sys_platform == "win32"
+yarl==1.25.1

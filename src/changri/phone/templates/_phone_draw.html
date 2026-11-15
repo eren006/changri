@@ -1,0 +1,120 @@
+{# 抽卡（RPG → 抽卡）：选池子点抽取，当场翻出结果。次数由管理员发放。 #}
+<div class="dr-page" id="drPage">
+  <div class="dr-note" id="drNote" hidden></div>
+  <div class="dr-pools" id="drPools"></div>
+  <div class="dr-wait" id="drWait" hidden><span class="dr-spin" aria-hidden="true"></span><span id="drWaitText">抽取中，机器人处理后翻开……</span></div>
+  <h3 class="ch-h">最近的结果</h3>
+  <div class="ch-list" id="drHist"></div>
+</div>
+<div class="dr-modal" id="drModal" hidden role="dialog" aria-modal="true" aria-labelledby="drModalName">
+  <div class="dr-card">
+    <div class="dr-pool" id="drModalPool"></div>
+    <div class="dr-name" id="drModalName"></div>
+    <div class="dr-tier" id="drModalTier" hidden></div>
+    <div class="dr-desc" id="drModalDesc"></div>
+    <div class="dr-pity" id="drModalPity" hidden>保底触发</div>
+    <button type="button" class="dr-ok" id="drModalOk">收下</button>
+  </div>
+</div>
+<style>
+.dr-page { padding: 4px 0 24px; }
+.dr-note { margin: 8px var(--gutter, 18px) 12px; padding: 10px 12px; border-radius: 12px; background: var(--theirs); color: var(--theirs-text); font-size: 13px; line-height: 1.6; }
+.dr-pools { display: grid; gap: 10px; margin: 10px var(--gutter, 18px) 0; }
+.dr-pool-card { display: flex; align-items: center; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); }
+.dr-pool-card .nm { flex: 1; min-width: 0; font-size: 16px; font-weight: 600; }
+.dr-pool-card .nm small { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--muted); }
+.dr-pool-card button { border: 0; border-radius: 18px; padding: 9px 18px; background: var(--mine); color: var(--mine-text, #fff); font-size: 15px; cursor: pointer; }
+.dr-pool-card button:disabled { opacity: .45; cursor: default; }
+.dr-wait { display: flex; align-items: center; gap: 10px; margin: 14px calc(var(--gutter, 18px) + 4px) 2px; font-size: 13px; color: var(--muted); }
+.dr-wait[hidden], .dr-modal[hidden], .dr-note[hidden], .dr-tier[hidden], .dr-pity[hidden] { display: none; }
+.dr-spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--mine); animation: drspin 1s linear infinite; }
+@keyframes drspin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .dr-spin { animation: none; } }
+.dr-modal { position: fixed; z-index: 40; inset: 0; background: rgba(0,0,0,.5); display: grid; place-items: center; padding: 24px; }
+.dr-card { width: 100%; max-width: 320px; text-align: center; padding: 28px 22px 20px; border-radius: 20px; background: var(--bg); color: var(--text); box-shadow: 0 12px 40px rgba(0,0,0,.35); animation: drpop .35s ease-out; }
+@keyframes drpop { from { transform: scale(.85); opacity: 0; } to { transform: none; opacity: 1; } }
+.dr-pool { font-size: 12px; color: var(--muted); letter-spacing: .12em; }
+.dr-name { margin: 10px 0 6px; font-size: 24px; font-weight: 700; }
+.dr-tier { display: inline-block; margin-bottom: 6px; padding: 2px 10px; border-radius: 10px; background: var(--theirs); font-size: 12px; }
+.dr-desc { font-size: 14px; line-height: 1.7; color: var(--muted); min-height: 24px; }
+.dr-pity { margin-top: 8px; font-size: 13px; color: var(--tag); }
+.dr-ok { margin-top: 18px; width: 100%; padding: 12px; border: 0; border-radius: 12px; background: var(--mine); color: var(--mine-text, #fff); font-size: 16px; cursor: pointer; }
+</style>
+<script>
+(function () {
+  var CSRF = {{ csrf()|tojson }}, INIT = {{ draw_state|tojson }};
+  var $ = function (id) { return document.getElementById(id); };
+  var st = INIT, seen = {}, first = true, shownKey = 'phone:drawseen:' + {{ role['id']|tojson }}, polling = null;
+  try { seen = JSON.parse(sessionStorage.getItem(shownKey) || '{}'); } catch (_) {}
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function remember() { try { sessionStorage.setItem(shownKey, JSON.stringify(seen)); } catch (_) {} }
+  function post(url, data) {
+    return fetch(url, { method: 'POST', body: new URLSearchParams(Object.assign({ _csrf: CSRF }, data || {})), credentials: 'same-origin' })
+      .then(function (r) { return r.json().catch(function () { return { ok: false, msg: '出错了，稍后再试' }; }); })
+      .catch(function () { return { ok: false, msg: '网络不通，稍后再试' }; });
+  }
+  function note(t) { var n = $('drNote'); n.textContent = t || ''; n.hidden = !t; }
+  var queue = [];
+  function showNext() {
+    if (!$('drModal').hidden || !queue.length) return;
+    var r = queue.shift();
+    $('drModalPool').textContent = '从「' + r.pool + '」抽到';
+    $('drModalName').textContent = r.name || '（未知物品）';
+    $('drModalTier').textContent = r.tier; $('drModalTier').hidden = !r.tier;
+    $('drModalDesc').textContent = r.desc || '';
+    $('drModalPity').hidden = !r.pity;
+    $('drModal').hidden = false;
+  }
+  $('drModalOk').addEventListener('click', function () { $('drModal').hidden = true; showNext(); });
+  function render() {
+    if (!st.enabled) { note('网页抽卡还没有开放'); return; }
+    note(st.can ? '' : st.why);
+    var box = $('drPools'); box.textContent = '';
+    st.pools.forEach(function (p) {
+      var c = el('div', 'dr-pool-card'), nm = el('div', 'nm', p.name);
+      nm.appendChild(el('small', null, '你有 ' + p.left + ' 次抽取' + (p.pity ? ' · ' + p.pity : '')));
+      var b = el('button', null, '抽取'); b.type = 'button';
+      b.disabled = !st.can || !p.can || st.pending >= 3;
+      b.addEventListener('click', function () {
+        b.disabled = true;
+        post('/p/me/draw', { pool: p.name }).then(function (r) {
+          if (!r.ok) { note(r.msg || '没抽成'); }
+          refresh();
+        });
+      });
+      c.appendChild(nm); c.appendChild(b); box.appendChild(c);
+    });
+    if (!st.pools.length && st.can) box.appendChild(el('div', 'dr-note', '现在没有开放的池子。'));
+    $('drWait').hidden = !st.pending;
+    $('drWaitText').textContent = st.pending ? ('抽取中…') : '';
+    var h = $('drHist'); h.textContent = '';
+    st.results.forEach(function (r) {
+      var it = el('div', 'ch-item'), top = el('div', 'top');
+      var label = !r.done ? '抽取中…' : (r.ok ? r.name : '没抽成');
+      top.appendChild(el('span', 'nm', label));
+      top.appendChild(el('span', 'ct', r.pool));
+      it.appendChild(top);
+      var sub = !r.done ? '' : (r.ok ? (r.desc || '') : (r.msg || ''));
+      if (sub) it.appendChild(el('div', 'ds', sub));
+      h.appendChild(it);
+    });
+    if (!st.results.length) h.appendChild(el('div', 'gm-empty ch-empty', '还没有抽过'));
+    // 新完成的结果翻牌：第一次进页面只记下已有的，不翻
+    st.results.slice().reverse().forEach(function (r) {
+      if (!r.done || seen[r.id]) return;
+      seen[r.id] = 1;
+      if (first) return;
+      if (r.ok) queue.push(r); else note(r.msg || '没抽成');
+    });
+    remember(); first = false; showNext();
+  }
+  function refresh() {
+    return fetch('/p/me/draw/state', { credentials: 'same-origin', cache: 'no-store' })
+      .then(function (r) { if (r.status === 401) { location.href = '/p'; return null; } return r.json(); })
+      .then(function (j) { if (j && j.ok) { st = j; render(); } })
+      .catch(function () {});
+  }
+  render();
+  setInterval(function () { if (!document.hidden && (st.pending || true)) refresh(); }, 4000);
+})();
+</script>

@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}小手机{% endblock %}
+{% block head %}
+<style>
+/* 小手机管理页：iOS 风（公共件在 base.html 的 .ios 里），这里只放这一页独有的 */
+.ios .tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin:0 0 36px}
+.ios .tile{display:block;padding:18px 18px 16px;color:inherit}
+.ios .tile .v{display:block;font:700 26px/1.15 var(--sans);letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin:14px 0 4px;overflow-wrap:anywhere}
+.ios .tile .n{display:block;color:var(--mute);font-size:13px;line-height:1.4}
+.ios .sec{margin:0 0 36px}
+.ios .stat-dot{flex:none;width:12px;height:12px;border-radius:50%}
+.ios .stat-dot.ok{background:var(--ok)}.ios .stat-dot.bad{background:var(--bad)}.ios .stat-dot.unknown{background:var(--field)}
+.ios .card .actions{margin:0;padding:6px 20px 20px}
+.ios .fpad .actions{padding:0;margin-top:22px}
+.ios .help{margin:0 20px 20px;padding:14px 16px;border-radius:12px;background:color-mix(in srgb,var(--warn) 9%,transparent);border:1px solid var(--warn)}
+.ios .help summary{cursor:pointer;font-weight:600}
+.ios .help ul{margin:8px 0 0;padding-left:20px}
+.ios .codes .grow{flex-wrap:wrap}
+.ios .codes .nm{min-width:5em;font-weight:600}
+.ios .codes .seen{color:var(--mute);font-size:13px;margin-left:auto}
+.ios .codes form{margin:0}
+.ios .gen{padding:16px 20px;border-bottom:1px solid var(--line)}
+@media (max-width:860px){.ios .tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:720px){.ios .lt{font-size:32px}.ios .tiles{gap:12px}.ios .fgrid{padding:18px 16px 4px}.ios .fpad{padding:18px 16px}.ios .codes .seen{margin-left:0;flex:1 1 100%}}
+</style>
+{% endblock %}
+{% block body %}
+<div class="ios">
+<h1 class="lt">小手机</h1>
+<p class="lt-sub">玩家用激活码在网页上玩的手机，和机器人同一个程序、同一份数据。玩家在个人群里发「手机码」就能领到链接和激活码。</p>
+
+{% if not enabled %}
+<div class="sec">
+  <p class="label">开启小手机</p>
+  <form class="card" method="post" action="{{ url_for('phone_enable') }}">{{ csrf() }}
+    <div class="fpad">
+      <p class="note" style="margin:0 0 20px">开启前先决定它用哪个端口：玩家要访问的网址就是「服务器 IP:端口」。端口是 1024–65535 之间的数字，不确定就用默认的 5092。所有机器人的小手机共用这一个端口，玩家用激活码登录时自动进到自己那个机器人。</p>
+      <div class="fields" style="max-width:none">
+        <div><label for="pe-port">端口</label><input id="pe-port" type="text" name="phone_port" value="{{ port }}" inputmode="numeric" required></div>
+        <div class="wide"><label for="pe-base">玩家访问网址（留空就自动用这台服务器的公网 IP）</label><input id="pe-base" type="text" name="phone_base_url" value="{{ base }}" placeholder="{{ suggest or 'http://服务器IP:5092' }}"></div>
+      </div>
+      <div class="actions"><button class="btn" type="submit">开启小手机</button></div>
+    </div>
+  </form>
+  <p class="foot">开启后还要到云服务商控制台的「安全组」放行这个端口，页面里的「检查玩家能不能打开」会帮你确认。</p>
+</div>
+{% else %}
+
+<p class="label">概况</p>
+<div class="tiles">
+  <div class="card tile"><span class="ico {{ 'c-orange' if paused else 'c-green' }}" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg></span><span class="v">{{ '已暂停' if paused else '开放中' }}</span><span class="n">小手机状态</span></div>
+  <div class="card tile"><span class="ico c-blue" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 12h16M4 7h16M4 17h16"/></svg></span><span class="v">{{ port }}</span><span class="n">端口</span></div>
+  <div class="card tile"><span class="ico c-purple" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M16 6l3 3"/></svg></span><span class="v">{{ codes|selectattr('code')|list|length }} / {{ codes|length }}</span><span class="n">已有激活码 / 角色</span></div>
+  <div class="card tile"><span class="ico c-pink" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="8.5" cy="10" r="1.2"/><circle cx="14" cy="8.5" r="1.2"/><circle cx="15.5" cy="13.5" r="1.2"/></svg></span><span class="v">{{ themes[theme.get('visual','modern')].name if theme.get('visual','modern') in themes else '默认' }}</span><span class="n">外观</span></div>
+</div>
+
+<div class="sec">
+  <p class="label">网络体检</p>
+  <div class="card group">
+    {% for l in lights %}
+    <div class="grow">
+      <span class="stat-dot {{ l.state }}" role="img" aria-label="{{ {'ok':'正常','bad':'有问题','unknown':'未知'}[l.state] }}"></span>
+      <div class="tx"><b>{{ l.name }}</b>{% if l.hint %}<span>{{ l.hint }}</span>{% endif %}</div>
+    </div>
+    {% endfor %}
+    <div class="grow"><form method="post" action="{{ url_for('phone_check') }}" style="margin:0">{{ csrf() }}<button class="btn ghost">检查玩家能不能打开</button></form></div>
+    {% if last and last.state in ('closed','timeout') %}
+    <details class="help" open><summary>怎么放行端口 {{ port }}</summary>
+      <p class="note">这一步只有你能做：到云服务器的网页控制台，给这台服务器的「安全组 / 防火墙」添加一条入站规则，协议 TCP，端口 {{ port }}，来源 0.0.0.0/0。</p>
+      <ul class="note">
+        <li><b>腾讯云</b>：控制台 → 云服务器 → 点你的服务器 → 安全组 → 编辑规则 → 入站规则 → 添加规则</li>
+        <li><b>阿里云</b>：控制台 → 云服务器 ECS → 实例 → 安全组 → 配置规则 → 入方向 → 手动添加</li>
+        <li><b>华为云</b>：控制台 → 弹性云服务器 → 安全组 → 配置规则 → 入方向规则 → 添加规则</li>
+      </ul>
+      <p class="note">改完回到这里再点一次「检查」，变绿就好了。</p>
+    </details>
+    {% endif %}
+  </div>
+</div>
+
+<div class="sec">
+  <p class="label">设置</p>
+  <form class="card" method="post" action="{{ url_for('phone_save') }}">{{ csrf() }}
+    <div class="group">
+      <label class="grow" style="cursor:pointer;color:var(--ink);font-size:inherit;margin:0"><div class="tx"><b>开放小手机</b><span>关掉后玩家打不开</span></div><span class="sw"><input type="checkbox" name="phone_enabled" {{ 'checked' if enabled }}><i></i></span></label>
+      <label class="grow" style="cursor:pointer;color:var(--ink);font-size:inherit;margin:0"><div class="tx"><b>暂停通讯</b><span>玩家能看，不能发</span></div><span class="sw"><input type="checkbox" name="phone_paused" {{ 'checked' if paused }}><i></i></span></label>
+    </div>
+    <div class="fgrid">
+      <div><label for="ps-base">玩家访问网址</label><input id="ps-base" type="text" name="phone_base_url" value="{{ base }}" placeholder="{{ suggest or 'http://服务器IP:5092' }}"></div>
+      <div><label for="ps-port">端口</label><input id="ps-port" type="text" name="phone_port" value="{{ port }}" inputmode="numeric"></div>
+      <div><label for="ps-visual">外观</label><select id="ps-visual" name="visual">{% for k, t in themes.items() %}<option value="{{ k }}" {{ 'selected' if theme.get('visual','modern') == k }}>{{ t.name }}</option>{% endfor %}</select></div>
+      <div><label for="ps-copy">用语（「信息」「公开播报」这些词）</label><select id="ps-copy" name="copy">{% for k in copies %}<option value="{{ k }}" {{ 'selected' if theme.get('copy','modern') == k }}>{{ themes[k].name }}</option>{% endfor %}</select></div>
+    </div>
+    <div class="fpad" style="padding-top:8px">
+      {% if suggest %}<p class="note" style="margin:0 0 12px">还没填网址。这台服务器的公网地址大概是 <b>{{ suggest }}</b>，复制进去保存，机器人发给玩家的消息里就会带上链接。</p>{% endif %}
+      <p class="note" style="margin:0">玩家可以在手机「我的」页里换自己的外观，用语跟随这里。端口可以自己改（1024–65535），所有机器人共用，保存后立刻生效，不用重启；改了端口要到云服务商安全组放行新端口。{% if not base.startswith('https://') %}当前是 http，登录不用密码、只有激活码；想更安全可以以后配 HTTPS 域名。{% endif %}</p>
+      <div class="actions"><button class="btn" type="submit">保存</button></div>
+    </div>
+  </form>
+</div>
+
+<div class="sec">
+  <p class="label">小手机里的功能</p>
+  <form class="card" method="post" action="{{ url_for('phone_features') }}">{{ csrf() }}
+    <div class="group">
+      {% for k, nm, desc in [('moments','朋友圈','发文字和图片、点赞评论；开了才有入口'),('masquerade','匿名舞会','戴面具起昵称的特别群聊；开了还要到管理页开场'),('games','小游戏','发现页里的小游戏和排行榜'),('groupchat','多人群聊','在小手机里拉几个人建一个群聊，代替原来的「微信」指令（机器人这边不再做）'),('chatroom','聊天室','开着：私约、官约、电话都在小手机网页里聊，不再拉 QQ 群（机器人掉线也能约）；关着：照旧走 QQ 群')] %}
+      <label class="grow" style="cursor:pointer;color:var(--ink);font-size:inherit;margin:0"><div class="tx"><b>{{ nm }}</b><span>{{ desc }}</span></div><span class="sw"><input type="checkbox" name="feat_{{ k }}" value="1" {{ 'checked' if feats[k] }}><i></i></span></label>
+      {% endfor %}
+    </div>
+    <div class="fgrid">
+      <div><label for="pf-d">朋友圈：每人每天最多发几条（0=不限；图片额度在「图片管理 → 朋友圈」）</label><input id="pf-d" type="text" name="moment_daily_posts" value="{{ fcfg.moment_daily_posts }}" inputmode="numeric"></div>
+      <div><label for="pf-g">小游戏：每人每款每天几次</label><input id="pf-g" type="text" name="game_daily_attempts" value="{{ fcfg.game_daily_attempts }}" inputmode="numeric"></div>
+    </div>
+    <div class="fpad" style="padding-top:8px">
+      <p class="note" style="margin:0">改了立刻生效，不用重启。管理页：{% if feats.moments %}<a href="{{ url_for('moments_page') }}">朋友圈</a>{% endif %}{% if feats.masquerade %}　<a href="{{ url_for('masq_admin_page') }}">匿名舞会</a>{% endif %}</p>
+      <div class="actions"><button class="btn" type="submit">保存</button></div>
+    </div>
+  </form>
+</div>
+
+<div class="sec">
+  <p class="label">激活码</p>
+  {% if enabled %}<form method="post" action="{{ url_for('phone_open_admin') }}" target="_blank" style="margin:0 0 10px">{{ csrf() }}<button class="btn ghost">打开管理员手机</button></form>{% endif %}
+  <div class="card codes">
+    <div class="gen"><form method="post" action="{{ url_for('phone_generate') }}" style="margin:0">{{ csrf() }}<button class="btn ghost">给还没有码的角色都生成</button></form></div>
+    <div class="group">
+    {% for r in codes %}
+      <div class="grow">
+        <span class="nm">{{ r.name }}</span>
+        <code class="cd">{{ r.code or '（还没有）' }}</code>
+        <span class="seen">{{ r.last_seen|datetimefmt if r.last_seen else '没用过' }}</span>
+        {% if r.code and enabled %}<form method="post" action="{{ url_for('phone_open_as', role_id=r.id) }}" target="_blank">{{ csrf() }}<button class="linkbtn">以 TA 打开</button></form>{% endif %}
+        {% if r.code %}<form method="post" action="{{ url_for('phone_reset', role_id=r.id) }}" onsubmit="return confirm('重置后旧码马上失效，要把新码重新发给 {{ r.name }}。确定吗？')">{{ csrf() }}<button class="linkbtn">重置</button></form>{% endif %}
+      </div>
+    {% else %}<p class="empty" style="padding:0 20px">还没有角色。</p>{% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+</div>
+{% endblock %}

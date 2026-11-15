@@ -6,11 +6,11 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 os.environ.setdefault("CHANGRI_DB_PATH", str(Path(tempfile.mkdtemp()) / "d.db"))
 os.environ["QQ_BOTS"] = "[]"
-from core import attrs, dice, roles  # noqa: E402
-from core.db import get_conn, init_db  # noqa: E402
+from changri.core import attrs, dice, roles  # noqa: E402
+from changri.core.db import get_conn, init_db  # noqa: E402
 
 
 def lookup_none(name):
@@ -330,7 +330,7 @@ class HouseRuleAndMadnessTests(unittest.TestCase):
         self.assertIn("房规 3", dice.house_text("3"))
 
     def test_madness_sub_tables(self):
-        from core import madness_tables as mt
+        from changri.core import madness_tables as mt
         self.assertEqual((len(mt.PHOBIAS), len(mt.MANIAS)), (100, 100))
         for table in (mt.PHOBIAS, mt.MANIAS):
             self.assertEqual(len({n for n, _ in table}), 100)                       # 名字不重复

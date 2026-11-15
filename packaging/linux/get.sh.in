@@ -1,0 +1,88 @@
+#!/bin/sh
+# 长日bot 一键安装（Linux）。在服务器上运行：
+#   curl -fsSL @BASE@/get.sh | sudo sh
+#
+# 它会：下载对应这台机器的安装包（自带 Python，不用联网装依赖）→ 校验 → 解压到 /opt/changri-bot
+#      → 设为开机自启并启动 → 打印设置平台的网址和首次设置验证码。下载的安装包装完就删。
+# 已经装过（新版）：只重新设一次开机自启，升级请用设置平台的「更新」。
+# 装过老版本（0.19 及以前）：先停掉老服务，老目录改名留着，数据自动搬过来。
+#
+# 可用环境变量：INSTALL_DIR（安装目录，默认 /opt/changri-bot）
+# 本文件由 packaging/build.py 生成：版本 @VERSION@
+set -eu
+
+BASE="@BASE@"
+VERSION="@VERSION@"
+DIR="${INSTALL_DIR:-/opt/changri-bot}"
+
+say() { printf '\n>>> %s\n' "$*"; }
+die() { printf '\n出错了：%s\n' "$*" >&2; exit 1; }
+
+[ "$(id -u)" -eq 0 ] || die "请用 root 运行：curl -fsSL $BASE/get.sh | sudo sh"
+
+case "$(uname -m)" in
+  x86_64|amd64) FILE="@LINUX_X64_FILE@"; SHA="@LINUX_X64_SHA@" ;;
+  aarch64|arm64) FILE="@LINUX_ARM64_FILE@"; SHA="@LINUX_ARM64_SHA@" ;;
+  *) die "暂时只支持 x86_64 和 arm64 的 Linux（这台是 $(uname -m)）。" ;;
+esac
+[ -n "$FILE" ] || die "这个版本还没有适合这台机器的安装包。"
+
+GLIBC="$(ldd --version 2>/dev/null | head -n1 | grep -oE '[0-9]+\.[0-9]+$' || true)"
+if [ -n "$GLIBC" ]; then
+  MAJ="${GLIBC%%.*}"; MIN="${GLIBC#*.}"
+  if [ "$MAJ" -lt 2 ] || { [ "$MAJ" -eq 2 ] && [ "$MIN" -lt 28 ]; }; then
+    die "这台服务器的系统太老了（glibc $GLIBC，需要 2.28 以上）。请换成 Ubuntu 20.04+、Debian 10+ 或 CentOS 8+ 的系统镜像。"
+  fi
+fi
+
+if [ -f "$DIR/current" ]; then
+  say "$DIR 已经装过了（$(cat "$DIR/current")）。重新设一次开机自启，数据不动；升级请用设置平台的「更新」。"
+  exec "$DIR/changri" service install
+fi
+
+OLD=""
+if [ -f "$DIR/bot.py" ]; then
+  OLD="$DIR.old-$(date +%Y%m%d%H%M%S)"
+  say "发现老版本，先停掉老服务，老目录改名为 $OLD（不删，数据会搬到新版本里）"
+  systemctl stop changri-bot 2>/dev/null || true
+  mv "$DIR" "$OLD"
+elif [ -e "$DIR" ] && [ -n "$(ls -A "$DIR" 2>/dev/null)" ]; then
+  die "$DIR 已经存在而且不是空的。换个目录：INSTALL_DIR=/opt/别的名字 再运行一次。"
+fi
+
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+say "下载 长日bot $VERSION（$FILE）"
+if command -v curl >/dev/null 2>&1; then
+  curl -fL --retry 3 --connect-timeout 20 -o "$TMP/pkg.tar.gz" "$BASE/downloads/$FILE" || die "下载失败，请检查这台服务器能不能访问 $BASE"
+elif command -v wget >/dev/null 2>&1; then
+  wget -q -O "$TMP/pkg.tar.gz" "$BASE/downloads/$FILE" || die "下载失败，请检查这台服务器能不能访问 $BASE"
+else
+  die "需要 curl 或 wget。"
+fi
+
+if command -v sha256sum >/dev/null 2>&1; then GOT="$(sha256sum "$TMP/pkg.tar.gz" | cut -d' ' -f1)"
+else GOT="$(shasum -a 256 "$TMP/pkg.tar.gz" | cut -d' ' -f1)"; fi
+[ "$GOT" = "$SHA" ] || die "下载的文件校验不对（可能没下完整），请重新运行。"
+
+say "解压到 $DIR"
+mkdir -p "$DIR"
+tar -xzf "$TMP/pkg.tar.gz" -C "$DIR" --strip-components=1
+rm -f "$TMP/pkg.tar.gz"
+
+if [ -n "$OLD" ]; then
+  say "把老版本的数据搬过来"
+  "$DIR/changri" migrate-legacy "$OLD" || die "数据没搬成功（老目录 $OLD 没动）。把上面的提示发给维护的人。"
+fi
+
+say "设为开机自启并启动"
+"$DIR/changri" service install
+
+cat <<TIP
+
+装好了。常用命令：
+  查看日志     journalctl -u changri-bot -f
+  重启         sudo systemctl restart changri-bot
+  自检         sudo $DIR/changri doctor
+  数据在       $DIR/data（备份就是复制这个文件夹）
+TIP

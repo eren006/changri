@@ -6,14 +6,14 @@ import time
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 os.environ["CHANGRI_DB_PATH"] = str(Path(tempfile.mkdtemp()) / "relalert.db")
 os.environ["QQ_BOTS"] = "[]"
 os.environ["ADMIN_PASSWORD"] = ""
 
-from admin import create_app  # noqa: E402
-from core import relations, webusers  # noqa: E402
-from core.db import get_config, get_conn, init_db, set_config  # noqa: E402
+from changri.admin import create_app  # noqa: E402
+from changri.core import relations, webusers  # noqa: E402
+from changri.core.db import get_config, get_conn, init_db, set_config  # noqa: E402
 
 
 def setup_data():
@@ -68,13 +68,13 @@ class Alert(unittest.TestCase):
         c = create_app().test_client()
         tok = lambda p: re.search(r'name="_csrf" value="([^"]+)"', c.get(p).get_data(as_text=True)).group(1)
         c.post("/login", data={"username": "boss", "password": "longenough1", "_csrf": tok("/login")})
-        html = c.get("/relations").get_data(as_text=True)
+        html = c.get("/relations?view=relations").get_data(as_text=True)
         self.assertIn("1 条超时没回复", html)
         self.assertIn("乙 · 50 小时", html)
         self.assertIn("超过 24 小时没人回复", c.get("/").get_data(as_text=True))       # 总览待办
         c.post("/relations/alert", data={"_csrf": tok("/relations"), "hours": "100"})
         self.assertEqual(get_config("rel_alert_hours"), "100")
-        self.assertNotIn("条超时没回复", c.get("/relations").get_data(as_text=True))
+        self.assertNotIn("条超时没回复", c.get("/relations?view=relations").get_data(as_text=True))
 
 
 if __name__ == "__main__":

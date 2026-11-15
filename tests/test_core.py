@@ -5,12 +5,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 _tmp = tempfile.mkdtemp()
 os.environ["CHANGRI_DB_PATH"] = str(Path(_tmp) / "t.db")
 
-from core import messaging, roles  # noqa: E402
-from core.db import get_conn, init_db, set_config  # noqa: E402
+from changri.core import messaging, roles  # noqa: E402
+from changri.core.db import get_conn, init_db, set_config  # noqa: E402
 
 
 def run(coro):
