@@ -186,7 +186,7 @@ def start(name: str = "", clear: bool = False, now: str | None = None) -> tuple[
     set_config("game_day", "")
     set_config("day_epoch", "0")
     if t >= s["start_date"]:
-        enter_d0()
+        enter_d0(t)
         return True, f"✅ 「{s['name']}」开始了，档期已经开始，直接进入 D0（自动天数、心动信已打开）。"
     return True, f"✅ 「{s['name']}」开始了，现在是筹备期；{s['start_date']} 自动进入 D0。\n玩家和 NPC 可以先「创建新角色 名字」。筹备期的互动（短信、礼物、心动信、关系线等）不会留下记录，进入 D0 时会清零。"
 
@@ -205,13 +205,16 @@ def clear_prep_records() -> dict[str, int]:
     return out
 
 
-def enter_d0() -> None:
+def enter_d0(day: str | None = None, skip_tonight: bool = True) -> None:
+    """进入 D0。day = 进入的那天（不传就是真实的今天）。
+    skip_tonight：当晚 23:59 不加一天（管理员手动开始时，可能已经很晚，D0 至少留到第二天）；
+    到了开始日自动进入（凌晨）时传 False：开始日当天就是 D0，当晚 23:59 进 D1。"""
     if running() and current_day() is None:
         clear_prep_records()
     set_config("game_day", "0")
     set_config("day_epoch", str(int(get_config("day_epoch", "0")) + 1))
     set_config("auto_day", "1")
-    set_config("auto_day_last", today())
+    set_config("auto_day_last", (day or today()) if skip_tonight else "")
     set_config("lovemail_enabled", "1")
 
 
@@ -279,7 +282,7 @@ async def tick(send, announce, now: time.struct_time | None = None) -> str:
                 pass
 
     if current_day() is None and t >= s["start_date"] and t <= last_end(s):
-        enter_d0()
+        enter_d0(t, skip_tonight=False)            # 到开始日自动进 D0：当天就是 D0，当晚 23:59 进 D1
         await say(f"📜 「{s['name']}」档期开始，现在是 D0。\n⚙️ 已自动打开：自动天数（每天 23:59 加一天）、心动信。\n🧹 筹备期的互动记录已清零，从今天重新算。")
         return "d0"
     if t > last_end(s) and get_config("season_closed_notice") != str(s["id"]):

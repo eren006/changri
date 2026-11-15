@@ -47,6 +47,30 @@ class SeasonTests(unittest.TestCase):
         self.assertFalse(season.book("丙季", "2026-11-15", "2026-11-20", "2026-11-18")[0])
         self.assertTrue(season.delete_booking(season.booked()[0]["id"]))
 
+    def test_lifecycle_does_not_depend_on_real_date(self):
+        """以前进入 D0 时记的是「真实的今天」：真实日期碰巧等于开始日时，当晚不进 D1（D0 变成两天）。现在只看触发时的日期。"""
+        from unittest import mock
+        for real in ("2026-11-15", "2030-01-01"):                                  # 碰巧同一天 / 完全不相干的一天
+            with self.subTest(real=real), mock.patch.object(season, "today", lambda now=None, _r=real: time.strftime("%Y-%m-%d", now) if now else _r):
+                self.setUp()
+                season.book("甲季", "2026-11-15", "2026-11-17", "2026-11-18", "")
+                season.start("", now="2026-11-14")
+                self.assertEqual(self.run_tick("2026-11-15", "00:05")[0], "d0")
+                self.assertEqual(self.run_tick("2026-11-15", "23:59")[0], "advanced")     # 开始日当天就是 D0，当晚进 D1
+                self.assertEqual(season.current_day(), 1)
+                season.end()
+
+    def test_manual_start_after_start_date_keeps_d0_tonight(self):
+        """档期已经开始后管理员才手动「开始季度」（可能已经很晚）：当晚不加一天，D0 留到第二天晚上。"""
+        season.book("乙季", "2026-11-10", "2026-11-17", "2026-11-18", "")
+        ok, msg = season.start("", now="2026-11-15")
+        self.assertTrue(ok)
+        self.assertIn("直接进入 D0", msg)
+        self.assertEqual(self.run_tick("2026-11-15", "23:59")[0], "idle")
+        self.assertEqual(season.current_day(), 0)
+        self.assertEqual(self.run_tick("2026-11-16", "23:59")[0], "advanced")
+        self.assertEqual(season.current_day(), 1)
+
     def test_lifecycle_and_auto_day(self):
         season.book("甲季", "2026-11-15", "2026-11-17", "2026-11-18", "阿林、阿森")
         ok, msg = season.start("", now="2026-11-14")
