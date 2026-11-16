@@ -12,7 +12,7 @@
       <div><label for="ok">类型</label><select id="ok" name="kind"><option>官约</option><option>官电</option></select></div>
       <div><label for="od">第几天（D几）</label><input id="od" type="number" min="1" name="day" value="{{ today }}"></div>
       <div><label for="ot">时间</label><input id="ot" name="time" placeholder="1400-1500" required></div>
-      <div><label for="op">地点（可不写；官电没有地点）</label><input id="op" name="place" maxlength="40" placeholder="留空 = 没有地点"></div>
+      <div id="opWrap"><label for="op">地点（可不写）</label><input id="op" name="place" maxlength="40" placeholder="留空 = 没有地点"></div>
     </div>
     <fieldset style="border:0;padding:0;margin:12px 0"><legend class="note">参与者（至少两位；第一位算发起人）</legend>
       <div style="display:flex;flex-wrap:wrap;gap:8px 16px">
@@ -20,6 +20,13 @@
       </div></fieldset>
     <div class="actions"><button class="btn" type="submit">发起并通知</button></div>
   </form>
+  <script>
+  (function () {
+    var kind = document.getElementById('ok'), wrap = document.getElementById('opWrap');
+    function sync() { wrap.hidden = kind.value === '官电'; }   // 官电没有地点
+    kind.addEventListener('change', sync); sync();
+  })();
+  </script>
 </section>
 <section>
   <div class="sec-head keep"><h2>最近的官约 / 官电</h2></div>

@@ -67,6 +67,8 @@ SECTIONS = [
         "limit_私约": ("每人每天最多发起几次私约（0 = 不限）", "0"),
         "limit_电话": ("每人每天最多发起几次电话（0 = 不限）", "0"),
         "limit_微信": ("每人每天最多发起几次微信（0 = 不限）", "0"),
+        "stakeout_enabled": ("踩点（1 开 / 0 关；开了以后玩家可以发「踩点 时间 地点」开一个只有自己的群，占时间线、要地点，结束发「结束踩点」）", "0"),
+        "limit_踩点": ("每人每天最多发起几次踩点（0 = 不限）", "0"),
         "phone_open_cap": ("每人最多同时有几个没结束的电话（0 = 不限）", "5"),
         "room_expire_enabled": ("到时间强制结群（1 开 / 0 关；开了以后，房间开满下面的「结戏限时」会自动结束，群放回群池）", "0"),
         "room_expire_hours": ("结戏限时（小时，从房间开始算；要打开上面的「到时间强制结群」才生效）", "24"),
@@ -135,7 +137,7 @@ SECTIONS = [
     }),
     ("跑团骰子", {
         "dice_enabled": ("跑团骰子开关（1 开 / 0 关）", "1"),
-        "dice_default_rule": ("群里默认规则（coc 或 dnd，群里可以用「切换规则」单独改）", "coc"),
+        "dice_default_rule": ("群里默认规则（coc、dnd 或 dg＝绿色三角洲，群里可以用「切换规则」单独改）", "coc"),
         "dice_card": ("检定结果发 Markdown 小卡片（1 开 / 0 关；QQ 没开 Markdown 权限时会自动退回文字，一小时后再试）", "1"),
     }),
     ("地点", {
@@ -293,7 +295,7 @@ def field_view(key: str, label: str, default: str, value: str) -> dict:
         i = label.rindex("（")
         main, inner = label[:i], label[i + 1:-1]
     f = {"key": key, "label": main.strip(), "hint": inner, "value": value, "kind": "text", "unit": ""}
-    m = re.match(r"^1\s*(?:开|是|要|算)\s*/\s*0\s*(?:关|否|不要|不算)\s*[，,]?\s*(.*)$", inner)      # 「1 开 / 0 关」这类都做成开关
+    m = re.match(r"^1\s*(?:开|是|要|算)\s*/\s*0\s*(?:关|否|不要|不算)\s*[，,；;]?\s*(.*)$", inner)      # 「1 开 / 0 关」这类都做成开关
     if m:
         f.update(kind="bool", hint=m.group(1), checked=value.strip() not in ("", "0"))
     elif re.fullmatch(r"-?\d+", str(default).strip()) and re.fullmatch(r"-?\d*", value.strip()):

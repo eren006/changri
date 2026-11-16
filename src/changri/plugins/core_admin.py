@@ -1,4 +1,4 @@
-"""核心：拉黑、认管理员、公告群。这些是别的功能的地基，不属于任何可关闭的扩展。"""
+"""核心：拉黑、认管理员、公告群 / 后台群 / 水群。这些是别的功能的地基，不属于任何可关闭的扩展。"""
 import nonebot
 from nonebot import logger, on_command
 from nonebot.adapters.qq import Bot, GroupMessageCreateEvent
@@ -136,3 +136,54 @@ async def _(event: GroupMessageCreateEvent):
         await unset_announce.finish(_admin_only("取消公告群"))
     announce_core.set_announce("", "")
     await unset_announce.finish("✅ 已取消公告群。")
+
+
+def _also(event, label: str) -> str:
+    """这个群如果还兼着别的身份，提醒一句（不拦，一个群兼公告群和后台群也是常见用法）。"""
+    others = [x for x in announce_core.roles_of(_bid(), event.group_openid) if x != label]
+    return f"\n（这个群同时也是{'、'.join(others)}）" if others else ""
+
+
+set_backstage = _cmd("设为后台群", {"设后台群"})
+
+
+@set_backstage.handle()
+async def _(event: GroupMessageCreateEvent):
+    if not admins.is_admin(_bid(), _sender(event)):
+        await set_backstage.finish(_admin_only("设为后台群"))
+    announce_core.set_backstage(_bid(), event.group_openid)
+    await set_backstage.finish("✅ 已把这个群设为后台群：QQ 号掉线等给管理组的提醒会发到这里（没设后台群时发公告群）。"
+                               + _also(event, "后台群"))
+
+
+unset_backstage = _cmd("取消后台群")
+
+
+@unset_backstage.handle()
+async def _(event: GroupMessageCreateEvent):
+    if not admins.is_admin(_bid(), _sender(event)):
+        await unset_backstage.finish(_admin_only("取消后台群"))
+    announce_core.set_backstage("", "")
+    await unset_backstage.finish("✅ 已取消后台群，给管理组的提醒改回发公告群。")
+
+
+set_water = _cmd("设为水群", {"设水群"})
+
+
+@set_water.handle()
+async def _(event: GroupMessageCreateEvent):
+    if not admins.is_admin(_bid(), _sender(event)):
+        await set_water.finish(_admin_only("设为水群"))
+    announce_core.set_water(_bid(), event.group_openid)
+    await set_water.finish("✅ 已把这个群设为水群：这个群不会被放进群池当约会房间。" + _also(event, "水群"))
+
+
+unset_water = _cmd("取消水群")
+
+
+@unset_water.handle()
+async def _(event: GroupMessageCreateEvent):
+    if not admins.is_admin(_bid(), _sender(event)):
+        await unset_water.finish(_admin_only("取消水群"))
+    announce_core.set_water("", "")
+    await unset_water.finish("✅ 已取消水群。")

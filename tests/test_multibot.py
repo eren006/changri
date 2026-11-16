@@ -66,6 +66,29 @@ class MultiBotTests(unittest.TestCase):
         set_announce("", "")
         self.assertIsNone(get_announce())
 
+    def test_backstage_and_water_groups(self):
+        from changri.core import announce, pool
+        set_announce("B1", "ANN")
+        self.assertEqual(announce.get_staff_notice(), ("B1", "ANN"))          # 没设后台群：提醒退回公告群
+        announce.set_backstage("B2", "BG")
+        announce.set_water("B1", "WG")
+        self.assertEqual(announce.get_staff_notice(), ("B2", "BG"))
+        self.assertEqual(announce.get_water(), ("B1", "WG"))
+        announce.set_backstage("B1", "ANN")
+        self.assertEqual(announce.roles_of("B1", "ANN"), ["公告群", "后台群"])
+        with get_conn() as c:
+            c.execute("DELETE FROM pool_groups")
+            c.execute("INSERT INTO pool_groups (bot_id, group_openid, added_ts) VALUES ('B1','WG',0)")
+        g = [x for x in pool.all_groups() if x["group_openid"] == "WG"][0]
+        self.assertEqual(g["conflict"], "水群")
+        ok, msg = pool.set_in_pool(g["id"], True)
+        self.assertFalse(ok); self.assertIn("水群", msg)
+        for f in (set_announce, announce.set_backstage, announce.set_water):
+            f("", "")
+        self.assertIsNone(announce.get_staff_notice())
+        with get_conn() as c:
+            c.execute("DELETE FROM pool_groups")
+
 
 class MigrationTests(unittest.TestCase):
     def test_old_schema_is_upgraded_without_losing_data(self):

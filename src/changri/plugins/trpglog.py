@@ -6,7 +6,7 @@ from nonebot.matcher import current_bot
 from nonebot.params import CommandArg
 from nonebot.rule import Rule
 
-from changri.core import admins, trpg, trpglog
+from changri.core import admins, dice, trpg, trpglog
 from changri.core import qqmanager, qqpool
 from changri.plugins._logtap import record_incoming, record_listened, record_say
 from changri.core.qqsend import reply_long
@@ -75,9 +75,7 @@ def _link_text(log: dict) -> str:
     return f"网页查看（有链接的人都能看）：{url}" if url else "网页链接：还没设置玩家访问网址，先在后台「小手机」页开启并填好网址。"
 
 
-HELP = ("【log】记录一场跑团\n/log new 名字　开始\n/log off　暂停　/log on　继续\n/log end　结束　/log halt　强制停止\n"
-        "/log on 名字　接着记以前的\n/log list　/log stat [名字]　/log get 名字（网页链接）　/log export 名字（文字）　/log del 名字\n"
-        "/说 台词　记一条角色发言（开了自动听取就不用）　/ob　切换旁观（旁观者的话不记）\n括号开头的话默认不记。")
+HELP = dice.HELP_LOG                       # 和 /骰子帮助 log 同一份
 
 log_cmd = _cmd("log")
 

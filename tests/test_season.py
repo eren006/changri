@@ -71,6 +71,18 @@ class SeasonTests(unittest.TestCase):
         self.assertEqual(self.run_tick("2026-11-16", "23:59")[0], "advanced")
         self.assertEqual(season.current_day(), 1)
 
+    def test_auto_day_announces_today_counts(self):
+        """自动换天时公告群那条带上全员今天的计数（换天之前算）。"""
+        season.book("丁季", "2026-11-10", "2026-11-17", "2026-11-18", "")
+        season.start("", now="2026-11-15")
+        key = season.day_key()
+        line = season.day_summary_line()
+        self.assertIn("私约 0 场", line); self.assertIn("短信 0 条", line)
+        r, sent = self.run_tick("2026-11-16", "23:59")
+        self.assertEqual(r, "advanced")
+        self.assertIn("🌐 全员今天：", sent[-1][2])
+        self.assertNotEqual(season.day_key(), key)
+
     def test_lifecycle_and_auto_day(self):
         season.book("甲季", "2026-11-15", "2026-11-17", "2026-11-18", "阿林、阿森")
         ok, msg = season.start("", now="2026-11-14")

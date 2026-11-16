@@ -29,7 +29,7 @@ def register(app, login_required):
             found = {r["id"]: r for r in conn.execute(f"SELECT * FROM roles WHERE id IN ({','.join('?' * len(ids))})", ids)}
         targets = [found[i] for i in ids if i in found]
         day = f.get("day", "").strip()
-        place = f.get("place", "").strip()
+        place = "" if call else f.get("place", "").strip()      # 官电没有地点（页面上也会把地点框藏起来）
         from changri.plugins import play           # 依赖 NoneBot，放在真要发之前再导入
         ok, text, _rid = loopbridge.run(play.launch_official(targets, f.get("time", "").strip(), place, int(day) if day.isdigit() else None, call=call), timeout=180)
         flash(text if ok else f"❌ {text}")

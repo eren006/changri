@@ -1,7 +1,7 @@
 """心愿：挂一条想约的事，等别人来摘；摘了就开一个「心愿」房间。"""
 import time
 
-from . import blocks, rooms, season, windows
+from . import blocks, rooms, season, storycal, windows
 from .db import get_conn, get_int
 
 
@@ -23,7 +23,7 @@ def post(poster_id: int, time_text: str, place: str, content: str, reward: str =
         return False, closed
     hm = rooms.parse_hm(time_text)
     if not hm:
-        return False, "时间格式不对，写成 1400-1500。"
+        return False, storycal.parse_when(time_text)[1] or storycal.format_error()
     if not place.strip() or not content.strip():
         return False, "地点和内容都要写。"
     cap = get_int("wish_max_concurrent", 0)

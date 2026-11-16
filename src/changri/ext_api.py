@@ -18,6 +18,7 @@ from changri.core import extensions as _ext
 from changri.core import messaging as _messaging
 from changri.core import roles as _roles
 from changri.core import pending as _pending, season as _season
+from changri.core import announce as _announce
 from changri.core.announce import get_announce as _get_announce
 from changri.core.db import get_config as _get_config
 from changri.core.db import get_conn as _get_conn
@@ -66,6 +67,21 @@ async def send_to_role(role_id: int, text: str) -> bool:
 def announce_group() -> tuple[str, str] | None:
     """公告群，没设置返回 None。返回 (bot_id, group_openid)，可以直接 send_group(*announce_group(), text)。"""
     return _get_announce()
+
+
+def backstage_group() -> tuple[str, str] | None:
+    """后台群（给管理组看的），没设置返回 None。"""
+    return _announce.get_backstage()
+
+
+def water_group() -> tuple[str, str] | None:
+    """水群，没设置返回 None。"""
+    return _announce.get_water()
+
+
+def staff_notice_group() -> tuple[str, str] | None:
+    """给管理组发提醒用：后台群优先，没设就是公告群；都没设返回 None。"""
+    return _announce.get_staff_notice()
 
 
 # ---------- 属性（COC / DND 骰子也读这个） ----------

@@ -81,7 +81,7 @@ class DiceE2E(unittest.TestCase):
         self.assertIn("已写回", self.say("/sc 1/1d6")[0])
         self.assertIn("DND5e", self.say("/切换规则 dnd")[0])
         self.assertIn("DC12", self.say("/ra 力量 12")[0])
-        self.assertIn("COC 的规矩", self.say("/sc 1/1d6")[0])
+        self.assertIn("DND 里没有", self.say("/sc 1/1d6")[0])
 
     def test_sanity_and_growth_write_back(self):
         self.say("/录属性 SAN60 侦查5")
@@ -175,8 +175,21 @@ class DiceE2E(unittest.TestCase):
         self.assertEqual(self.say("/rd d20"), [])
 
     def test_long_output_goes_as_image(self):
-        out = self.say("/骰子帮助")
+        out = self.say("/骰子帮助")                                                     # 目录也超过 200 字，照常发图
         self.assertTrue(out and all(x == "<图>" for x in out))
+
+    def test_help_is_a_menu_then_sections(self):
+        set_config("long_as_image", "0")
+        menu = self.say("/骰子帮助")[0]
+        self.assertIn("1. 掷骰", menu)
+        self.assertIn("← 当前规则", menu)
+        self.assertLess(len(menu), 600)                                                  # 目录本身不长
+        self.assertIn("【绿色三角洲】", self.say("/骰子帮助 5")[0])
+        self.assertIn("【队伍】", self.say("/骰子帮助 team")[0])
+        self.assertIn("没有「火星」", self.say("/骰子帮助 火星")[0])
+        from changri.core import dice as core_dice
+        for _, _, _, text, _ in core_dice.HELP_SECTIONS:                              # 每块都不长
+            self.assertLess(len(text), 400, text[:10])
 
 
 if __name__ == "__main__":
@@ -279,7 +292,7 @@ class TrpgE2E(unittest.TestCase):
     def setUp(self):
         init_db()
         with get_conn() as c:
-            for t in ("trpg_log_lines", "trpg_logs", "trpg_attr_history", "trpg_active", "trpg_card_attrs", "trpg_cards",
+            for t in ("trpg_team_members", "trpg_teams", "trpg_growth_marks", "trpg_log_lines", "trpg_logs", "trpg_attr_history", "trpg_active", "trpg_card_attrs", "trpg_cards",
                       "trpg_identities", "trpg_players", "role_attrs", "role_groups", "roles", "config"):
                 c.execute(f"DELETE FROM {t}")
         set_config("dice_card", "0")        # 老测试断言的是纯文字；卡片的路径在 CardE2E 里测
@@ -322,6 +335,146 @@ class TrpgE2E(unittest.TestCase):
         card = trpg.active_card("G1", trpg.player_for("M1", "G1", create=False))
         self.assertEqual(trpg.get_attr(card["id"], "SAN"), 55)
         self.assertTrue(any(h["source"] == "理智损失" and h["new_value"] == 55 for h in trpg.card_history(card["id"])))
+
+    def test_growth_marks(self):
+        """检定成功自动记成长标记（属性不记、失败不记、只说一次），/en+ /en- /en list，/en 一次掷完并写回、清空。"""
+        from changri.core import trpg
+        self.say("st 侦查50 力量60")
+        with mock.patch("changri.core.dice.random.randint", lambda a, b: b):           # D100=99：失败
+            self.assertNotIn("成长标记", self.say("ra 侦查")[0])
+        with mock.patch("changri.core.dice.random.randint", lambda a, b: 1):           # D100=11：成功
+            self.assertIn("侦查记下成长标记", self.say("ra 侦查")[0])
+            self.assertNotIn("成长标记", self.say("ra 侦查")[0])                        # 已经标过，不再说
+            self.assertNotIn("成长标记", self.say("ra 力量")[0])                        # 属性不能成长
+            self.assertNotIn("成长标记", self.say("ra 潜行 40")[0])                     # 卡上没有的技能不标
+        self.assertIn("侦查", self.say("en list")[0])
+        self.assertIn("卡上没有", self.say("en+ 开锁术")[0])                          # 卡上没有、也没有初始值
+        self.say("st 图书馆40")
+        out = self.say("en+ 图书馆，力量")[0]
+        self.assertIn("记上成长标记：图书馆", out)
+        self.assertIn("属性不能成长", out)
+        self.assertIn("去掉成长标记：图书馆", self.say("en- 图书馆")[0])
+        self.assertIn("成长标记：侦查", self.say("st")[0])
+        with mock.patch("changri.core.dice.random.randint", lambda a, b: b):           # D100=100 必成长，+10
+            out = self.say("en")[0]
+        self.assertIn("成长检定 ×1", out)
+        self.assertIn("50 → 60", out)
+        card = trpg.active_card("G1", trpg.player_for("M1", "G1", create=False))
+        self.assertEqual(trpg.get_attr(card["id"], "侦查"), 60)
+        self.assertTrue(any(h["source"] == "技能成长" for h in trpg.card_history(card["id"])))
+        self.assertIn("还没有成长标记", self.say("en")[0])
+        self.assertIn("成长检定", self.say("en 侦查")[0])                                # 单项写法照旧
+        with mock.patch("changri.core.dice.random.randint", lambda a, b: 1):
+            self.say("ra 侦查")
+        self.assertIn("已清掉", self.say("en clr")[0])
+        self.assertEqual(trpg.growth_marks(card["id"]), [])
+
+    def test_coc_defaults_derived_and_caps(self):
+        """没录的技能按初始值；生命/魔法/理智有上限；/st 显示上限、DB、体格；初始值技能也能记成长并写回。"""
+        set_config("long_as_image", "0")                                                # 断言文字，不发长图
+        from changri.core import trpg
+        self.say("st 力量70 体质50 体型60 意志50")
+        out = self.say("ra 侦查 25")[0]
+        self.assertNotIn("初始值", out)                                                  # 自己写了数值
+        with mock.patch("changri.core.dice.random.randint", lambda a, b: 1):
+            out = self.say("ra 侦查")[0]
+        self.assertIn("侦查25，初始值", out)
+        self.assertIn("记下成长标记", out)                                               # 初始值技能也能标
+        self.assertIn("还没有「闪避」", self.say("ra 闪避")[0])                         # 闪避=敏捷/2，敏捷还没录
+        self.say("st 敏捷60")
+        self.assertIn("闪避30，初始值", self.say("ra 闪避")[0])
+        self.assertIn("上限 11", self.say("st 生命20")[0])                             # (50+60)/10
+        self.assertIn("10 +5 → 10（上限 10）", self.say("st 魔法+5")[0])               # 没录过：按初始值 意志/5 增减
+        self.say("st 克苏鲁神话30")
+        self.assertIn("上限 69", self.say("st 理智80")[0])
+        shown = self.say("st")[0]
+        for part in ("生命上限 11", "魔法上限 10", "理智上限 69", "DB +1D4", "体格 1"):
+            self.assertIn(part, shown)
+        with mock.patch("changri.core.dice.random.randint", lambda a, b: b):           # 成长必中 +10
+            out = self.say("en")[0]
+        self.assertIn("25 → 35", out)
+        card = trpg.active_card("G1", trpg.player_for("M1", "G1", create=False))
+        self.assertEqual(trpg.get_attr(card["id"], "侦查"), 35)
+
+    def test_sanity_uses_pow_when_san_missing(self):
+        self.say("st 意志55")
+        out = self.say("sc 1/1")[0]
+        self.assertIn("55", out)
+        self.assertIn("已写回", out)
+
+    def test_coc_generation(self):
+        set_config("long_as_image", "0")                                                # 断言文字，不发长图
+        out = self.say("coc 3")[0]
+        self.assertIn("第3组", out)
+        self.assertIn("DB", out)
+        self.assertEqual(self.say("coc7规则真好玩"), [])                                 # 不是数字：当聊天，不回
+        from changri.core.db import set_config as sc
+        sc("dice_rule:B1|G1", "dnd")
+        self.assertIn("COC 的指令", self.say("coc")[0])
+
+    def test_team(self):
+        set_config("long_as_image", "0")                                                # 断言文字，不发长图
+        self.say("st 侦查60 聆听50")
+        self.say("st 侦查40", member="M2")
+        self.say("nn 小甲")
+        self.assertIn("1 人", self.say("team 调查员 add")[0])
+        self.assertIn("2 人", self.say("team 调查员 add", member="M2")[0])
+        self.assertIn("调查员（2 人）", self.say("team list")[0])
+        out = self.say("team 调查员 侦查 聆听")[0]
+        self.assertLess(out.index("侦查 60"), out.index("侦查 40"))                     # 按第一项从高到低
+        self.assertIn("聆听 20（初始）", out)
+        with mock.patch("changri.core.dice.random.randint", lambda a, b: 1):
+            out = self.say("team 调查员 ra 侦查")[0]
+        self.assertIn("小甲", out)
+        self.assertEqual(out.count("检定"), 2)
+        self.assertIn("移出 1 人", self.say("team 调查员 del", member="M2")[0])
+        self.assertIn("解散", self.say("team 调查员 clear")[0])
+        self.assertIn("没有「调查员」", self.say("team 调查员")[0])
+
+    def test_tools(self):
+        self.assertEqual(self.say("name 英 3")[0].count("、"), 2)
+        self.assertTrue(self.say("who 甲 乙 丙")[0].startswith("随机顺序"))
+        self.assertIn("正位", self.say("draw 塔罗 3")[0].replace("逆位", "正位"))
+        self.assertIn("可以抽的牌堆", self.say("draw")[0])
+        self.assertEqual(self.say("jrrp")[0], self.say("今日人品")[0])                  # 同一天固定
+
+    def test_delta_green(self):
+        """绿色三角洲：切换规则、建卡跟群规则、属性×5、初始值、两位相同判大成功/大失败、失败记成长、/en +1D4、理智与崩溃点、/dg。"""
+        from changri.core import trpg
+        set_config("long_as_image", "0")
+        self.assertIn("绿色三角洲", self.say("切换规则 绿色三角洲")[0])
+        self.say("st 力量12 体质10 意志11")
+        card = trpg.active_card("G1", trpg.player_for("M1", "G1", create=False))
+        self.assertEqual(card["rule"], "dg")                                              # 自动建的卡跟群规则
+        with mock.patch("changri.core.dice.random.randint", lambda a, b: 30):
+            self.assertIn("力量12×5", self.say("ra 力量")[0])                              # 60 对 30：成功
+            out = self.say("ra 搜索")[0]                                                   # 初始值 20，掷 30：失败
+        self.assertIn("搜索20，初始值", out)
+        self.assertIn("记下成长标记", out)                                               # 失败才记
+        with mock.patch("changri.core.dice.random.randint", lambda a, b: 11):
+            self.assertIn("大成功", self.say("ra 枪械")[0])                               # 11 ≤ 20 且两位相同
+            self.assertIn("大失败", self.say("ra 枪械-15")[0])                            # 11 > 5 且两位相同
+        self.assertIn("没有奖励骰", self.say("rb 枪械")[0])
+        self.assertIn("COC 的指令", self.say("ti")[0])
+        shown = self.say("st")[0]
+        for part in ("（×5 = 60）", "生命上限 11", "意志力上限 11", "理智上限 99", "崩溃点 44"):
+            self.assertIn(part, shown)
+        self.assertIn("上限 11", self.say("st 意志力20")[0])
+        with mock.patch("changri.core.dice.random.randint", lambda a, b: b):
+            out = self.say("en")[0]
+        self.assertIn("+1D4(4)", out)
+        self.assertIn("20 +1D4(4) → 24", out)
+        self.assertEqual(trpg.get_attr(card["id"], "搜索"), 24)
+        self.say("st 理智46")                                                             # 崩溃点 44
+        with mock.patch("changri.core.dice.random.randint", lambda a, b: 99 if b == 100 else b):
+            out = self.say("sc 0/1d4")[0]                                                 # 99 两位相同且失败：大失败，损失取最大 4
+        self.assertIn("大失败", out)
+        self.assertIn("46 → 42", out)
+        self.assertIn("崩溃点重设为 42 - 11 = 31", out)
+        self.assertEqual(trpg.get_attr(card["id"], "崩溃点"), 31)
+        self.assertIn("第2组", self.say("dg 2")[0])
+        self.assertEqual(self.say("dg 那个团"), [])
+        self.assertIn("绿色三角洲", self.say("骰子帮助 dg")[0])
 
     def test_flow(self):
         from changri.core import trpglog

@@ -59,7 +59,6 @@ Environment=PYTHONUNBUFFERED=1
 ExecStart={APP_ROOT}/changri run
 Restart=always
 RestartSec=5
-KillMode=mixed
 TimeoutStopSec=20
 
 [Install]

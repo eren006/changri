@@ -4,6 +4,7 @@
     kind      "core"（核心，不能关）/ "official"（随包带的可选扩展）/ "phone"（小手机里的功能，开关在「小手机」页）
     order     在「扩展」页里的顺序（小的在前）
     url_prefixes  设置平台里属于它的网址前缀：功能关着时这些页面 404
+    personal  True = 放进「功能与设置 → 个性化模块」页：别人点名要的小定制，永远默认关，「全部恢复默认设置」时也会关回去
     其余字段（name、module、settings_group、nav、links、description、default_on）和以前 extensions.OFFICIAL 里的一样
 - 设置平台页面：有 admin.py 的功能，里面写 register(app, login_required)
 - 小手机页面：有 phone.py 的功能，里面写 register(app, ctx)

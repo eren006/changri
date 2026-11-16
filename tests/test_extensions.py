@@ -390,6 +390,33 @@ class ExtensionAdminTests(_PatchedDir):
         self.login()
         self.assertEqual(self.c.post("/extensions/toggle", data={"id": "nope", "on": "1", "_csrf": token(self.c, "/extensions")}).status_code, 404)
 
+    def test_storycal_page_and_personal_card(self):
+        self.login()
+        self.assertIn("故事历", self.c.get("/extensions?tab=custom").get_data(as_text=True))
+        self.assertEqual(self.c.get("/storycal").status_code, 404)             # 关着时页面 404
+        from changri.core import extensions as ec
+        ec.set_enabled("storycal", True)
+        self.assertIn("年号", self.c.get("/storycal").get_data(as_text=True))
+        r = self.c.post("/storycal", data={"era": "康熙十四年", "d0": "3月1日-3月31日", "_csrf": token(self.c, "/storycal")}, follow_redirects=True)
+        html = r.get_data(as_text=True)
+        self.assertIn("已保存", html); self.assertIn('data-s="3,1" data-e="3,31"', html)
+
+    def test_personal_tab_default_off_and_reset(self):
+        self.login()
+        from changri.core import extensions as ec
+        demo = {"id": "tiny_demo", "name": "小定制演示", "module": "changri.plugins.tiny_demo", "settings_group": "", "nav": [], "links": [],
+                "description": "d", "personal": True, "default_on": False, "kind": "official", "version": "v", "author": "a", "homepage": "", "license": "l"}
+        with mock.patch.object(ec, "OFFICIAL", ec.OFFICIAL + [demo]):
+            self.assertFalse(ec.is_enabled("tiny_demo"))                           # 默认关
+            page = self.c.get("/extensions?tab=custom").get_data(as_text=True)
+            self.assertIn("个性化模块", page); self.assertIn("小定制演示", page)
+            self.assertNotIn("小定制演示", self.c.get("/extensions?tab=aux").get_data(as_text=True))
+            self.assertNotIn("小定制演示", self.c.get("/extensions").get_data(as_text=True))
+            ec.set_enabled("tiny_demo", True)
+            self.assertTrue(ec.is_enabled("tiny_demo"))
+            self.c.post("/init", data={"mode": "reset", "_csrf": token(self.c, "/extensions")})
+            self.assertFalse(ec.is_enabled("tiny_demo"))                           # 重置后又关上
+
 
 if __name__ == "__main__":
     unittest.main()

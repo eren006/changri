@@ -1,6 +1,7 @@
 """跑团骰子：rd 通用掷骰；COC7（ra/rb/rp/sc/en）和 DND5e（ra/rb/rp/dnd/ri/at）；录属性/属性。
 规则和做法参考索罗，口吻中性；属性存在这个系统自己的角色上。逻辑都在 core/dice.py。"""
 import json
+import re
 import time
 
 from nonebot import logger, on_command
@@ -10,7 +11,7 @@ from nonebot.matcher import current_bot
 from nonebot.params import CommandArg
 from nonebot.rule import Rule
 
-from changri.core import attrs, dice, messaging, roles, trpg, trpglog
+from changri.core import attrs, dice, dicefun, messaging, roles, trpg, trpglog
 from changri.core.db import get_config, set_config
 from changri.core import dicecard
 from changri.core.qqsend import make_send, reply_long
@@ -77,11 +78,18 @@ def _trpg_lookup(event: GroupMessageCreateEvent, proxy: str | None, name: str):
     if not card:
         return ("被 @ 的这位还没有角色卡，数值取不到。让 TA 先 /st 录属性，或者你直接写数值。" if proxy
                 else "你还没有角色卡。用 /st 力量60 敏捷70 录属性，或者直接写数值。")
-    val = trpg.get_attr(card["id"], name)
-    if val is None:
+    return _card_lookup(card, name)
+
+
+def _card_lookup(card: dict, name: str):
+    got = trpg.skill_value(card["id"], name)
+    if got is None:
         have = "、".join(n for n, _ in trpg.list_attrs(card["id"])) or "（没有）"
         return f"角色「{card['name']}」还没有「{name}」这个属性。现有：{have}\n用 /st {name}60 记一个。"
-    return card["name"], val
+    val, is_default = got
+    if card["rule"] == "dg" and trpg.canon(name) in dice.DG_STATS:          # 绿色三角洲属性检定 = 属性×5
+        return card["name"], val * 5, f"，{trpg.canon(name)}{val}×5"
+    return (card["name"], val, "，初始值") if is_default else (card["name"], val)
 
 
 def _lookup(event: MessageEvent):
@@ -186,6 +194,8 @@ sc_cmd = _cmd("sc", {"理智检定"}, short=True)
 en_cmd = _cmd("en", {"成长"}, short=True)
 rav_cmd = _cmd("rav", {"对抗"}, short=True)
 dnd_cmd = _cmd("dnd", {"属性生成"}, short=True)
+coc_cmd = _cmd("coc", {"制卡", "车卡"}, short=True)
+dg_cmd = _cmd("dg", short=True)
 ri_cmd = _cmd("ri", {"先攻"}, short=True)
 at_cmd = _cmd("at", {"攻击"}, short=True)
 rh_cmd = _cmd("rh", {"暗骰"}, short=True)
@@ -205,11 +215,40 @@ async def _(event: MessageEvent, args=CommandArg()):
 def _check_text(event: MessageEvent, raw: str, extra: int) -> str:
     if _rule(event) == "dnd":
         return dice.dnd_check(raw, (extra > 0) - (extra < 0), _lookup(event))
+    if _rule(event) == "dg":
+        return dice.dg_check(raw, extra, _lookup(event), proxy=bool(_proxy_openid(event)))
     return dice.coc_check(raw, extra, _lookup(event), proxy=bool(_proxy_openid(event)), house=_house(event))
 
 
+def _trpg_card(event: MessageEvent, member: str | None = None) -> dict | None:
+    """跑团群里这个人（member 不给就是发指令的人）当前的角色卡；不是跑团群或没有卡返回 None。"""
+    if not _in_trpg(event):
+        return None
+    pid = trpg.player_for(member or event.author.member_openid, event.group_openid, create=False)
+    return trpg.active_card(event.group_openid, pid) if pid else None
+
+
+def _earns_mark(rule: str, res) -> bool:
+    """这次检定该不该记成长标记：COC 是成功时记，绿色三角洲是失败时记，DND 不记。数值要取自角色卡。"""
+    if not getattr(res, "label", "") or not getattr(res, "from_card", False) or rule == "dnd":
+        return False
+    ok = str(getattr(res, "verdict", "")).endswith("成功")
+    return not ok if rule == "dg" else ok
+
+
+def _mark_growth(event: MessageEvent, res):
+    """跑团：该记成长标记的检定（见 _earns_mark），给（被代骰的人或自己的）当前卡上这项技能记一笔，第一次标上时在结果末尾说一声。"""
+    label = getattr(res, "label", "")
+    if not _earns_mark(_rule(event), res):
+        return res
+    card = _trpg_card(event, _proxy_openid(event))
+    if card and trpg.mark_growth(card["id"], label):
+        return _with_note(res, f"📌 {card['name']}的{trpg.canon(label)}记下成长标记，团后发 /en 一起掷")
+    return res
+
+
 async def _check(matcher, event: MessageEvent, raw: str, extra: int) -> None:
-    await _reply(matcher, _check_text(event, raw, extra))
+    await _reply(matcher, _mark_growth(event, _check_text(event, raw, extra)))
 
 
 def _in_trpg(event: MessageEvent) -> bool:
@@ -266,9 +305,12 @@ async def _(event: MessageEvent, args=CommandArg()):
 
 @sc_cmd.handle()
 async def _(event: MessageEvent, args=CommandArg()):
-    if _rule(event) == "dnd":
-        await sc_cmd.finish("理智检定是 COC 的规矩，DND 里没有。要用就 /切换规则 COC。")
-    res = dice.coc_sanity(args.extract_plain_text(), _lookup(event), _house(event))
+    rule = _rule(event)
+    if rule == "dnd":
+        await sc_cmd.finish("理智检定是 COC 和绿色三角洲的规矩，DND 里没有。要用就 /切换规则 COC。")
+    res = (dice.dg_sanity(args.extract_plain_text(), _lookup(event)) if rule == "dg"
+           else dice.coc_sanity(args.extract_plain_text(), _lookup(event), _house(event)))
+    raw_res = res                                        # 加注释后的新对象不带 san_left 等字段，崩溃点判断用这个
     if getattr(res, "from_lookup", False):            # 理智是从角色上读的：扣完写回去
         if _proxy_openid(event):
             res = _with_note(res, f"代骰不会自动写回，请 TA 自己 /st 理智{res.san_left}")
@@ -276,14 +318,42 @@ async def _(event: MessageEvent, args=CommandArg()):
             res = _with_note(res, f"已写回：{res.who}的理智 {res.san_before} → {res.san_left}")
         elif res.loss:
             res = _with_note(res, f"没能写回角色，请自己 /st 理智{res.san_left}")
+        if rule == "dg" and raw_res.loss and not _proxy_openid(event):
+            res = _breaking_point(event, raw_res, res)
     await _reply(sc_cmd, res)
+
+
+def _breaking_point(event: MessageEvent, sc, res):
+    """绿色三角洲：理智降到崩溃点（含）以下，提醒获得精神障碍，并把崩溃点重设为 理智 - 意志。"""
+    card = _trpg_card(event)
+    if not card:
+        return res
+    bp = trpg.skill_value(card["id"], "崩溃点")
+    if not bp or sc.san_left > bp[0] or sc.san_before <= bp[0]:
+        return res
+    pow_ = trpg.get_attr(card["id"], "意志")
+    note = f"⚠️ 理智 {sc.san_left} 到了崩溃点 {bp[0]}：获得一种精神障碍（由 Handler 决定）。"
+    if pow_ is not None:
+        new_bp = max(0, sc.san_left - pow_)
+        _write_attr(event, "崩溃点", new_bp, "崩溃点重设")
+        note += f"崩溃点重设为 {sc.san_left} - {pow_} = {new_bp}。"
+    else:
+        note += "卡上没有意志，请自己 /st 崩溃点 设新的崩溃点（理智 - 意志）。"
+    return _with_note(res, note)
 
 
 @en_cmd.handle()
 async def _(event: MessageEvent, args=CommandArg()):
     if _rule(event) == "dnd":
-        await en_cmd.finish("技能成长是 COC 的规矩，DND 里没有。要用就 /切换规则 COC。")
-    res = dice.coc_growth(args.extract_plain_text(), _lookup(event))
+        await en_cmd.finish("技能成长是 COC 和绿色三角洲的规矩，DND 里没有。要用就 /切换规则 COC。")
+    text = args.extract_plain_text().strip()
+    if _in_trpg(event) and (not text or text[0] in "+-＋－" or text.lower() in EN_LIST | EN_CLEAR):
+        await _en_marks(event, text)
+        return
+    if _rule(event) == "dg":
+        await _reply(en_cmd, _dg_en_one(event, text))
+        return
+    res = dice.coc_growth(text, _lookup(event))
     if getattr(res, "from_lookup", False) and res.gain:       # 技能是从角色上读的：成长了就记上
         if _proxy_openid(event):
             res = _with_note(res, f"代骰不会自动写回，请 TA 自己 /st {res.label}{res.value + res.gain}")
@@ -292,6 +362,85 @@ async def _(event: MessageEvent, args=CommandArg()):
         else:
             res = _with_note(res, f"没能写回角色，请自己 /st {res.label}{res.value + res.gain}")
     await _reply(en_cmd, res)
+
+
+def _dg_en_one(event: MessageEvent, text: str):
+    """绿色三角洲 /en 技能 [数值]：直接 +1D4；数值取自角色卡时写回。"""
+    m = re.match(r"^(.*?)\s*(\d{1,3})$", text)
+    if m and m.group(1).strip():
+        return dice.dg_improve(m.group(1).strip(), int(m.group(2)))
+    if not text:
+        return "格式：/en 技能名 [当前数值]，绿色三角洲的成长是直接 +1D4"
+    got = _lookup(event)(text)
+    if isinstance(got, str):
+        return got
+    res = dice.dg_improve(text, got[1])
+    if _proxy_openid(event):
+        return _with_note(res, f"代骰不会自动写回，请 TA 自己 /st {text}{res.value + res.gain}")
+    if _write_attr(event, text, res.value + res.gain, "技能成长"):
+        return _with_note(res, "已写回角色卡。")
+    return _with_note(res, f"没能写回角色，请自己 /st {text}{res.value + res.gain}")
+
+
+EN_LIST = {"list", "ls", "标记", "看"}
+EN_CLEAR = {"clr", "clear", "清空"}
+EN_USAGE = ("/en　一次掷完所有标了成长的技能\n/en+ 侦查 图书馆　手动加标记；/en- 侦查　去掉\n"
+            "/en list　看标记；/en clr　清空；/en 侦查　只掷这一项")
+
+
+async def _en_marks(event: MessageEvent, text: str) -> None:
+    """跑团群的成长标记：/en（全部掷）、/en+ /en-（加减）、/en list、/en clr。"""
+    card = _trpg_card(event)
+    if not card:
+        await en_cmd.finish("你还没有角色卡。先 /st 侦查60 录属性，检定成功会自动记成长标记。")
+    cid, who = card["id"], card["name"]
+    low = text.lower()
+    if low in EN_CLEAR:
+        n = trpg.clear_growth(cid)
+        await en_cmd.finish(f"已清掉「{who}」的 {n} 个成长标记。" if n else f"「{who}」本来就没有成长标记。")
+    if text and text[0] in "+-＋－":
+        names = [n for n in re.split(r"[,，;；、\s]+", text[1:]) if n]
+        if not names:
+            await en_cmd.finish("要写技能名，例：/en+ 侦查 图书馆")
+        add = text[0] in "+＋"
+        done, miss = [], []
+        for n in names:
+            if add:
+                if not trpg.can_grow(n):
+                    miss.append(f"{n}（属性不能成长）")
+                elif trpg.skill_value(cid, n) is None:
+                    miss.append(f"{n}（卡上没有）")
+                else:
+                    trpg.mark_growth(cid, n)
+                    done.append(trpg.canon(n))
+            elif trpg.unmark_growth(cid, n):
+                done.append(trpg.canon(n))
+            else:
+                miss.append(n)
+        out = (f"「{who}」{'记上' if add else '去掉'}成长标记：{'、'.join(done)}" if done else "")
+        if miss:
+            out += ("\n" if out else "") + ("没标上：" if add else "本来就没标：") + "、".join(miss)
+        await en_cmd.finish(out)
+    marks = trpg.growth_marks(cid)
+    if low in EN_LIST:
+        await en_cmd.finish(f"「{who}」标了成长的技能：{'、'.join(marks)}\n发 /en 一次掷完。" if marks
+                            else f"「{who}」还没有成长标记。\n{EN_USAGE}")
+    if not marks:
+        await en_cmd.finish(f"「{who}」还没有成长标记（{'技能检定失败' if _rule(event) == 'dg' else '技能检定成功'}会自动记）。\n{EN_USAGE}")
+    dg = _rule(event) == "dg"
+    lines, grown = [], 0
+    for name in marks:
+        value = min((trpg.skill_value(cid, name) or (0, False))[0], 100)
+        res = dice.dg_improve(name, value) if dg else dice.coc_growth(f"{name} {value}")
+        line = str(res)
+        if res.gain:
+            grown += 1
+            if not _write_attr(event, name, value + res.gain, "技能成长"):
+                line += f"（没能写回，请自己 /st {name}{value + res.gain}）"
+        lines.append(line)
+    trpg.clear_growth(cid)
+    await _reply(en_cmd, dice.Rolled(f"「{who}」{'技能成长（每项 +1D4）' if dg else '成长检定'} ×{len(marks)}：\n" + "\n".join(lines)
+                                     + f"\n成长了 {grown} 项，已写回角色卡；成长标记已清空。"))
 
 
 @rav_cmd.handle()
@@ -311,8 +460,9 @@ async def _(event: MessageEvent, args=CommandArg()):
 
 
 async def _need_coc(matcher, event: MessageEvent) -> None:
-    if _rule(event) == "dnd":
-        await matcher.finish("这是 COC 的指令（疯狂症状、房规、对抗检定……），DND 里没有。要用就 /切换规则 COC。")
+    rule = _rule(event)
+    if rule != "coc":
+        await matcher.finish(f"这是 COC 的指令（疯狂症状、房规、对抗检定、制卡……），{dice.RULE_TITLE[rule]}里没有。要用就 /切换规则 COC。")
 
 
 @ti_cmd.handle()
@@ -357,6 +507,25 @@ async def _need_dnd(matcher, event: MessageEvent) -> None:
         await matcher.finish("这是 DND 的指令，先 /切换规则 DND。")
 
 
+@coc_cmd.handle()
+async def _(event: MessageEvent, args=CommandArg()):
+    text = args.extract_plain_text().strip()
+    if text and not text.isdigit():           # 「coc7 规则……」这类聊天不当指令
+        await coc_cmd.finish()
+    await _need_coc(coc_cmd, event)
+    await reply_long(coc_cmd, dice.coc_stats(text))
+
+
+@dg_cmd.handle()
+async def _(event: MessageEvent, args=CommandArg()):
+    text = args.extract_plain_text().strip()
+    if text and not text.isdigit():           # 「dg 那个团……」这类聊天不当指令
+        await dg_cmd.finish()
+    if _rule(event) != "dg":
+        await dg_cmd.finish("这是绿色三角洲的制卡指令，先 /切换规则 绿色三角洲。")
+    await reply_long(dg_cmd, dice.dg_stats(text))
+
+
 @dnd_cmd.handle()
 async def _(event: MessageEvent, args=CommandArg()):
     await _need_dnd(dnd_cmd, event)
@@ -390,22 +559,143 @@ async def _(event: MessageEvent, args=CommandArg()):
     text = args.extract_plain_text().strip().lower()
     cur = _rule(event)
     if not text:
-        await rule_cmd.finish(f"这里现在用 {dice.RULE_TITLE[cur]} 规则。\n切换：/切换规则 COC 或 /切换规则 DND\n"
-                              "DND 下 /ra 掷 D20+修正对难度，/rb 优势，/rp 劣势；/rd 两边通用。")
+        await rule_cmd.finish(f"这里现在用 {dice.RULE_TITLE[cur]} 规则。\n切换：/切换规则 COC、/切换规则 DND、/切换规则 绿色三角洲\n"
+                              "DND 下 /ra 掷 D20+修正对难度，/rb 优势，/rp 劣势；绿色三角洲是 D100，两位相同算大成功/大失败；/rd 都通用。")
     rule = dice.RULE_NAMES.get(text)
     if rule is None:
-        await rule_cmd.finish("只认 COC 和 DND 两种，换哪个？")
+        await rule_cmd.finish("只认 COC、DND、绿色三角洲 三种，换哪个？")
     if rule == cur:
         await rule_cmd.finish(f"本来就是 {dice.RULE_TITLE[rule]}，不用折腾。")
     set_config(f"dice_rule:{_scope(event)}", rule)
-    tail = ("检定改成 D20+修正对难度（DC），/rb 优势、/rp 劣势；/sc 和 /en 是 COC 的东西，先收起来。" if rule == "dnd"
-            else "检定回到 D100 对技能值，/rb 奖励骰、/rp 惩罚骰，/sc /en 照常用。")
+    tail = {"dnd": "检定改成 D20+修正对难度（DC），/rb 优势、/rp 劣势；/sc 和 /en 是 COC 的东西，先收起来。",
+            "dg": "检定是 D100 对技能值，掷出两位相同（11、22……）成功算大成功、失败算大失败；没有奖励/惩罚骰，用 +20/-20；"
+                  "检定失败记成长标记，团后 /en 每项 +1D4。/骰子帮助 dg 看全部。"}.get(
+        rule, "检定回到 D100 对技能值，/rb 奖励骰、/rp 惩罚骰，/sc /en 照常用。")
     await rule_cmd.finish(f"好，这里改用 {dice.RULE_TITLE[rule]} 规则。{tail}")
 
 
 @help_cmd.handle()
 async def _(event: MessageEvent, args=CommandArg()):
     await reply_long(help_cmd, dice.help_text(args.extract_plain_text(), _rule(event)))
+
+
+# ---------- 队伍 ----------
+
+team_cmd = _cmd("team", {"队伍"})
+TEAM_ROLLS = {"ra": 0, "rc": 0, "检定": 0, "rb": 1, "rp": -1}
+
+
+def _mentioned(event: MessageEvent) -> list[str]:
+    out = []
+    for m in getattr(event, "mentions", None) or []:
+        if getattr(m, "scope", None) == "single" and not getattr(m, "bot", False) and not getattr(m, "is_you", False):
+            openid = getattr(m, "member_openid", "")
+            if openid and openid not in out:
+                out.append(openid)
+    return out
+
+
+@team_cmd.handle()
+async def _(event: MessageEvent, args=CommandArg()):
+    if not _in_trpg(event):
+        await team_cmd.finish("队伍只在跑团模式的群里用（/模式 跑团）。")
+    gid = event.group_openid
+    parts = args.extract_plain_text().split()
+    if not parts or parts[0].lower() in ("list", "ls", "列表"):
+        teams = trpg.list_teams(gid)
+        await team_cmd.finish("本群的队伍：\n" + "\n".join(f"· {t['name']}（{t['n']} 人）" for t in teams) if teams
+                              else "本群还没有队伍。/team 名字 add @甲 @乙 建一个。\n" + dice.HELP_TEAM)
+    name, sub, rest = parts[0], (parts[1].lower() if len(parts) > 1 else ""), parts[2:]
+    if sub in ("add", "加", "加入"):
+        pids = [trpg.player_for(o, gid) for o in (_mentioned(event) or [event.author.member_openid])]
+        team, err = trpg.team_add(gid, name, pids)
+        if not team:
+            await team_cmd.finish(err)
+        await team_cmd.finish(f"队伍「{name}」现在 {len(trpg.team_members(team['id']))} 人："
+                              + "、".join(trpg.player_name(p) for p in trpg.team_members(team["id"])))
+    team = trpg.find_team(gid, name)
+    if not team:
+        await team_cmd.finish(f"本群没有「{name}」这个队伍。/team {name} add @甲 @乙 建一个，/team list 看已有的。")
+    members = trpg.team_members(team["id"])
+    if sub in ("del", "rm", "删", "移出"):
+        pids = [p for p in (trpg.player_for(o, gid, create=False) for o in (_mentioned(event) or [event.author.member_openid])) if p]
+        n = trpg.team_remove(team["id"], pids)
+        await team_cmd.finish(f"从「{name}」移出 {n} 人。" if n else "这几位本来就不在队伍里。")
+    if sub in ("clear", "clr", "解散"):
+        trpg.team_delete(team["id"])
+        await team_cmd.finish(f"队伍「{name}」解散了。")
+    if not members:
+        await team_cmd.finish(f"「{name}」里还没有人。/team {name} add @甲 @乙")
+
+    def label(pid: int, card) -> str:
+        who = trpg.player_name(pid)
+        return f"{who}（{card['name']}）" if card and card["name"] != who else who
+
+    rows = [(pid, trpg.active_card(gid, pid)) for pid in members]
+    if not sub:
+        await team_cmd.finish(f"队伍「{name}」：\n" + "\n".join(f"· {label(p, c)}" + ("" if c else "　还没有角色卡") for p, c in rows))
+    if sub in TEAM_ROLLS:
+        raw = " ".join(rest)
+        if not raw:
+            await team_cmd.finish(f"要写检定什么，例：/team {name} ra 聆听")
+        rule = _rule(event)
+        lines = []
+        for pid, card in rows:
+            if not card:
+                lines.append(f"{label(pid, card)}：还没有角色卡")
+                continue
+            lookup = lambda n, card=card: _card_lookup(card, n)  # noqa: E731
+            if rule == "dnd":
+                res = dice.dnd_check(raw, TEAM_ROLLS[sub], lookup)
+            elif rule == "dg":
+                res = dice.dg_check(raw, TEAM_ROLLS[sub], lookup)
+            else:
+                res = dice.coc_check(raw, TEAM_ROLLS[sub], lookup, house=_house(event))
+            line = f"{label(pid, card)}：{res}"
+            if _earns_mark(rule, res) and trpg.mark_growth(card["id"], res.label):
+                line += "　📌成长标记"
+            lines.append(line)
+        await _reply(team_cmd, dice.Rolled(f"队伍「{name}」{sub} {raw}：\n" + "\n".join(lines)))
+        return
+    attrs_wanted = parts[1:]
+    out = []
+    for pid, card in rows:
+        if not card:
+            out.append((None, f"{label(pid, card)}：还没有角色卡"))
+            continue
+        got = [trpg.skill_value(card["id"], a) for a in attrs_wanted]
+        cells = [f"{a} {'—' if g is None else g[0]}{'（初始）' if g and g[1] else ''}" for a, g in zip(attrs_wanted, got)]
+        out.append((got[0][0] if got[0] else -1, f"{label(pid, card)}：" + "　".join(cells)))
+    out.sort(key=lambda r: -2 if r[0] is None else r[0], reverse=True)       # 按第一项从高到低，没有卡的排最后
+    await reply_long(team_cmd, f"队伍「{name}」的{'、'.join(attrs_wanted)}：\n" + "\n".join(t for _, t in out))
+
+
+# ---------- 小工具 ----------
+
+name_cmd = _cmd("name", {"随机名字", "取名"})
+who_cmd = _cmd("who", {"随机顺序"})
+draw_cmd = _cmd("draw", {"抽牌"})
+jrrp_cmd = _cmd("jrrp", {"今日人品"})
+
+
+@name_cmd.handle()
+async def _(event: MessageEvent, args=CommandArg()):
+    await name_cmd.finish(dicefun.names(args.extract_plain_text()))
+
+
+@who_cmd.handle()
+async def _(event: MessageEvent, args=CommandArg()):
+    await who_cmd.finish(dicefun.who(args.extract_plain_text()))
+
+
+@draw_cmd.handle()
+async def _(event: MessageEvent, args=CommandArg()):
+    await reply_long(draw_cmd, dicefun.draw(args.extract_plain_text()))
+
+
+@jrrp_cmd.handle()
+async def _(event: MessageEvent):
+    await jrrp_cmd.finish(dicefun.jrrp(f"{_bid()}|{event.get_user_id()}"))
 
 
 # ---------- 角色属性 ----------

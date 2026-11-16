@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}故事历{% endblock %}
+{% block body %}
+<style>
+.strow{display:flex;gap:10px;align-items:center;margin:8px 0;flex-wrap:wrap}
+.strow .stn{width:36px;font-weight:600}
+.strow .stg{white-space:nowrap}
+.field .strow select{width:auto;max-width:none;padding:5px 8px;border:1px solid var(--field);border-radius:6px;background:var(--paper);color:var(--ink);font:inherit;margin-left:4px}
+.strow.off{opacity:.45}
+</style>
+<h1>故事历</h1>
+<p class="lede">把一个 D（现实里的一天）平分成若干个故事日，只用来<b>显示和写时间</b>。心动信、每日上限、自动天数照旧按 D 和现实时间走。年号写一次，所有 D 共用；每个 D 写故事日期的起止，这一天有几个故事日，现实的一天就平分成几份，所以每个 D 的流速可以不一样。</p>
+{% if not enabled %}<div class="warnbox">故事历现在是关着的：到「功能与设置 → 个性化模块」打开开关，再点「重启并生效」。</div>{% endif %}
+{% if now %}<p class="note">现在故事里是：<b>{{ now }}</b></p>{% endif %}
+<form method="post" action="{{ url_for('storycal_save') }}">{{ csrf() }}
+  <div class="field"><label for="era">年号</label><p class="d">放在日期最前面，比如「康熙十四年」。可以留空。</p>
+    <input type="text" id="era" name="era" value="{{ era }}" maxlength="20"></div>
+  <div class="field"><label>每个 D 的故事日期</label>
+    <p class="d">用下拉选「从哪天到哪天」。选好一个 D 的结束日，下一个 D 的开头会自动接到它的后一天；开头只能往后挑，不能挑到已经用过的日期，所以不会重叠。不用的 D 留空（「清空」）。月份长度按公历。</p>
+    <div id="strows">
+    {% for r in rows %}
+    <div class="strow" data-d="{{ r.d }}" data-s="{{ r.s }}" data-e="{{ r.e }}">
+      <span class="stn">D{{ r.d }}</span>
+      <span class="stg">从 <select class="sm" aria-label="D{{ r.d }} 开始的月份"></select><select class="sd" aria-label="D{{ r.d }} 开始的日"></select></span>
+      <span class="stg">到 <select class="em" aria-label="D{{ r.d }} 结束的月份"></select><select class="ed" aria-label="D{{ r.d }} 结束的日"></select></span>
+      <button type="button" class="btn sm ghost stclr">清空</button>
+      <input type="hidden" name="d{{ r.d }}" value="{{ r.text }}">
+      <span class="muted stinfo"></span>
+    </div>
+    {% endfor %}
+    </div>
+  </div>
+  <div class="actions"><button class="btn" type="submit">保存</button></div>
+</form>
+<p class="note">故事历开着时，开房间的时间只能写某一天，比如「3月5日」（不能写时间段，也不能写 1400-1500），会换成当前这个 D 里对应的现实钟点。没填日期的 D 仍然写钟点。</p>
+<script>
+(function(){
+var ML=[31,28,31,30,31,30,31,31,30,31,30,31],CUM=[0];
+for(var i=0;i<12;i++)CUM.push(CUM[i]+ML[i]);
+function doy(m,d){return CUM[m-1]+d;}
+function md(n){var m=1;while(m<12&&n>CUM[m])m++;return [m,n-CUM[m-1]];}
+function fmtLen(x){if(x>=60){var t=Math.round(x),h=Math.floor(t/60),m=t%60;return h+" 小时"+(m?" "+m+" 分钟":"");}
+  return Math.abs(x-Math.round(x))<0.05?Math.round(x)+" 分钟":"约 "+x.toFixed(1)+" 分钟";}
+function pair(a){return a?[+a.split(",")[0],+a.split(",")[1]]:null;}
+var rows=[].map.call(document.querySelectorAll(".strow"),function(el){
+  var S=pair(el.dataset.s),E=pair(el.dataset.e);
+  return {el:el,sm:el.querySelector(".sm"),sd:el.querySelector(".sd"),em:el.querySelector(".em"),ed:el.querySelector(".ed"),
+    hid:el.querySelector("input[type=hidden]"),info:el.querySelector(".stinfo"),
+    s:S?doy(S[0],S[1]):0,e:E?doy(E[0],E[1]):0,auto:!S,slo:1,elo:1};});
+/* 把一个下拉对（月、日）刷成「可选范围 lo–hi，当前值 v」；blank = 允许留空 */
+function fill(selM,selD,lo,hi,v,blank,off){
+  var h=blank?'<option value="">—</option>':"";
+  for(var m=1;m<=12;m++)if(CUM[m]>=lo&&CUM[m-1]+1<=hi)h+='<option value="'+m+'">'+m+'月</option>';
+  selM.innerHTML=h;
+  var cur=v?md(v):null,dh="";
+  selM.value=cur?String(cur[0]):"";
+  if(cur){var a=Math.max(1,lo-CUM[cur[0]-1]),b=Math.min(ML[cur[0]-1],hi-CUM[cur[0]-1]);
+    for(var d=a;d<=b;d++)dh+='<option value="'+d+'">'+d+'日</option>';
+    selD.innerHTML=dh;selD.value=String(cur[1]);
+  }else selD.innerHTML='<option value="">—</option>';
+  selM.disabled=!!off;selD.disabled=!!off||!cur;
+}
+function render(){
+  var prevEnd=0,prevDone=true,shownOff=false;
+  rows.forEach(function(r,i){
+    var avail=i===0||prevDone||r.s>0,min=prevEnd+1;
+    if(!avail){r.s=r.e=0;r.auto=true;}
+    if(avail&&prevEnd>0&&(r.auto||r.s<min))r.s=min;          // 开头自动接在上一个 D 结束日的后一天；只能往后挑
+    if(min>365){r.s=r.e=0;avail=false;}                      // 12月31日用完了
+    if(r.s&&r.e&&r.e<r.s)r.e=r.s;
+    if(!r.s)r.e=0;
+    r.slo=min;r.elo=r.s||min;
+    r.el.classList.toggle("off",!avail);
+    r.el.style.display=(avail||!shownOff)?"":"none";           // 还锁着的 D 只露出紧挨着的一个，选完再往后出
+    if(!avail)shownOff=true;
+    fill(r.sm,r.sd,min,365,r.s,i===0||prevEnd===0,!avail);
+    fill(r.em,r.ed,r.s||min,365,r.e,true,!avail||!r.s);
+    var done=r.s>0&&r.e>0;
+    r.hid.value=done?md(r.s)[0]+"月"+md(r.s)[1]+"日-"+md(r.e)[0]+"月"+md(r.e)[1]+"日":"";
+    var n=done?r.e-r.s+1:0;
+    r.info.textContent=done?("共 "+n+" 天，1 故事日 = "+fmtLen(1440/n)):(r.s?"再选结束日":"");
+    prevDone=done;if(done)prevEnd=r.e;
+  });
+}
+function chosen(sm,sd,lo){var m=+sm.value;if(!m)return 0;var d=+sd.value;return d?Math.max(doy(m,d),lo):Math.max(doy(m,1),lo);}
+rows.forEach(function(r){
+  r.sm.addEventListener("change",function(){r.s=chosen(r.sm,{value:0},r.slo);r.auto=false;render();});
+  r.sd.addEventListener("change",function(){r.s=chosen(r.sm,r.sd,r.slo);r.auto=false;render();});
+  r.em.addEventListener("change",function(){r.e=chosen(r.em,{value:0},r.elo);render();});
+  r.ed.addEventListener("change",function(){r.e=chosen(r.em,r.ed,r.elo);render();});
+  r.el.querySelector(".stclr").addEventListener("click",function(){r.s=r.e=0;r.auto=true;render();});
+});
+render();
+})();
+</script>
+{% endblock %}

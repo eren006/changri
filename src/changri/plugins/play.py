@@ -193,6 +193,8 @@ async def start_room(kind: str, me, targets: list, time_text: str, place: str = 
         await _invite(t["id"], room, me["name"])
     await _announce_in_room(room_id)
     refused = info.partition("\n")[2]           # 多人邀约里有人拉黑了你：create 在提示后面附了一行
+    if kind in rooms.SOLO_KINDS:
+        return True, f"✅ {kind}已发起，房间号 R{room_id}（只有你一个人）。\n{_slot(room)}\n{_group_line(room)}\n聊完在群里发「结束{kind}」。", room_id
     return True, f"✅ {kind}已发起，房间号 R{room_id}。\n{_slot(room)}\n{_group_line(room)}\n对方已收到通知。" + (f"\n{refused}" if refused else ""), room_id
 
 
@@ -243,6 +245,19 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     await _start_room(phone, bot, event, "电话", p[0], "", _names(p[1]))
 
 
+stakeout = _cmd("踩点")
+
+
+@stakeout.handle()
+async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
+    if not rooms.stakeout_enabled():
+        await stakeout.finish("❌ 踩点没有开放。")
+    p = args.extract_plain_text().split(None, 1)
+    if len(p) < 2:
+        await stakeout.finish("用法：踩点 时间 地点（一个人的群，不带别人）\n例：踩点 1400-1500 大图书馆")
+    await _start_room(stakeout, bot, event, "踩点", p[0], p[1].strip(), [])
+
+
 wechat = _cmd("微信")
 
 
@@ -260,7 +275,7 @@ def parse_official(text: str, call: bool = False):
     day = None
     if p and re.fullmatch(r"[Dd]\d+", p[0]):
         day, p = int(p[0][1:]), p[1:]
-    if not p or not rooms.parse_hm(p[0]):
+    if not p or not rooms.parse_hm(p[0], day):
         return None
     t, rest = p[0], p[1:]
     if not rest:
@@ -507,7 +522,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     await reply_long(review_cmd, IMG + text)
 
 
-end_room = _cmd("结束私约", {"结束电话", "结束官约", "结束微信", "结束心愿", "结束约会", "结束前置电话"})
+end_room = _cmd("结束私约", {"结束电话", "结束官约", "结束微信", "结束心愿", "结束约会", "结束前置电话", "结束踩点"})
 
 
 @end_room.handle()
@@ -742,7 +757,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     day = room["day"]
     if p and re.fullmatch(r"[Dd]\d+", p[0]):
         day = int(p.pop(0)[1:])
-    hm = rooms.parse_hm(p[0]) if p else None
+    hm = rooms.parse_hm(p[0], day) if p else None
     if not hm:
         await chg.finish("用法：修改时间线 [D几] 时间\n例：修改时间线 D1 1400-1500")
     ok, why = rooms.propose_change(room["id"], me["id"], day, *hm)
@@ -802,7 +817,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent):
     lines = [f"📊 {me['name']} 今天（{season.day_label() if season.running() else '自然日'}）的数量"]
     for k, label in (("sms", "短信"), ("gift", "送礼")):
         lines.append(f"{label} {one(m.day_count(me['id'], k), m.daily_limit(k))}")
-    for k in ("私约", "电话", "微信"):
+    for k in ("私约", "电话", "微信") + (("踩点",) if rooms.stakeout_enabled() else ()):
         lines.append(f"{k} {one(rooms.day_count(me['id'], k), rooms.daily_limit(k))}")
     from changri.core import extensions as _ext
     if _ext.is_enabled("wishes"):
@@ -873,7 +888,7 @@ async def _check_presence(only_gid: str = "") -> None:
             await _receipt_all_here(rooms.get(room["id"]))
 
 
-_ROOM_CMD = re.compile(r"[/.。]?(结束(?:私约|电话|官约|微信|心愿|约会|前置电话)|修改时间线|同意时间线|拒绝时间线)\s*(.*)")
+_ROOM_CMD = re.compile(r"[/.。]?(结束(?:私约|电话|官约|微信|心愿|约会|前置电话|踩点)|修改时间线|同意时间线|拒绝时间线)\s*(.*)")
 _LEAD_AT = re.compile(r"^(?:@\S+\s*)+")          # QQ 里「回复」一条消息会自动在开头 @ 原发送人
 
 
@@ -907,7 +922,7 @@ async def _listen_cmd(app_id, msg) -> bool:
         day = room["day"]
         if p and re.fullmatch(r"[Dd]\d+", p[0]):
             day = int(p.pop(0)[1:])
-        hm = rooms.parse_hm(p[0]) if p else None
+        hm = rooms.parse_hm(p[0], day) if p else None
         if not hm:
             await say("用法：修改时间线 [D几] 时间\n例：修改时间线 D1 1400-1500")
             return True

@@ -274,6 +274,27 @@ class PlayE2E(unittest.TestCase):
         self.say("私约 1000-1100 咖啡厅 丙")
         self.assertIn("次数用完", self.say("私约 1200-1300 咖啡厅 丙")[0])
 
+    def test_stakeout_solo_room(self):
+        self.add_pool(1)
+        self.assertIn("没有开放", self.say("踩点 1400-1500 大图书馆")[0])          # 默认关
+        set_config("stakeout_enabled", "1")
+        self.assertIn("用法", self.say("踩点 1400-1500")[0])
+        out = self.say("踩点 1400-1500 大图书馆")
+        self.assertTrue(any("踩点已发起" in o and "只有你一个人" in o and "1234560" in o for o in out))
+        rid = rooms.open_rooms()[0]["id"]
+        self.assertEqual([m["name"] for m in rooms.members(rid)], ["甲"])
+        self.assertIn("撞了", self.say("私约 1430-1530 咖啡厅 乙")[0])            # 踩点占时间线
+        a, b = (roles.get_role_by_name(n)["id"] for n in ("甲", "乙"))
+        self.assertIn("不能带别人", rooms.create("踩点", b, [a], "1600-1700", "花园")[1])
+        self.assertIn("要写地点", rooms.create("踩点", b, [], "1600-1700", "")[1])
+        self.assertIn("踩点", self.say("我的数量")[0])
+        out = self.say("结束踩点", member="M0", group="POOL0")
+        self.assertTrue(any("已经结束" in o for o in out))
+        set_config("limit_踩点", "1")
+        self.assertIn("次数用完", self.say("踩点 1800-1900 花园")[0])
+        set_config("stakeout_enabled", "0")
+        self.assertIn("没有开放", rooms.create("踩点", b, [], "1600-1700", "花园")[1])
+
     def test_wechat_no_timeline(self):
         a, b, c = (roles.get_role_by_name(n)["id"] for n in ("甲", "乙", "丙"))
         self.assertTrue(rooms.create("微信", a, [b], "", "")[0])               # 网页多人群聊建的房间

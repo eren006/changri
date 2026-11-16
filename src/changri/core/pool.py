@@ -51,13 +51,15 @@ def all_groups() -> list:
         rows = c.execute("SELECT * FROM pool_groups ORDER BY set_name, id").fetchall()
         bound = {(r["bot_id"], r["group_openid"]): r["name"] for r in c.execute(
             "SELECT g.bot_id, g.group_openid, r.name FROM role_groups g JOIN roles r ON r.id=g.role_id WHERE g.group_openid IS NOT NULL")}
-    stage, ann = get_config("stage_group", ""), get_config("announce_group", "")
+    special = {get_config(k, ""): label for k, label in (
+        ("water_group", "水群"), ("backstage_group", "后台群"), ("announce_group", "公告群"), ("stage_group", "戏群"))}
+    special.pop("", None)
     out = []
     for r in rows:
         d = dict(r)
         key = f"{r['bot_id']}|{r['group_openid']}"
         d["owner"] = bound.get((r["bot_id"], r["group_openid"]), "")
-        d["conflict"] = "个人群" if (r["bot_id"], r["group_openid"]) in bound else "戏群" if key == stage else "公告群" if key == ann else ""
+        d["conflict"] = "个人群" if (r["bot_id"], r["group_openid"]) in bound else special.get(key, "")
         out.append(d)
     return out
 

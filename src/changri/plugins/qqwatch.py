@@ -1,4 +1,4 @@
-"""QQ 号断线提醒：掉线超过 2 分钟，用卡拉往公告群发一条；恢复了再发一条。不发就记日志。
+"""QQ 号断线提醒：掉线超过 2 分钟，用卡拉往后台群（没设就公告群）发一条；恢复了再发一条。不发就记日志。
 掉线备案（core/outage.py，默认开）：掉线时通知所有玩家暂停 QQ 群回戏、自动打开小手机并发激活码；恢复后关回去、@ 大家回 QQ 群。"""
 import time
 
@@ -14,10 +14,10 @@ from nonebot_plugin_apscheduler import scheduler  # noqa: E402
 
 
 async def _notify(text: str) -> None:
-    ann = announce.get_announce()
+    ann = announce.get_staff_notice()          # 后台群优先，没设退回公告群
     bot = nonebot.get_bots().get(ann[0]) if ann else None
     if not bot:
-        logger.warning(f"[QQ号监听] {text}（没有设公告群或机器人不在线，只记日志）")
+        logger.warning(f"[QQ号监听] {text}（没有设后台群/公告群或机器人不在线，只记日志）")
         return
     try:
         await send_to_group(bot, ann[1], text)

@@ -264,6 +264,24 @@ def set_day(n: int) -> None:
     set_config("day_epoch", str(int(get_config("day_epoch", "0")) + 1))   # 换新的计数键，当天的投稿次数等于清零
 
 
+def day_summary_line() -> str:
+    """全员今天（当前 day_key）一共发生了多少：天数推进时发到公告群。撤回的短信、取消的房间不算；
+    管理员在上帝模式里「重置今日次数」只影响个人上限，这里照实算。"""
+    key = day_key()
+    with get_conn() as c:
+        room = {r[0]: r[1] for r in c.execute(
+            "SELECT kind, COUNT(*) FROM rooms WHERE dkey=? AND status!='cancelled' GROUP BY kind", (key,))}
+        msg = {r[0]: r[1] for r in c.execute(
+            "SELECT kind, COUNT(*) FROM messages WHERE day=? AND error!='已撤回' GROUP BY kind", (key,))}
+        wish = c.execute("SELECT COUNT(*) FROM wishes WHERE dkey=?", (key,)).fetchone()[0]
+    parts = [f"{k} {room.pop(k, 0)} 场" for k in ("私约", "电话", "官约")]
+    parts += [f"{k} {n} 场" for k, n in room.items() if n]             # 微信、踩点、前置电话……有才显示
+    parts += [f"短信 {msg.get('sms', 0)} 条", f"礼物 {msg.get('gift', 0)} 份"]
+    if wish:
+        parts.append(f"心愿 {wish} 个")
+    return "🌐 全员今天：" + "｜".join(parts)
+
+
 # ---------- 定时 ----------
 
 async def tick(send, announce, now: time.struct_time | None = None) -> str:
@@ -283,7 +301,9 @@ async def tick(send, announce, now: time.struct_time | None = None) -> str:
 
     if current_day() is None and t >= s["start_date"] and t <= last_end(s):
         enter_d0(t, skip_tonight=False)            # 到开始日自动进 D0：当天就是 D0，当晚 23:59 进 D1
-        await say(f"📜 「{s['name']}」档期开始，现在是 D0。\n⚙️ 已自动打开：自动天数（每天 23:59 加一天）、心动信。\n🧹 筹备期的互动记录已清零，从今天重新算。")
+        from . import storycal
+        sl = storycal.stage_line(0)
+        await say(f"📜 「{s['name']}」档期开始，现在是 D0。" + (f"\n🕰️ {sl}" if sl else "") + "\n⚙️ 已自动打开：自动天数（每天 23:59 加一天）、心动信。\n🧹 筹备期的互动记录已清零，从今天重新算。")
         return "d0"
     if t > last_end(s) and get_config("season_closed_notice") != str(s["id"]):
         set_config("season_closed_notice", str(s["id"]))
@@ -294,7 +314,14 @@ async def tick(send, announce, now: time.struct_time | None = None) -> str:
     if now.tm_hour * 60 + now.tm_min == 1439 and get_config("auto_day") == "1" and get_config("auto_day_last") != t and current_day() is not None:
         set_config("auto_day_last", t)
         prev = current_day()
+        try:
+            counts = "\n" + day_summary_line()          # 换天之前算，换了就是新一天的键了
+        except Exception:  # noqa: BLE001
+            counts = ""
         set_day(prev + 1)
-        await say(f"📜 自动天数推进：D{prev} → D{prev + 1}（今天的计数已清空）")
+        from . import storycal
+        sl = storycal.stage_line(prev + 1)
+        counts += f"\n🕰️ {sl}" if sl else ""
+        await say(f"📜 自动天数推进：D{prev} → D{prev + 1}（今天的计数已清空）{counts}")
         return "advanced"
     return "idle"

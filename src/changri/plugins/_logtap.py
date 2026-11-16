@@ -19,7 +19,8 @@ def speaker_of(event: GroupMessageCreateEvent) -> tuple[int, str]:
     return pid, name
 
 
-_KNOWN = set(_MANAGE) | {"r", "rd", "ra", "rb", "rp", "sc", "en", "dnd", "ri", "at", "st", "检定", "理智检定", "成长", "先攻", "攻击", "录卡", "录属性", "看卡", "角色卡"}
+_KNOWN = set(_MANAGE) | {"r", "rd", "ra", "rb", "rp", "sc", "en", "dnd", "ri", "at", "st", "检定", "理智检定", "成长", "先攻", "攻击", "录卡", "录属性", "看卡", "角色卡",
+                         "coc", "dg", "制卡", "车卡", "team", "队伍"}
 
 
 def _command_word(text: str) -> tuple[str, bool]:

@@ -2,7 +2,8 @@
 
 规则照索罗的做法：rd 通用掷骰；COC7 的 ra / rb / rp / sc / en；DND5e 的 ra / rb / rp（D20 对 DC）、dnd / ri / at。
 和索罗不同的两处：①口吻是中性的（索罗那套是拿破仑·索罗的台词，不搬）；②属性在这个系统自己的角色上存，不走存档站。
-每个函数返回要回给玩家的一段文字。lookup(name) -> (角色名, 数值) | 提示文字，由调用方提供（读角色属性）。
+每个函数返回要回给玩家的一段文字。lookup(name) -> (角色名, 数值[, 附注]) | 提示文字，由调用方提供（读角色属性）；
+附注（如「，初始值」）会跟在检定说明里。
 """
 from __future__ import annotations
 
@@ -488,14 +489,15 @@ def _coc_parse(raw: str, extra: int, lookup: Lookup, proxy: bool):
         got = lookup(rest)
         if isinstance(got, str):
             return got
-        role, val = got
+        role, val = got[:2]
+        tag = got[2] if len(got) > 2 else ""
         label, target = rest, min(val + mod, 100)
         if val + mod > 100:
-            note_cap = f"（{role}的{label}{val}{mod_text}，按100算）"
+            note_cap = f"（{role}的{label}{val}{mod_text}{tag}，按100算）"
         elif proxy:
-            note_cap = f"（代{role}投，{label}{val}{mod_text}）"
+            note_cap = f"（代{role}投，{label}{val}{mod_text}{tag}）"
         else:
-            note_cap = f"（{role}的{label}{val}{mod_text}）"
+            note_cap = f"（{role}的{label}{val}{mod_text}{tag}）"
         if target < 1:
             return f"「{role}」的{label}是 {val}{mod_text}，掷不出成功。"
     if mod and target < 1:
@@ -504,7 +506,7 @@ def _coc_parse(raw: str, extra: int, lookup: Lookup, proxy: bool):
         return "数值有误，请再核对一下。"
     if abs(extra) > MAX_EXTRA_DICE:
         return f"奖励/惩罚骰最多 {MAX_EXTRA_DICE} 颗。"
-    return {"label": label, "target": target, "extra": extra, "difficulty": difficulty, "note_cap": note_cap}
+    return {"label": label, "target": target, "extra": extra, "difficulty": difficulty, "note_cap": note_cap, "from_card": not m}
 
 
 def _coc_roll(spec: dict, house: str) -> Rolled:
@@ -528,7 +530,7 @@ def _coc_roll(spec: dict, house: str) -> Rolled:
     prefix = f"{label} " if label else ""
     plain = f"{prefix}检定：D100={roll}/{shown}{note_cap}{note} —— {verdict}。{remark}"
     card = dicecard.check_card(label, roll, target, verdict, remark, need=need, dice_note=note.strip("（）"), cap_note=note_cap.strip("（）"))
-    return Rolled(plain, card, roll=roll, level=level, target=target, verdict=verdict)
+    return Rolled(plain, card, roll=roll, level=level, target=target, verdict=verdict, label=label, from_card=spec.get("from_card", False))
 
 
 def coc_check(raw: str, extra: int, lookup: Lookup, proxy: bool = False, house: str = DEFAULT_HOUSE) -> str:
@@ -549,7 +551,8 @@ def coc_check(raw: str, extra: int, lookup: Lookup, proxy: bool = False, house: 
     lines = [f"第{i}次 " + str(r).split("检定：", 1)[1] for i, r in enumerate(results, 1)]
     wins = sum(1 for r in results if r.verdict.endswith("成功"))
     head = f"{spec['label'] + ' ' if spec['label'] else ''}连续检定 ×{times}（{spec['target']}）："
-    return Rolled(head + "\n" + "\n".join(lines) + f"\n成功 {wins} 次，失败 {times - wins} 次。")
+    return Rolled(head + "\n" + "\n".join(lines) + f"\n成功 {wins} 次，失败 {times - wins} 次。",
+                  label=spec["label"], verdict="成功" if wins else "失败", from_card=spec.get("from_card", False))
 
 
 def coc_oppose(raw: str, lookup: Lookup, house: str = DEFAULT_HOUSE) -> str:
@@ -585,7 +588,8 @@ def _roll_loss(expr: str):
     if terms is None or not terms_valid(terms):
         return None
     detail, total = roll_terms(terms)
-    return max(total, 0), max(expr_range(terms)[1], 0), detail
+    lo, hi = expr_range(terms)
+    return max(total, 0), max(hi, 0), detail, max(lo, 0)
 
 
 def coc_sanity(raw: str, lookup: Lookup, house: str = DEFAULT_HOUSE) -> str:
@@ -638,7 +642,7 @@ def coc_growth(raw: str, lookup: Lookup | None = None) -> str:
         got = lookup(text)
         if isinstance(got, str):
             return got
-        who, value = got
+        who, value = got[:2]
         label, from_card = text, True
         value = min(value, 100)
     else:
@@ -654,6 +658,181 @@ def coc_growth(raw: str, lookup: Lookup | None = None) -> str:
         plain = f"{prefix}成长检定：D100={roll}/{value} —— 没有成长。{remark}"
     return Rolled(plain, dicecard.en_card(label, roll, value, gain, remark), gain=gain, value=value,
                   label=label, from_lookup=from_card, who=who)
+
+
+# ---------- COC7 派生值与制卡 ----------
+
+def coc_db_build(strength: int, size: int) -> tuple[str, int]:
+    """伤害加值（DB）和体格，按 力量+体型 查表。"""
+    total = strength + size
+    if total < 65:
+        return "-2", -2
+    if total < 85:
+        return "-1", -1
+    if total < 125:
+        return "0", 0
+    if total < 165:
+        return "+1D4", 1
+    if total < 205:
+        return "+1D6", 2
+    extra = (total - 205) // 80
+    return f"+{2 + extra}D6", 3 + extra
+
+
+def coc_hp_max(con: int, size: int) -> int:
+    return (con + size) // 10
+
+
+def coc_mov(strength: int, dex: int, size: int) -> int:
+    """移动力（没算年龄：40 岁起每 10 年 -1）。"""
+    if strength < size and dex < size:
+        return 7
+    if strength > size and dex > size:
+        return 9
+    return 8
+
+
+COC_STAT_ORDER = ("力量", "体质", "体型", "敏捷", "外貌", "智力", "意志", "教育", "幸运")
+_COC_2D6 = {"体型", "智力", "教育"}                  # 这三项是 (2D6+6)×5，其余 3D6×5
+
+
+def coc_stats(raw: str) -> str:
+    """/coc [组数]：COC7 制卡，每组 9 项属性 + 生命、魔法、理智、DB、体格、移动。"""
+    text = raw.strip()
+    times = int(text) if text.isdigit() else 1
+    if not 1 <= times <= 5:
+        return "一次最多出 5 组。"
+    lines = ["COC7 制卡（力量体质敏捷外貌意志幸运 3D6×5，体型智力教育 (2D6+6)×5）："]
+    for i in range(1, times + 1):
+        v = {k: (sum(random.randint(1, 6) for _ in range(2)) + 6 if k in _COC_2D6 else sum(random.randint(1, 6) for _ in range(3))) * 5
+             for k in COC_STAT_ORDER}
+        db, build = coc_db_build(v["力量"], v["体型"])
+        total = sum(v[k] for k in COC_STAT_ORDER if k != "幸运")
+        lines.append(f"第{i}组 " + " ".join(f"{k}{v[k]}" for k in COC_STAT_ORDER)
+                     + f"\n　总计{total}（不含幸运）　生命{coc_hp_max(v['体质'], v['体型'])} 魔法{v['意志'] // 5} 理智{v['意志']}"
+                     + f" DB{db} 体格{build} 移动{coc_mov(v['力量'], v['敏捷'], v['体型'])}")
+    lines.append("移动没算年龄（40 岁起每 10 年 -1）。选好一组后 /st 力量60 体质50 …… 录进角色卡。")
+    return "\n".join(lines)
+
+
+# ---------- 绿色三角洲（Delta Green）----------
+# D100 ≤ 技能成功；掷出 01 或两位相同（11、22……99）是大成功（成功时）/大失败（失败时），00 永远大失败。
+# 没有奖励/惩罚骰和困难等级，用 ±20、±40 修正。属性检定 = 属性×5。
+
+DG_STATS = ("力量", "体质", "敏捷", "智力", "意志", "魅力")
+DG_USAGE = "格式：/ra 技能名 [数值] [+20/-20]\n例：/ra 搜索 50、/ra 枪械+20、/ra 力量（属性自动×5）"
+
+
+def judge_dg(roll: int, target: int) -> str:
+    if roll == 100:
+        return "大失败"
+    ok = roll <= target
+    if roll == 1 or roll % 11 == 0:
+        return "大成功" if ok else "大失败"
+    return "成功" if ok else "失败"
+
+
+def _dg_roll(spec: dict) -> Rolled:
+    label, target, note_cap = spec["label"], spec["target"], spec["note_cap"]
+    roll = random.randint(1, 100)
+    level = judge_dg(roll, target)
+    remark = _pick(LEVEL_REMARKS, level)
+    prefix = f"{label} " if label else ""
+    plain = f"{prefix}检定：D100={roll}/{target}{note_cap} —— {level}。{remark}"
+    card = dicecard.check_card(label, roll, target, level, remark, cap_note=note_cap.strip("（）"))
+    return Rolled(plain, card, roll=roll, level=level, target=target, verdict=level, label=label,
+                  from_card=spec.get("from_card", False))
+
+
+def dg_check(raw: str, extra: int, lookup: Lookup, proxy: bool = False) -> str:
+    """绿色三角洲的 /ra。前面写「3#」连掷几次。"""
+    if extra:
+        return "绿色三角洲没有奖励骰/惩罚骰，用修正代替：/ra 枪械+20、/ra 潜行-20。"
+    raw = raw.strip()
+    times = 1
+    m = re.match(r"^(\d{1,3})#\s*(.*)$", raw)
+    if m:
+        times, raw = int(m.group(1)), m.group(2)
+        if not 1 <= times <= MAX_TIMES:
+            return f"一次最多连掷 {MAX_TIMES} 次。"
+    spec = _coc_parse(raw, 0, lookup, proxy)
+    if isinstance(spec, str):
+        return spec.replace(COC_USAGE, DG_USAGE)
+    if spec["extra"] or spec["difficulty"]:
+        return "绿色三角洲没有奖励骰/惩罚骰和困难等级，用修正代替：/ra 枪械+20、/ra 潜行-40。"
+    if times == 1:
+        return _dg_roll(spec)
+    results = [_dg_roll(spec) for _ in range(times)]
+    lines = [f"第{i}次 " + str(r).split("检定：", 1)[1] for i, r in enumerate(results, 1)]
+    wins = sum(1 for r in results if r.verdict.endswith("成功"))
+    head = f"{spec['label'] + ' ' if spec['label'] else ''}连续检定 ×{times}（{spec['target']}）："
+    return Rolled(head + "\n" + "\n".join(lines) + f"\n成功 {wins} 次，失败 {times - wins} 次。",
+                  label=spec["label"], verdict="失败" if wins < times else "成功", from_card=spec.get("from_card", False))
+
+
+def dg_sanity(raw: str, lookup: Lookup) -> str:
+    """/sc 成功损失/失败损失 [理智]：大成功损失取最小，大失败取最大。"""
+    m = re.match(r"^(\S+?)/(\S+?)(?:\s+(\d{1,3}))?$", raw.strip())
+    if not m:
+        return "格式：/sc 成功损失/失败损失 [当前理智]\n例：/sc 0/1d4 60、/sc 1/1d6；不写理智就取你角色卡的理智"
+    note, from_card, who = "", False, ""
+    if m.group(3):
+        san = int(m.group(3))
+    else:
+        got = lookup("SAN")
+        if isinstance(got, str):
+            return got
+        san, from_card, who = got[1], True, got[0]
+        note = f"（取自{who}的理智）"
+    ok_loss, bad_loss = _roll_loss(m.group(1)), _roll_loss(m.group(2))
+    if ok_loss is None or bad_loss is None:
+        return "损失的写法看不懂，数字或 1d6 这类即可。"
+    roll = random.randint(1, 100)
+    level = judge_dg(roll, san)
+    if level == "大成功":
+        loss, process = ok_loss[3], "大成功，取最小值"
+    elif level == "成功":
+        loss, process = ok_loss[0], ok_loss[2]
+    elif level == "大失败":
+        loss, process = bad_loss[1], "大失败，取最大值"
+    else:
+        loss, process = bad_loss[0], bad_loss[2]
+    left = max(san - loss, 0)
+    hints = []
+    if left == 0:
+        hints.append("理智归零：Agent 永久疯狂，交给 Handler。")
+    elif loss >= 5:
+        hints.append(f"一次失去 {loss} 点（≥5）：临时疯狂，由 Handler 决定反应（战斗、逃跑或崩溃）。")
+    plain = f"理智检定：D100={roll}/{san} —— {level}\n损失 {loss}（{process}），理智 {san} → {left}。{note}"
+    if hints:
+        plain += "\n" + "\n".join(hints)
+    return Rolled(plain, None, san_left=left, san_before=san, loss=loss, from_lookup=from_card, who=who, level=level)
+
+
+def dg_stats(raw: str) -> str:
+    """/dg [组数]：6 项属性各 4D6 取高 3，顺带算 生命、意志力、理智、崩溃点。"""
+    text = raw.strip()
+    times = int(text) if text.isdigit() else 1
+    if not 1 <= times <= 5:
+        return "一次最多出 5 组。"
+    lines = ["绿色三角洲制卡（6 项属性各 4D6 取高 3；属性检定 = 属性×5）："]
+    for i in range(1, times + 1):
+        v = {k: sum(sorted(random.randint(1, 6) for _ in range(4))[1:]) for k in DG_STATS}
+        san = v["意志"] * 5
+        lines.append(f"第{i}组 " + " ".join(f"{k}{v[k]}" for k in DG_STATS) + f"，合计 {sum(v.values())}"
+                     + f"\n　生命{dg_hp_max(v['力量'], v['体质'])} 意志力{v['意志']} 理智{san} 崩溃点{san - v['意志']}")
+    lines.append("选好一组后 /st 力量12 体质10 …… 录进角色卡（理智、生命等不录也会按属性算初始值）。")
+    return "\n".join(lines)
+
+
+def dg_improve(label: str, value: int) -> Rolled:
+    """绿色三角洲的成长：失败过的技能团后 +1D4，不用掷 D100。"""
+    gain = random.randint(1, 4)
+    return Rolled(f"{label}：{value} +1D4({gain}) → {value + gain}", None, gain=gain, value=value, label=label)
+
+
+def dg_hp_max(strength: int, con: int) -> int:
+    return (strength + con + 1) // 2
 
 
 # ---------- 疯狂症状（COC7 第 8 章，文字是概括的）----------
@@ -761,7 +940,7 @@ def dnd_check(raw: str, adv: int, lookup: Lookup) -> str:
     if label:
         got = lookup(label)
         if not isinstance(got, str):       # 没有这个属性就当普通检定名，不报错
-            role, val = got
+            role, val = got[:2]
             if label.upper() in DND_ABILITIES:       # 属性值（力量16）换算成调整值
                 cm = ability_mod(val)
                 card_note = f"（{role}的{label}{val}→{cm:+d}）"
@@ -870,62 +1049,122 @@ def dnd_attack(raw: str) -> str:
 
 # ======================== 帮助 ========================
 
-HELP_SWITCH = "【切换规则】/切换规则 COC 或 DND，每个群各记各的；不带参数看当前规则。"
+# ======================== 帮助 ========================
+# /骰子帮助 不带参数只发目录；/骰子帮助 编号或名字 发对应的一小块。每块尽量短，不要一次刷屏。
+
 HELP_RD = (
-    "【通用掷骰 /rd】两种规则都能用\n"
-    "/rd 3d6+2d4-1　加减、常数\n"
-    "/rd 2d6×3、/rd (1d6+2)×2　乘法、括号\n"
-    "/rd 4d6k3　取最高3颗(k=kh)；/rd 2d20kl1　取最低1颗\n"
-    "/rd 3d6!　爆骰：掷到最大面再掷，每颗最多连爆10次\n"
-    "/rd 5#2d6　连掷5轮(最多10轮)；/rd 100　等于D100\n"
-    "/rd 伤害 2d6+3、/rd 2d6+3 伤害　原因写在前后都行；不写表达式默认D100\n"
-    f"上限：骰子1~{MAX_COUNT}颗、面数1~{MAX_SIDES}、最多{MAX_TERMS}项、括号{MAX_DEPTH}层。"
+    "【掷骰】所有规则通用\n"
+    "/rd 3d6+2d4-1　加减、常数；/rd 2d6×3、(1d6+2)×2　乘法、括号\n"
+    "/rd 4d6k3　取最高3颗；/rd 2d20kl1　取最低1颗；/rd 3d6!　爆骰\n"
+    "/rd 5#2d6　连掷5轮；/rd 伤害 2d6+3　带原因；不写表达式就是 D100\n"
+    "/rh 表达式　暗骰：结果私聊给你，群里只说一声（要先把你加进机器人白名单）"
 )
 HELP_COC = (
-    "【COC7 规则】/切换规则 COC\n"
-    "/ra [技能名] 数值　D100检定，如 /ra 侦查 70\n"
-    "/ra b2 困难 射击 60　b=奖励骰、p=惩罚骰(可带数字，最多5颗)，困难/极难要求更高\n"
-    "/rb 70　奖励骰检定；/rp 45　惩罚骰检定\n"
-    "/ra 3#侦查 60　连掷3次(最多10次)；/rav 力量 60 vs 力量 50　对抗检定，比成功等级\n"
-    "/ra 侦查+10、/ra 侦查 70-20　临时修正，加在技能值上\n"
-    "/sc 成功损失/失败损失 当前理智　如 /sc 1/1d6 60\n"
-    "/en [技能名] [当前数值]　技能成长，如 /en 侦查 55；只写技能名就取你角色的数值，成长后自动记上\n"
-    "不写数值就取你角色的同名属性：/ra 力量（要先 /录属性 力量60，超过100按100算）\n"
-    "代骰：/ra 力量 @某人，取被 @ 者角色的数值替 TA 投\n"
-    "/sc 1/1d6 不写理智就取你的 SAN，扣完自动写回；单次损失≥5会提醒做智力检定\n"
-    "/ti　临时疯狂症状；/li　总结疯狂症状（后面可以写人名）；抽到恐惧/狂躁会自动再掷具体症状\n"
-    "/恐惧症状、/狂躁症状　单独掷一次具体症状（各100项，是自己整理的表，和规则书的编号不同）\n"
-    "/setcoc [0-5]　房规：改大成功/大失败的范围，不带数字看说明；每个群各记各的\n"
-    "/rh [表达式]　暗骰，结果私下发给执行的人，群里只说一声；/rah 技能 数值　暗检定\n"
-    "　收不到的话：请把你（KP）加进机器人白名单，就能收到私聊"
+    "【COC7 · 检定】\n"
+    "/ra 侦查 70　D100 检定；不写数值就取你角色卡上的（没录过按规则书初始值）\n"
+    "/ra b2 困难 射击　b 奖励骰、p 惩罚骰，困难/极难；/rb、/rp 是简写\n"
+    "/ra 侦查+10　临时修正；/ra 3#侦查　连掷3次\n"
+    "/ra 侦查 @某人　代骰，取 TA 的数值\n"
+    "/rav 力量 60 vs 力量 50　对抗；/rah 侦查　暗检定\n"
+    "/setcoc 0-5　房规（大成功/大失败的范围）"
+)
+HELP_COC2 = (
+    "【COC7 · 理智、成长、制卡】\n"
+    "/sc 1/1d6　理智检定，不写理智就取卡上的，扣完自动写回；一次掉 5 点以上会提醒智力检定\n"
+    "/ti、/li　临时 / 总结疯狂症状；/恐惧症状、/狂躁症状　单掷具体症状\n"
+    "/en 侦查　成长检定，成长了自动写回\n"
+    "跑团模式：检定成功会记成长标记，团后发 /en 一次掷完\n"
+    "/coc 3　制卡：一次掷 3 组属性，带生命、魔法、理智、DB、体格、移动"
 )
 HELP_DND = (
-    "【DND5e 规则】/切换规则 DND\n"
-    "/ra [名字] [+修正] [DC]　D20+修正对难度，如 /ra 侦察 +3 15；DC可不写\n"
-    "/rb 优势、/rp 劣势　掷2颗D20取高/取低；/ra 后面直接写 优势/劣势 也行；两样都有就抵消\n"
-    "/dnd [组数]　属性生成：6项各4D6取高3，一次最多5组\n"
-    "/ri 名字 +修正　先攻；/ri 看顺序；/ri 清空 重置(程序重启也会清空)\n"
-    "/at [名字] +命中 AC 伤害 [优势|劣势]　如 /at 长剑 +5 15 1d8+3\n"
-    "　自然20必中且伤害骰翻倍，自然1必失手\n"
-    "不写修正：/ra 力量 会取你角色的力量，自动换算成调整值（(力量-10)÷2，向下取整）\n"
-    "六项属性（力量/敏捷/体质/智力/感知/魅力，或 STR DEX CON INT WIS CHA）存属性值；其他技能（运动、侦察……）存的是加值，不换算：/st 运动5，/ra 运动\n"
-    "临时修正可以连写：/ra 运动+2 15\n"
-    "/sc 和 /en 是 COC 的指令，DND 规则下用不了"
+    "【DND5e】\n"
+    "/ra 运动 +3 15　D20+修正 对 DC（DC 可不写）；属性名会自动换算成调整值\n"
+    "/rb 优势、/rp 劣势　也可以在 /ra 后面写 优势/劣势\n"
+    "/at 长剑 +5 15 1d8+3　攻击：命中、AC、伤害；自然20暴击\n"
+    "/ri 名字 +2　先攻；/ri 看顺序；/ri 清空\n"
+    "/dnd 3　属性生成：6 项各 4D6 取高 3"
+)
+HELP_DG = (
+    "【绿色三角洲】\n"
+    "/ra 搜索　D100 ≤ 技能成功；01 或两位相同（11、22……）：成功时大成功、失败时大失败；00 必大失败\n"
+    "/ra 枪械+20　没有奖励骰和困难等级，用 ±20、±40 修正\n"
+    "/ra 力量　属性检定自动按 属性×5\n"
+    "/sc 0/1d4　理智检定：大成功取最小、大失败取最大；掉到崩溃点会提醒并重设崩溃点\n"
+    "跑团模式：检定失败记成长标记，团后 /en 每项 +1D4\n"
+    "/dg 3　制卡：属性 4D6 取高 3，带生命、意志力、理智、崩溃点"
+)
+HELP_CARD = (
+    "【角色卡】跑团模式的群里用；卡跟着你走，换群也能用\n"
+    "/st 力量60 敏捷70　录属性；/st 生命-3　增减；/st　看卡（含上限、DB）\n"
+    "/st del 力量、/st clr　删一项 / 清空\n"
+    "/pc new 名字 [coc|dnd|dg]　多建一张；/pc list；/pc 切换 名字；/pc del 名字\n"
+    "/nn 名字　设你在 log 里显示的名字\n"
+    "/en list　看成长标记；/en+ 侦查、/en- 侦查　手动加减；/en clr　清空"
+)
+HELP_TEAM = (
+    "【队伍】跑团模式的群里用\n"
+    "/team 调查员 add @甲 @乙　加人（不 @ 是加自己，队伍没有会自动建）\n"
+    "/team 调查员 侦查 聆听　列出全队的数值，按第一项排\n"
+    "/team 调查员 ra 聆听　全队各掷一次\n"
+    "/team list；/team 调查员 del @甲；/team 调查员 clear　解散"
+)
+HELP_LOG = (
+    "【跑团 log】跑团模式的群里用\n"
+    "/log new 名字　开始记；/log off 暂停；/log on 继续；/log on 名字　接着记以前的\n"
+    "/log end　结束（给网页链接）；/log halt　强制停止（不给链接）\n"
+    "/log list；/log stat [名字]；/log get 名字；/log export 名字；/log del 名字\n"
+    "/说 台词　记一条角色发言（开了自动听取就不用）；/ob　切换旁观\n"
+    "括号开头的话默认不记"
 )
 HELP_ATTR = (
-    "【角色属性】\n"
-    "/录属性 力量60 敏捷70 SAN55　记下（同名会覆盖；也可以写 力量 60）\n"
-    "/属性　看自己的；/删属性 力量；/清空属性\n"
-    "属性存在你的角色上，检定时直接写属性名就会取用。"
+    "【恋综角色的属性】恋综模式的群里用\n"
+    "/录属性 力量60 敏捷70　记下；/属性　看；/删属性 力量；/清空属性\n"
+    "检定时直接写属性名就会取用"
 )
-RULE_TITLE = {"coc": "COC7", "dnd": "DND5e"}
-RULE_NAMES = {"coc": "coc", "coc7": "coc", "克苏鲁": "coc", "dnd": "dnd", "dnd5e": "dnd", "5e": "dnd", "龙与地下城": "dnd"}
+HELP_FUN = (
+    "【小工具】\n"
+    "/name 日 3 女　随机人名（中/英/日、男/女、数量）\n"
+    "/who 甲 乙 丙　随机排顺序\n"
+    "/draw 塔罗 3　抽牌（塔罗、扑克、遭遇），不带参数看牌堆\n"
+    "/jrrp　今日人品"
+)
+HELP_SWITCH = "【切换规则】/切换规则 COC、/切换规则 DND、/切换规则 绿色三角洲；每个群各记各的，不带参数看当前规则"
+
+# (编号用的名字, 别名, 目录里的一句话, 正文, 只在哪种规则下标「当前」)
+HELP_SECTIONS = [
+    ("掷骰", ("rd", "r", "暗骰"), "/rd 通用掷骰、暗骰", HELP_RD, ""),
+    ("COC检定", ("coc", "coc7", "检定"), "COC7 的 /ra、奖励惩罚骰、对抗", HELP_COC, "coc"),
+    ("COC理智", ("理智", "成长", "sc", "en", "制卡", "coc2"), "COC7 的 /sc、疯狂、/en、/coc 制卡", HELP_COC2, "coc"),
+    ("DND", ("dnd", "dnd5e", "5e"), "DND5e 的检定、攻击、先攻", HELP_DND, "dnd"),
+    ("绿色三角洲", ("dg", "三角洲", "deltagreen"), "绿色三角洲的检定、理智、成长", HELP_DG, "dg"),
+    ("角色卡", ("卡", "st", "pc", "nn"), "跑团模式的 /st、/pc、/nn、成长标记", HELP_CARD, ""),
+    ("队伍", ("team",), "/team 全队查数值、一起掷", HELP_TEAM, ""),
+    ("log", ("记录", "跑团log"), "/log 记录一场跑团", HELP_LOG, ""),
+    ("小工具", ("工具", "name", "draw", "jrrp"), "/name /who /draw /jrrp", HELP_FUN, ""),
+    ("恋综属性", ("属性", "录属性"), "恋综模式的 /录属性", HELP_ATTR, ""),
+    ("切换规则", ("规则",), "COC / DND / 绿色三角洲 怎么换", HELP_SWITCH, ""),
+]
+
+RULE_TITLE = {"coc": "COC7", "dnd": "DND5e", "dg": "绿色三角洲"}
+RULE_NAMES = {"coc": "coc", "coc7": "coc", "克苏鲁": "coc", "dnd": "dnd", "dnd5e": "dnd", "5e": "dnd", "龙与地下城": "dnd",
+              "dg": "dg", "deltagreen": "dg", "delta": "dg", "绿色三角洲": "dg", "三角洲": "dg", "绿三角": "dg"}
+
+
+def help_menu(rule: str) -> str:
+    lines = [f"骰子帮助（这个群现在是 {RULE_TITLE.get(rule, rule)} 规则）", "发「/骰子帮助 编号」或「/骰子帮助 名字」看那一部分："]
+    for i, (name, _, desc, _, only) in enumerate(HELP_SECTIONS, 1):
+        lines.append(f"{i}. {name}　{desc}" + ("　← 当前规则" if only and only == rule else ""))
+    return "\n".join(lines)
 
 
 def help_text(topic: str, rule: str) -> str:
-    sections = {"rd": HELP_RD, "coc": HELP_COC, "dnd": HELP_DND, "规则": HELP_SWITCH, "切换规则": HELP_SWITCH, "属性": HELP_ATTR}
+    """不带参数：目录。带编号或名字：对应的一块。认不出来：目录。"""
     t = topic.strip().lower()
-    if t in sections:
-        return sections[t]
-    return (f"骰子（这里现在是 {RULE_TITLE.get(rule, rule)} 规则）\n\n{HELP_SWITCH}\n\n{HELP_RD}\n\n{HELP_COC}\n\n{HELP_DND}\n\n{HELP_ATTR}\n\n"
-            "只看某一块：/骰子帮助 rd、coc、dnd、属性")
+    if not t:
+        return help_menu(rule)
+    if t.isdigit() and 1 <= int(t) <= len(HELP_SECTIONS):
+        return HELP_SECTIONS[int(t) - 1][3]
+    for name, aliases, _, text, _ in HELP_SECTIONS:
+        if t == name.lower() or t in aliases:
+            return text
+    return f"没有「{topic.strip()}」这一部分。\n\n" + help_menu(rule)

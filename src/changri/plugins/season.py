@@ -37,7 +37,9 @@ def _status() -> str:
     lines = [f"📆 「{s['name']}」{label}",
              f"档期：{s['start_date']} ~ {s['end_date']}" + (f"，补戏到 {s['supp_end']}" if s["supp_end"] else ""),
              f"自动天数：{'开' if get_config('auto_day') == '1' else '关'}；心动信：{'开' if get_config('lovemail_enabled', '1') != '0' else '关'}"]
-    from changri.core import npc as npc_core
+    from changri.core import npc as npc_core, storycal
+    if storycal.now_label():
+        lines.append(f"故事里：{storycal.now_label()}（{storycal.stage_line(season.current_day())}）")
     if npc_core.names():
         lines.append("NPC：" + "、".join(npc_core.names()))
     lines.append("下一步：" + {"prep": "玩家创建角色，等开始日。", "playing": "正常进行；结束时发「结束季度」。", "over": "发「结束季度」。"}[p])

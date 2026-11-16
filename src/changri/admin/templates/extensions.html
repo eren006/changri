@@ -79,8 +79,9 @@
 {% endif %}
 
 <nav class="tabs" aria-label="扩展分页">
-  <a href="{{ url_for('extensions_page') }}" {% if tab not in ('aux', 'ai') %}aria-current="page"{% endif %}>核心功能</a>
+  <a href="{{ url_for('extensions_page') }}" {% if cur == 'core' and tab != 'ai' %}aria-current="page"{% endif %}>核心功能</a>
   <a href="{{ url_for('extensions_page', tab='aux') }}" {% if tab == 'aux' %}aria-current="page"{% endif %}>辅助功能</a>
+  <a href="{{ url_for('extensions_page', tab='custom') }}" {% if tab == 'custom' %}aria-current="page"{% endif %}>个性化模块</a>
   <a href="{{ url_for('extensions_page', tab='ai') }}" {% if tab == 'ai' %}aria-current="page"{% endif %}>给 AI 的模板</a>
 </nav>
 
@@ -92,20 +93,22 @@
 <textarea id="aip" readonly style="width:100%;height:420px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font:13px/1.55 ui-monospace,Menlo,monospace">{{ ai_prompt }}</textarea>
 {% else %}
 {% if tab == 'aux' %}<p class="note" style="margin:0 0 12px">辅助功能可以开关：官方扩展和你自己装的扩展。关着的功能，对应的指令和后台页面都不会出现。</p>
+{% elif tab == 'custom' %}<p class="note" style="margin:0 0 12px">个性化模块是别人点名要的、非常小的定制功能，平时用不上。<b>每个都默认关着</b>，点「全部恢复默认设置」时也会全部关回去；要用哪个自己打开开关，再点「重启并生效」。</p>
 {% else %}<p class="note" style="margin:0 0 12px">核心功能一直开着，不能关；点「进入设置」调这个功能的设置。</p>{% endif %}
 <div class="bar">
-  {% if owner and tab == 'aux' %}
+  {% if owner and cur == 'aux' %}
   <form method="post" action="{{ url_for('extensions_upload') }}" enctype="multipart/form-data" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">{{ csrf() }}
     <input type="file" name="file" accept=".zip" aria-label="选择扩展压缩包" required>
     <label style="font-size:13.5px"><input type="checkbox" name="replace" value="1"> 覆盖已有的同名扩展</label>
     <button class="btn" type="submit">上传扩展</button>
   </form>
   {% endif %}
+  {% if cur == 'custom' and not items|selectattr('group','equalto','custom')|list %}<p class="note">还没有个性化模块。有人点名要小功能时，会加在这里。</p>{% endif %}
   <input type="search" id="q" placeholder="搜索扩展" aria-label="搜索扩展" oninput="filterExt()">
 </div>
 {% if owner %}<p class="note" style="margin:-8px 0 16px"><b style="color:var(--warn)">注意：</b>扩展是 Python 代码，装上就和主程序有同样的权限（包括能读到机器人的 AppSecret）。只安装你信得过的人写的扩展。上传的扩展默认是关闭的，要自己打开开关。</p>{% endif %}
 
-{% for it in items if (tab not in ('aux', 'ai')) == (it.kind == 'core') %}
+{% for it in items if it.group == cur %}
 <article class="ext" data-search="{{ it.name }} {{ it.description }} {{ it.author }}">
   <div class="head">
     {% if it.kind != 'core' %}<span class="sw {{ 'on' if it.enabled }}">

@@ -1,4 +1,4 @@
-"""约会房间：私约、电话、官约、微信、心愿约会。房间 = 一个时间线条目 + 一个群池里的群。
+"""约会房间：私约、电话、官约、微信、心愿约会、踩点（一个人的群，默认关）。房间 = 一个时间线条目 + 一个群池里的群。
 时间说的是游戏里的「几点到几点」（1400-1500），不是真实时钟；房间真实存活时间由 room_expire_hours 管。"""
 import json
 import re
@@ -8,12 +8,21 @@ from . import blocks, pool, rpg, season, windows
 from .db import get_conn, get_config, get_int
 
 ROOM_KINDS_GATED = ("私约", "电话", "微信")
-KINDS = {"私约": True, "电话": False, "官约": True, "微信": False, "心愿": True, "前置电话": False}   # 值：是否需要地点
+KINDS = {"私约": True, "电话": False, "官约": True, "微信": False, "心愿": True, "前置电话": False, "踩点": True}   # 值：是否需要地点
 NO_TIMELINE = {"微信", "前置电话"}                                                            # 微信不占时间线
+SOLO_KINDS = {"踩点"}                                                                       # 只有发起人自己的房间
 
 
-def parse_hm(text: str) -> tuple[str, str] | None:
+def stakeout_enabled() -> bool:
+    """踩点开关（「功能与设置 → 约会房间」，默认关）。"""
+    return get_config("stakeout_enabled", "0") == "1"
+
+
+def parse_hm(text: str, day: int | None = None) -> tuple[str, str] | None:
     """「1400-1500」「14:00-15:00」→ ('14:00', '15:00')；结束必须晚于开始。"""
+    from . import storycal                  # 故事历打开（且这个 D 填了日期）时，约时间只认「3月5日」这种某一天，不认钟点
+    if storycal.exclusive(day):
+        return storycal.parse_when(text, day)[0]
     m = re.fullmatch(r"(\d{1,2}):?(\d{2})\s*[-~到至]\s*(\d{1,2}):?(\d{2})", text.strip())
     if not m:
         return None
@@ -102,15 +111,23 @@ def create(kind: str, creator_id: int, target_ids: list[int], time_text: str, pl
     成功时提示是「R房间号」；多人邀约里有人拉黑了发起人，会被悄悄剔掉，提示后面多一行「\n…」告诉发起人谁没加进来（对方设了静默的不提）。"""
     if kind not in KINDS:
         return False, "不认识的类型", 0
+    if kind in SOLO_KINDS:
+        if not official and not stakeout_enabled():
+            return False, "踩点没有开放。", 0
+        if target_ids:
+            return False, "踩点是一个人的群，不能带别人。", 0
+        if not place.strip():
+            return False, "踩点要写地点。", 0
     closed = "" if official else windows.check("date")
     if closed:
         return False, closed, 0
     if kind != "微信":
         if season.phase() != "playing":
             return False, "现在不是进行中的季度（筹备期/没有季度时不能约）。", 0
-        hm = parse_hm(time_text)
+        hm = parse_hm(time_text, day)
         if not hm:
-            return False, "时间格式不对，写成 1400-1500（结束要晚于开始）。", 0
+            from . import storycal
+            return False, (storycal.parse_when(time_text, day)[1] or storycal.format_error(day)), 0
     else:
         hm = ("", "")
     ids = list(dict.fromkeys(target_ids))
@@ -124,7 +141,7 @@ def create(kind: str, creator_id: int, target_ids: list[int], time_text: str, pl
             bad = godmode.check(rid_, kind, "你" if rid_ == creator_id else f"「{nm.get(rid_, '对方')}」")
             if bad:
                 return False, bad.replace("🚫 ", "").replace("暂时关闭", "暂时关闭，不能参与"), 0
-    if not ids:
+    if not ids and kind not in SOLO_KINDS:
         return False, "至少要有一位对象。", 0
     if day is not None and day < 1:
         return False, "D几 要写成大于 0 的数字。", 0
@@ -149,7 +166,7 @@ def create(kind: str, creator_id: int, target_ids: list[int], time_text: str, pl
                 ids.remove(t)             # 多人邀约：把拉黑了你的人剔掉，其余人照常
                 if not b["silent"]:
                     refused.append(names.get(t, "对方"))
-        if not ids:
+        if not ids and kind not in SOLO_KINDS:
             return False, "邀约对象都不可用，请检查名单或稍后再试。", 0
         if kind == "电话":
             cap = get_int("phone_open_cap", 5)

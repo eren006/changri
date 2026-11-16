@@ -44,6 +44,13 @@ def _cmd(name: str, aliases: set[str] | None = None, rule=_trpg_rule):
     return on_command(name, aliases=aliases or set(), rule=Rule(rule), priority=15, block=True)
 
 
+def _dice_rule(event: GroupMessageCreateEvent) -> str:
+    """这个群掷骰用的规则（和 plugins/dice.py 的 _rule 同一个设置）：新建的卡默认跟它走。"""
+    from changri.core.db import get_config
+    r = get_config(f"dice_rule:{current_bot.get().self_id}|{event.group_openid}", "") or get_config("dice_default_rule", "coc")
+    return r if r in trpg.RULES else "coc"
+
+
 def _me(event: GroupMessageCreateEvent) -> int:
     return trpg.player_for(event.author.member_openid, event.group_openid)
 
@@ -124,9 +131,10 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
         card = trpg.active_card(event.group_openid, pid)
         if not card:
             await st_cmd.finish("你还没有角色卡。用 /st 力量60 敏捷70 录属性（会自动建一张），或 /pc new 名字 先建卡。")
-        await reply_long(st_cmd, trpg.format_card(card))
+        marks = trpg.growth_marks(card["id"])
+        await reply_long(st_cmd, trpg.format_card(card) + (f"\n📌 成长标记：{'、'.join(marks)}（团后 /en 一起掷）" if marks else ""))
         return
-    card = trpg.active_card(event.group_openid, pid, create=True)
+    card = trpg.active_card(event.group_openid, pid, create=True, rule=_dice_rule(event))
     if not card:
         await st_cmd.finish("建卡失败了，请稍后再试。")
     if low in ("clr", "clear", "清空"):
@@ -171,9 +179,9 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
         return
     if sub in ("new", "新建", "建"):
         if len(parts) < 2:
-            await pc_cmd.finish("格式：/pc new 名字 [coc|dnd]")
+            await pc_cmd.finish("格式：/pc new 名字 [coc|dnd|dg]（不写就跟这个群的规则）")
         rule = trpg.dice.RULE_NAMES.get(parts[2].lower(), "") if len(parts) > 2 else ""
-        card, err = trpg.new_card(pid, parts[1], rule or "coc")
+        card, err = trpg.new_card(pid, parts[1], rule or _dice_rule(event))
         if not card:
             await pc_cmd.finish(err)
         trpg.set_active(event.group_openid, pid, card["id"])
@@ -190,7 +198,7 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
             await pc_cmd.finish("没有这张卡。看 /pc list。")
         trpg.delete_card(card["id"])
         await pc_cmd.finish(f"已删掉「{card['name']}」。")
-    await pc_cmd.finish("格式：/pc list　/pc new 名字 [coc|dnd]　/pc 切换 名字　/pc del 名字")
+    await pc_cmd.finish("格式：/pc list　/pc new 名字 [coc|dnd|dg]　/pc 切换 名字　/pc del 名字")
 
 
 nn_cmd = _cmd("nn", {"改名"})

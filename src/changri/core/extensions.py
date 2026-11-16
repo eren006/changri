@@ -34,6 +34,8 @@ for _e in CORE_CARDS:
 for _e in OFFICIAL:
     _e.setdefault("links", [])
     _e.update(kind="official", version="随主程序", author="长日将尽", homepage="", license="随主程序")
+    if _e.get("personal"):           # 个性化模块：别人点名要的小功能，永远默认关
+        _e["default_on"] = False
 
 ID_RE = re.compile(r"^[a-z][a-z0-9_]{1,30}$")
 SETTING_TYPES = {"int", "string", "text", "bool", "choice"}
@@ -58,6 +60,23 @@ def is_enabled(ext_id: str) -> bool:
 def set_enabled(ext_id: str, on: bool) -> None:
     set_config(f"ext:{ext_id}", "1" if on else "0")
     set_config("ext_pending_restart", "1")
+
+
+def personal_ids() -> list[str]:
+    """个性化模块（FEATURE 里写 personal=True）的 id。"""
+    return [e["id"] for e in OFFICIAL if e.get("personal")]
+
+
+def reset_personal() -> int:
+    """把个性化模块全部关上（「全部恢复默认设置」时调用）；返回原本开着、被关掉的个数。"""
+    n = 0
+    for ext_id in personal_ids():
+        if is_enabled(ext_id):
+            n += 1
+        set_config(f"ext:{ext_id}", "0")
+    if n:
+        set_config("ext_pending_restart", "1")
+    return n
 
 
 def pending_restart() -> bool:

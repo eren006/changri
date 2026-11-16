@@ -6,7 +6,7 @@
 import json
 import time
 
-from . import rooms, season
+from . import rooms, season, storycal
 from .db import get_config, get_conn, set_config
 
 # 功能 → 给玩家看的名字。官约是管理员发起的，不在里面
@@ -44,9 +44,9 @@ def global_locks() -> list[dict]:
 
 
 def add_global_lock(day: int | None, time_text: str, note: str = "") -> tuple[bool, str]:
-    hm = rooms.parse_hm(time_text)
+    hm = rooms.parse_hm(time_text, day)
     if not hm:
-        return False, "时间格式不对，写成 1400-1500（结束要晚于开始）。"
+        return False, storycal.parse_when(time_text, day)[1] or storycal.format_error(day)
     items = global_locks()
     items.append({"id": time.time_ns(), "day": day, "start_hm": hm[0], "end_hm": hm[1], "note": note.strip()[:40]})
     set_config("god_global_locks", json.dumps(items, ensure_ascii=False))
@@ -77,9 +77,9 @@ def closed_list() -> list[dict]:
 # ---------- 时间锁定 ----------
 
 def add_lock(role_id: int, day: int | None, time_text: str, note: str = "") -> tuple[bool, str]:
-    hm = rooms.parse_hm(time_text)
+    hm = rooms.parse_hm(time_text, day)
     if not hm:
-        return False, "时间格式不对，写成 1400-1500（结束要晚于开始）。"
+        return False, storycal.parse_when(time_text, day)[1] or storycal.format_error(day)
     with get_conn() as c:
         if not c.execute("SELECT 1 FROM roles WHERE id=?", (role_id,)).fetchone():
             return False, "找不到这个角色。"

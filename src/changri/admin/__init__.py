@@ -519,6 +519,8 @@ def create_app() -> Flask:
             if mode == "reset" or get_config(key, "\0") == "\0":
                 set_config(key, default)
                 n += 1
+        if mode == "reset":
+            ext_core.reset_personal()      # 个性化模块每次重置都回到关闭
         what = "、".join(made) if made else "基础内容都在"
         flash(("已恢复全部设置为默认" if mode == "reset" else "已补齐没设过的设置") + f"（{n} 项）；{what}。")
         return redirect(url_for("extensions_page"))
@@ -533,7 +535,10 @@ def create_app() -> Flask:
             it["load_error"] = it.get("error") or ext_core.load_error(it["id"])
             if it["kind"] == "user":
                 it["vals"] = {st["key"]: ext_core.get_setting(it["id"], st["key"]) for st in it.get("settings", [])}
-        return render_template("extensions.html", items=items, tab=request.args.get("tab", "core"), pending=ext_core.pending_restart(),
+        for it in items:
+            it["group"] = "core" if it["kind"] == "core" else ("custom" if it.get("personal") else "aux")
+        tab = request.args.get("tab", "core")
+        return render_template("extensions.html", items=items, tab=tab, cur=tab if tab in ("aux", "custom") else "core", pending=ext_core.pending_restart(),
                                owner=bool(session.get("owner")), restarting=request.args.get("restarting") == "1", ai_prompt=ext_core.ai_prompt() if request.args.get("tab") == "ai" else "")
 
     @app.route("/extensions/ai-prompt.md")

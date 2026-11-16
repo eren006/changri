@@ -7,7 +7,7 @@
 产出 release_out/<版本>/site/，按 system.changri.work 上的路径放好，整个传上去即可（脚本最后会打印命令）：
   latest.json                         在线更新清单（签名）
   get.sh                              Linux 一键安装（下载地址和校验值写死在里面）
-  install.html                        安装说明页
+  install/index.html                  安装说明页（网址 /install）
   downloads/changri-bot-<版本>-<平台>.zip|tar.gz   完整安装包（自带 Python）
   downloads/app-<版本>.zip            更新包：只有程序代码，几百 KB
   downloads/runtime-<编号>-<平台>.tar.gz   运行环境（Python + 依赖 + 字体）：依赖变了才会有新编号
@@ -268,9 +268,51 @@ def runtime_dir(plat: str, rid: str) -> Path:
 
 # ---------- 打包 ----------
 
+# 打包结果要「同样的内容 → 一模一样的文件」：重打以后服务器上已有的/传了一半的文件还能续传、能跳过。
+# 所以压缩包里不记打包时的时间和本机用户：时间统一成 FIXED_MTIME，属主统一成 root，gzip 头里不记时间和文件名。
+FIXED_MTIME = 1735689600            # 2025-01-01 00:00 UTC
+FIXED_ZIP_TIME = (2025, 1, 1, 0, 0, 0)
+
+
+def _norm_tarinfo(ti: tarfile.TarInfo) -> tarfile.TarInfo:
+    ti.mtime = FIXED_MTIME
+    ti.uid = ti.gid = 0
+    ti.uname = ti.gname = ""
+    ti.pax_headers = {}
+    return ti
+
+
+class _ReproTar:
+    """with _ReproTar(out) as t: t.add(...)：固定时间、固定属主、gzip 头不记时间。"""
+
+    def __init__(self, out: Path):
+        import gzip
+        self._raw = open(out, "wb")
+        self._gz = gzip.GzipFile(filename="", fileobj=self._raw, mode="wb", compresslevel=9, mtime=0)
+        self._tar = tarfile.open(fileobj=self._gz, mode="w", format=tarfile.GNU_FORMAT)
+
+    def add(self, path: Path, arcname: str) -> None:
+        self._tar.add(path, arcname=arcname, filter=_norm_tarinfo)        # 目录会按文件名排序递归加进去
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self._tar.close()
+        self._gz.close()
+        self._raw.close()
+
+
+def _zip_add(z: zipfile.ZipFile, arcname: str, data: bytes, mode: int = 0o644) -> None:
+    info = zipfile.ZipInfo(arcname, date_time=FIXED_ZIP_TIME)
+    info.compress_type = zipfile.ZIP_DEFLATED
+    info.external_attr = (mode & 0xFFFF) << 16
+    z.writestr(info, data, compress_type=zipfile.ZIP_DEFLATED, compresslevel=9)
+
+
 def _tar_dir(src: Path, out: Path, prefix: str = "") -> None:
     """src 里的东西打进 tar.gz；prefix 为空时不带顶层目录（更新器解压到 runtime/<编号>/ 里）。保留执行权限和链接。"""
-    with tarfile.open(out, "w:gz", compresslevel=9) as t:
+    with _ReproTar(out) as t:
         for p in sorted(src.iterdir()):
             t.add(p, arcname=f"{prefix}{p.name}" if prefix else p.name)
 
@@ -279,7 +321,47 @@ def _zip_dir(src: Path, out: Path, prefix: str) -> None:
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
         for p in sorted(src.rglob("*")):
             if p.is_file():
-                z.write(p, f"{prefix}{p.relative_to(src).as_posix()}")
+                _zip_add(z, f"{prefix}{p.relative_to(src).as_posix()}", p.read_bytes(), p.stat().st_mode)
+
+
+def _local_secrets() -> dict[str, str]:
+    """发布者本机上不该进安装包的东西：家目录路径、用户名、.env 里的口令、~/.changri_secrets 里的值。只拿来比对，不打印。"""
+    import re
+    home = Path.home()
+    out = {"本机家目录路径": str(home), "本机用户名": home.name}
+    env = ROOT / ".env"
+    if env.exists():
+        for line in env.read_text(errors="ignore").splitlines():
+            k, _, v = line.partition("=")
+            v = v.strip().strip("\"'")
+            if len(v) >= 8 and any(t in k.upper() for t in ("SECRET", "TOKEN", "PASSWORD", "KEY", "QQ_BOTS")):
+                out[f".env 的 {k.strip()}"] = v
+    sec = home / ".changri_secrets"
+    if sec.is_dir():
+        for f in sec.iterdir():
+            if f.is_file():
+                for i, v in enumerate(re.findall(r"[A-Za-z0-9_\-]{10,}", f.read_text(errors="ignore"))):
+                    out[f"~/.changri_secrets/{f.name} 第 {i + 1} 个值"] = v
+    return out
+
+
+def check_no_secrets(files: dict[str, bytes]) -> None:
+    """打进包里的程序文件（不含第三方运行环境）里不能出现发布者本机的口令、用户名、路径和私钥；有就停止打包。"""
+    import re
+    bad = []
+    for name, value in _local_secrets().items():
+        needle = value.encode()
+        for rel, data in files.items():
+            if needle and needle in data:
+                bad.append(f"{rel}：含有{name}")
+    for rel, data in files.items():
+        if re.search(rb"-----BEGIN [A-Z ]*PRIVATE KEY-----\s*[A-Za-z0-9+/=]{40,}", data):
+            bad.append(f"{rel}：像是一段私钥")
+        if Path(rel).name in (".env", ".secret_key", ".setup_code") or rel.endswith((".db", ".pem", ".key")):
+            bad.append(f"{rel}：不该打进安装包的文件")
+    if bad:
+        sys.exit("安装包里发现敏感内容，已停止打包：\n  " + "\n  ".join(sorted(set(bad))[:30]))
+    log(f"  敏感信息检查通过（{len(files)} 个程序文件）")
 
 
 def app_files(rid: str, pubkey: str | None) -> dict[str, bytes]:
@@ -329,7 +411,7 @@ def full_package(plat: str, ver: str, rid: str, rt: Path, app: dict[str, bytes],
             (top / "changri").chmod(0o755)
             (top / "README.txt").write_text(fill((HERE / "linux" / "README.txt").read_text(encoding="utf-8"), VERSION=ver, BASE=base), encoding="utf-8")
             out = out_dir / f"{name}.tar.gz"
-            with tarfile.open(out, "w:gz", compresslevel=9) as t:
+            with _ReproTar(out) as t:
                 t.add(top, arcname=name)
     return out
 
@@ -395,10 +477,11 @@ def main() -> None:
     log(f"长日bot {ver}，运行环境 {rid}，平台：{', '.join(plats)}" + ("（测试密钥，不能发布）" if a.test_key else ""))
 
     app = app_files(rid, pub if a.test_key else None)
+    check_no_secrets(app)
     app_zip = site / "downloads" / f"app-{ver}.zip"
     with zipfile.ZipFile(app_zip, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
-        for rel, data in app.items():
-            z.writestr(rel, data)
+        for rel, data in sorted(app.items()):
+            _zip_add(z, rel, data)
     app_sha = sha256_of(app_zip)
     manifest = {"version": ver, "notes": a.notes, "runtime": rid,
                 "app": {"url": f"downloads/{app_zip.name}", "sha256": app_sha, "signature": sign(key, updater.sign_message(ver, app_sha)),
@@ -431,7 +514,8 @@ def main() -> None:
     page = fill((HERE / "site" / "install.html.in").read_text(encoding="utf-8"), BASE=base, VERSION=ver,
                 WINDOWS_LINK=link("windows-x64", "下载 Windows 版") or "（这个版本没有 Windows 包）",
                 LINUX_LINKS=" ".join(x for x in (link("linux-x64", "x86_64"), link("linux-arm64", "arm64")) if x) or "（这个版本没有 Linux 包）")
-    (site / "install.html").write_text(page, encoding="utf-8")
+    (site / "install").mkdir(exist_ok=True)
+    (site / "install" / "index.html").write_text(page, encoding="utf-8")      # 网址是 /install（nginx 不会自动补 .html）
 
     log(f"\n完成：{site}")
     log(f"  更新包 app-{ver}.zip：{app_zip.stat().st_size / 1024:.0f} KB；按需下载的背景音乐 {remote / 1048576:.1f} MB（site/media/）")
@@ -442,7 +526,7 @@ def main() -> None:
         log("  ssh jarvis 'mkdir -p /var/www/system/downloads && cp /var/www/system/latest.json /var/www/system/latest.json.bak 2>/dev/null; true'")
         log(f"  rsync -av {site}/downloads/ jarvis:/var/www/system/downloads/")
         log(f"  rsync -av {site}/media/ jarvis:/var/www/system/media/")
-        log(f"  rsync -av {site}/get.sh {site}/install.html jarvis:/var/www/system/")
+        log(f"  rsync -av {site}/get.sh {site}/install jarvis:/var/www/system/")
         log(f"  rsync -av {site}/latest.json jarvis:/var/www/system/latest.json      # 最后传：传上去以后各处才会看到新版本")
 
 
