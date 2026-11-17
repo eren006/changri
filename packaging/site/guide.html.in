@@ -529,6 +529,42 @@ body::after{content:"";position:fixed;inset:0;z-index:30;pointer-events:none;
 @media (max-width:640px){.top .wrap::after{left:12px;right:12px}}
 @media (prefers-reduced-motion:reduce){body::after,.twinkle,.float{animation:none!important}}
 
+/* ===== 圣诞：功能卡、对话框、主展示板顶上的薄积雪（雪形由脚本生成，每张卡不同） ===== */
+.lavcard,.phone,.season{overflow:visible}
+.season{position:relative}
+.lavcard::after{border-radius:inherit}
+.snowcap{position:absolute;z-index:3;top:-11px;left:10px;right:10px;height:26px;pointer-events:none;
+  filter:drop-shadow(0 -.5px 0 rgba(140,155,170,.35)) drop-shadow(0 1.5px 1px rgba(95,115,135,.3)) drop-shadow(0 5px 6px rgba(72,61,37,.14));transform-origin:50% 55%;
+  animation:snowgrow 1.8s cubic-bezier(.2,.7,.2,1) both;animation-delay:var(--sd,0s)}
+.snowcap svg{display:block;overflow:visible}
+.snowcap .gl{transform-box:fill-box;transform-origin:center;animation:glint 3s ease-in-out infinite}
+.snowcap .star{animation-duration:4.2s;filter:drop-shadow(0 0 1.5px rgba(255,250,225,.95))}
+@keyframes glint{0%,100%{opacity:.2;transform:scale(.55)}50%{opacity:1;transform:scale(1.15)}}
+@keyframes snowgrow{from{opacity:0;transform:scaleY(.2)}to{opacity:1;transform:none}}
+.snowdust{position:absolute;width:3px;height:3px;border-radius:50%;background:#fff;box-shadow:0 0 3px rgba(255,255,255,.95),0 0 1px rgba(120,145,170,.8);animation:snowdust var(--fd,1.4s) ease-in forwards}
+@keyframes snowdust{0%{opacity:0;transform:none}15%{opacity:1}100%{opacity:0;transform:translate(var(--dx,4px),32px)}}
+:root[data-theme="dark"] .snowcap{filter:brightness(.9) drop-shadow(0 3px 4px rgba(0,0,0,.4))}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .snowcap{filter:brightness(.9) drop-shadow(0 3px 4px rgba(0,0,0,.4))}}
+@media (max-width:640px){.snowcap{top:-9px;height:20px;left:12px;right:12px}}
+.feat .ic,.orbic{position:relative}
+.callout,.gloss > div,.anat,.cmd,details.qa,.dgcard,.rule,.arch .node,.form,.ex .chat{position:relative}
+.snowcap.snoworb{z-index:2;right:auto;animation-delay:calc(var(--sd) + .3s)}
+@media (prefers-reduced-motion:reduce){.snowcap{animation:none!important}.snowdust{display:none}}
+
+/* ===== 圣诞：标号金球改成挂球（金属扣 + 挂环，金/红/绿轮换，悬停轻轻摆） ===== */
+.season .d,article h2 .n{position:relative;overflow:visible;transform-origin:50% -10px}
+.season .d::before,article h2 .n::before{content:"";position:absolute;left:50%;top:-4px;width:34%;height:6px;transform:translateX(-50%);border-radius:2px 2px 1px 1px;
+  background:repeating-linear-gradient(90deg,rgba(0,0,0,.18) 0 1px,transparent 1px 3px),linear-gradient(90deg,#7a5a1c,#f3e2a8 38%,#c09a3c 62%,#6d4e0e);
+  box-shadow:inset 0 -1px 0 rgba(0,0,0,.28),0 1px 1px rgba(60,40,10,.25)}
+.season .d::after,article h2 .n::after{content:"";position:absolute;left:50%;top:-11px;width:7px;height:8px;transform:translateX(-50%);border:1.5px solid #b8902f;border-bottom:0;border-radius:50% 50% 0 0}
+article h2 .n::before{top:-3px;height:5px}
+article h2 .n::after{top:-9px;width:6px;height:7px}
+.season > div:nth-of-type(3n+2) .d,article h2:nth-of-type(3n+2) .n{background:url(assets/orb-red.webp) center/cover no-repeat!important}
+.season > div:nth-of-type(3n) .d,article h2:nth-of-type(3n) .n{background:url(assets/orb-green.webp) center/cover no-repeat!important}
+.season .d,article h2 .n{text-shadow:0 1px 2px rgba(0,0,0,.35)}
+.season > div:hover .d{animation:ornsway 1.6s ease-in-out}
+@keyframes ornsway{0%,100%{transform:rotate(0)}25%{transform:rotate(7deg)}55%{transform:rotate(-5deg)}80%{transform:rotate(2deg)}}
+
 </style>
 </head>
 <body data-role="all">
@@ -1577,6 +1613,130 @@ document.addEventListener("keydown",function(e){
 
 // ---------- 安装页红包口令：点一下才显示 ----------
 $("#hbBtn").addEventListener("click",function(){var r=$("#hbReveal");r.hidden=false;this.hidden=true;this.setAttribute("aria-expanded","true")});
+
+// ---------- 圣诞：卡片和小球上的积雪（每处厚薄不同：整片 / 几块 / 几片雪粒；带雪粒质感和亮片）+ 悬停落雪粉 ----------
+(function(){
+  var calm=matchMedia("(prefers-reduced-motion: reduce)").matches,hover=matchMedia("(hover: hover)").matches,uid=0;
+  var COLS=["#ffffff","#fff1bf","#cfeeff","#ffd9ec","#e4dbff"];
+  var MAIN=".lavcard,.phone,.feat,.season";
+  var BOX=".callout,.gloss > div,.anat,.cmd,details.qa,.dgcard,.rule,.arch .node,.form,.ex .chat";
+  var ORB=".feat .ic,.orbic,.season .d,article h2 .n";
+  var ORNAMENT=".season .d,article h2 .n";
+  function rng(s){return function(){s=(s*9301+49297)%233280;return s/233280}}
+  function f(n){return n.toFixed(1)}
+  function mid(a,b){return f((a[0]+b[0])/2)+","+f((a[1]+b[1])/2)}
+  function smooth(p){var d="M"+mid(p[p.length-1],p[0]);for(var i=0;i<p.length;i++)d+="Q"+f(p[i][0])+","+f(p[i][1])+" "+mid(p[i],p[(i+1)%p.length]);return d+"Z"}
+  function pick(r,w){var x=r(),acc=0;for(var key in w){acc+=w[key];if(x<acc)return key}return key}
+  function sparkles(r,n,xy,k,tw){var g="";for(var i=0;i<n;i++){var p=xy(),t=r()<tw;
+    g+='<circle cx="'+f(p[0])+'" cy="'+f(p[1])+'" r="'+((.35+r()*.75)*k).toFixed(2)+'" fill="'+COLS[Math.floor(r()*COLS.length)]+'"'+(t?' class="gl" style="animation-delay:-'+(r()*3).toFixed(2)+'s"':' opacity=".8"')+'/>'}return g}
+  function star(r,x,y,s){var c=f(x)+" "+f(y);
+    return '<path class="gl star" style="animation-delay:-'+(r()*4).toFixed(2)+'s" fill="#fff" d="M'+f(x)+" "+f(y-s)+"Q"+c+" "+f(x+s)+" "+f(y)+"Q"+c+" "+f(x)+" "+f(y+s)+"Q"+c+" "+f(x-s)+" "+f(y)+"Q"+c+" "+f(x)+" "+f(y-s)+'Z"/>'}
+  // 雪堆：底色是偏蓝的阴影，上面叠一层往上挪一点的白，露出下沿的蓝灰边；再盖一层雪粒噪点
+  function pile(id,d,W,H,k,seed,extra){
+    return '<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+" "+H+'"><defs>'+
+      '<linearGradient id="'+id+'g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset=".5" stop-color="#f8fafb"/><stop offset="1" stop-color="#e3ebf0"/></linearGradient>'+
+      '<clipPath id="'+id+'c"><path d="'+d+'"/></clipPath>'+
+      '<filter id="'+id+'f" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="1.2" numOctaves="2" seed="'+seed+'"/><feColorMatrix values="0 0 0 0 .5  0 0 0 0 .58  0 0 0 0 .68  0 0 0 -1.8 1"/></filter>'+
+      '</defs><path d="'+d+'" fill="#b9c8d4"/><g clip-path="url(#'+id+'c)">'+
+      '<path d="'+d+'" fill="url(#'+id+'g)" transform="translate(0 '+(-2.4*k).toFixed(2)+')"/>'+
+      '<rect width="'+W+'" height="'+H+'" filter="url(#'+id+'f)" opacity=".4"/>'+extra+'</g></svg>'}
+  function flakes(r,n,xy,k){var g="";for(var i=0;i<n;i++){var p=xy();
+    g+='<ellipse cx="'+f(p[0])+'" cy="'+f(p[1])+'" rx="'+f((1+r()*1.3)*k)+'" ry="'+f((.7+r()*.8)*k)+'" fill="#fbfdfe" stroke="#c3d1db" stroke-width=".4"/>'}return g}
+
+  function buildCard(cap){
+    var W=Math.round(cap.clientWidth),H=cap.clientHeight;if(W<40||!H||(cap._w===W&&cap._h===H))return;
+    cap._w=W;cap._h=H;
+    var k=H/26,r=rng(cap._seed),id="sn"+(++uid),drips=[],kind=cap._kind,i,x,d="",lumps=[];
+    if(kind==="dust"){
+      var dz=function(){return [6+r()*(W-12),(9.4+r()*2.6)*k]};
+      cap.innerHTML='<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+" "+H+'">'+flakes(r,Math.max(4,Math.round(W/26)),dz,Math.max(k,.85))+sparkles(r,Math.round(W/16),dz,Math.max(k,.85),.4)+(r()<.6?star(r,10+r()*(W-20),9*k,(2.2+r()*1.4)*Math.max(k,.85)):"")+'</svg>';
+      cap._drips=[20+r()*60];return;
+    }
+    if(kind==="full")lumps.push([0,W]);
+    else{var m=2+Math.floor(r()*3),seg=W/m;for(i=0;i<m;i++){var w=Math.min(seg-8,(.32+r()*.5)*seg+16),x0=i*seg+r()*(seg-w);lumps.push([x0,x0+w])}}
+    lumps.forEach(function(L){
+      var x0=L[0],x1=L[1],w=x1-x0,top=[[x0,10.5*k]],bot=[],dx=[],step=15,big=kind==="full";
+      var nd=big?Math.max(1,Math.round(w/170)):(w>55&&r()<.55?1:0);
+      for(i=0;i<nd;i++)dx.push(x0+(i+.2+r()*.6)*w/nd);
+      // 高低起伏 = 两道缓坡叠加（大雪丘）+ 小雪包；两端 22px 内慢慢变薄
+      var p1=r()*6.3,p2=r()*6.3,f1=1.2+r()*1.6,f2=2.6+r()*2.4;
+      x=x0;while(true){x+=big?9+r()*16:6+r()*11;if(x>x1-(big?8:6))break;
+        var u=(x-x0)/w,e=big?Math.min(1,(x-x0)/22,(x1-x)/22):Math.pow(Math.sin(Math.PI*u),.55),
+            mound=big?.5+.32*Math.sin(u*f1*6.28+p1)+.18*Math.sin(u*f2*6.28+p2):1;
+        top.push([x,(10.5-e*((big?1.8:2.6)+mound*(big?7.2:6.4)+r()*(big?1.8:1.4)))*k])}
+      top.push([x1,10.5*k]);
+      for(x=x1-step*.5;x>x0+4;x-=step){var y=(11.6+r()*1.6)*k;
+        dx.forEach(function(q){var t=Math.abs(x-q);if(t<step*.55){y=(18.5+r()*5)*k;drips.push(x/W*100)}else if(t<step*1.5)y=Math.max(y,(13.6+r()*1.8)*k)});
+        bot.push([x,y])}
+      if(!bot.length)bot.push([(x0+x1)/2,12.2*k]);
+      d+=smooth(top.concat(bot));
+    });
+    var g=sparkles(r,Math.round(W/(kind==="full"?6:9)),function(){var L=lumps[Math.floor(r()*lumps.length)];return [L[0]+r()*(L[1]-L[0]),(2.5+r()*10)*k]},Math.max(k,.8),.38);
+    var ns=kind==="full"?Math.max(2,Math.round(W/140)):Math.min(lumps.length,1+Math.floor(r()*2));
+    for(i=0;i<ns;i++){var L=lumps[i%lumps.length];g+=star(r,L[0]+(.2+r()*.6)*(L[1]-L[0]),(3.5+r()*5)*k,(2.4+r()*1.8)*Math.max(k,.8))}
+    cap._drips=drips.length?drips:[(lumps[0][0]+lumps[0][1])/2/W*100];
+    cap.innerHTML=pile(id,d,W,H,k,cap._seed,g);
+  }
+
+  // 小球：雪顺着球面弧线堆在顶上；挂球的顶上有金属扣，只在一侧肩上积一点
+  function buildOrb(cap){
+    var D=cap.parentNode.clientWidth;if(D<12||cap._w===D)return;cap._w=D;
+    var P=Math.ceil(D*.3),S=D+2*P,c=S/2,R=D/2,s=D/40,r=rng(cap._seed),id="so"+(++uid),kind=cap._kind,i;
+    cap.style.left=cap.style.top=(-P)+"px";cap.style.width=cap.style.height=S+"px";
+    function at(deg,rad){var t=deg*Math.PI/180;return [c+rad*Math.cos(t),c+rad*Math.sin(t)]}
+    if(kind==="dust"){
+      var arc=function(){return at(205+r()*130,R-.5+r()*1.2)};
+      cap.innerHTML='<svg width="'+S+'" height="'+S+'" viewBox="0 0 '+S+" "+S+'">'+flakes(r,3+Math.floor(r()*4),arc,Math.max(s,.6))+sparkles(r,4+Math.floor(r()*4),arc,Math.max(s,.7),.5)+'</svg>';return;
+    }
+    var a0,a1;
+    if(kind==="full"){a0=198+r()*10;a1=332+r()*10}
+    else{var left=r()<.5;a0=left?196+r()*8:290+r()*6;a1=a0+40+r()*14}
+    var n=kind==="full"?11:6,out=[],inn=[],drip=Math.floor(1+r()*(n-2));
+    for(i=0;i<=n;i++){var e=Math.pow(Math.sin(Math.PI*i/n),.7),deg=a0+(a1-a0)*i/n;out.push(at(deg,R+e*(2+r()*3.5)*s))}
+    for(i=n;i>=0;i--){var e2=Math.pow(Math.sin(Math.PI*i/n),.8),deg2=a0+(a1-a0)*i/n,u=e2*(1.4+r()*2.2)*s;if(i===drip&&kind==="full")u=(5+r()*3)*s;inn.push(at(deg2,R-u))}
+    var d=smooth(out.concat(inn)),g=sparkles(r,Math.round(D/(kind==="full"?3:5)),function(){return at(a0+r()*(a1-a0),R+(r()*3-1.5)*s)},Math.max(s,.6),.45);
+    if(kind==="full"&&D>=30){var sp=at((a0+a1)/2+(r()*30-15),R+1.5*s);g+=star(r,sp[0],sp[1],(2+r()*1.2)*Math.max(s,.7))}
+    cap.innerHTML=pile(id,d,S,S,Math.max(s,.5),cap._seed,g);
+  }
+
+  function dust(cap){
+    if(calm||cap._busy||!cap._drips)return;cap._busy=true;setTimeout(function(){cap._busy=false},900);
+    for(var k=0;k<3;k++){
+      var dot=document.createElement("i"),z=(2+Math.random()*1.6).toFixed(1)+"px";dot.className="snowdust";
+      dot.style.left=(cap._drips[k%cap._drips.length]+(Math.random()*4-2))+"%";
+      dot.style.top=Math.round(cap.clientHeight*.62)+"px";
+      dot.style.background=COLS[Math.floor(Math.random()*COLS.length)];
+      dot.style.setProperty("--dx",(Math.random()*10-5).toFixed(1)+"px");
+      dot.style.setProperty("--fd",(1.1+Math.random()*.6).toFixed(2)+"s");
+      dot.style.animationDelay=(k*.12).toFixed(2)+"s";dot.style.width=dot.style.height=z;
+      dot.addEventListener("animationend",function(){this.remove()});
+      cap.appendChild(dot);
+    }
+  }
+  function build(cap){cap._orb?buildOrb(cap):buildCard(cap)}
+  var ro=window.ResizeObserver?new ResizeObserver(function(es){es.forEach(function(e){var c=e.target._snow||e.target;if(c.isConnected)build(c)})}):null;
+  var n=0;
+  function add(el,kind,orb){
+    var cap=document.createElement("span");cap.className=orb?"snowcap snoworb":"snowcap";cap.setAttribute("aria-hidden","true");
+    cap._seed=17+n*37;cap._kind=kind;cap._orb=orb;cap.style.setProperty("--sd",((n%12)*.08).toFixed(2)+"s");
+    el.insertBefore(cap,el.firstChild);el._snow=cap;build(cap);
+    if(ro)ro.observe(orb?el:cap);
+    if(hover&&!orb)el.addEventListener("mouseenter",function(){dust(cap)});
+  }
+  // 每个元素只抽一次签（抽到「不积雪」的也记下），重渲染时不会变来变去
+  function scan(root){
+    root.querySelectorAll(MAIN+","+BOX+","+ORB).forEach(function(el){
+      if(el._snowDone)return;el._snowDone=true;
+      var r=rng(31+(n++)*53);r();
+      if(el.matches(ORB)){var ko=el.matches(ORNAMENT)?pick(r,{none:.35,dust:.3,side:.35}):pick(r,{none:.15,dust:.25,side:.25,full:.35});if(ko!=="none")add(el,ko,true)}
+      else if(el.matches(MAIN))add(el,pick(r,{full:.65,patch:.35}),false);
+      else{var kb=pick(r,{none:.3,dust:.3,patch:.25,full:.15});if(kb!=="none")add(el,kb,false)}
+    });
+  }
+  scan(document.body);
+  var pend=false;
+  new MutationObserver(function(ms){if(pend)return;pend=true;requestAnimationFrame(function(){pend=false;scan(document.body)})}).observe(document.body,{childList:true,subtree:true});
+})();
 
 setRole(store("cr-role")||"all");
 route();
