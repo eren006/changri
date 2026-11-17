@@ -67,6 +67,7 @@ class PlayE2E(unittest.TestCase):
         self.bot = FakeBot(nonebot.get_adapter(Adapter), "B1", BotInfo(id="B1", token="", secret="x" * 16))
         nonebot.get_bots()["B1"] = self.bot
         admins.claim(admins.make_code(), "B1", "ADMIN")
+        set_config("qq_buttons", "0")         # 老测试断言的是纯文字；按钮的路径在 test_buttons.py 里测
         self.n = 0
         self.say(f"预订季度 甲季 {rng()}", member="ADMIN", group="ADM")
         self.say("开始季度 确认", member="ADMIN", group="ADM")

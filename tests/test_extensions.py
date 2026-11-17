@@ -352,15 +352,15 @@ class ExtensionAdminTests(_PatchedDir):
         from changri.core import pool
         pool.register("B1", "OPENID_ABC", real_gid="555", set_name="A组")
         self.login()
-        page = self.c.get("/pool").get_data(as_text=True)
+        page = self.c.get("/backup-pool").get_data(as_text=True)
         self.assertIn("A组", page); self.assertIn("555", page)
         gid = pool.is_pool_group("B1", "OPENID_ABC")["id"]
-        self.c.post(f"/pool/{gid}/save", data={"real_gid": "777", "label": "一号", "set_name": "B组", "_csrf": token(self.c, "/pool")})
+        self.c.post(f"/backup-pool/{gid}/save", data={"real_gid": "777", "label": "一号", "set_name": "B组", "_csrf": token(self.c, "/backup-pool")})
         self.assertEqual(pool.get(gid)["real_gid"], "777")
-        self.c.post("/pool/bulk", data={"nums": "1\n2", "set_name": "", "_csrf": token(self.c, "/pool")})
-        self.c.post(f"/pool/{gid}/toggle", data={"on": "0", "_csrf": token(self.c, "/pool")})
+        self.c.post("/backup-pool/bulk", data={"nums": "1\n2", "set_name": "", "_csrf": token(self.c, "/backup-pool")})
+        self.c.post(f"/backup-pool/{gid}/toggle", data={"on": "0", "_csrf": token(self.c, "/backup-pool")})
         self.assertEqual(pool.get(gid)["in_pool"], 0)
-        self.c.post(f"/pool/{gid}/delete", data={"_csrf": token(self.c, "/pool")})
+        self.c.post(f"/backup-pool/{gid}/delete", data={"_csrf": token(self.c, "/backup-pool")})
         self.assertIsNone(pool.get(gid))
 
     def test_forum_page(self):

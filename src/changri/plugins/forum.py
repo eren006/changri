@@ -8,7 +8,8 @@ from nonebot.adapters.qq import Bot, GroupMessageCreateEvent
 from nonebot.params import CommandArg
 
 from changri.core import admins, announce, forum, godmode, roles, windows
-from changri.core.qqsend import reply_long, send_to_group
+from changri.core.buttons import Btn
+from changri.core.qqsend import reply_buttons, send_to_group
 
 NEED_ROLE = "请先在你的个人群里发「创建新角色 名字」绑定角色。"
 NOT_ADMIN = "❌ 权限不足，仅管理员可用。"
@@ -173,7 +174,9 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
         if not ps:
             await view_cmd.finish("论坛还没有帖子。")
         lines = [f"{forum.pid(p['id'])}  {p['sign']}：{p['content'][:30]}{'…' if len(p['content']) > 30 else ''}（{p['n']} 回复 👍{forum.tally('p%d' % p['id'])[0]}）" for p in ps]
-        await reply_long(view_cmd, "📰 最近的帖子\n" + "\n".join(lines) + "\n看某个帖子发「查看帖子 贴号」")
+        await reply_buttons(view_cmd, "📰 最近的帖子\n" + "\n".join(lines) + "\n看某个帖子发「查看帖子 贴号」",
+                            [Btn(f"📰 {forum.pid(p['id'])}", f"查看帖子 {forum.pid(p['id'])}") for p in ps], per_row=5)
+        await view_cmd.finish()
     n = forum.parse_post_ref(t)
     th = forum.thread(n) if n else None
     if not th:
@@ -184,4 +187,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     for r in rs:
         u, d = forum.tally(f"r{r['id']}")
         out.append(f"{r['floor']}楼  {r['sign']}  👍{u} 👎{d}" + (f"\n　　↳ 引用 {r['quote']}" if r["quote"] else "") + f"\n　　{r['content']}")
-    await reply_long(view_cmd, "\n".join(out))
+    n3 = forum.pid(p["id"])
+    await reply_buttons(view_cmd, "\n".join(out), [Btn("👍 点赞", f"点赞 {n3}"), Btn("👎 点踩", f"点踩 {n3}", style="secondary"),
+                                                    Btn("💬 回复", f"回复帖子 {n3} ", enter=False, style="secondary")], per_row=3)
+    await view_cmd.finish()

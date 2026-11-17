@@ -183,7 +183,7 @@ class AdminTests(unittest.TestCase):
         a, b = (roles.get_role_by_name(n)["id"] for n in "甲乙")
         lovemail.add_mail(a, b, "匿名", "你好")
         self.login()
-        for p in ["/", "/extensions", "/pool", "/forum", "/rpg", "/lovemail", "/relations", "/admins", "/bots", "/accounts"]:
+        for p in ["/", "/extensions", "/backup-pool", "/forum", "/rpg", "/lovemail", "/relations", "/admins", "/bots", "/accounts"]:
             self.assertEqual(self.c.get(p, follow_redirects=True).status_code, 200, p)
         html = self.c.get("/").get_data(as_text=True)
         self.assertIn("今日通告", html); self.assertIn("22:00", html); self.assertIn("信池里 1 封", html)

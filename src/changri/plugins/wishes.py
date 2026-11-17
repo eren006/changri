@@ -7,9 +7,10 @@ from nonebot import logger
 from nonebot.adapters.qq import Bot, GroupMessageCreateEvent
 from nonebot.params import CommandArg  # noqa: F401
 
-from changri.core import announce, publicfeed, rooms, wishes
+from changri.core import announce, publicfeed, rooms, storycal, wishes
 from changri.core.db import get_config
-from changri.core.qqsend import make_send, reply_long
+from changri.core.buttons import Btn
+from changri.core.qqsend import make_send, reply_buttons
 from changri.plugins.play import NEED_ROLE, _announce_in_room, _cmd, _group_line, _invite, _me, _push, _room_arg, _slot
 
 def _wish_line(w) -> str:
@@ -28,10 +29,10 @@ async def _post_wish(matcher, bot, event, args, bounty: bool):
         text, reward = re.split(r"[|｜]", text, 1)
         text, reward = text.strip(), reward.strip()
     if bounty and not reward:
-        await matcher.finish("用法：悬赏心愿 时间 地点 内容 | 奖励\n例：悬赏心愿 1400-1500 图书馆 陪我看书 | 滋补汤 1")
+        await matcher.finish(f"用法：悬赏心愿 时间 地点 内容 | 奖励\n例：悬赏心愿 {storycal.example_time()} 图书馆 陪我看书 | 滋补汤 1")
     p = text.split(None, 2)
     if len(p) < 3:
-        await matcher.finish("用法：挂心愿 时间 地点 内容\n例：挂心愿 1400-1500 花园 一起散步")
+        await matcher.finish(f"用法：挂心愿 时间 地点 内容\n例：挂心愿 {storycal.example_time()} 花园 一起散步")
     ok, info = wishes.post(me["id"], p[0], p[1], p[2], reward, sign)
     if not ok:
         await matcher.finish(f"❌ {info}")
@@ -69,7 +70,12 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
 @wish_list.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent):
     ws = wishes.list_open()
-    await reply_long(wish_list, "🌠 开放的心愿\n" + "\n".join(_wish_line(w) for w in ws) + "\n摘一个发「摘心愿 编号」" if ws else "现在没有开放的心愿。")
+    if not ws:
+        await wish_list.finish("现在没有开放的心愿。")
+    # 摘心愿会马上开房间、通知对方：按钮只把指令填进输入框，玩家自己按发送
+    await reply_buttons(wish_list, "🌠 开放的心愿\n" + "\n".join(_wish_line(w) for w in ws) + "\n摘一个发「摘心愿 编号」",
+                        [Btn(f"🌠 摘 #{w['id']}", f"摘心愿 {w['id']}", enter=False) for w in ws], per_row=4)
+    await wish_list.finish()
 
 
 @wish_take.handle()

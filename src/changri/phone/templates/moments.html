@@ -44,7 +44,7 @@
           </div>
           {% endif %}
           <div class="mmeta">
-            <span>{{ p.day_label }} {{ p.time }}</span>
+            <span>{{ p.day_label }}{% if p.story %}（{{ p.story }}）{% endif %} {{ p.time }}</span>
             {% if p.mine %}<button type="button" class="m-del">删除</button>{% endif %}
             <span class="grow"></span>
             {% if not why %}<button type="button" class="m-like{{ ' liked' if p.liked }}" aria-pressed="{{ 'true' if p.liked else 'false' }}">{{ phone_symbol('heart') }} {{ '已赞' if p.liked else '赞' }}</button>

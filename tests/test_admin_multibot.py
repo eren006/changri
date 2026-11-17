@@ -293,7 +293,7 @@ class AdminMultiBot(unittest.TestCase):
             hp = [x for x in rpg.attr_defs() if x["name"] == "HP"][0]
         self.assertEqual((hp["min_value"], hp["max_value"], hp["default_value"]), (0, 100, 100))
         self.assertEqual(self.c.get(base + "/messages").status_code, 404)
-        for path in ("/qqlink", "/season", "/relations", "/pool"):
+        for path in ("/qqlink", "/season", "/relations", "/backup-pool"):
             self.assertEqual(self.c.get(base + path).status_code, 200, path)
         for path in ("/accounts", "/bots"):
             self.assertEqual(self.c.get(path).status_code, 200, path)

@@ -4,7 +4,8 @@ from nonebot.adapters.qq import Bot, GroupMessageCreateEvent, MessageSegment
 from nonebot.params import CommandArg
 
 from changri.core import blocks, messaging, roles, rpg, rpgcard
-from changri.core.qqsend import make_send, reply_long
+from changri.core.buttons import Btn
+from changri.core.qqsend import make_send, reply_buttons, reply_long
 
 NEED_ROLE = "请先在你的个人群里发「创建新角色 名字」绑定角色。"
 
@@ -85,8 +86,11 @@ async def _():
     rows = rpg.listings()
     if not rows:
         await shop.finish("🏪 商城暂无上架物品。")
-    await reply_long(shop, "🏪 商城\n" + "\n".join(
-        f"[{x['item_code']}] {x['name']} — {x['price']}{x['currency_name']}\n  {x['description']}" for x in rows))
+    # 购买按钮只填进输入框（后面可以补数量），玩家自己按发送
+    await reply_buttons(shop, "🏪 商城\n" + "\n".join(
+        f"[{x['item_code']}] {x['name']} — {x['price']}{x['currency_name']}\n  {x['description']}" for x in rows) + "\n买东西发「购买 名字 [数量]」",
+        [Btn(f"🛒 {x['name']}", f"购买 {x['name']} ", enter=False) for x in rows], per_row=3)
+    await shop.finish()
 
 
 @buy.handle()

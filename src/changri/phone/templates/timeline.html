@@ -12,10 +12,10 @@
     <div style="padding:14px 20px;white-space:pre-wrap;line-height:1.7;font-size:15px">{{ report }}</div>
     {% else %}
     {% for d in days %}
-    <div class="disc-label">D{{ d.day }}</div>
+    <div class="disc-label">D{{ d.day }}{% if d.story %} · {{ d.story }}{% endif %}</div>
     {% for it in d['items'] %}
     <div style="padding:12px 20px;border-bottom:1px solid var(--line)">
-      <div style="display:flex;justify-content:space-between;gap:10px"><b>{{ it.time }} {{ it.kind }}{% if it.place %} @{{ it.place }}{% endif %}</b><span style="color:var(--mute);font-size:13px">{{ it.status }}</span></div>
+      <div style="display:flex;justify-content:space-between;gap:10px"><b>{% if it.story %}{{ it.story }} {% endif %}{{ it.time }} {{ it.kind }}{% if it.place %} @{{ it.place }}{% endif %}</b><span style="color:var(--mute);font-size:13px">{{ it.status }}</span></div>
       <div style="color:var(--mute);font-size:14px;margin-top:2px">与 {{ it.others or '（只有你）' }} · {% if chat_on %}<a href="{{ url_for('room_page', rid=it.room) }}">R{{ it.room }}</a>{% else %}R{{ it.room }}{% endif %}</div>
     </div>
     {% endfor %}

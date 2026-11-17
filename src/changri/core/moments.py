@@ -5,6 +5,7 @@ import io
 import re
 import time
 
+from . import storycal
 from .db import get_config, get_conn, get_int
 
 MAX_IMAGES = 9
@@ -123,6 +124,8 @@ def feed(viewer_id: int, before: int | None = None, limit: int = 20, role_id: in
         for p in posts:
             p["mine"] = p["role_id"] == viewer_id
             p["time"] = time.strftime("%m-%d %H:%M", time.localtime(p["created_ts"]))
+            _dm = re.match(r"^D(-?\d+)$", (p.get("day_label") or "").strip())
+            p["story"] = storycal.label_for_ts(int(_dm[1]), p["created_ts"]) if _dm else ""          # 故事历开着：朋友圈也显示故事日期
             p["images"] = [dict(r) for r in c.execute("SELECT id, width, height, deleted FROM moment_images WHERE moment_id=? ORDER BY seq, id", (p["id"],))]
             lk = list(c.execute("SELECT r.id, r.name FROM moment_likes l JOIN roles r ON r.id=l.role_id WHERE l.moment_id=? ORDER BY l.created_ts", (p["id"],)))
             p["likes"] = [r["name"] for r in lk]

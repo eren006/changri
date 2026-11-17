@@ -77,6 +77,52 @@ async def reply_long(matcher, text: str, as_image: bool = True) -> None:
         await matcher.send(part)
 
 
+BTN_MD_MAX = 1200      # 正文再长就按原来的方式发（长图 / 拆文字），按钮另发一条短的
+_btn_off_until = 0.0
+
+
+async def reply_buttons(matcher, text: str, btns, per_row: int = 3, tail: str = "👇 点下面的按钮", fallback: bool = True) -> bool:
+    """回复一段文字并在下面挂按钮（见 core/buttons.py）。
+    · 关了按钮、没有按钮、QQ 拒绝过（多半没 Markdown 权限，一小时内不再试）：原样走 reply_long，玩家照文字提示手打指令；
+    · QQ 明确拒绝：消息一定没发出去，退回纯文字；其他异常（超时、回包出错）可能已经发出去了，不补发，免得重复；
+    · 正文太长：先照原来的方式发正文，再另发一条短的「tail」挂按钮（这条失败了就算了，正文里有手打的提示）。
+    返回按钮是否（可能）发出去了。fallback=False：发不了按钮时什么都不发，由调用方换别的办法（比如公知改发长图）。"""
+    global _btn_off_until
+    from nonebot.adapters.qq import Message
+    from nonebot.adapters.qq.exception import ActionFailed
+    from nonebot.adapters.qq.models import MessageKeyboard
+
+    from changri.core import buttons
+
+    btns = [b for b in (btns or []) if b]
+    if not btns or not buttons.enabled() or time.time() < _btn_off_until:
+        if fallback:
+            await reply_long(matcher, text)
+        return False
+    too_long = len(_strip_img(text)) > BTN_MD_MAX or text.startswith(IMG)
+    if too_long:
+        await reply_long(matcher, text)
+    md, kb = buttons.build(tail if too_long else _strip_img(text), btns, per_row)
+    try:
+        await matcher.send(Message([MessageSegment.markdown(md), MessageSegment.keyboard(MessageKeyboard.model_validate(kb))]))
+    except ActionFailed as e:
+        _btn_off_until = time.time() + 3600
+        logger.warning("[按钮] 被 QQ 拒绝（多半是机器人没有群 Markdown / 按钮权限），一小时内改发纯文字：" + ascii(str(e))[:200])
+        if fallback and not too_long:
+            await reply_long(matcher, text)
+        return False
+    except Exception as e:  # noqa: BLE001
+        logger.warning("[按钮] 发送出现异常（可能已发出，不再补发纯文字）：" + type(e).__name__ + " " + ascii(str(e))[:200])
+        return True
+    if not too_long:
+        try:
+            from changri.plugins._logtap import tap_reply
+            tap_reply(matcher, text)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[跑团log] 记录回复出错：{e}")
+    return True
+
+
 AT_RE = re.compile(r"\A\{\{AT:(\w+):([^}]*)\}\}")
 _md_off_until = 0.0
 

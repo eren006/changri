@@ -217,3 +217,41 @@ def format_error(day: int | None = None) -> str:
             day = season.current_day()
         return f"时间要写故事里的某一天，比如 {_fmt_md(day_list(day)[0])}（D{day} 是 {span_text(day)}）。"
     return "时间格式不对，写成 1400-1500（结束要晚于开始）。"
+
+
+def example_time(day: int | None = None) -> str:
+    """用法提示里的时间例子：故事历开着并且这个 D 填了日期就给一个故事日期（3月5日），否则是 1400-1500。"""
+    if exclusive(day):
+        if day is None:
+            from . import season
+            day = season.current_day()
+        return _fmt_md(day_list(day)[0])
+    return "1400-1500"
+
+
+def hm_minute(hm_text: str) -> int | None:
+    """「14:00」→ 840；写错返回 None。"""
+    m = re.match(r"^\s*(\d{1,2}):?(\d{2})\s*$", hm_text or "")
+    return int(m[1]) * 60 + int(m[2]) if m else None
+
+
+def label_for(day, minute: int | None) -> str:
+    """D{day} 的第 minute 分钟是故事里的哪天（「康熙十四年3月5日」）；没开故事历、这个 D 没填日期、没有天数时返回空串。"""
+    try:
+        day = int(day)
+    except (TypeError, ValueError):
+        return ""
+    if not enabled() or minute is None or not day_list(day):
+        return ""
+    return label_at(day, minute)
+
+
+def label_for_ts(day, ts: float) -> str:
+    """同上，用现实时间戳（按本机时区的钟点）。"""
+    import time
+    t = time.localtime(ts)
+    return label_for(day, t.tm_hour * 60 + t.tm_min)
+
+
+def label_for_slot(day, start_hm: str) -> str:
+    return label_for(day, hm_minute(start_hm))

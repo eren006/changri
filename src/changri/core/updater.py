@@ -24,6 +24,7 @@ import tarfile
 import tempfile
 import threading
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 import zipfile
@@ -146,22 +147,63 @@ def check(url: str | None = None) -> dict:
 
 # ---------- 下载 / 解压 ----------
 
-def _download(item: dict, dest: Path, limit: int, message: bytes | None) -> Path:
-    h, size = hashlib.sha256(), 0
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *a, **k):
+        return None
+
+
+MIRROR_PREFIX = "https://ghfast.top/"      # 主页把下载跳转到这个 GitHub 镜像；镜像不稳时改走 GitHub 直连
+
+
+def _direct_url(url: str) -> str | None:
+    """主页的下载地址若跳转到镜像，返回去掉镜像前缀的直连地址；否则 None。"""
     try:
-        with _open(item["url"], 60) as r, open(dest, "wb") as f:
-            while chunk := r.read(1 << 16):
-                size += len(chunk)
-                if size > limit:
-                    raise UpdateError("更新包太大，已拒绝。")
-                h.update(chunk)
-                f.write(chunk)
-    except UpdateError:
-        dest.unlink(missing_ok=True)
-        raise
-    except Exception as e:  # noqa: BLE001
-        dest.unlink(missing_ok=True)
-        raise UpdateError(f"下载失败（{type(e).__name__}）。") from e
+        opener = urllib.request.build_opener(_NoRedirect)
+        opener.open(urllib.request.Request(url, headers={"User-Agent": "changri-bot-updater"}), timeout=15)
+    except urllib.error.HTTPError as e:
+        loc = e.headers.get("Location", "")
+        if loc.startswith(MIRROR_PREFIX + "https://"):
+            return loc[len(MIRROR_PREFIX):]
+    except Exception:  # noqa: BLE001
+        pass
+    return None
+
+
+def _fetch_to(url: str, dest: Path, limit: int, h) -> None:
+    size = 0
+    with _open(url, 60) as r, open(dest, "wb") as f:
+        while chunk := r.read(1 << 16):
+            size += len(chunk)
+            if size > limit:
+                raise UpdateError("更新包太大，已拒绝。")
+            h.update(chunk)
+            f.write(chunk)
+
+
+def _download(item: dict, dest: Path, limit: int, message: bytes | None) -> Path:
+    """网络抖动时重试 2 次，仍失败再试一次 GitHub 直连（镜像不稳时）。校验 sha256 / 签名不变。"""
+    h, last = hashlib.sha256(), None
+    urls = [item["url"], item["url"], None]
+    for i, url in enumerate(urls):
+        if url is None:
+            url = _direct_url(item["url"])
+            if not url:
+                break
+        h = hashlib.sha256()
+        try:
+            _fetch_to(url, dest, limit, h)
+            last = None
+            break
+        except UpdateError:
+            dest.unlink(missing_ok=True)
+            raise
+        except Exception as e:  # noqa: BLE001
+            dest.unlink(missing_ok=True)
+            last = e
+            if i < 2:
+                time.sleep(2 * (i + 1))
+    if last is not None:
+        raise UpdateError(f"下载失败（{type(last).__name__}）。已重试并尝试直连，请换个网络再试。") from last
     if h.hexdigest() != item["sha256"]:
         dest.unlink(missing_ok=True)
         raise UpdateError("下载下来的文件和清单对不上（可能传输出错），已丢弃。")

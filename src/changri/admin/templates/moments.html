@@ -11,7 +11,7 @@
   <div class="sec-head keep"><h2>帖子</h2></div>
   {% for p in posts %}
   <div class="card" style="margin-bottom:12px">
-    <div><b>{{ p.role_name }}</b> <span class="muted">{{ p.day_label }} {{ p.time }} · #{{ p.id }}</span></div>
+    <div><b>{{ p.role_name }}</b> <span class="muted">{{ p.day_label }}{% if p.story %}（{{ p.story }}）{% endif %} {{ p.time }} · #{{ p.id }}</span></div>
     {% if p.content %}<div style="white-space:pre-wrap;margin:6px 0">{{ p.content }}</div>{% endif %}
     {% if p.images %}<div style="display:flex;flex-wrap:wrap;gap:8px;margin:6px 0">
       {% for im in p.images %}{% if im.deleted %}<span class="muted">（图片已删除）</span>{% else %}

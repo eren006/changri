@@ -5,7 +5,8 @@ from nonebot.adapters.qq import Bot, GroupMessageCreateEvent
 from nonebot.matcher import current_bot
 from nonebot.params import CommandArg
 
-from changri.core.qqsend import make_send, reply_long  # noqa: E402
+from changri.core.qqsend import make_send, reply_buttons, reply_long  # noqa: E402
+from changri.core.buttons import Btn
 from changri.core import admins, messaging, relations, roles
 from changri.core.db import get_config, get_int
 
@@ -146,7 +147,8 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
     if max_total > 0:
         reply += f"　总数 {len(items)}/{max_total}（发起+收到）"
     reply += "\n💡 输入「查看关系线 名字」查看细节"
-    await view_rel.finish(reply)
+    await reply_buttons(view_rel, reply, [Btn(it["other_name"], f"查看关系线 {it['other_name']}") for it in items], per_row=3)
+    await view_rel.finish()
 
 
 rel_stats = _cmd("关系线统计")
@@ -269,6 +271,10 @@ def _make_view(kind: str):
             everyone = sheets.all_of(kind)       # 不带名字：看所有人的；带名字：只看这一个人
             if not everyone:
                 await cmd.finish("还没有人提交公知。发「提交公知 内容」就能提交。")
+            if len(everyone) > 1 and await reply_buttons(    # 能发按钮：列名字，点谁看谁（带他自己的图），不再拼一整张长图
+                    cmd, f"📜 公知\n{len(everyone)} 位，点下面的名字查看（或发「查看公知 名字」）",
+                    [Btn(x["name"], f"查看公知 {x['name']}") for x in everyone], per_row=3, fallback=False):
+                await cmd.finish()
             await _show(cmd, everyone, kind)
             await cmd.finish()
         target = roles.get_role_by_name(name) if name else me

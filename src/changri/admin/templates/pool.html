@@ -23,7 +23,7 @@ form.i{display:inline}
   {% if not counts.free %}<span style="color:var(--bad)">　没有空闲的群了，新的约会、电话会开不成（不排队）。多拉几个空群进来，或把等人退群的放回池。</span>{% endif %}</p>
   {% if unfilled %}<p class="note">有 {{ unfilled }} 个群还没填群号。</p>{% endif %}
   <span class="btns"><details class="panel"><summary class="btn ghost">{{ ic.tray() }}批量填群号</summary>
-    <form class="form" method="post" action="{{ url_for('pool_bulk') }}">{{ csrf() }}
+    <form class="form" method="post" action="{{ url_for('backup_pool_bulk') }}">{{ csrf() }}
       <label for="pb-nums">一行一个（或用逗号隔开）</label>
       <textarea id="pb-nums" name="nums" rows="4" required placeholder="123456789&#10;987654321"></textarea>
       <div class="fields"><div><label for="pb-set">归入组（可选）</label><input type="text" id="pb-set" name="set_name" placeholder="例如 A组"></div></div>
@@ -35,12 +35,12 @@ form.i{display:inline}
 {% for set_name, gs in sets.items() %}
 <div class="setbar"><h3>{{ set_name }}</h3>
   {% if set_name != '（未分组）' %}
-  <form class="i" method="post" action="{{ url_for('pool_set') }}">{{ csrf() }}<input type="hidden" name="set_name" value="{{ set_name }}"><input type="hidden" name="on" value="1"><button class="btn sm ghost">整组放进池</button></form>
-  <form class="i" method="post" action="{{ url_for('pool_set') }}">{{ csrf() }}<input type="hidden" name="set_name" value="{{ set_name }}"><input type="hidden" name="on" value="0"><button class="btn sm ghost">整组移出池</button></form>
+  <form class="i" method="post" action="{{ url_for('backup_pool_set') }}">{{ csrf() }}<input type="hidden" name="set_name" value="{{ set_name }}"><input type="hidden" name="on" value="1"><button class="btn sm ghost">整组放进池</button></form>
+  <form class="i" method="post" action="{{ url_for('backup_pool_set') }}">{{ csrf() }}<input type="hidden" name="set_name" value="{{ set_name }}"><input type="hidden" name="on" value="0"><button class="btn sm ghost">整组移出池</button></form>
   {% endif %}</div>
   {% for g in gs %}
   <div class="pg">
-    <form method="post" action="{{ url_for('pool_save', pid=g.id) }}">{{ csrf() }}
+    <form method="post" action="{{ url_for('backup_pool_save', pid=g.id) }}">{{ csrf() }}
       <div class="row">
         <div><label>群号（玩家靠它申请入群）</label><input type="text" name="real_gid" value="{{ g.real_gid }}" placeholder="还没填"></div>
         <div><label>备注名（自己认得就行）</label><input type="text" name="label" value="{{ g.label }}"></div>
@@ -52,10 +52,10 @@ form.i{display:inline}
       <b style="color:var(--ink)">群 {{ g.group_openid[:8] }}…</b>
         <span class="st {{ g.state }}">{{ {'free':'空闲','occupied':'占用中','cleaning':'等人退群'}[g.state] }}</span>
         <span>{{ '在池里' if g.in_pool else '不在池里' }}</span>
-        <form class="i" method="post" action="{{ url_for('pool_toggle', pid=g.id) }}">{{ csrf() }}<input type="hidden" name="on" value="{{ 0 if g.in_pool else 1 }}"><button class="linkbtn" style="color:var(--ink)">{{ '移出池' if g.in_pool else '放进池' }}</button></form>
-        {% if g.state == 'cleaning' %}<form class="i" method="post" action="{{ url_for('pool_clean', pid=g.id) }}">{{ csrf() }}<button class="btn sm">人已退光，直接放回池</button></form>{% endif %}
+        <form class="i" method="post" action="{{ url_for('backup_pool_toggle', pid=g.id) }}">{{ csrf() }}<input type="hidden" name="on" value="{{ 0 if g.in_pool else 1 }}"><button class="linkbtn" style="color:var(--ink)">{{ '移出池' if g.in_pool else '放进池' }}</button></form>
+        {% if g.state == 'cleaning' %}<form class="i" method="post" action="{{ url_for('backup_pool_clean', pid=g.id) }}">{{ csrf() }}<button class="btn sm">人已退光，直接放回池</button></form>{% endif %}
         {% if g.room_id %}<span>房间 <a href="{{ url_for('review_view', rid=g.room_id) }}">R{{ g.room_id }}</a></span>{% endif %}
-      <form class="i" method="post" action="{{ url_for('pool_delete', pid=g.id) }}" onsubmit="return confirm('从列表里删掉这个群？机器人下次在群里被看到还会再出现。')">{{ csrf() }}<button class="linkbtn">删除</button></form>
+      <form class="i" method="post" action="{{ url_for('backup_pool_delete', pid=g.id) }}" onsubmit="return confirm('从列表里删掉这个群？机器人下次在群里被看到还会再出现。')">{{ csrf() }}<button class="linkbtn">删除</button></form>
 
     </div>
   </div>
@@ -70,7 +70,7 @@ form.i{display:inline}
   <p class="note" style="margin:8px 0">这些群已经是玩家的个人群、戏群或公告群，不会被分给约会，也不用填群号。点「删除」只是不再在这里列出，机器人下次在群里被看到还会再出现。</p>
   <table class="rt">
     {% for g in blocked %}<tr><td>群 {{ g.group_openid[:8] }}…</td><td>{{ g.conflict }}{% if g.owner %}：{{ g.owner }}{% endif %}</td>
-      <td><form class="i" method="post" action="{{ url_for('pool_delete', pid=g.id) }}" onsubmit="return confirm('从列表里删掉这个群？机器人下次在群里被看到还会再出现。')">{{ csrf() }}<button class="linkbtn">删除</button></form></td></tr>{% endfor %}
+      <td><form class="i" method="post" action="{{ url_for('backup_pool_delete', pid=g.id) }}" onsubmit="return confirm('从列表里删掉这个群？机器人下次在群里被看到还会再出现。')">{{ csrf() }}<button class="linkbtn">删除</button></form></td></tr>{% endfor %}
   </table>
 </details>
 {% endif %}

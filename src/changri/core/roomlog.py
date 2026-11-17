@@ -6,7 +6,7 @@ import difflib
 import re
 import time
 
-from . import pool, rooms
+from . import pool, rooms, storycal
 from .db import get_conn, get_int
 
 _RP = re.compile(r"^\s*(\S{1,12}?)\s*[：:\s]\s*(.+)$", re.S)
@@ -294,6 +294,7 @@ def events(role: str = "", kind: str = "", q: str = "") -> list[dict]:
                 if r["day"] is not None:                                   # 约好的是第几天，就算在第几天
                     num, label = r["day"], f"D{r['day']}"
                 out.append({"type": "room", "ts": r["created_ts"], "day": num, "day_label": label, "id": r["id"], "kind": r["kind"],
+                            "story": ("" if r["kind"] in rooms.NO_TIMELINE else storycal.label_for_slot(num, r["start_hm"])),
                             "who": who, "slot": ("" if r["kind"] in rooms.NO_TIMELINE else f"{r['start_hm']}-{r['end_hm']}" + (f" @{r['place']}" if r["place"] else "")),
                             "status": r["status"], "lines": ls, "n": len(ls), "chars": sum(x["chars"] for x in ls)})
         if kind in ("", "sms", "gift", "msg"):
@@ -309,6 +310,7 @@ def events(role: str = "", kind: str = "", q: str = "") -> list[dict]:
                     continue
                 num, label = _day_of(m["day"])
                 out.append({"type": m["kind"], "ts": m["created_ts"], "day": num, "day_label": label, "id": m["id"],
+                            "story": storycal.label_for_ts(num, m["created_ts"]),
                             "frm": m["sign"] or m["fn"], "to": m["tn"], "title": m["title"], "content": m["content"], "status": m["status"]})
     out.sort(key=lambda e: (e["day"], e["ts"]))
     return out

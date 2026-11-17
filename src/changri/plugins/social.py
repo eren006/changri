@@ -10,8 +10,9 @@ from nonebot.matcher import current_bot
 from nonebot.params import CommandArg
 from nonebot.typing import T_State
 
-from changri.core.qqsend import download_images, make_send, recall_group_message, reply_long, send_to_group  # noqa: E402
-from changri.core import admins, blocks, forms, gifts, messaging, msgimages, roles, season, sendmsg, windows
+from changri.core.qqsend import download_images, make_send, recall_group_message, reply_buttons, reply_long, send_to_group  # noqa: E402
+from changri.core import admins, blocks, formats, forms, gifts, messaging, msgimages, roles, season, sendmsg, windows
+from changri.core.buttons import Btn
 from changri.core.db import get_config, get_conn, get_int, per_bot
 
 nonebot.require("nonebot_plugin_apscheduler")
@@ -168,21 +169,20 @@ fmt = _cmd("格式")
 
 @fmt.handle()
 async def _(args=CommandArg()):
+    """「格式」= 菜单，只列开着的功能；「格式短信」（连写或空一格都行）= 直接给模板。"""
     t = args.extract_plain_text().strip()
-    t = {"送礼物": "送礼"}.get(t, t)
-    if t in forms.TEMPLATES:
-        await fmt.finish(forms.TEMPLATES[t])
-    await fmt.finish("输入「格式短信」「格式送礼」「格式撤回」拿可以复制的模板。")
-
-
-for _k in ("短信", "送礼", "撤回"):
-    def _mk(key):
-        c = _cmd("格式" + key)
-
-        @c.handle()
-        async def _():
-            await c.finish(forms.TEMPLATES[key])
-    _mk(_k)
+    if t:
+        st, text = formats.template(t)
+        if st == "off":
+            await fmt.finish(text)
+        if st == "ok":
+            f = formats.fill(t)             # 「✏️ 填入输入框」：只把指令开头填进输入框，不直接发出
+            await reply_buttons(fmt, text, [Btn("✏️ 填入输入框", f, enter=False)] if f else [], per_row=1)
+            await fmt.finish()
+    names = formats.available()
+    await reply_buttons(fmt, formats.menu_text(names),
+                        [Btn(n, formats.fill(n), enter=False) if formats.fill(n) else Btn(n, "格式" + n, style="secondary") for n in names], per_row=4)
+    await fmt.finish()
 
 
 album = _cmd("我的图鉴", {"图鉴", "我的礼物"})

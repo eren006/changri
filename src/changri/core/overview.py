@@ -1,12 +1,13 @@
 """时间线和「我的待回」的内容。QQ 指令和小手机网页共用这一份，两边看到的永远一样。"""
-from . import pending, rooms
+from . import pending, rooms, storycal
 from .db import get_conn
 
 
 def slot_text(r) -> str:
     if r["kind"] in rooms.NO_TIMELINE:
         return "（不占时间线）"
-    return f"D{r['day']} {r['start_hm']}-{r['end_hm']}" + (f" @{r['place']}" if r["place"] else "")
+    story = storycal.label_for_slot(r["day"], r["start_hm"])          # 故事历开着：D3（康熙十四年3月5日）
+    return f"D{r['day']}" + (f"（{story}）" if story else "") + f" {r['start_hm']}-{r['end_hm']}" + (f" @{r['place']}" if r["place"] else "")
 
 
 def group_line(room) -> str:
@@ -18,15 +19,21 @@ def group_line(room) -> str:
     return "备用群池暂时没有空群，请稍后再试。"
 
 
+def _story_span(day) -> str:
+    line = storycal.stage_line(day)
+    return line.split(" = ", 1)[-1] if line else ""
+
+
 def timeline_days(role_id: int) -> list[dict]:
     """[{day, items:[{time, kind, place, others, room, status}]}]，按天分组。"""
     out: list[dict] = []
     for r in rooms.timeline(role_id):
         if not out or out[-1]["day"] != r["day"]:
-            out.append({"day": r["day"], "items": []})
+            out.append({"day": r["day"], "items": [], "story": _story_span(r["day"])})
         others = "、".join(m["name"] for m in rooms.members(r["id"]) if m["role_id"] != role_id)
         out[-1]["items"].append({"time": f"{r['start_hm']}-{r['end_hm']}", "kind": r["kind"], "place": r["place"] or "", "others": others,
-                                 "room": r["id"], "status": {"open": "进行中", "ended": "已结束"}.get(r["status"], r["status"])})
+                                 "room": r["id"], "status": {"open": "进行中", "ended": "已结束"}.get(r["status"], r["status"]),
+                                 "story": storycal.label_for_slot(r["day"], r["start_hm"])})
     return out
 
 

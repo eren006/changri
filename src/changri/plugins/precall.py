@@ -7,7 +7,9 @@ from nonebot.adapters.qq import Bot, GroupMessageCreateEvent
 from nonebot.params import CommandArg
 
 from changri.core import precall, rooms, roles
+from changri.core.buttons import Btn
 from changri.core.db import get_conn
+from changri.core.qqsend import reply_buttons
 from changri.plugins.play import NEED_ROLE, NOT_ADMIN, _announce_in_room, _cmd, _invite, _is_admin, _me, _group_line, _push, _slot
 
 SHOW_MAX = 60
@@ -75,7 +77,10 @@ async def _(bot: Bot, event: GroupMessageCreateEvent):
             last = it["grp"]
         out.append(f"#{it['no']}{'（你）' if it['role_id'] == me['id'] else ''}  {_short(it['text'])}")
     out.append(f"\n{precall.usage(me['id'])}")
-    await view.finish("\n".join(out))
+    # 拨打会马上开电话房间：按钮只把指令填进输入框，玩家自己按发送
+    await reply_buttons(view, "\n".join(out), [Btn(f"📞 拨 #{it['no']}", f"拨打前置电话 {it['no']}", enter=False)
+                                               for it in items if it["role_id"] != me["id"]], per_row=4)
+    await view.finish()
 
 
 mine = _cmd("我的前置电话")

@@ -10,8 +10,9 @@ from nonebot import logger, on_command, on_message
 from nonebot.adapters.qq import Bot, GroupAddRobotEvent, GroupMessageCreateEvent
 from nonebot.params import CommandArg
 
-from changri.core.qqsend import make_send, reply_long, send_to_group  # noqa: E402
-from changri.core import admins, announce, messaging, pending, pool, qqmanager, qqpool, roles, rooms, season, windows, wishes
+from changri.core.qqsend import make_send, reply_buttons, reply_long, send_to_group  # noqa: E402
+from changri.core.buttons import Btn
+from changri.core import admins, announce, messaging, pending, pool, qqmanager, qqpool, roles, rooms, season, storycal, windows, wishes
 from changri.core.db import get_config, get_conn, get_int, per_bot, set_config
 
 nonebot.require("nonebot_plugin_apscheduler")
@@ -236,7 +237,7 @@ private = _cmd("约会", {"私约"})                 # 0.21 起私约改名约�
 async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     p = args.extract_plain_text().split(None, 2)
     if len(p) < 3:
-        await private.finish("用法：约会 时间 地点 对方（多人用 / 隔开）\n例：约会 1400-1500 咖啡厅 张三/李四")
+        await private.finish(f"用法：约会 时间 地点 对方（多人用 / 隔开）\n例：约会 {storycal.example_time()} 咖啡厅 张三/李四")
     await _start_room(private, bot, event, "约会", p[0], p[1], _names(p[2]))
 
 
@@ -247,7 +248,7 @@ phone = _cmd("电话")
 async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     p = args.extract_plain_text().split(None, 1)
     if len(p) < 2:
-        await phone.finish("用法：电话 时间 对方（多人用 / 隔开）\n例：电话 1400-1500 张三")
+        await phone.finish(f"用法：电话 时间 对方（多人用 / 隔开）\n例：电话 {storycal.example_time()} 张三")
     await _start_room(phone, bot, event, "电话", p[0], "", _names(p[1]))
 
 
@@ -260,7 +261,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
         await stakeout.finish("❌ 踩点没有开放。")
     p = args.extract_plain_text().split(None, 1)
     if len(p) < 2:
-        await stakeout.finish("用法：踩点 时间 地点（一个人的群，不带别人）\n例：踩点 1400-1500 大图书馆")
+        await stakeout.finish(f"用法：踩点 时间 地点（一个人的群，不带别人）\n例：踩点 {storycal.example_time()} 大图书馆")
     await _start_room(stakeout, bot, event, "踩点", p[0], p[1].strip(), [])
 
 
@@ -314,7 +315,7 @@ async def launch_official(targets: list, time_text: str, place: str = "", day: i
 
 
 OFFICIAL_USAGE = ("用法：发起官约 [D几] 时间 [地点] 名字/名字（至少两人；地点可以不写，D几 不写就是今天）\n"
-                  "例：发起官约 1400-1500 后山 张三/李四\n例：发起官约 D3 1400-1500 张三/李四（不写地点）")
+                  f"例：发起官约 {storycal.example_time()} 后山 张三/李四\n例：发起官约 D3 {storycal.example_time()} 张三/李四（不写地点）")
 OFFICIAL_CALL_USAGE = "用法：发起官电 [D几] 时间 名字/名字（至少两人）\n例：发起官电 D2 2000-2100 张三/李四"
 
 official = _cmd("发起官约")
@@ -381,7 +382,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
         await plan_cmd.finish("✅ 已清空计划。")
     parsed = parse_official(t)
     if not parsed:
-        await plan_cmd.finish("用法：计划官约 [D几] 时间 [地点] 名字/名字\n例：计划官约 D2 1400-1500 后山 张三/李四\n（先攒着，发「执行官约」一起发起；「计划官约 清空」清掉）")
+        await plan_cmd.finish(f"用法：计划官约 [D几] 时间 [地点] 名字/名字\n例：计划官约 D2 {storycal.example_time()} 后山 张三/李四\n（先攒着，发「执行官约」一起发起；「计划官约 清空」清掉）")
     day, tm, place, names = parsed
     targets, missing = _resolve(names)
     if missing or len(targets) < 2:
@@ -662,7 +663,12 @@ async def _(bot: Bot, event: GroupMessageCreateEvent):
     if not me:
         await join_list.finish(NEED_ROLE)
     qs = rooms.pending_requests(me["id"])
-    await join_list.finish("🙋 收到的加入申请\n" + "\n".join(f"#{q['id']} {q['applicant']} 想加入 R{q['room_id']} {q['kind']}（D{q['day']} {q['start_hm']}-{q['end_hm']}）" for q in qs) if qs else "没有待处理的加入申请。")
+    if not qs:
+        await join_list.finish("没有待处理的加入申请。")
+    text = "🙋 收到的加入申请\n" + "\n".join(f"#{q['id']} {q['applicant']} 想加入 R{q['room_id']} {q['kind']}（D{q['day']} {q['start_hm']}-{q['end_hm']}）" for q in qs)
+    btns = [b for q in qs for b in (Btn(f"✅ 同意 #{q['id']} {q['applicant']}", f"同意加入 {q['id']}"), Btn(f"❌ 拒绝 #{q['id']}", f"拒绝加入 {q['id']}", style="danger"))]
+    await reply_buttons(join_list, text + "\n同意发「同意加入 编号」，拒绝发「拒绝加入 编号」", btns, per_row=2)
+    await join_list.finish()
 
 
 async def _answer(matcher, bot, event, args, accept: bool):
@@ -773,11 +779,13 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
         day = int(p.pop(0)[1:])
     hm = rooms.parse_hm(p[0], day) if p else None
     if not hm:
-        await chg.finish("用法：修改时间线 [D几] 时间\n例：修改时间线 D1 1400-1500")
+        await chg.finish(f"用法：修改时间线 [D几] 时间\n例：修改时间线 D1 {storycal.example_time()}")
     ok, why = rooms.propose_change(room["id"], me["id"], day, *hm)
     if not ok:
         await chg.finish(f"❌ {why}")
-    await chg.finish(f"📝 {me['name']} 申请把时间线改成 D{day} {hm[0]}-{hm[1]}。其他人发「同意时间线」，全部同意后生效；不同意发「拒绝时间线」。")
+    await reply_buttons(chg, f"📝 {me['name']} 申请把时间线改成 D{day} {hm[0]}-{hm[1]}。其他人发「同意时间线」，全部同意后生效；不同意发「拒绝时间线」。",
+                        [Btn("✅ 同意时间线", "同意时间线"), Btn("❌ 拒绝时间线", "拒绝时间线", style="danger")], per_row=2)
+    await chg.finish()
 
 
 async def _vote(matcher, bot: Bot, event: GroupMessageCreateEvent, args, agree: bool):
@@ -970,7 +978,7 @@ async def _listen_cmd(app_id, msg) -> bool:
             day = int(p.pop(0)[1:])
         hm = rooms.parse_hm(p[0], day) if p else None
         if not hm:
-            await say("用法：修改时间线 [D几] 时间\n例：修改时间线 D1 1400-1500")
+            await say(f"用法：修改时间线 [D几] 时间\n例：修改时间线 D1 {storycal.example_time()}")
             return True
         ok, why = rooms.propose_change(room["id"], me["id"], day, *hm)
         await say(f"📝 {me['name']} 申请把时间线改成 D{day} {hm[0]}-{hm[1]}。其他人发「同意时间线」，全部同意后生效；不同意发「拒绝时间线」。" if ok else f"❌ {why}")

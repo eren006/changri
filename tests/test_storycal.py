@@ -74,5 +74,19 @@ class StoryCalTests(unittest.TestCase):
         self.assertEqual(cal.era(), "康熙")
 
 
+    def test_story_labels_for_display_and_examples(self):
+        from changri.core import overview
+        room = {"kind": "私约", "day": 1, "start_hm": "12:00", "end_hm": "13:00", "place": "花园"}
+        self.assertEqual(overview.slot_text(room), "D1 12:00-13:00 @花园")           # 关着：和以前一样
+        self.assertEqual(cal.example_time(), "1400-1500")
+        self.on()
+        cal.save("康熙十四年", {1: "6月1日-6月30日"})
+        self.assertEqual(cal.label_for(1, 12 * 60), "康熙十四年6月16日")
+        self.assertEqual(cal.label_for_slot(1, "12:00"), "康熙十四年6月16日")
+        self.assertEqual(cal.label_for(2, 0), "")                                   # 这个 D 没填：不显示
+        self.assertEqual(overview.slot_text(room), "D1（康熙十四年6月16日） 12:00-13:00 @花园")
+        self.assertEqual(cal.example_time(), "6月1日")
+
+
 if __name__ == "__main__":
     unittest.main()

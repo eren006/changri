@@ -74,7 +74,7 @@ a.tile:active{transform:scale(.97)}
 {% block body %}
 {% set nx = (d.sheet|selectattr('state','equalto','next')|list|first) if d.sheet else none %}
 {% set facts = d.facts %}
-{% set fact_ico = [('person','c-pink','#roles'),('door','c-blue',url_for('pool_page')),('chat','c-green',url_for('reviews_page', tab='sms')),('mail','c-orange',url_for('lovemail_page')),('link','c-purple',url_for('relations_page'))] %}
+{% set fact_ico = [('person','c-pink','#roles'),('door','c-blue',url_for('backup_pool_page')),('chat','c-green',url_for('reviews_page', tab='sms')),('mail','c-orange',url_for('lovemail_page')),('link','c-purple',url_for('relations_page'))] %}
 <div class="ios">
 <h1 class="lt">{{ d.date }}</h1>
 <p class="lt-sub">现在 <b>{{ d.now }}</b></p>

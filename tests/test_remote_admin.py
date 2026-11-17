@@ -25,7 +25,7 @@ class Remote(unittest.TestCase):
         self.assertTrue(call(g, "8.8.8.8", "/login")[0].startswith("404"))       # 名单外
         for path in ("/bots", "/bots/x/secret", "/accounts/password", "/update/apply", "/remote/save", "/extensions/upload", "/extensions/abc/delete", "/extensions/restart"):
             self.assertTrue(call(g, "1.2.3.4", path)[0].startswith("403"), path)
-        for path in ("/extensions", "/extensions/abc/settings", "/pool", "/settings/基础"):
+        for path in ("/extensions", "/extensions/abc/settings", "/backup-pool", "/settings/基础"):
             self.assertFalse(is_blocked_path(path), path)
         self.assertEqual(len(parse_allow("bad, 1.1.1.1  2.2.2.0/24")), 2)
         self.assertFalse(allowed("nonsense", parse_allow("1.1.1.1")))

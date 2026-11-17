@@ -68,6 +68,7 @@ class SocialE2E(unittest.TestCase):
         roles.create_role("甲", "B1", "GA", "MA")
         roles.create_role("乙", "B1", "GB", "MB")
         set_config("sms_cooldown_sec", "0"); set_config("gift_cooldown_sec", "0")
+        set_config("qq_buttons", "0")         # 老测试断言的是纯文字；按钮的路径在 test_buttons.py 里测
         self.n = 0
 
     def tearDown(self):
