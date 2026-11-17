@@ -15,3 +15,5 @@ async def _gate(matcher: Matcher, state: T_State):
         return
     if get_config("require_prefix", "0") == "1" and not pf.get("command_start"):
         raise IgnoredException("设置要求指令必须带前缀")
+    from changri.core import usage
+    usage.count_command()                               # 只记次数，给匿名使用情况上报用（见 core/usage.py）

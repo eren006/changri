@@ -1,6 +1,7 @@
 """接收长日bot 报错日志的服务，部署在主页服务器（system.changri.work）上，由作者部署，不随安装包使用。
 
-收：POST /api/errors，JSON {"app","version","errors":[{ts,kind,source,message,trace,version}]}（长日bot 的 core/errlog.py 发的）。
+收：POST /api/errors，JSON {"app","version","install","errors":[{ts,kind,source,message,trace,version}]}（长日bot 的 core/errlog.py 发的）。
+    每条另记来源 IP 和实例编号（install，机器人本地随机生成的，0.21.6 起才带），监控后台（console_service.py）按这两个分实例。
 看：GET /api/errors（需要请求头 Authorization: Bearer <口令>；口令从环境变量 CHANGRI_ERRORS_TOKEN 读，没设就不开放查看），
     返回最近 100 条。也可以直接 tail 数据文件。
 
@@ -50,12 +51,17 @@ def rate_ok(ip: str, now: float | None = None) -> bool:
     return True
 
 
-def clean(payload) -> list[dict]:
-    """把收到的内容整理成安全的记录；格式不对返回空列表。"""
+_INSTALL = re.compile(r"^[0-9a-f]{16,32}$")
+
+
+def clean(payload, ip: str = "") -> list[dict]:
+    """把收到的内容整理成安全的记录；格式不对返回空列表。ip = 发来的那台机器（来自反代的 X-Real-IP）。"""
     if not isinstance(payload, dict) or not isinstance(payload.get("errors"), list):
         return []
     app = scrub(payload.get("app"))[:40]
     ver = scrub(payload.get("version"))[:20]
+    inst = str(payload.get("install") or "")
+    inst = inst if _INSTALL.match(inst) else ""
     out = []
     for e in payload["errors"][-MAX_ITEMS:]:
         if not isinstance(e, dict):
@@ -66,6 +72,7 @@ def clean(payload) -> list[dict]:
         except (TypeError, ValueError):
             row["ts"] = 0
         row["app"], row["app_version"] = app, ver
+        row["install"], row["ip"] = inst, str(ip)[:45]
         row["got"] = int(time.time())
         out.append(row)
     return out
@@ -115,7 +122,7 @@ class Handler(BaseHTTPRequestHandler):
             payload = json.loads(self.rfile.read(n).decode("utf-8"))
         except (ValueError, UnicodeDecodeError):
             return self._send(400, {"ok": False})
-        rows = clean(payload)
+        rows = clean(payload, ip)
         if not rows:
             return self._send(400, {"ok": False})
         store(rows)

@@ -1,6 +1,6 @@
 """报错日志：程序里出的错、整个程序崩溃（没正常退出）都记下来，恢复之后自动发给「报错接收地址」。
 玩家/管理员什么都不用做；后台「总览」最下面有一个默认折叠的「报错日志」可以看。
-记在本机 data/errors.jsonl（只留最近 200 条）。发出去的内容只有：时间、种类、版本、出错位置和报错文字，
+记在本机 data/errors.jsonl（只留最近 200 条）。发出去的内容只有：时间、种类、版本、实例编号（本机随机生成的，见 core/usage.py）、出错位置和报错文字，
 并且把长得像密钥/口令的字符串抹掉；不带聊天内容、群号、QQ 号。"""
 from __future__ import annotations
 
@@ -140,7 +140,12 @@ def report_pending() -> int:
     todo = [r for r in rows if not r.get("reported")]
     if not todo:
         return 0
-    body = json.dumps({"app": "changri_bot", "version": _version(), "errors": todo[-50:]}, ensure_ascii=False).encode("utf-8")
+    try:
+        from .usage import install_id
+        inst = install_id()
+    except Exception:  # noqa: BLE001
+        inst = ""
+    body = json.dumps({"app": "changri_bot", "version": _version(), "install": inst, "errors": todo[-50:]}, ensure_ascii=False).encode("utf-8")
     try:
         req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json", "User-Agent": "changri-bot"})
         with urllib.request.urlopen(req, timeout=8) as resp:        # noqa: S310

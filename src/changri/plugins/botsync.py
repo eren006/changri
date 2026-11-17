@@ -46,7 +46,7 @@ async def _sync():
             logger.info(f"[机器人] 已连接 {bot_id}")
 
 
-# ---- 在线更新：新版本跑满 90 秒才算成功（否则启动保护会回滚）；每 6 小时悄悄查一次有没有新版本 ----
+# ---- 在线更新：新版本跑满 90 秒才算成功（否则启动保护会回滚）；每 6 小时悄悄查一次有没有新版本（顺便匿名上报使用情况） ----
 import datetime  # noqa: E402
 
 from changri.core import updater  # noqa: E402
@@ -62,6 +62,13 @@ async def _update_check():
         set_config("update_latest", info["version"] if info["newer"] else "")
     except Exception as e:  # noqa: BLE001
         logger.debug(f"[更新] 检查失败：{e}")
+    try:                                                   # 顺便匿名上报一次使用情况（后台「基础」里能关，见 core/usage.py）
+        from changri.core import usage
+        from changri.core.db import list_bot_ids
+        bots, online = len(list_bot_ids()), len(nonebot.get_bots())
+        await asyncio.get_running_loop().run_in_executor(None, usage.report, bots, online)
+    except Exception as e:  # noqa: BLE001
+        logger.debug(f"[使用情况] 上报失败：{e}")
 
 
 @scheduler.scheduled_job("interval", seconds=30, id="heartbeat", max_instances=1, coalesce=True)
