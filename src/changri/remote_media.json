@@ -14,5 +14,41 @@
   "phone/static/masquerade/masquerade_at_the_academy.m4a": {
     "sha256": "9235767473cb87511a570b38461f5522917cff3179f20b1898a6d9dd7e39c729",
     "size": 3036847
+  },
+  "assets/skins/antique.png": {
+    "sha256": "11a76cca30f40678e660044774359a7aac77e696b8430e5367869abda22b3d06",
+    "size": 3035996
+  },
+  "assets/skins/botanical-branch.png": {
+    "sha256": "8db37c8904a7e3b1f5a91b9307773d0c182a2e35bab64ffc363ba674df485c03",
+    "size": 1530889
+  },
+  "assets/skins/botanical.png": {
+    "sha256": "531a2f9d8da7ba1adc7ada33a165b233dcc17e04bf0b51368b5c8d63a4192d87",
+    "size": 2122594
+  },
+  "assets/skins/lace.png": {
+    "sha256": "73706aacfc7125d9f2b08f7ffe805333d6764d5721dccc3d0d90c34e5d140bd8",
+    "size": 2783356
+  },
+  "assets/skins/postal.png": {
+    "sha256": "27a255ae1cabf7a08420df2fddc9122e9e7976a4d6d2b4785a788a732d822516",
+    "size": 2379663
+  },
+  "assets/skins/postcard.png": {
+    "sha256": "3ac717c69d70f021836b53fc2b6bc9c77caea9d4b17df4504c7f5abaf12424fe",
+    "size": 2692076
+  },
+  "assets/skins/rose.png": {
+    "sha256": "4bd84a67fb77d438a0a274363e7d0dfe31f1b524b76ecc9d1b43d806789f92ea",
+    "size": 2813875
+  },
+  "assets/skins/sage-side-vine.png": {
+    "sha256": "8e37f66b04864eb1c78860a7e27673f6eb71db148fc9cff3beddba747040f6f5",
+    "size": 644946
+  },
+  "assets/skins/sage.png": {
+    "sha256": "8edd7c4edf63b385b700a3aebafae70ae2c27b5cfb1656cc3ea1ad1512b18dc9",
+    "size": 3182702
   }
 }

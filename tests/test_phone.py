@@ -650,8 +650,12 @@ class PhoneSearchSongs(Phone):
 class PhonePrecall(Phone):
     def _wipe(self):
         with get_conn() as c:
-            for t in ("precall_calls", "precall_picks", "precall_entries", "precall_groups", "room_members", "rooms"):
+            for t in ("precall_calls", "precall_picks", "precall_entries", "precall_groups", "room_members", "rooms", "pool_groups"):
                 c.execute(f"DELETE FROM {t}")
+        from changri.core import pool                      # 备用群池没有空群时前置电话也接不通（不排队），先放几个群
+        for i in range(3):
+            pool.register("B1", f"POOLP{i}", real_gid=f"98000{i}", set_name="A组")
+            pool.set_in_pool(pool.is_pool_group("B1", f"POOLP{i}")["id"], True)
 
     def test_precall_flow(self):
         from changri.core import precall, rooms
@@ -767,6 +771,9 @@ class PhoneArchive(Phone):
             c.execute("INSERT INTO seasons(name,start_date,end_date,status) VALUES('S','2000-01-01','2099-01-01','running')")
         set_config("game_day", "1")
         self.addCleanup(self._drop_seasons)
+        from changri.core import pool
+        pool.register("B1", "POOLX", real_gid="990001", set_name="A组")
+        pool.set_in_pool(pool.is_pool_group("B1", "POOLX")["id"], True)
         a, b = self.a["id"], self.b["id"]
         ok, _, rid = rooms.create("私约", a, [b], "1400-1500", "")
         self.assertTrue(ok)

@@ -201,7 +201,7 @@ class PlayE2E(unittest.TestCase):
         self.assertIn("还没有提交", self.say("查看二表", member="M1", group="P1")[0])
 
     def test_allocation_skips_group_with_leftover_players(self):
-        """分群前查群成员：群里还有别的玩家（绑过 QQ 的人）就先放一边，房间排队；人退光后自动放回池再分给房间。"""
+        """分群前查群成员：群里还有别的玩家（绑过 QQ 的人）就先放一边；换不到干净的群就当没有空群，房间不建、不排队；人退光后自动放回池，再发起就能开。"""
         import asyncio
         from changri.core import qqmanager, qqpool, rooms
         from changri.plugins import play
@@ -215,15 +215,15 @@ class PlayE2E(unittest.TestCase):
         try:
             out = self.say("私约 1400-1500 咖啡厅 乙")
             self.assertFalse(any("请申请入群" in o and "100001" in o for o in out), out)     # 有人的群不能分给房间
+            self.assertTrue(any("备用群池暂时没有空闲的群" in o for o in out), out)            # 当没有空群：不排队
+            self.assertEqual(pool.counts()["waiting"], 0)
             st = lambda: [g for g in pool.all_groups() if g["real_gid"] == "100001"][0]["state"]      # noqa: E731
             self.assertEqual(st(), "cleaning")
             members["100001"] = set()                                    # 人退光了
             asyncio.run(play._sweep_cleaning())
             self.assertEqual(st(), "free")
-            got = rooms.assign_waiting()
-            self.assertEqual(len(got), 1)
-            asyncio.run(play._ensure_clean(got[0]))
-            self.assertTrue(rooms.get(got[0])["pool_id"])
+            out = self.say("私约 1400-1500 咖啡厅 乙")
+            self.assertTrue(any("请申请入群" in o and "100001" in o for o in out), out)
         finally:
             qqmanager.group_members = old
 
@@ -257,16 +257,17 @@ class PlayE2E(unittest.TestCase):
         self.assertTrue(any("已经结束，请退群" in t for _, t in said))
         self.assertIsNone(rooms.room_of_group("B1", "qq:100001"))
 
-    def test_queue_when_pool_empty_then_assign(self):
+    def test_no_queue_when_pool_empty(self):
+        """备用群池没有空群：不排队，直接告诉玩家没开成，也不留下房间。"""
         out = self.say("电话 1400-1500 乙")
-        self.assertTrue(any("排队" in o for o in out))
-        self.assertEqual(pool.counts()["waiting"], 1)
-        self.add_pool(1)
-        for rid in rooms.assign_waiting():
-            self.assertTrue(rooms.get(rid)["pool_id"])
+        self.assertTrue(any("备用群池暂时没有空闲的群" in o for o in out), out)
         self.assertEqual(pool.counts()["waiting"], 0)
+        self.assertEqual(rooms.timeline(roles.get_role_by_name("甲")["id"]), [])
+        self.add_pool(1)                                         # 补了群之后就能开
+        self.assertTrue(any("电话已发起" in o for o in self.say("电话 1400-1500 乙")))
 
     def test_phone_cap_and_daily_limit(self):
+        self.add_pool(4)
         set_config("phone_open_cap", "1")
         self.say("电话 1400-1500 乙")
         self.assertIn("还没结束", self.say("电话 1600-1700 丙")[0])
@@ -372,7 +373,7 @@ class PlayE2E(unittest.TestCase):
         self.assertIn("时间线还是空的", self.say("时间线", member="M1", group="P1")[0])
 
     def test_official_without_place_and_with_day(self):
-        self.add_pool(2)
+        self.add_pool(4)
         out = self.say("发起官约 1400-1500 乙/丙", member="ADMIN", group="ADM")          # 不写地点
         self.assertTrue(any("官约已发起" in o for o in out), out)
         r1 = rooms.timeline(roles.get_role_by_name("乙")["id"])[0]
@@ -404,8 +405,8 @@ class PlayE2E(unittest.TestCase):
     # ---------- 群池 ----------
     def test_pool_admin_commands_and_conflict(self):
         self.assertIn("权限不足", self.say("设为群池 A组 111", group="X1")[0])
-        self.assertIn("已放进群池", self.say("设为群池 A组 111", member="ADMIN", group="X1")[0])
-        self.assertIn("空闲 1", self.say("查看群池", member="ADMIN", group="ADM")[0])
+        self.assertIn("已放进备用群池", self.say("设为备用群池 A组 111", member="ADMIN", group="X1")[0])
+        self.assertIn("空闲 1", self.say("查看备用群池", member="ADMIN", group="ADM")[0])
         # 个人群不能放进池
         pool.note_group("B1", "P0")
         r = pool.set_in_pool(pool.is_pool_group("B1", "P0")["id"], True)
@@ -637,7 +638,7 @@ class PlayE2E(unittest.TestCase):
         self.assertIn("没有这条", self.say(f"同意加入 {qid}")[0])
 
     def test_join_conflict_and_reject(self):
-        self.add_pool(2)
+        self.add_pool(4)
         roles.create_role("丁", "B1", "P3", "M3")
         self.say("私约 1400-1500 咖啡厅 乙")
         self.say("私约 1430-1530 花园 丁", member="M2", group="P2")        # 丙 14:30-15:30 已有安排
@@ -651,7 +652,7 @@ class PlayE2E(unittest.TestCase):
 
     # ---------- 官电 / 计划官约 / 我的数量 / 删帖 ----------
     def test_official_phone_and_plans(self):
-        self.add_pool(2)
+        self.add_pool(4)
         self.assertIn("权限不足", self.say("发起官电 2000-2100 乙/丙")[0])
         out = self.say("发起官电 2000-2100 乙/丙", member="ADMIN", group="ADM")
         self.assertTrue(any("官电已发起" in o for o in out) and any("[P1]" in o and "官电" in o for o in out))

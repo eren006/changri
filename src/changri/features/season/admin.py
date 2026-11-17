@@ -56,9 +56,21 @@ def register(app, login_required):
     @app.post("/season/end")
     @login_required
     def season_end():
-        from changri.core.qqsend import make_send
-        flash(loopbridge.run(season_core.end_and_report(make_send()), timeout=120)[1])
+        from changri.core.qqsend import make_send, make_send_image
+        flash(loopbridge.run(season_core.end_and_report(make_send(), make_send_image()), timeout=600)[1])     # 每人一张海报，人多要一会儿
         return redirect(url_for("season_page"))
+
+    @app.route("/season/poster-preview")
+    @login_required
+    def season_poster_preview():
+        """季末海报预览：用示例数据画一张（第一次用某款皮肤会先从主站下载素材）"""
+        from flask import Response
+        from changri.core.render import season_poster
+        data = dict(season_poster.SAMPLE)
+        s = season_core.running()
+        if s:
+            data["show_name"] = s["name"]
+        return Response(season_poster.render(data, request.args.get("skin", "")), mimetype="image/jpeg", headers={"Cache-Control": "no-store"})
 
     @app.post("/season/wipe")
     @login_required

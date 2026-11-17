@@ -37,7 +37,8 @@ SECTIONS = [
         "welcome_text": ("机器人被拉进新群时发的欢迎语（留空用默认）", ""),
         "error_report_url": ("报错接收地址（http/https 网址；留空 = 报错只存在本机。程序崩溃或出错、恢复后会自动把报错文字发到这里，不含聊天内容和群号。默认发到主站 system.changri.work）", "https://system.changri.work/api/errors"),
         "max_backup_groups": ("每个角色最多几个备用群（短信、礼物、心动信、通知默认发到角色的主群；主群发不出去时依次改发备用群。玩家在自己群里生成码就能加备用群，这里限制最多加几个）", "3"),
-        "season_report": ("季末报告（1 开 / 0 关；开了以后，结束季度时会给每位有互动的玩家的个人群发一份本季小结：约会场次、短信礼物心动信的数量、互动最多的人。机器人要还在个人群里才发得出去）", "0"),
+        "season_report": ("季末报告（1 开 / 0 关；开了以后，结束季度时会给每位有互动的玩家的个人群先发一句话、再单独发一张本季结算海报：约会场次、短信礼物心动信、互动最多的人、最常互动的时间、最精彩的一场戏。海报画不出来就改发文字小结。机器人要还在个人群里才发得出去）", "0"),
+        "season_poster_skin": ("季末海报的样式（第一次用某款时从主站下载花边素材，下载不了就用素色纸）", "antique"),
         "block_undo_hours": ("拉黑满几小时才能解除", "2"),
         "brand_name": ("系统名称（画在长图左上角，留空用默认）", ""),
         "long_as_image": ("长内容发图片（1 开 / 0 关，关了就拆成文字）", "1"),
@@ -70,7 +71,7 @@ SECTIONS = [
         "stakeout_enabled": ("踩点（1 开 / 0 关；开了以后玩家可以发「踩点 时间 地点」开一个只有自己的群，占时间线、要地点，结束发「结束踩点」）", "0"),
         "limit_踩点": ("每人每天最多发起几次踩点（0 = 不限）", "0"),
         "phone_open_cap": ("每人最多同时有几个没结束的电话（0 = 不限）", "5"),
-        "room_expire_enabled": ("到时间强制结群（1 开 / 0 关；开了以后，房间开满下面的「结戏限时」会自动结束，群放回群池）", "0"),
+        "room_expire_enabled": ("到时间强制结群（1 开 / 0 关；开了以后，房间开满下面的「结戏限时」会自动结束，群放回备用群池）", "0"),
         "room_expire_hours": ("结戏限时（小时，从房间开始算；要打开上面的「到时间强制结群」才生效）", "24"),
         "room_expire_warn_hours": ("结戏前提醒（小时，到时间前这么久在房间群里 @ 所有参与者，告诉大家可以收尾了；0 = 不提醒）", "4"),
         "pool_auto_free": ("房间结束后群自动放回池（1 是 / 0 否，否 = 要管理员确认群里的人清空了才放回；开着时，下次分配前会查一遍群里有没有玩家）", "1"),
@@ -287,6 +288,15 @@ GLOBAL_ENDPOINTS = {"theme_set", "wizard", "bots_erase", "login", "logout", "set
                     "https_page", "https_status", "https_enable", "https_disable"}
 
 
+def _poster_skins() -> list[tuple[str, str]]:
+    from changri.core.render.season_poster import skin_choices
+    return skin_choices()
+
+
+# 下拉选择的设置项：key -> (取选项的函数, 预览按钮的路由名或 "")
+FIELD_CHOICES = {"season_poster_skin": (_poster_skins, "season_poster_preview")}
+
+
 def field_view(key: str, label: str, default: str, value: str) -> dict:
     """把「标签（说明）」形式的设置项变成界面要的样子：1/0 的变开关，数字的变数字框（带单位），其余是文本框。"""
     import re
@@ -295,6 +305,11 @@ def field_view(key: str, label: str, default: str, value: str) -> dict:
         i = label.rindex("（")
         main, inner = label[:i], label[i + 1:-1]
     f = {"key": key, "label": main.strip(), "hint": inner, "value": value, "kind": "text", "unit": ""}
+    if key in FIELD_CHOICES:
+        options, preview = FIELD_CHOICES[key]
+        opts = options()
+        f.update(kind="choice", options=opts, preview=preview, value=value if value in dict(opts) else default)
+        return f
     m = re.match(r"^1\s*(?:开|是|要|算)\s*/\s*0\s*(?:关|否|不要|不算)\s*[，,；;]?\s*(.*)$", inner)      # 「1 开 / 0 关」这类都做成开关
     if m:
         f.update(kind="bool", hint=m.group(1), checked=value.strip() not in ("", "0"))

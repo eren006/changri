@@ -229,13 +229,13 @@ def end() -> tuple[bool, str]:
     return True, f"⏹️ 「{s['name']}」已结束。核对完存档后发「收尾」清空本季的角色和互动记录（先预览，再「收尾 确认」）。"
 
 
-async def end_and_report(send) -> tuple[bool, str]:
-    """结束季度；「基础」里开了季末报告就顺带给每个玩家发一份。"""
+async def end_and_report(send, send_image=None) -> tuple[bool, str]:
+    """结束季度；「基础」里开了季末报告就顺带给每个玩家发一份（给了 send_image 就先发一句文字、再单独发结算海报）。"""
     ok, msg = end()
     if ok:
         from . import seasonreport
         if seasonreport.enabled():
-            sent, bad = await seasonreport.send_all(send)
+            sent, bad = await seasonreport.send_all(send, send_image)
             msg += f"\n📖 季末报告：已发给 {sent} 位玩家" + (f"，{bad} 位没发出去（个人群连不上）" if bad else "") + "。"
     return ok, msg
 

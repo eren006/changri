@@ -11,7 +11,7 @@
   downloads/changri-bot-<版本>-<平台>.zip|tar.gz   完整安装包（自带 Python）
   downloads/app-<版本>.zip            更新包：只有程序代码，几百 KB
   downloads/runtime-<编号>-<平台>.tar.gz   运行环境（Python + 依赖 + 字体）：依赖变了才会有新编号
-  media/...                           按需下载的背景音乐（src/changri/remote_media.json 里登记的文件）
+  media/...                           按需下载的背景音乐、季末海报皮肤图（src/changri/remote_media.json 里登记的文件）
 
 运行环境编号 = Python 版本 + requirements.lock + 字体 + 精简规则 的哈希。不变的话，已安装的机器更新时不用再下载它。
 """
@@ -128,9 +128,9 @@ def media_files() -> list[Path]:
 
 
 def refresh_remote_manifest() -> None:
-    """按包里现有的音乐文件重新算校验值（换了、加了音乐之后运行一次）。"""
+    """按包里现有的音乐文件、季末海报皮肤图重新算校验值（换了、加了之后运行一次）。"""
     out = {}
-    for f in sorted((PKG / "phone" / "static" / "masquerade").glob("*.m4a")):
+    for f in sorted((PKG / "phone" / "static" / "masquerade").glob("*.m4a")) + sorted((PKG / "assets" / "skins").glob("*.png")):
         out[f.relative_to(PKG).as_posix()] = {"sha256": sha256_of(f), "size": f.stat().st_size}
     REMOTE_MANIFEST.write_text(json.dumps(out, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     log(f"已更新 {REMOTE_MANIFEST.relative_to(ROOT)}：{len(out)} 个文件")
@@ -516,9 +516,14 @@ def main() -> None:
                 LINUX_LINKS=" ".join(x for x in (link("linux-x64", "x86_64"), link("linux-arm64", "arm64")) if x) or "（这个版本没有 Linux 包）")
     (site / "install").mkdir(exist_ok=True)
     (site / "install" / "index.html").write_text(page, encoding="utf-8")      # 网址是 /install（nginx 不会自动补 .html）
+    # 主页就是使用手册（安装、恋综指南、指令大全、申请专属 App）；/guide 是旧链接，跳回主页
+    (site / "index.html").write_text(fill((HERE / "site" / "guide.html.in").read_text(encoding="utf-8"), BASE=base, VERSION=ver), encoding="utf-8")
+    shutil.copytree(HERE / "site" / "assets", site / "assets", dirs_exist_ok=True)   # 主页用的 3D 渲染图（packaging/site/studio 里重新渲染）
+    (site / "guide").mkdir(exist_ok=True)
+    (site / "guide" / "index.html").write_text('<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=/"><link rel="canonical" href="/"><a href="/">长日系统</a>', encoding="utf-8")
 
     log(f"\n完成：{site}")
-    log(f"  更新包 app-{ver}.zip：{app_zip.stat().st_size / 1024:.0f} KB；按需下载的背景音乐 {remote / 1048576:.1f} MB（site/media/）")
+    log(f"  更新包 app-{ver}.zip：{app_zip.stat().st_size / 1024:.0f} KB；按需下载的背景音乐和海报皮肤 {remote / 1048576:.1f} MB（site/media/）")
     if a.test_key:
         log("  ⚠ 这是测试包（临时密钥），不要上传。")
     else:
@@ -526,7 +531,7 @@ def main() -> None:
         log("  ssh jarvis 'mkdir -p /var/www/system/downloads && cp /var/www/system/latest.json /var/www/system/latest.json.bak 2>/dev/null; true'")
         log(f"  rsync -av {site}/downloads/ jarvis:/var/www/system/downloads/")
         log(f"  rsync -av {site}/media/ jarvis:/var/www/system/media/")
-        log(f"  rsync -av {site}/get.sh {site}/install jarvis:/var/www/system/")
+        log(f"  rsync -av {site}/get.sh {site}/install {site}/index.html {site}/guide {site}/assets jarvis:/var/www/system/")
         log(f"  rsync -av {site}/latest.json jarvis:/var/www/system/latest.json      # 最后传：传上去以后各处才会看到新版本")
 
 

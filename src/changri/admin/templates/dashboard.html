@@ -97,7 +97,7 @@ a.tile:active{transform:scale(.97)}
   <a class="card tile" href="{{ meta[2] }}"><span class="ico {{ meta[1] }}" aria-hidden="true">{{ icon(meta[0]) }}</span><span class="v">{{ v }}</span><span class="n">{{ k }}</span></a>
   {% endfor %}
   <a class="card tile" href="#todo"><span class="ico {{ 'c-red' if d.todo else 'c-green' }}" aria-hidden="true">{{ icon('alert' if d.todo else 'check') }}</span><span class="v">{{ d.todo|length }}</span><span class="n">需要处理</span></a>
-  <a class="card tile" href="#rooms"><span class="ico c-teal" aria-hidden="true">{{ icon('door') }}</span><span class="v">{{ live_rooms|length }}</span><span class="n">进行中的房间{% if waiting_rooms %}（{{ waiting_rooms }} 个等群）{% endif %}</span></a>
+  <a class="card tile" href="#rooms"><span class="ico c-teal" aria-hidden="true">{{ icon('door') }}</span><span class="v">{{ live_rooms|length }}</span><span class="n">进行中的房间</span></a>
   <a class="card tile" href="#errors"><span class="ico {{ 'c-red' if errors else 'c-gray' }}" aria-hidden="true">{{ icon('bell') }}</span><span class="v">{{ errors|length }}</span><span class="n">报错日志</span></a>
 </div>
 
@@ -133,7 +133,7 @@ a.tile:active{transform:scale(.97)}
 
 <details class="card dcard" id="rooms"{% if live_rooms|length %} open{% endif %}>
   <summary><span class="ico c-teal" aria-hidden="true">{{ icon('door') }}</span>
-    <div class="tx"><b>进行中的房间</b><span>{% if waiting_rooms %}{{ waiting_rooms }} 个在排队等群{% else %}玩家私约和微信房间{% endif %}</span></div>
+    <div class="tx"><b>进行中的房间</b><span>玩家私约和微信房间</span></div>
     <span class="badge">{{ live_rooms|length }}</span><i class="chev" aria-hidden="true"></i></summary>
   <div class="body">
     {% with live=live_rooms %}{% include "_rooms_block.html" %}{% endwith %}

@@ -1,4 +1,4 @@
-"""按需下载的大文件（目前是匿名舞会的背景音乐）：安装包里不带，第一次用到时从主页下载一次，校验后存进 data/media/。
+"""按需下载的大文件（匿名舞会的背景音乐、季末海报的皮肤图）：安装包里不带，第一次用到时从主页下载一次，校验后存进 data/media/。
 
 哪些文件、校验值多少，写在 changri/remote_media.json（发布者改了文件就重新生成，见 packaging/build.py --refresh-remote-media）。
 开发时文件就在包里，直接用；安装后：包里 → 运行环境的 changri-media/ → data/media/ → 下载。
@@ -89,3 +89,13 @@ def fetch(rel: str) -> Path:
             raise MediaError("下载的文件校验不对，已丢弃")
         os.replace(tmp, target)
         return target
+
+
+def local_path(rel: str) -> Path:
+    """按需下载的文件在本机的位置：开发时在包里；安装后先找运行环境的 changri-media/、再找 data/media/，都没有就下载。
+    失败抛 MediaError（调用方自己决定怎么退回）。"""
+    from .layout import MEDIA_DIR
+    for p in (PKG_DIR / rel, MEDIA_DIR / rel):
+        if p.is_file():
+            return p
+    return fetch(rel)

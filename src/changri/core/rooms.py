@@ -186,7 +186,10 @@ def create(kind: str, creator_id: int, target_ids: list[int], time_text: str, pl
         for t in ids:
             c.execute("INSERT INTO room_members(room_id, role_id) VALUES(?,?)", (rid_, t))
     if kind != "微信" and not web_mode():                                            # 聊天室开着：约会在小手机网页里聊，不占 QQ 群
-        pool.allocate(rid_)
+        if not pool.allocate(rid_):                                                  # 备用群池没有空群：不排队，直接告诉玩家没开成
+            with get_conn() as c:
+                c.execute("DELETE FROM rooms WHERE id=?", (rid_,))                   # 成员、发言连带删除（外键级联）
+            return False, f"备用群池暂时没有空闲的群，这次{kind}没能开成，请稍后再试，或联系管理员多准备几个备用群。", 0
     try:                                                          # 目击系统（额外扩展）：关着就什么都不做
         from . import sighting
         sighting.detect(rid_)
@@ -197,14 +200,16 @@ def create(kind: str, creator_id: int, target_ids: list[int], time_text: str, pl
 
 
 def create_call(creator_id: int, target_id: int, note: str = "") -> int:
-    """前置电话拨通：不看季度、不占时间线，直接开房间（网页聊天室开着就不占 QQ 群，否则群池有空群就分群，没有排队/走网页）。"""
+    """前置电话拨通：不看季度、不占时间线，直接开房间（网页聊天室开着就不占 QQ 群，否则备用群池有空群就分群，没有就不建（返回 0，不排队））。"""
     with get_conn() as c:
         rid = c.execute("INSERT INTO rooms(kind, creator_id, day, start_hm, end_hm, place, note, dkey, created_ts) VALUES('前置电话',?,NULL,'','','',?,?,?)",
                         (creator_id, note, season.day_key(), int(time.time()))).lastrowid
         c.execute("INSERT INTO room_members(room_id, role_id, agree) VALUES(?,?,1)", (rid, creator_id))
         c.execute("INSERT INTO room_members(room_id, role_id, agree) VALUES(?,?,1)", (rid, target_id))
-    if not web_mode():
-        pool.allocate(rid)
+    if not web_mode() and not pool.allocate(rid):                  # 备用群池没有空群：不排队，房间不建，返回 0
+        with get_conn() as c:
+            c.execute("DELETE FROM rooms WHERE id=?", (rid,))
+        return 0
     return rid
 
 

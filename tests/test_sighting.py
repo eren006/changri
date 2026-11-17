@@ -20,6 +20,12 @@ class SightingTest(unittest.TestCase):
         with get_conn() as c:
             self.a, self.b, self.c, self.d = [r["id"] for r in c.execute("SELECT id FROM roles ORDER BY id")]
             c.execute("INSERT INTO seasons(name,start_date,end_date,status) VALUES('S','2000-01-01','2099-01-01','running')")
+        from changri.core import pool                          # 备用群池没有空群时房间开不成（不排队），先放几个群
+        with get_conn() as c:
+            c.execute("DELETE FROM pool_groups")
+        for i in range(6):
+            pool.register("B1", f"POOL{i}", real_gid=f"99000{i}", set_name="A组")
+            pool.set_in_pool(pool.is_pool_group("B1", f"POOL{i}")["id"], True)
         set_config("game_day", "1")
         set_config("sighting_chance", "100")
         for k, v in (("ext:sighting", "0"), ("sighting_seen_mode", "随机"), ("sighting_notify_seen", "1"), ("sighting_overlap_pct", "30"), ("sighting_daily_limit", "5"), ("sighting_include_ended", "0")):

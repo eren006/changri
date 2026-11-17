@@ -2,7 +2,7 @@
     <tr><th>房间</th><th>类型</th><th>时间</th><th>参与者</th><th>群</th><th></th></tr>
     {% for r in live %}
     <tr><td><a href="{{ url_for('review_view', rid=r.id) }}">R{{ r.id }}</a></td><td>{{ r.kind }}</td><td>{{ r.slot }}{% if r.place %} @{{ r.place }}{% endif %}</td><td>{{ r.who }}</td>
-      <td>{% if r.grp %}{{ r.grp.real_gid or '未填群号' }} {{ r.grp.label }}{% else %}<span style="color:var(--bad)">排队等群</span>{% endif %}</td>
+      <td>{% if r.grp %}{{ r.grp.real_gid or '未填群号' }} {{ r.grp.label }}{% else %}<span class="muted">没占群（网页聊天室）</span>{% endif %}</td>
       <td><form class="i" method="post" action="{{ url_for('room_end', rid=r.id) }}" onsubmit="return confirm('结束这个房间？网页上结束不会通知玩家。')">{{ csrf() }}<button class="linkbtn">结束</button></form></td></tr>
     {% else %}<tr><td colspan="6" class="empty">现在没有进行中的房间。</td></tr>{% endfor %}
   </table></div>

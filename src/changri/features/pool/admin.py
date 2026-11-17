@@ -36,7 +36,7 @@ def register(app, login_required):
         g = pool_core.get(pid)
         if g and g["state"] == "cleaning":
             pool_core.release(pid, "free")
-            flash("已放回群池，排队的房间稍后自动补上群。")
+            flash("已放回备用群池。")
         return redirect(url_for("pool_page"))
 
     @app.post("/pool/<int:pid>/delete")

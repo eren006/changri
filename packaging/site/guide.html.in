@@ -1,0 +1,1399 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>长日系统 · 把恋综装进自己的 QQ 群</title>
+<meta name="description" content="长日bot：一个独立的 QQ 官方机器人加一个设置平台，装在你自己的服务器上，就能在群里办一档恋综。安装、恋综指南、全部指令与跑团骰子说明。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#efe9e1;--bg2:#e8e1d7;--ink:#1d1b22;--mute:#67626f;--faint:#9b95a2;
+  --line:rgba(255,255,255,.75);--line2:rgba(120,110,160,.22);--hair:rgba(40,30,60,.08);
+  --glass:rgba(255,255,255,.42);--glass2:rgba(255,255,255,.62);--card:rgba(255,255,255,.5);
+  --lav:#7a6fe0;--lav2:#a79ff0;--lav3:#d9d4fb;--accent:#6a5fd6;--accent-ink:#fff;--rose:#6a5fd6;--gold:#8f86e8;--plum:#5a4fc0;--amber:#c48a5c;
+  --code:rgba(255,255,255,.55);--btn:#1b1a20;--btn-ink:#fff;
+  --lavgrad:linear-gradient(135deg,rgba(143,134,232,.88) 0%,rgba(167,159,240,.62) 45%,rgba(217,212,251,.35) 100%);
+  --sun:linear-gradient(120deg,#5a4fc0,#8f86e8 60%,#b9b2f2);
+  --shadow:0 1px 0 rgba(255,255,255,.9) inset,0 0 0 1px rgba(255,255,255,.55) inset,0 24px 50px -24px rgba(70,55,120,.28),0 4px 14px -6px rgba(70,55,120,.12);
+  --sans:"Inter",system-ui,-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --serif:var(--sans);--latin:var(--sans);--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#141219;--bg2:#1a1721;--ink:#eeeaf4;--mute:#a7a0b4;--faint:#77708a;
+  --line:rgba(255,255,255,.12);--line2:rgba(180,170,255,.2);--hair:rgba(255,255,255,.07);
+  --glass:rgba(40,36,54,.45);--glass2:rgba(52,47,70,.6);--card:rgba(44,40,60,.5);
+  --lav:#a79ff0;--lav2:#8f86e8;--lav3:#3a3460;--accent:#b5adf6;--accent-ink:#141219;--rose:#b5adf6;--gold:#a79ff0;--plum:#c7c0fa;
+  --code:rgba(255,255,255,.07);--btn:#eeeaf4;--btn-ink:#141219;
+  --lavgrad:linear-gradient(135deg,rgba(122,111,224,.55) 0%,rgba(122,111,224,.25) 50%,rgba(122,111,224,.08) 100%);
+  --sun:linear-gradient(120deg,#b9b2f2,#8f86e8 60%,#d9d4fb);
+  --shadow:0 1px 0 rgba(255,255,255,.08) inset,0 0 0 1px rgba(255,255,255,.06) inset,0 30px 60px -28px rgba(0,0,0,.7);color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141219;--bg2:#1a1721;--ink:#eeeaf4;--mute:#a7a0b4;--faint:#77708a;
+  --line:rgba(255,255,255,.12);--line2:rgba(180,170,255,.2);--hair:rgba(255,255,255,.07);
+  --glass:rgba(40,36,54,.45);--glass2:rgba(52,47,70,.6);--card:rgba(44,40,60,.5);
+  --lav:#a79ff0;--lav2:#8f86e8;--lav3:#3a3460;--accent:#b5adf6;--accent-ink:#141219;--rose:#b5adf6;--gold:#a79ff0;--plum:#c7c0fa;
+  --code:rgba(255,255,255,.07);--btn:#eeeaf4;--btn-ink:#141219;
+  --lavgrad:linear-gradient(135deg,rgba(122,111,224,.55) 0%,rgba(122,111,224,.25) 50%,rgba(122,111,224,.08) 100%);
+  --sun:linear-gradient(120deg,#b9b2f2,#8f86e8 60%,#d9d4fb);
+  --shadow:0 1px 0 rgba(255,255,255,.08) inset,0 0 0 1px rgba(255,255,255,.06) inset,0 30px 60px -28px rgba(0,0,0,.7);color-scheme:dark}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:84px}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.8 var(--sans);-webkit-font-smoothing:antialiased;overflow-x:hidden;position:relative}
+/* soft ambient light behind all the glass */
+body::before{content:"";position:fixed;inset:-10%;z-index:-1;pointer-events:none;
+  background:radial-gradient(40% 35% at 18% 22%,rgba(167,159,240,.38),transparent 70%),
+             radial-gradient(35% 30% at 85% 15%,rgba(255,255,255,.9),transparent 70%),
+             radial-gradient(45% 40% at 75% 80%,rgba(143,134,232,.25),transparent 70%),
+             radial-gradient(30% 30% at 10% 90%,rgba(255,240,225,.8),transparent 70%)}
+:root[data-theme="dark"] body::before{background:radial-gradient(40% 35% at 18% 22%,rgba(122,111,224,.28),transparent 70%),radial-gradient(45% 40% at 80% 75%,rgba(90,79,192,.22),transparent 70%)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) body::before{background:radial-gradient(40% 35% at 18% 22%,rgba(122,111,224,.28),transparent 70%),radial-gradient(45% 40% at 80% 75%,rgba(90,79,192,.22),transparent 70%)}}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline;text-underline-offset:3px}
+code{font-family:var(--mono);font-size:.86em;background:var(--code);border:1px solid var(--hair);padding:.08em .45em;border-radius:6px}
+::selection{background:rgba(143,134,232,.3)}
+.wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+.glass,.feat,.cmd,.tbl,.gloss div,.callout,.anat,.phone,.season,.ex .chat,.kbtn,.ibtn,.search{
+  background:var(--glass);backdrop-filter:blur(22px) saturate(1.5);-webkit-backdrop-filter:blur(22px) saturate(1.5);
+  border:1px solid var(--line);box-shadow:var(--shadow)}
+
+/* ---------- top bar ---------- */
+.top{position:sticky;top:0;z-index:40;padding:12px 0}
+.top .wrap{display:flex;align-items:center;gap:18px;height:56px;background:var(--glass2);backdrop-filter:blur(24px) saturate(1.6);-webkit-backdrop-filter:blur(24px) saturate(1.6);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:0 10px 0 18px;max-width:1150px}
+.brand{display:flex;align-items:center;gap:9px;color:var(--ink);font-weight:700;font-size:17px;letter-spacing:.02em;white-space:nowrap}
+.brand:hover{text-decoration:none}
+.brand .mark{width:22px;height:22px;border-radius:50%;flex:none;background:radial-gradient(circle at 32% 28%,#fff 0,#d9d4fb 22%,#8f86e8 58%,#4b3fa6 100%);box-shadow:0 3px 8px -2px rgba(75,63,166,.5)}
+.brand small{font-weight:500;color:var(--faint);font-size:14px}
+nav.main{display:flex;gap:2px;margin-left:8px}
+nav.main a{color:var(--mute);padding:6px 13px;border-radius:999px;font-size:14px;white-space:nowrap;font-weight:500}
+nav.main a:hover{color:var(--ink);text-decoration:none;background:rgba(255,255,255,.35)}
+nav.main a.on{color:var(--ink);background:var(--glass2);box-shadow:0 0 0 1px var(--line) inset,0 2px 8px -4px rgba(70,55,120,.3)}
+.top .sp{flex:1}
+.kbtn{display:flex;align-items:center;gap:10px;color:var(--faint);border-radius:999px;padding:6px 8px 6px 14px;font:inherit;font-size:13px;cursor:pointer;min-width:190px;box-shadow:none}
+.kbtn:hover{color:var(--mute)}
+.kbtn kbd{margin-left:auto}
+kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line2);border-radius:6px;padding:1px 6px;color:var(--mute);background:var(--glass2)}
+.ibtn{width:36px;height:36px;border-radius:50%;color:var(--mute);display:grid;place-items:center;cursor:pointer;flex:none;box-shadow:none}
+.ibtn:hover{color:var(--ink)}
+.ver{font-family:var(--mono);font-size:12px;color:#fff;background:var(--btn);border-radius:999px;padding:4px 12px;white-space:nowrap}
+:root[data-theme="dark"] .ver{color:var(--btn-ink)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .ver{color:var(--btn-ink)}}
+.menu{display:none}
+
+/* ---------- decor ---------- */
+.orb{position:absolute;border-radius:50%;pointer-events:none;z-index:0}
+.orb.silver{background:repeating-conic-gradient(from 10deg,rgba(255,255,255,.55) 0 3deg,rgba(255,255,255,0) 3deg 9deg),radial-gradient(circle at 32% 28%,#fff 0,#e9e9ee 22%,#b9b9c4 58%,#7e7e8c 100%);box-shadow:0 18px 30px -12px rgba(60,55,80,.45),inset -6px -8px 16px rgba(60,55,80,.25)}
+.orb.pearl{background:radial-gradient(circle at 32% 26%,#fff 0,#e3dffc 14%,#9d94ec 48%,#5a4fc0 85%,#463b9e 100%);box-shadow:0 16px 28px -10px rgba(75,63,166,.55)}
+.orb.bubble{background:radial-gradient(circle at 30% 26%,rgba(255,255,255,.95) 0,rgba(255,255,255,.35) 18%,rgba(255,255,255,.06) 55%,rgba(255,255,255,.25) 100%);border:1px solid rgba(255,255,255,.85);box-shadow:0 20px 30px -14px rgba(70,55,120,.35),inset 0 -8px 18px rgba(143,134,232,.18);backdrop-filter:blur(3px)}
+.squig{position:absolute;pointer-events:none;z-index:0;filter:drop-shadow(0 8px 10px rgba(90,79,192,.3))}
+.dust{position:absolute;pointer-events:none;z-index:0;
+  background-image:radial-gradient(circle,rgba(130,125,150,.75) 0 1.1px,transparent 1.6px),radial-gradient(circle,rgba(255,255,255,1) 0 1.3px,transparent 1.8px);
+  background-size:13px 11px,17px 19px;background-position:0 0,6px 4px;
+  -webkit-mask:radial-gradient(closest-side,#000 20%,transparent);mask:radial-gradient(closest-side,#000 20%,transparent)}
+.float{animation:float 7s ease-in-out infinite}
+.float.b{animation-duration:9s;animation-delay:-3s}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+
+/* ---------- hero ---------- */
+.hero{position:relative;padding:36px 0 72px}
+.frame{position:relative;border-radius:34px;padding:56px;background:rgba(255,255,255,.22);border:1px solid var(--line);box-shadow:var(--shadow);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.frame .inner{position:relative;z-index:1;display:grid;grid-template-columns:1.1fr .9fr;gap:40px;align-items:center}
+.lavcard{position:relative;border-radius:26px;padding:44px 40px;background:var(--lavgrad);border:1px solid rgba(255,255,255,.7);box-shadow:var(--shadow);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);overflow:hidden}
+.lavcard::after{content:"";position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(circle,rgba(255,255,255,.9) 0 1px,transparent 1.5px);background-size:23px 29px;opacity:.5;-webkit-mask:linear-gradient(120deg,transparent 30%,#000);mask:linear-gradient(120deg,transparent 30%,#000)}
+.eyebrow{font-size:12.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--plum);margin:0 0 16px;display:inline-flex;align-items:center;gap:8px;padding:4px 12px;border-radius:999px;background:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.8)}
+:root[data-theme="dark"] .eyebrow{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.12)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .eyebrow{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.12)}}
+.hero h1{font-weight:700;font-size:clamp(32px,4.4vw,52px);line-height:1.2;letter-spacing:-.005em;margin:0 0 18px}
+.hero h1 em{font-style:normal;color:#fff;text-shadow:0 2px 18px rgba(75,63,166,.45)}
+:root[data-theme="dark"] .hero h1 em{color:var(--plum);text-shadow:none}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .hero h1 em{color:var(--plum);text-shadow:none}}
+.hero p.lead{font-size:15.5px;color:color-mix(in srgb,var(--ink) 75%,transparent);max-width:32em;margin:0 0 28px}
+.cta{display:flex;gap:10px;flex-wrap:wrap;position:relative;z-index:1}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border-radius:999px;font-weight:600;font-size:14.5px;border:1px solid transparent;cursor:pointer;font-family:inherit;transition:transform .15s,box-shadow .15s}
+.btn:hover{text-decoration:none;transform:translateY(-1px)}
+.btn.pri{background:var(--btn);color:var(--btn-ink);box-shadow:0 10px 20px -10px rgba(20,15,35,.6)}
+.btn.sec{background:rgba(255,255,255,.35);color:var(--ink);border-color:rgba(29,27,34,.55)}
+:root[data-theme="dark"] .btn.sec{border-color:rgba(255,255,255,.35);background:rgba(255,255,255,.06)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn.sec{border-color:rgba(255,255,255,.35);background:rgba(255,255,255,.06)}}
+.meta{display:flex;gap:12px;margin-top:30px;color:var(--mute);font-size:12.5px;flex-wrap:wrap;position:relative;z-index:1}
+.meta div{padding:10px 14px;border-radius:16px;background:rgba(255,255,255,.4);border:1px solid rgba(255,255,255,.75)}
+:root[data-theme="dark"] .meta div{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .meta div{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1)}}
+.meta b{display:block;font-size:20px;font-weight:700;color:var(--ink);line-height:1.2}
+
+/* chat demo */
+.phone{position:relative;border-radius:26px;overflow:hidden}
+.phone .bar{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--hair);font-size:13.5px}
+.phone .bar .av{width:30px;height:30px;border-radius:50%;background:radial-gradient(circle at 32% 28%,#fff 0,#d9d4fb 20%,#8f86e8 60%,#4b3fa6);color:#fff;display:grid;place-items:center;font-weight:700;font-size:12px}
+.phone .bar small{color:var(--faint);display:block;font-size:11.5px;line-height:1.3}
+.chat{padding:18px;display:flex;flex-direction:column;gap:10px;min-height:340px}
+.msg{max-width:86%;padding:9px 13px;border-radius:16px;font-size:13.5px;line-height:1.6;white-space:pre-wrap;opacity:0;transform:translateY(6px);transition:opacity .35s,transform .35s}
+.msg.show{opacity:1;transform:none}
+.msg.me{align-self:flex-end;background:var(--btn);color:var(--btn-ink);border-bottom-right-radius:5px;font-family:var(--mono);font-size:12.5px}
+.msg.bot{align-self:flex-start;background:rgba(255,255,255,.65);border:1px solid rgba(255,255,255,.9);border-bottom-left-radius:5px}
+:root[data-theme="dark"] .msg.bot{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.1)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .msg.bot{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.1)}}
+.msg .who{display:block;font-size:11px;color:var(--faint);margin-bottom:2px;font-family:var(--sans)}
+.chat.static .msg{opacity:1;transform:none}
+
+/* ---------- sections ---------- */
+.band{padding:72px 0;position:relative}
+.band.alt{background:transparent}
+.shead{display:flex;align-items:end;justify-content:space-between;gap:24px;margin-bottom:36px;flex-wrap:wrap}
+.shead h2{font-weight:700;font-size:clamp(26px,3vw,36px);line-height:1.3;margin:0}
+.shead p{color:var(--mute);margin:0;max-width:34em}
+.num{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--lav);margin-bottom:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.feat{border-radius:22px;padding:24px 22px 22px;position:relative;transition:transform .25s,box-shadow .25s}
+.feat:hover{transform:translateY(-3px)}
+.feat .ic{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;color:#fff;margin-bottom:16px;background:radial-gradient(circle at 32% 28%,#fff 0,#cfc9fa 16%,#8f86e8 55%,#5a4fc0);box-shadow:0 10px 18px -8px rgba(75,63,166,.6)}
+.feat h3{font-size:17px;margin:0 0 6px;font-weight:600}
+.feat p{margin:0;color:var(--mute);font-size:14px}
+.feat .cmds{margin-top:14px;display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-family:var(--mono);font-size:11.5px;padding:3px 10px;border-radius:999px;border:1px solid var(--line2);color:var(--mute);background:rgba(255,255,255,.4);cursor:pointer;white-space:nowrap}
+.chip:hover{color:var(--ink);border-color:var(--lav)}
+:root[data-theme="dark"] .chip{background:rgba(255,255,255,.04)}
+
+/* season strip */
+.season{display:grid;grid-template-columns:repeat(5,1fr);gap:0;border-radius:24px;overflow:hidden}
+.season > div{padding:24px 22px;border-right:1px solid var(--hair);position:relative}
+.season > div:last-child{border-right:0}
+.season .d{display:inline-grid;place-items:center;width:38px;height:38px;border-radius:50%;font-size:13px;font-weight:700;color:#fff;background:radial-gradient(circle at 32% 28%,#fff 0,#cfc9fa 14%,#8f86e8 55%,#5a4fc0)}
+.season h4{margin:14px 0 4px;font-size:15.5px;font-weight:600}
+.season p{margin:0;color:var(--mute);font-size:13.5px}
+
+/* ---------- doc layout ---------- */
+.doc{display:grid;grid-template-columns:230px minmax(0,1fr);gap:48px;padding-top:28px;padding-bottom:96px}
+.toc{position:sticky;top:96px;align-self:start;max-height:calc(100vh - 120px);overflow:auto;font-size:13.5px;padding:16px 10px;border-radius:20px;background:var(--glass);border:1px solid var(--line);box-shadow:var(--shadow);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+.toc .t{font-size:11.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--lav);margin:0 0 8px 10px}
+.toc a{display:block;color:var(--mute);padding:6px 10px;border-radius:10px;line-height:1.45}
+.toc a:hover{color:var(--ink);text-decoration:none;background:rgba(255,255,255,.35)}
+.toc a.on{color:var(--ink);background:var(--glass2);box-shadow:0 0 0 1px var(--line) inset;font-weight:600}
+.toc a.on::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--lav);margin-right:8px;vertical-align:2px}
+article{min-width:0;max-width:800px;position:relative}
+.ptitle{font-weight:700;font-size:clamp(30px,3.6vw,42px);line-height:1.25;margin:0 0 12px}
+.psub{color:var(--mute);font-size:16px;margin:0 0 36px;max-width:38em}
+article h2{font-size:23px;font-weight:700;margin:60px 0 16px;padding-top:8px;display:flex;align-items:center;gap:12px}
+article h2 .n{display:inline-grid;place-items:center;width:32px;height:32px;border-radius:50%;font-size:12px;font-weight:700;color:#fff;flex:none;background:radial-gradient(circle at 32% 28%,#fff 0,#cfc9fa 14%,#8f86e8 55%,#5a4fc0);box-shadow:0 6px 12px -6px rgba(75,63,166,.6)}
+article h3{font-size:17.5px;margin:32px 0 10px;font-weight:600}
+article p,article li{color:color-mix(in srgb,var(--ink) 84%,var(--mute))}
+article ul,article ol{padding-left:1.3em}
+article li{margin:5px 0}
+hr.orn{border:0;height:1px;background:linear-gradient(90deg,transparent,var(--line2),transparent);margin:52px 0}
+
+.callout{border-radius:18px;padding:15px 18px 15px 50px;position:relative;margin:20px 0;font-size:14.5px}
+.callout::before{content:"";position:absolute;left:18px;top:18px;width:18px;height:18px;border-radius:50%;background:radial-gradient(circle at 32% 28%,#fff 0,#cfc9fa 16%,#8f86e8 55%,#5a4fc0)}
+.callout.warn::before{background:radial-gradient(circle at 32% 28%,#fff 0,#f3d9c3 18%,#d39a6a 60%,#a86a3e)}
+.callout b{color:var(--ink)}
+.callout p{margin:0}
+
+.cmdline{display:flex;align-items:center;gap:10px;background:#1b1a20;color:#eeeaf4;border-radius:16px;padding:12px 12px 12px 18px;font-family:var(--mono);font-size:13.5px;margin:14px 0;overflow-x:auto;box-shadow:0 18px 30px -18px rgba(20,15,35,.6)}
+.cmdline .pr{color:var(--lav2);user-select:none}
+.cmdline code{background:none;border:0;padding:0;color:inherit;white-space:pre;flex:1}
+.copy{flex:none;font:600 12px var(--sans);border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:inherit;border-radius:999px;padding:5px 12px;cursor:pointer}
+.copy:hover{background:rgba(255,255,255,.14)}
+
+/* steps */
+.steps{counter-reset:s;list-style:none;padding:0;margin:20px 0}
+.steps > li{counter-increment:s;position:relative;padding:0 0 24px 52px;margin:0}
+.steps > li::before{content:counter(s);position:absolute;left:0;top:0;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:13px;color:var(--plum);background:var(--glass2);border:1px solid var(--line);box-shadow:var(--shadow)}
+.steps > li::after{content:"";position:absolute;left:17px;top:40px;bottom:4px;width:1px;background:linear-gradient(var(--line2),transparent)}
+.steps > li:last-child::after{display:none}
+.steps > li > b:first-child{display:block;font-size:15.5px;font-weight:600;color:var(--ink);margin-bottom:2px;padding-top:5px}
+
+/* tabs */
+.tabs{display:inline-flex;gap:4px;padding:4px;background:var(--glass);border:1px solid var(--line);border-radius:999px;margin:8px 0 18px;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+.tabs button{font:inherit;font-size:13.5px;border:0;background:transparent;color:var(--mute);padding:6px 18px;border-radius:999px;cursor:pointer;font-weight:600}
+.tabs button.on{background:var(--btn);color:var(--btn-ink)}
+.pane{display:none}.pane.on{display:block}
+
+/* table */
+.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:14px;margin:16px 0;border-radius:20px;overflow:hidden}
+.tbl th{font-weight:600;text-align:left;font-size:11.5px;color:var(--faint);letter-spacing:.1em;padding:11px 16px;border-bottom:1px solid var(--hair);background:rgba(255,255,255,.25)}
+.tbl td{padding:12px 16px;border-top:1px solid var(--hair);vertical-align:top}
+.tbl tr:nth-child(2) td{border-top:0}
+.tbl td:first-child{white-space:nowrap;color:var(--ink);font-weight:600}
+.tblwrap{overflow-x:auto}
+
+/* glossary */
+.gloss{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:18px 0}
+.gloss div{border-radius:18px;padding:14px 18px}
+.gloss dt{font-weight:600;margin-bottom:2px}
+.gloss dd{margin:0;color:var(--mute);font-size:14px}
+
+/* role switch */
+.roleswitch{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:-12px 0 32px;padding:14px 18px;border-radius:20px;font-size:14px;color:var(--mute);background:var(--lavgrad);border:1px solid rgba(255,255,255,.7);box-shadow:var(--shadow)}
+.roleswitch > span:first-child{color:var(--ink);font-weight:600}
+body[data-role="player"] .only-admin,body[data-role="admin"] .only-player{display:none!important}
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:1px 9px;border-radius:999px;vertical-align:2px;margin-left:6px;white-space:nowrap}
+.tag.a{color:#fff;background:#1b1a20}
+:root[data-theme="dark"] .tag.a{color:#141219;background:#eeeaf4}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .tag.a{color:#141219;background:#eeeaf4}}
+.tag.p{color:var(--plum);background:rgba(143,134,232,.2)}
+.tag.x{color:var(--amber);background:rgba(196,138,92,.15)}
+
+/* example pair */
+.ex{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:16px 0}
+.ex .chat{min-height:0;border-radius:22px;padding:16px}
+.ex .note{font-size:14px;color:var(--mute);align-self:center}
+
+/* flow */
+.flow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:18px 0;font-size:13.5px}
+.flow span{background:var(--glass2);border:1px solid var(--line);box-shadow:var(--shadow);padding:6px 14px;border-radius:999px;font-weight:500}
+.flow i{color:var(--lav);font-style:normal}
+
+/* anatomy */
+.anat{border-radius:24px;padding:30px 24px 20px;margin:20px 0}
+.anat .line{font-family:var(--mono);font-size:clamp(18px,3vw,28px);display:flex;flex-wrap:wrap;justify-content:center;gap:3px;margin-bottom:22px}
+.anat .line span{padding:4px 8px;border-radius:10px;border-bottom:3px solid var(--c);cursor:default;transition:background .15s}
+.anat .line span.on,.anat .line span:hover{background:color-mix(in srgb,var(--c) 22%,transparent)}
+.anat .parts{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.anat .parts div{padding:10px 12px;border-radius:12px;border-left:3px solid var(--c);background:rgba(255,255,255,.35);font-size:13.5px;transition:background .15s}
+:root[data-theme="dark"] .anat .parts div{background:rgba(255,255,255,.04)}
+.anat .parts div.on{background:color-mix(in srgb,var(--c) 18%,transparent)}
+.anat .parts b{display:block;font-size:13px}
+.anat .parts span{color:var(--mute)}
+
+/* ---------- commands ---------- */
+.cbar{position:sticky;top:80px;z-index:20;padding:12px 0;margin-bottom:10px}
+.cbar .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.search{flex:1;min-width:220px;display:flex;align-items:center;gap:10px;border-radius:999px;padding:0 18px;height:46px;background:var(--glass2)}
+.search input{border:0;outline:0;background:transparent;font:inherit;color:var(--ink);flex:1;height:100%;min-width:0}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:3px;background:var(--glass2);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);box-shadow:var(--shadow)}
+.seg button{font:inherit;font-size:13px;border:0;background:transparent;color:var(--mute);padding:7px 14px;border-radius:999px;cursor:pointer;white-space:nowrap;font-weight:500}
+.seg button.on{background:var(--btn);color:var(--btn-ink)}
+.cats{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+.cats button{font:inherit;font-size:12.5px;border:1px solid var(--line);background:var(--glass);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);color:var(--mute);padding:4px 13px;border-radius:999px;cursor:pointer;white-space:nowrap}
+.cats button.on{background:var(--lavgrad);color:var(--ink);border-color:rgba(255,255,255,.8);font-weight:600}
+.cgroup{margin:34px 0 0}
+.cgroup h3{font-size:19px;font-weight:700;margin:0 0 4px;display:flex;align-items:baseline;gap:10px}
+.cgroup h3 small{font-weight:400;font-size:13px;color:var(--faint)}
+.cgroup > p{margin:0 0 14px;color:var(--mute);font-size:14px}
+.clist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.cmd{border-radius:20px;padding:15px 17px;position:relative;transition:transform .2s}
+.cmd:hover{transform:translateY(-2px)}
+.cmd .h{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding-right:56px}
+.cmd .nm{font-weight:600;font-size:15.5px}
+.cmd .al{font-size:12px;color:var(--faint)}
+.cmd .d{font-size:13.5px;color:var(--mute);margin:4px 0 8px}
+.cmd .u{font-family:var(--mono);font-size:12.3px;background:var(--code);border:1px solid var(--hair);border-radius:12px;padding:7px 11px;white-space:pre-wrap;word-break:break-all;color:var(--ink)}
+.cmd .cp{position:absolute;top:13px;right:13px;font:600 11.5px var(--sans);border:0;background:var(--btn);color:var(--btn-ink);border-radius:999px;padding:4px 11px;cursor:pointer}
+.cmd .cp:hover{opacity:.85}
+.empty{padding:60px 0;text-align:center;color:var(--faint)}
+mark{background:rgba(143,134,232,.35);color:inherit;border-radius:3px;padding:0 1px}
+
+/* faq */
+details.qa{border-radius:18px;padding:2px 20px;margin:10px 0;background:var(--glass);border:1px solid var(--line);box-shadow:var(--shadow);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+details.qa summary{cursor:pointer;list-style:none;padding:15px 36px 15px 0;font-weight:600;font-size:15.5px;position:relative}
+details.qa summary::-webkit-details-marker{display:none}
+details.qa summary::after{content:"+";position:absolute;right:0;top:9px;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:18px;color:#fff;background:radial-gradient(circle at 32% 28%,#fff 0,#cfc9fa 14%,#8f86e8 55%,#5a4fc0);transition:transform .2s}
+details.qa[open] summary::after{transform:rotate(45deg)}
+details.qa > div{padding:0 0 16px;color:var(--mute)}
+
+/* palette */
+.pal{position:fixed;inset:0;z-index:80;background:rgba(40,30,60,.22);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:none;align-items:flex-start;justify-content:center;padding:12vh 16px 16px}
+.pal.on{display:flex}
+.pal .box{width:min(620px,100%);background:var(--glass2);backdrop-filter:blur(30px) saturate(1.6);-webkit-backdrop-filter:blur(30px) saturate(1.6);border:1px solid var(--line);border-radius:24px;box-shadow:0 40px 90px -30px rgba(40,30,80,.55);overflow:hidden}
+.pal input{width:100%;border:0;border-bottom:1px solid var(--hair);background:transparent;font:inherit;font-size:16px;padding:18px 22px;outline:0;color:var(--ink)}
+.pal ul{list-style:none;margin:0;padding:8px;max-height:52vh;overflow:auto}
+.pal li{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:14px;cursor:pointer}
+.pal li.on{background:var(--lavgrad)}
+.pal li .k{font-size:11px;color:var(--mute);border:1px solid var(--line2);border-radius:999px;padding:0 8px;flex:none}
+.pal li .t{font-weight:600}
+.pal li .s{color:var(--faint);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.pal li.on .s{color:var(--mute)}
+.pal .foot{display:flex;gap:16px;padding:10px 18px;border-top:1px solid var(--hair);font-size:12px;color:var(--faint)}
+
+.toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,20px);background:var(--btn);color:var(--btn-ink);padding:9px 18px;border-radius:999px;font-size:13.5px;opacity:0;transition:.25s;z-index:90;pointer-events:none}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+
+footer{padding:24px 0 48px;color:var(--faint);font-size:13px}
+footer .wrap{display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;padding-top:28px;border-top:1px solid var(--line2)}
+footer .brand{font-size:15px}
+
+.page{display:none}.page.on{display:block;animation:fade .35s ease}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ---------- responsive ---------- */
+@media (max-width:1200px){.ver{display:none}.kbtn{min-width:0}.kbtn .lbl{display:none}nav.main a{padding:6px 10px}}
+@media (max-width:1000px){
+  nav.main{display:none}
+  .menu{display:grid}
+  .kbtn{min-width:0;padding:0;width:36px;height:36px;justify-content:center;border-radius:50%}.kbtn .lbl,.kbtn kbd{display:none}
+  .frame{padding:28px}
+  .frame .inner{grid-template-columns:1fr;gap:24px}
+  .grid3{grid-template-columns:1fr 1fr}
+  .season{grid-template-columns:1fr 1fr}
+  .season > div{border-bottom:1px solid var(--hair)}
+  .doc{grid-template-columns:1fr;gap:0}
+  .toc{display:none}
+  .clist{grid-template-columns:1fr}
+}
+@media (max-width:640px){
+  .wrap{padding:0 16px}
+  .top{padding:8px 0}
+  .top .wrap{gap:8px;padding:0 6px 0 14px;margin:0 8px}
+  .ver{display:none}
+  .brand small{display:none}
+  .hero{padding:16px 0 40px}
+  .frame{padding:10px;border-radius:26px}
+  .lavcard{padding:30px 22px;border-radius:20px}
+  .orb,.squig,.dust{display:none}
+  .grid3,.season,.gloss,.ex,.anat .parts{grid-template-columns:1fr}
+  .season > div{border-right:0}
+  .band{padding:48px 0}
+  .tbl td:first-child{white-space:normal}
+  .roleswitch{margin-top:0}
+  .cbar{top:72px}
+}
+.drawer{position:fixed;top:76px;left:16px;right:16px;z-index:39;background:var(--glass2);backdrop-filter:blur(26px);-webkit-backdrop-filter:blur(26px);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);padding:8px 14px;display:none}
+.drawer.on{display:block}
+.drawer a{display:block;padding:12px 4px;color:var(--ink);border-bottom:1px solid var(--hair);font-weight:500}
+.drawer a:last-child{border-bottom:0}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}html{scroll-behavior:auto}}
+
+/* form */
+.form{border-radius:24px;padding:26px 26px 22px;max-width:600px}
+.form .row{margin:0 0 16px}
+.form label{display:block;font-size:14px;font-weight:600;margin-bottom:6px}
+.form label small{font-weight:400;color:var(--faint);margin-left:6px}
+.form input[type=text],.form textarea{width:100%;font:inherit;font-size:15px;color:var(--ink);background:var(--glass2);border:1px solid var(--line);border-radius:14px;padding:10px 14px;outline:0;box-shadow:0 1px 2px rgba(70,55,120,.06) inset;resize:vertical}
+.form input[type=text]:focus,.form textarea:focus{border-color:var(--lav2);box-shadow:0 0 0 4px rgba(143,134,232,.18)}
+.colorrow{display:flex;align-items:center;gap:12px}
+.colorrow input[type=color]{width:46px;height:40px;border:1px solid var(--line);border-radius:12px;background:var(--glass2);padding:3px;cursor:pointer}
+.colorrow #cv{font-family:var(--mono);font-size:13px;color:var(--mute)}
+.colorrow .swatch{width:28px;height:28px;border-radius:50%;box-shadow:inset -4px -5px 10px rgba(0,0,0,.25),inset 3px 3px 6px rgba(255,255,255,.6)}
+/* architecture */
+.arch{display:grid;grid-template-columns:1fr 92px 1.05fr 92px 1fr;align-items:center;margin:8px 0 12px}
+.arch .node{position:relative;border-radius:24px;padding:22px 20px 18px;background:var(--glass);border:1px solid var(--line);box-shadow:var(--shadow);backdrop-filter:blur(22px) saturate(1.5);-webkit-backdrop-filter:blur(22px) saturate(1.5)}
+.arch .node.core{background:var(--lavgrad);border-color:rgba(255,255,255,.8);padding:28px 22px 22px}
+.arch h4{margin:12px 0 2px;font-size:16px}
+.arch .node > p{margin:0 0 10px;color:var(--mute);font-size:12.5px;line-height:1.55}
+.arch ul{margin:0;padding:0;list-style:none;font-size:13.2px}
+.arch li{padding:5px 0;border-top:1px solid var(--hair);color:color-mix(in srgb,var(--ink) 82%,var(--mute))}
+.orbic{display:block;width:30px;height:30px;border-radius:50%;background:radial-gradient(circle at 32% 26%,#fff 0,#e3dffc 14%,#9d94ec 48%,#5a4fc0 85%);box-shadow:0 10px 18px -8px rgba(75,63,166,.6)}
+.orbic.big{width:40px;height:40px}
+.orbic.silver,.ic.silver{background:repeating-conic-gradient(from 10deg,rgba(255,255,255,.55) 0 3deg,rgba(255,255,255,0) 3deg 9deg),radial-gradient(circle at 32% 28%,#fff 0,#e9e9ee 22%,#b9b9c4 58%,#7e7e8c 100%)!important;box-shadow:0 10px 18px -8px rgba(60,55,80,.5)}
+.wire{position:relative;height:2px;margin:0 6px;background:linear-gradient(90deg,var(--lav2),var(--lav))}
+.wire span{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);font-size:10.5px;line-height:1.35;color:var(--mute);text-align:center;width:120px}
+.wire i{position:absolute;top:-3px;left:0;width:8px;height:8px;border-radius:50%;background:#fff;box-shadow:0 0 0 3px rgba(143,134,232,.45);animation:pulse 2.6s linear infinite}
+@keyframes pulse{0%{left:0}50%{left:calc(100% - 8px)}100%{left:0}}
+.duo{display:grid;grid-template-columns:1fr 140px 1fr;align-items:center;gap:0}
+.duo .feat{color:inherit;text-decoration:none}
+.duo-mid{display:flex;flex-direction:column;align-items:center;gap:4px;position:relative}
+.duo-mid::before{content:"";position:absolute;top:20px;left:-10px;right:-10px;height:2px;background:linear-gradient(90deg,var(--lav2),var(--lav),var(--lav2));z-index:-1}
+.duo-mid b{font-size:14px;margin-top:4px}.duo-mid small{color:var(--faint);font-size:12px}
+.relay .who{display:inline-block;font-size:11px;font-weight:600;padding:0 9px;border-radius:999px;margin-left:8px;vertical-align:2px}
+.relay .who.k{color:#fff;background:#1b1a20}
+.relay .who.c{color:var(--plum);background:rgba(143,134,232,.22)}
+.relay .who.q{color:#5d5d6b;background:rgba(160,160,175,.25)}
+:root[data-theme="dark"] .relay .who.k{color:#141219;background:#eeeaf4}
+:root[data-theme="dark"] .relay .who.q{color:#c9c9d4}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .relay .who.k{color:#141219;background:#eeeaf4}:root:not([data-theme="light"]) .relay .who.q{color:#c9c9d4}}
+@media (max-width:1100px){
+  .arch{grid-template-columns:1fr;gap:0}
+  .wire{width:2px;height:56px;margin:0 auto;background:linear-gradient(var(--lav2),var(--lav))}
+  .wire span{left:14px;bottom:auto;top:50%;transform:translateY(-50%);text-align:left;width:150px}
+  .wire i{left:-3px!important;animation:pulsev 2.6s linear infinite}
+  @keyframes pulsev{0%{top:0}50%{top:calc(100% - 8px)}100%{top:0}}
+  .duo{grid-template-columns:1fr;gap:12px}
+  .duo-mid{flex-direction:row;justify-content:center}
+  .duo-mid::before{display:none}
+}
+
+/* dice */
+.rules{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:0 0 8px}
+.rule{border-radius:22px;padding:20px 18px 16px;background:var(--glass);border:1px solid var(--line);box-shadow:var(--shadow);backdrop-filter:blur(22px) saturate(1.5);-webkit-backdrop-filter:blur(22px) saturate(1.5);display:flex;flex-direction:column}
+.rule.dg{background:var(--lavgrad);border-color:rgba(255,255,255,.8)}
+.rule h4{margin:12px 0 4px;font-size:16px}
+.rule p{margin:0 0 14px;font-size:13px;color:var(--mute);line-height:1.6;flex:1}
+.rule code{align-self:flex-start;cursor:pointer;background:var(--btn);color:var(--btn-ink);border:0;border-radius:999px;padding:4px 12px;font-size:12px}
+.tbl.dt td:first-child{width:42%}
+.tbl.dt td:first-child code{cursor:pointer;white-space:nowrap}
+.tbl.dt td:first-child code:hover{border-color:var(--lav)}
+.dgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}
+.dgcard{border-radius:20px;padding:16px 18px;font-size:14px}
+.dgcard > b{font-size:15px}
+.dgcard p{margin:4px 0 6px;color:var(--mute)}
+.dgcard ul{margin:0;padding-left:1.1em}
+.dgcard li{margin:3px 0}
+.dgcard em{font-style:normal;color:var(--accent);font-weight:600}
+@media (max-width:640px){
+  .rules,.dgrid{grid-template-columns:1fr}
+  .tbl.dt,.tbl.dt tbody,.tbl.dt tr,.tbl.dt td{display:block;width:100%!important}
+  .tbl.dt tr:first-child{display:none}
+  .tbl.dt td{border-top:0;padding:4px 16px}
+  .tbl.dt tr{border-top:1px solid var(--hair);padding:8px 0}
+  .tbl.dt tr:nth-child(2){border-top:0}
+  .tbl.dt td:first-child code{white-space:normal}
+}
+
+/* ---------- rendered 3D assets + deeper glass ---------- */
+:root{--pearl-img:url(assets/orb-pearl.webp);--silver-img:url(assets/orb-silver.webp);
+  --noise:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .09 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  --glass:linear-gradient(140deg,rgba(255,255,255,.66) 0%,rgba(255,255,255,.34) 45%,rgba(255,255,255,.2) 100%);
+  --glass2:linear-gradient(140deg,rgba(255,255,255,.82),rgba(255,255,255,.5));
+  --shadow:inset 1.5px 1.5px 0 rgba(255,255,255,.95),inset -1px -1px 0 rgba(255,255,255,.35),inset 0 0 22px rgba(255,255,255,.35),0 34px 60px -30px rgba(70,55,120,.38),0 10px 22px -12px rgba(70,55,120,.18)}
+:root[data-theme="dark"]{--glass:linear-gradient(140deg,rgba(255,255,255,.1),rgba(255,255,255,.03));--glass2:linear-gradient(140deg,rgba(255,255,255,.14),rgba(255,255,255,.06));
+  --shadow:inset 1.5px 1.5px 0 rgba(255,255,255,.18),inset -1px -1px 0 rgba(255,255,255,.04),inset 0 0 22px rgba(255,255,255,.04),0 34px 60px -30px rgba(0,0,0,.75)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--glass:linear-gradient(140deg,rgba(255,255,255,.1),rgba(255,255,255,.03));--glass2:linear-gradient(140deg,rgba(255,255,255,.14),rgba(255,255,255,.06));
+  --shadow:inset 1.5px 1.5px 0 rgba(255,255,255,.18),inset -1px -1px 0 rgba(255,255,255,.04),inset 0 0 22px rgba(255,255,255,.04),0 34px 60px -30px rgba(0,0,0,.75)}}
+.glass,.feat,.cmd,.tbl,.gloss div,.callout,.anat,.phone,.season,.ex .chat,.toc,.arch .node,.rule,details.qa,.dgcard,.top .wrap,.form{background-image:var(--noise),var(--glass)!important;background-color:transparent!important}
+.top .wrap{background-image:var(--noise),var(--glass2)!important}
+.arch .node.core,.rule.dg,.roleswitch{background-image:var(--noise),var(--lavgrad)!important}
+/* violet cloud inside the hero card, like light trapped in glass */
+.lavcard{background:var(--noise),radial-gradient(70% 80% at 72% 40%,rgba(98,84,214,.78),rgba(140,128,232,.45) 45%,rgba(220,214,250,.25) 75%,rgba(255,255,255,.18) 100%)!important;box-shadow:var(--shadow)}
+.frame{background:var(--noise),linear-gradient(140deg,rgba(255,255,255,.42),rgba(255,255,255,.12))!important;box-shadow:inset 2px 2px 0 rgba(255,255,255,.9),inset -1px -1px 0 rgba(255,255,255,.3),inset 0 0 40px rgba(255,255,255,.3),0 50px 90px -40px rgba(70,55,120,.35)!important}
+:root[data-theme="dark"] .frame{background:var(--noise),linear-gradient(140deg,rgba(255,255,255,.08),rgba(255,255,255,.02))!important}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .frame{background:var(--noise),linear-gradient(140deg,rgba(255,255,255,.08),rgba(255,255,255,.02))!important}}
+.slab{position:absolute;z-index:0;left:24%;top:9%;width:42%;height:86%;border-radius:44px;pointer-events:none;
+  background:var(--noise),linear-gradient(150deg,rgba(255,255,255,.5),rgba(255,255,255,.12));border:1px solid rgba(255,255,255,.7);
+  box-shadow:inset 2px 2px 0 rgba(255,255,255,.9),inset 0 0 30px rgba(255,255,255,.35),0 30px 60px -30px rgba(70,55,120,.3);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+:root[data-theme="dark"] .slab{background:linear-gradient(150deg,rgba(255,255,255,.035),rgba(255,255,255,.01));border-color:rgba(255,255,255,.05);box-shadow:none}:root[data-theme="dark"] .lavcard{background:var(--noise),radial-gradient(70% 80% at 72% 40%,rgba(110,96,230,.55),rgba(90,79,192,.28) 50%,rgba(40,34,70,.35) 100%)!important}:root[data-theme="dark"] .phone{background-image:var(--noise),linear-gradient(140deg,rgba(40,36,56,.75),rgba(28,25,40,.7))!important}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .slab{background:linear-gradient(150deg,rgba(255,255,255,.035),rgba(255,255,255,.01));border-color:rgba(255,255,255,.05);box-shadow:none}:root:not([data-theme="light"]) .lavcard{background:var(--noise),radial-gradient(70% 80% at 72% 40%,rgba(110,96,230,.55),rgba(90,79,192,.28) 50%,rgba(40,34,70,.35) 100%)!important}:root:not([data-theme="light"]) .phone{background-image:var(--noise),linear-gradient(140deg,rgba(40,36,56,.75),rgba(28,25,40,.7))!important}}
+.deco{position:absolute;z-index:2;pointer-events:none;height:auto;filter:drop-shadow(0 16px 18px rgba(70,55,120,.28))}
+.band .wrap{position:relative}
+.hero,.band{overflow-x:clip}
+html{overflow-x:clip}
+.band .deco{z-index:0}
+/* small UI pearls use the rendered pearl */
+.brand .mark,.orbic,.feat .ic,.phone .bar .av,.season .d,article h2 .n,.callout::before,details.qa summary::after{background:var(--pearl-img) center/cover no-repeat!important}
+.orbic.silver,.feat .ic.silver{background:var(--silver-img) center/cover no-repeat!important}
+.callout.warn::before{background:radial-gradient(circle at 32% 28%,#fff 0,#f3d9c3 18%,#d39a6a 60%,#a86a3e)!important}
+@media (max-width:640px){.deco,.slab{display:none}.frame .deco.m1,.frame .deco.m2,.frame .deco.m3{display:block}.frame .deco.m1{width:58px!important;right:-10px!important;top:-20px!important}.frame .deco.m2{width:52px!important;left:auto!important;right:22px!important;bottom:-22px!important}.frame .deco.m3{width:26px!important;right:auto!important;left:18px!important;bottom:-10px!important}}
+.hero h1 em{color:#4f43b8!important;text-shadow:0 1px 0 rgba(255,255,255,.6)!important}
+:root[data-theme="dark"] .hero h1 em{color:#cfc8ff!important;text-shadow:none!important}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .hero h1 em{color:#cfc8ff!important;text-shadow:none!important}}
+</style>
+</head>
+<body data-role="all">
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#/"><span class="mark"></span>长日<small>bot</small></a>
+    <nav class="main" id="nav">
+      <a href="#/" data-r="">首页</a>
+      <a href="#/install" data-r="install">安装</a>
+      <a href="#/how" data-r="how">工作原理</a>
+      <a href="#/season" data-r="season">恋综指南</a>
+      <a href="#/commands" data-r="commands">指令大全</a>
+      <a href="#/dice" data-r="dice">跑团骰子</a>
+      <a href="#/faq" data-r="faq">常见问题</a>
+      <a href="#/app" data-r="app">申请 App</a>
+    </nav>
+    <span class="sp"></span>
+    <button class="kbtn" id="openPal" aria-label="搜索指令"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span class="lbl">搜索指令或章节</span><kbd>⌘K</kbd></button>
+    <span class="ver">v@VERSION@</span>
+    <button class="ibtn" id="theme" aria-label="切换深浅色"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+    <button class="ibtn menu" id="menu" aria-label="菜单"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+  </div>
+</header>
+<div class="drawer" id="drawer">
+  <a href="#/">首页</a><a href="#/install">安装</a><a href="#/how">工作原理</a><a href="#/season">恋综指南</a><a href="#/commands">指令大全</a><a href="#/dice">跑团骰子</a><a href="#/faq">常见问题</a><a href="#/app">申请专属 App</a>
+</div>
+
+<main>
+<!-- ================= HOME ================= -->
+<section class="page" data-page="">
+  <div class="hero">
+    <div class="wrap">
+  <div class="frame">
+    <span class="slab"></span>
+    <img class="deco float" src="assets/orb-silver.webp" alt="" aria-hidden="true" style="width:58px;left:-24px;top:64px">
+    <img class="deco float b m1" src="assets/orb-silver.webp" alt="" aria-hidden="true" style="width:96px;right:-34px;top:22px">
+    <img class="deco float b m3" src="assets/orb-pearl.webp" alt="" aria-hidden="true" style="width:44px;right:43%;bottom:-18px">
+    <img class="deco float m2" src="assets/orb-glass.webp" alt="" aria-hidden="true" style="width:86px;left:38%;bottom:-40px">
+    <img class="deco float b" src="assets/orb-glass.webp" alt="" aria-hidden="true" style="width:26px;right:34%;top:14px">
+    <img class="deco float" src="assets/squiggle-lav.webp" alt="" aria-hidden="true" style="width:92px;left:44%;top:-22px">
+    <img class="deco float b" src="assets/squiggle-glass.webp" alt="" aria-hidden="true" style="width:130px;left:-34px;bottom:42px">
+    <img class="deco" src="assets/beads.webp" alt="" aria-hidden="true" style="width:220px;right:-40px;bottom:-30px;opacity:.9">
+    <img class="deco" src="assets/beads.webp" alt="" aria-hidden="true" style="width:190px;left:18%;top:-46px;opacity:.75;transform:scaleX(-1)">
+    <div class="inner">
+      <div class="lavcard">
+        <p class="eyebrow">✦ The Remains of the Day</p>
+        <h1>让一整季的心动，<br><em>有条不紊</em>地发生。</h1>
+        <p class="lead">长日bot 是为群恋综而生的 QQ 官方机器人：角色、短信、礼物、私约、心动信、关系线、季度，外加一部玩家用的网页小手机。装好以后全在网页后台管理，不用写一行代码。</p>
+        <div class="cta">
+          <a class="btn pri" href="#/install">开始安装 <span aria-hidden="true">→</span></a>
+          <a class="btn sec" href="#/season">读恋综指南</a>
+        </div>
+        <div class="meta">
+          <div><b>3 分钟</b>Linux 一条命令装好</div>
+          <div><b>0</b>需要另装的依赖</div>
+          <div><b>多机器人</b>一台服务器各管各的</div>
+        </div>
+      </div>
+      <div class="phone" aria-label="对话示例">
+        <div class="bar"><span class="av">长</span><div><b>阿林的个人群</b><small>你的机器人 · 官方机器人</small></div></div>
+        <div class="chat" id="demo"></div>
+      </div>
+    </div>
+  </div>
+    </div>
+  </div>
+
+  <div class="band">
+    <div class="wrap">
+      <div class="shead">
+        <div><span class="num">Features · 能做什么</span><h2>一场恋综需要的，<br>它都替你做。</h2></div>
+        <p>主持人不再对着表格手动转发短信、核对时间线。玩家在自己的群里发一句话，剩下的交给机器人。</p>
+      </div>
+      <img class="deco float b" src="assets/orb-glass.webp" alt="" aria-hidden="true" style="width:70px;right:-10px;top:-30px">
+      <div class="grid3" id="feats"></div>
+    </div>
+  </div>
+
+  <div class="band">
+    <div class="wrap">
+      <div class="shead">
+        <div><span class="num">How it works · 工作原理</span><h2>一个负责说，<br>一个负责听。</h2></div>
+        <p>官方机器人稳定、不怕封号，收发消息、指令、通知都靠它。可选的 QQ 小号本来就在各个群里，帮你旁听房间、记下戏文，还能自动改群名。<a href="#/how">看它们怎么配合 →</a></p>
+      </div>
+      <div class="duo">
+        <a class="feat" href="#/how"><div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16v10H8l-4 4z"/></svg></div><h3>官方机器人</h3><p>收指令、发短信、送邀请、派心动信。玩家看到的所有回复都来自它。</p></a>
+        <div class="duo-mid"><span class="orbic big"></span><b>长日bot</b><small>你的服务器</small></div>
+        <a class="feat" href="#/how"><div class="ic silver"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="12" cy="12" r="2.5"/></svg></div><h3>QQ 小号 <span class="tag x">可选</span></h3><p>旁听备用群、记下每一句戏、自动改群名，复盘和字数统计靠它。</p></a>
+      </div>
+    </div>
+  </div>
+
+  <div class="band alt">
+    <div class="wrap">
+      <div class="shead">
+        <div><span class="num">A Season · 一季的样子</span><h2>从预订档期，到收尾封存。</h2></div>
+        <p><a href="#/season">恋综指南</a>按这个顺序，分「玩家」和「主持人」两条线讲清楚每一步该发什么。</p>
+      </div>
+      <img class="deco float" src="assets/orb-silver.webp" alt="" aria-hidden="true" style="width:56px;left:-18px;bottom:-24px;z-index:3">
+      <img class="deco" src="assets/beads.webp" alt="" aria-hidden="true" style="width:200px;right:-20px;bottom:-60px;opacity:.7">
+      <div class="season">
+        <div><span class="d">01</span><h4>开季之前</h4><p>预订季度、设公告群和备用群池；玩家建群、创建角色。</p></div>
+        <div><span class="d">02</span><h4>出场</h4><p>抽取出场顺序，轮到谁，戏群里就出现谁。</p></div>
+        <div><span class="d">03</span><h4>日常</h4><p>短信、送礼、寄信、私约、电话，时间线自动记。</p></div>
+        <div><span class="d">04</span><h4>夜里</h4><p>心动信统一派送，关系线一根根拉起来。</p></div>
+        <div><span class="d">05</span><h4>结季</h4><p>结束季度、复盘长图、收尾清空，等下一季。</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= INSTALL ================= -->
+<section class="page" data-page="install">
+  <div class="wrap doc">
+    <aside class="toc"></aside>
+    <article>
+      <h1 class="ptitle">安装</h1>
+      <p class="psub">安装包自带运行环境，不用装 Python，也不用联网装依赖。Linux 一条命令，Windows 解压即用。当前版本 <code>@VERSION@</code>。</p>
+
+      <h2 id="i-prep"><span class="n">01</span>准备</h2>
+      <div class="gloss">
+        <div><dt>一台服务器</dt><dd>Linux（Ubuntu 20.04+ / Debian 10+ / CentOS 8+）或 Windows，有公网 IP。2 核 2G 够用。</dd></div>
+        <div><dt>一个 QQ 官方机器人</dt><dd>在 <a href="https://q.qq.com" rel="noopener" target="_blank">QQ 开放平台</a> 创建，记下 AppID 和 AppSecret。</dd></div>
+        <div><dt>不需要域名</dt><dd>也不需要备案。想要 HTTPS，后台一键开通。</dd></div>
+        <div><dt>两个端口</dt><dd><code>5091</code> 设置平台；<code>5092</code> 玩家小手机（用到再开）。</dd></div>
+      </div>
+
+      <h2 id="i-setup"><span class="n">02</span>安装</h2>
+      <div class="tabs" data-tabs="os"><button class="on" data-t="linux">Linux</button><button data-t="win">Windows</button></div>
+      <div class="pane on" data-pane="os:linux">
+        <p>登录服务器（腾讯云可以点「登录」打开网页终端），粘贴这一行，回车：</p>
+        <div class="cmdline"><span class="pr">$</span><code>curl -fsSL @BASE@/get.sh | sudo sh</code><button class="copy">复制</button></div>
+        <p>它会自动下载、校验签名、装到 <code>/opt/changri-bot</code>、设为开机自启并启动，最后打印<b>设置平台网址</b>和<b>首次设置验证码</b>。装过 0.19 及以前老版本的，会自动把数据搬过来。</p>
+        <div class="callout"><p>想手动下载安装包，或看 x86_64 / arm64 的直链：<a href="@BASE@/install">下载页 →</a></p></div>
+      </div>
+      <div class="pane" data-pane="os:win">
+        <ol class="steps">
+          <li><b>下载</b>到 <a href="@BASE@/install">下载页</a> 下 Windows 版 zip。</li>
+          <li><b>解除锁定</b>右键 zip →「属性」→ 勾选最下面的「解除锁定」→ 确定。跳过这步，启动时会弹安全提示。</li>
+          <li><b>解压到固定位置</b>例如 <code>D:\changri-bot</code>。解压完压缩包可以删掉。</li>
+          <li><b>启动</b>双击 <code>Start-Changri.bat</code>，浏览器会自动打开设置平台。若弹出「Windows 已保护你的电脑」，点「更多信息」→「仍要运行」。</li>
+          <li><b>开机自启（可选）</b>右键 <code>Install-Autostart.bat</code> →「以管理员身份运行」。</li>
+        </ol>
+        <div class="callout warn"><p>有的杀毒软件会对 .bat 弹提示：它们都是普通文本脚本，可以用记事本打开看内容。</p></div>
+      </div>
+
+      <h2 id="i-first"><span class="n">03</span>第一次使用</h2>
+      <ol class="steps">
+        <li><b>放行端口</b>云服务商控制台的「安全组 / 防火墙」放行 TCP <code>5091</code>；以后开小手机再放行 <code>5092</code>。</li>
+        <li><b>打开设置平台</b>浏览器访问 <code>http://服务器公网IP:5091</code>，输入安装时显示的验证码，建管理账号。</li>
+        <li><b>跟着向导走</b>填 AppID / AppSecret → 把服务器 IP 加进 QQ 开放平台的 IP 白名单 → 设 QQ 管理员 → 建第一个角色 →（可选）开小手机。</li>
+        <li><b>测一下</b>在群里对机器人发 <code>/ping</code>，回「收到」就通了。</li>
+      </ol>
+
+      <h2 id="i-daily"><span class="n">04</span>日常维护</h2>
+      <div class="tblwrap"><table class="tbl">
+        <tr><th>想做的事</th><th>怎么做</th></tr>
+        <tr><td>升级</td><td>后台「更新」一键升级，或 <code>sudo /opt/changri-bot/changri update</code>。会先备份所有数据库；新版本起不来会自动退回。</td></tr>
+        <tr><td>开 HTTPS</td><td>后台「HTTPS」页：先装 Caddy（Linux 粘贴页面上的命令；Windows 右键 <code>Install-HTTPS.bat</code> 以管理员运行），再点「开通」。不用域名。</td></tr>
+        <tr><td>自检</td><td>Linux <code>sudo /opt/changri-bot/changri doctor</code>；Windows 双击 <code>Doctor.bat</code>。</td></tr>
+        <tr><td>备份</td><td>所有数据都在安装目录的 <code>data/</code>，复制它就是备份；也可以 <code>changri backup</code>。</td></tr>
+        <tr><td>看日志</td><td>Linux <code>journalctl -u changri-bot -f</code>；Windows 看启动窗口。</td></tr>
+        <tr><td>重启</td><td>Linux <code>sudo systemctl restart changri-bot</code>；Windows 关窗口再双击 <code>Start-Changri.bat</code>。</td></tr>
+      </table></div>
+
+      <h2 id="i-safe"><span class="n">05</span>安全</h2>
+      <ul>
+        <li>后台默认是 http 明文。到「HTTPS」页一键加密；或在「远程访问」页只放行自己的 IP；或把 <code>data/config.toml</code> 的 <code>host</code> 改成 <code>127.0.0.1</code>。</li>
+        <li><b>扩展是 Python 代码</b>，装上就有和主程序一样的权限，只装信得过的人写的。</li>
+        <li>更新包带 Ed25519 签名，安装前校验；主页即使被改也推不进恶意代码。</li>
+      </ul>
+    </article>
+  </div>
+</section>
+
+<!-- ================= SEASON GUIDE ================= -->
+<section class="page" data-page="season">
+  <div class="wrap doc">
+    <aside class="toc"></aside>
+    <article>
+      <h1 class="ptitle">恋综指南</h1>
+      <p class="psub">一季恋综从头到尾，每一步该在哪个群、发什么。先选你的身份，页面只留和你有关的部分。</p>
+      <div class="roleswitch">
+        <span>我是</span>
+        <div class="seg" id="roleSeg"><button data-role="all" class="on">都看</button><button data-role="player">玩家</button><button data-role="admin">主持人 / 管理员</button></div>
+        <span style="font-size:13px">指令前面加不加 <code>/</code> <code>.</code> <code>。</code> 都行；后台开了「指令必须带前缀」时必须加。</span>
+      </div>
+
+      <h2 id="s-words"><span class="n">00</span>先认识几个词</h2>
+      <dl class="gloss">
+        <div><dt>个人群</dt><dd>每个玩家自己建的小群，拉机器人进去。短信、礼物、邀请都送到这里。</dd></div>
+        <div><dt>公告群</dt><dd>全员大群。论坛、播报、点歌等公开内容发在这里。</dd></div>
+        <div><dt>戏群</dt><dd>出场时用的群，轮到谁，机器人就把谁的出场戏发进来。</dd></div>
+        <div><dt>备用群池</dt><dd>预先建好的一批空群（备用群）。私约、电话开房间时，从这里领一个；没有空群时新的房间开不成，不排队。</dd></div>
+        <div><dt>房间 R12</dt><dd>一次约会 / 电话 / 官约就是一个房间，带编号，复盘、结束都靠它。</dd></div>
+        <div><dt>D几 · 时间</dt><dd>游戏内第几天，时间写成 <code>1400-1500</code>。不写 D 就是今天。</dd></div>
+      </dl>
+
+      <h2 id="s-before"><span class="n">01</span>开季之前</h2>
+      <div class="only-admin">
+        <h3>主持人：搭好舞台 <span class="tag a">管理员</span></h3>
+        <ol class="steps">
+          <li><b>认管理员</b>在设置平台「管理员」页生成 6 位码，到群里发 <code>认管理员 码</code>。</li>
+          <li><b>划分群</b>在全员群发 <code>设为公告群</code>；主持人内部群发 <code>设为后台群</code>；闲聊群发 <code>设为水群</code>；出场用的群发 <code>设为戏群</code>。</li>
+          <li><b>准备备用群池</b>把机器人拉进一批空群，在每个群里发 <code>设为备用群池</code>。<code>查看备用群池</code> 看还剩几个。</li>
+          <li><b>预订季度</b><code>预订季度 长日将尽 1115-1120 补戏1123</code>，也可以在设置平台「季度」页填。</li>
+          <li><b>NPC（可选）</b><code>创建NPC 名字</code> 建一个没有个人群的角色；或 <code>设为NPC 角色名</code>。NPC 不参与出场。</li>
+        </ol>
+      </div>
+      <div class="only-player">
+        <h3>玩家：建好自己的个人群 <span class="tag p">玩家</span></h3>
+        <ol class="steps">
+          <li><b>建群并拉机器人</b>自己建一个 QQ 群，把机器人拉进去，它会发一段欢迎语。</li>
+          <li><b>创建角色</b>在这个群里发 <code>创建新角色 名字</code>，这个群就成了你的个人群。</li>
+          <li><b>备用群（可选）</b>在个人群发 <code>备用群码</code> 拿 6 位码，到新群发 <code>绑定备用群 码</code>。个人群发不出去时会自动改投备用群。</li>
+          <li><b>小手机（可选）</b>发 <code>手机码</code>，拿网页链接和激活码，在手机浏览器里打开。</li>
+          <li><b>拿模板</b>发 <code>格式短信</code> <code>格式送礼</code>，拿到能直接复制的写法。</li>
+        </ol>
+        <div class="ex">
+          <div class="chat static">
+            <div class="msg me">创建新角色 阿林</div>
+            <div class="msg bot"><span class="who">机器人</span>✅ 角色「阿林」创建好了，这个群就是你的个人群。</div>
+          </div>
+          <p class="note">名字就是别人给你发短信、约你时要写的名字，起好再发。换群用 <code>主群码</code> + <code>换主群 码</code>。</p>
+        </div>
+      </div>
+
+      <h2 id="s-entrance"><span class="n">02</span>出场</h2>
+      <p>开季第一天，所有角色按顺序在戏群里登场。</p>
+      <div class="flow"><span>抽取出场顺序</span><i>→</i><span>玩家预存出场戏</span><i>→</i><span>开始出场</span><i>→</i><span>逐个发到戏群</span></div>
+      <ul>
+        <li class="only-admin"><span class="tag a">管理员</span> 在戏群发 <code>抽取出场顺序</code>，再发 <code>开始出场</code>。有人卡住可以 <code>跳过出场</code>。随时 <code>查看出场状态</code>。</li>
+        <li class="only-player"><span class="tag p">玩家</span> 在个人群提前发 <code>提交出场 阿林 内容</code>（可以带图），轮到你时自动发到戏群。也可以轮到时直接在戏群发「阿林 内容」，算你已出场。</li>
+      </ul>
+
+      <h2 id="s-daily"><span class="n">03</span>日常：短信、送礼、寄信</h2>
+      <p>在<b>自己的个人群</b>里发，机器人会转到对方的个人群。每天的次数和冷却由主持人在后台设定。</p>
+      <div class="ex">
+        <div class="chat static">
+          <div class="msg me">短信 小满 今晚的月色很好</div>
+          <div class="msg bot"><span class="who">机器人</span>✅ 已送达「小满」。今天还能发 4 条。</div>
+          <div class="msg me">送礼 小满 一束桔梗 路过花店</div>
+        </div>
+        <div class="note">
+          <p><b>竖着写也行</b>，适合长内容：</p>
+          <div class="cmd" style="padding:12px 14px"><div class="u">【短信】
+对象：小满
+内容：今晚的月色很好
+署名：神秘人（选填）</div></div>
+          <p style="margin-top:10px">发错了？<b>2 分钟内</b>发 <code>撤回</code>，对方群里那条一起删，次数返还。</p>
+        </div>
+      </div>
+      <ul>
+        <li><code>寄信 收件人 内容</code>：比短信更慢、更有仪式感的信。开了「混乱寄信」扩展时，信可能错字、丢半截、被误投……</li>
+        <li><code>我的图鉴</code>：看看收到过哪些礼物。<code>礼品店</code>：送礼时可以直接写编号。</li>
+        <li><code>我的数量</code>：今天还剩几次。<code>我的待回</code>：还有哪些消息、邀请没处理。</li>
+      </ul>
+
+      <h2 id="s-date"><span class="n">04</span>约会：私约、电话、踩点</h2>
+      <p>发起后机器人从备用群池领一个空群当「房间」，通知对方进群。人到齐就开始，聊完在房间里发「结束私约」。</p>
+      <div class="tblwrap"><table class="tbl">
+        <tr><th>类型</th><th>写法</th><th>说明</th></tr>
+        <tr><td>私约</td><td><code>私约 1400-1500 咖啡厅 小满</code></td><td>多人用 <code>/</code> 隔开：<code>小满/阿川</code></td></tr>
+        <tr><td>电话</td><td><code>电话 2100-2200 小满</code></td><td>不需要地点，别人不能中途加入</td></tr>
+        <tr><td>踩点</td><td><code>踩点 1400-1500 大图书馆</code></td><td>一个人去某个地方，看看会遇到谁</td></tr>
+        <tr><td>多人群聊</td><td>小手机 → 发现 → 邀约</td><td>原「微信」已搬到小手机里</td></tr>
+      </table></div>
+      <h3>房间里</h3>
+      <div class="callout"><p><b>戏文格式：</b>首行写角色名，再跟换行 / 空格 / 冒号，后面是正文，例如「阿林：你也来了？」。不按格式的算闲聊，不计入存档和字数。</p></div>
+      <ul>
+        <li><code>结束私约</code>（电话、官约也用这一条）：聊完结束，写进双方时间线。</li>
+        <li><code>申请加入 小满 14:00</code>：想加入别人正在进行的约会；对方用 <code>同意加入 编号</code> / <code>拒绝加入 编号</code>。</li>
+        <li><code>复盘 R12</code>：把一场房间的戏文画成长图，只有参与者和管理员能看。</li>
+        <li><code>补录 R12</code>：监听的 QQ 号掉线漏记了？把聊天记录合并转发到备用群，回复它发这一句。</li>
+        <li><code>时间线</code> / <code>时间线 角色名</code>：看排期。要改：<code>修改时间线 D1 1400-1500</code>，所有参与者 <code>同意时间线</code> 后生效。</li>
+      </ul>
+
+      <h2 id="s-official"><span class="n">05</span>官约与官电</h2>
+      <p>由主持人安排的「节目组约会」。</p>
+      <div class="only-admin">
+        <ul>
+          <li><span class="tag a">管理员</span> <code>发起官约 D3 1400-1500 后山 小满/阿林</code>：立即发起（地点可省）。</li>
+          <li><code>发起官电 D2 2000-2100 小满/阿林</code>：节目组安排的电话。</li>
+          <li><b>批量排：</b>先多次 <code>计划官约 …</code> 攒着，再发一次 <code>执行官约</code> 一起发出；<code>计划官约 清空</code> 重来。</li>
+          <li><code>取消官约 R12</code> 当作没发生过；<code>强结私约 R12</code> 结束卡住的房间；<code>删除时间线 角色名 R12</code> 彻底删掉一场。</li>
+        </ul>
+      </div>
+      <p class="only-player"><span class="tag p">玩家</span> 收到官约邀请后，和私约一样进房间、按格式写戏、结束时发 <code>结束私约</code>。</p>
+
+      <h2 id="s-lovemail"><span class="n">06</span>心动信</h2>
+      <p>每晚的重头戏：白天悄悄投递，到点统一派送。收信人不知道是谁写的，除非你署名。</p>
+      <div class="ex">
+        <div class="chat static">
+          <div class="msg me">发送心动信
+【发送对象】小满
+【内容】今天在图书馆，谢谢你借我的伞。
+【署名】雨天的人</div>
+          <div class="msg bot"><span class="who">机器人</span>💌 已投进信箱，会在今晚统一送达。</div>
+        </div>
+        <div class="note">
+          <p><span class="tag p">玩家</span> <code>我的心动信</code> 看还没送出的；<code>撤回心动信 1</code> 按序号撤回。</p>
+          <p class="only-admin"><span class="tag a">管理员</span> 后台可设定时派送，或手动 <code>统一送心动信</code>。<code>设置信箱上限 D0:3 D1:5</code> 按天限制数量，<code>信箱统计</code> 看每人收了几封。</p>
+        </div>
+      </div>
+
+      <h2 id="s-relations"><span class="n">07</span>关系线、公知与二表</h2>
+      <ul>
+        <li><code>拉线 小满 第一次见面是在雨里</code>：给你和对方的关系线添一条细节，会同步到对方的群。</li>
+        <li><code>查看关系线 小满</code> 看你们之间的所有细节；<code>撤回关系 小满 要撤回的内容</code>；双方都认可时 <code>确认关系线 小满</code>。</li>
+        <li><code>提交公知 内容</code>：大家都能看到的公开设定，可带图，重复提交会覆盖。<code>查看公知</code> 生成长图。</li>
+        <li><code>提交二表 内容</code>：只有本人和管理员能看的私密设定。</li>
+        <li class="only-admin"><span class="tag a">管理员</span> <code>关系线统计</code>：每个人拉了几根线。</li>
+      </ul>
+
+      <h2 id="s-extras"><span class="n">08</span>可选玩法</h2>
+      <p>这些在后台「功能与设置」「扩展」里按需打开，没开的指令不会响应。</p>
+      <div class="grid3" style="grid-template-columns:repeat(2,1fr)">
+        <div class="feat"><h3>论坛</h3><p><code>发帖 署名 内容</code> 匿名发帖；<code>回复帖子 001 内容</code>，<code>点赞 001</code>，<code>查看帖子</code>。</p></div>
+        <div class="feat"><h3>心愿</h3><p><code>挂心愿 1400-1500 花园 一起散步</code>，别人 <code>摘心愿 编号</code> 就开一场约会。悬赏心愿可以带奖励。</p></div>
+        <div class="feat"><h3>前置电话</h3><p><code>提交前置电话 内容</code>，别人 <code>拨打前置电话 编号</code>。管理员可分组、设可选。</p></div>
+        <div class="feat"><h3>物品与商城</h3><p><code>背包</code> <code>商城</code> <code>购买</code> <code>使用</code> <code>转账 小明 金币 50</code>，还有兑换与合成。</p></div>
+        <div class="feat"><h3>晚餐</h3><p>管理员 <code>开始晚餐 8</code>，玩家 <code>入座 3</code>，相邻的人可以 <code>戳你一下 名字</code>。</p></div>
+        <div class="feat"><h3>小玩意</h3><p>漂流瓶、抽取池、点歌、提醒、收集……完整列表见 <a href="#/commands">指令大全</a>。</p></div>
+      </div>
+
+      <h2 id="s-end"><span class="n">09</span>结季与收尾</h2>
+      <div class="only-admin">
+        <ol class="steps">
+          <li><b>看进度</b><code>季度状态</code> 随时告诉你现在在哪一步、下一步该做什么。</li>
+          <li><b>调天数</b>默认按日期自动推进；需要时 <code>设置天数 D3</code>，或 <code>关闭自动天数</code>。<code>修改档期 1115-1121</code> 改日期。</li>
+          <li><b>结束季度</b>最后一天结束后发 <code>结束季度</code>。<code>本场统计</code> 看数据。</li>
+          <li><b>收尾</b>核对存档后发 <code>收尾</code> 先预览会清空什么，再发 <code>收尾 确认</code>。管理员、设置、季度记录会保留。</li>
+        </ol>
+      </div>
+      <p class="only-player"><span class="tag p">玩家</span> 结季前记得用 <code>复盘</code> 把喜欢的戏存成长图；<code>本场统计</code> 看看这一季你发了多少。</p>
+      <hr class="orn">
+      <p style="color:var(--mute)">想查某条指令的全部别名和写法？去 <a href="#/commands">指令大全</a>，或在任意页面按 <kbd>⌘K</kbd> / <kbd>Ctrl K</kbd>。</p>
+    </article>
+  </div>
+</section>
+
+<!-- ================= COMMANDS ================= -->
+<section class="page" data-page="commands">
+  <div class="wrap" style="padding-top:48px;padding-bottom:96px">
+    <h1 class="ptitle">指令大全</h1>
+    <p class="psub" style="margin-bottom:20px">所有群指令，按功能分组。点「复制」直接粘贴到 QQ；搜索支持指令名、别名和说明。</p>
+    <div class="cbar">
+      <div class="row">
+        <label class="search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--faint)"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" placeholder="搜「心动信」「rd」「撤回」…" autocomplete="off"></label>
+        <div class="seg" id="whoSeg"><button class="on" data-w="all">全部</button><button data-w="p">玩家</button><button data-w="a">管理员</button></div>
+      </div>
+      <div class="cats" id="cats"></div>
+    </div>
+    <div id="clist"></div>
+  </div>
+</section>
+
+<!-- ================= DICE ================= -->
+<section class="page" data-page="dice">
+  <div class="wrap doc">
+    <aside class="toc"></aside>
+    <article>
+      <h1 class="ptitle">跑团骰子</h1>
+      <p class="psub">同一个机器人，把群切到跑团模式，就是一颗完整的跑团骰子：COC7、DND5e、绿色三角洲三套规则，还有角色卡、队伍和跑团 log。恋综的指令在跑团群里自动静音，两边互不打扰。点表格里的指令可以直接复制。</p>
+
+      <div class="rules">
+        <div class="rule"><span class="orbic"></span><h4>COC7</h4><p>克苏鲁的呼唤第七版。D100 检定、奖励 / 惩罚骰、困难与极难、理智、疯狂、成长。</p><code data-copy="/切换规则 COC">/切换规则 COC</code></div>
+        <div class="rule"><span class="orbic"></span><h4>DND5e</h4><p>龙与地下城第五版。D20 + 修正对 DC、优势劣势、攻击与暴击、先攻。</p><code data-copy="/切换规则 DND">/切换规则 DND</code></div>
+        <div class="rule dg"><span class="orbic silver"></span><h4>绿色三角洲 <span class="tag x">新</span></h4><p>Delta Green。D100 ≤ 技能，±20 修正，意志力、崩溃点、失败才成长。</p><code data-copy="/切换规则 绿色三角洲">/切换规则 绿色三角洲</code></div>
+      </div>
+
+      <h2 id="d-mode"><span class="n">01</span>开始之前</h2>
+      <ol class="steps">
+        <li><b>切到跑团模式</b>管理员在群里发 <code>/模式 跑团</code>，这个群里的恋综指令就不再响应；<code>/模式 恋综</code> 切回来。单聊和其他群不受影响。</li>
+        <li><b>选规则</b><code>/切换规则 COC</code>、<code>DND</code> 或 <code>绿色三角洲</code>，每个群各记各的。不带参数看当前规则。</li>
+        <li><b>建卡</b><code>/st 力量60 敏捷70</code> 直接录属性，会自动建一张卡；或 <code>/pc new 名字</code> 先建卡。也可以用 <code>/coc</code>、<code>/dnd</code>、<code>/dg</code> 随机掷一组属性。</li>
+        <li><b>看说明</b>群里发 <code>/骰子帮助</code> 会列出目录，<code>/骰子帮助 绿色三角洲</code> 只看其中一块，不会刷屏。</li>
+      </ol>
+
+      <h2 id="d-anat"><span class="n">02</span>一条指令长什么样</h2>
+      <p>把鼠标放到每一段上看看它是什么。</p>
+      <div class="anat" id="anat">
+        <div class="line">
+          <span style="--c:var(--rose)" data-i="0">/</span><span style="--c:var(--amber)" data-i="1">ra</span><span style="--c:var(--gold)" data-i="2">b2</span><span style="--c:var(--plum)" data-i="3">侦查</span><span style="--c:#5a8a7a" data-i="4">+10</span>
+        </div>
+        <div class="parts">
+          <div style="--c:var(--rose)" data-i="0"><b>起始符号</b><span><code>/</code> <code>.</code> <code>。</code> 都可以；不强制时可省略。</span></div>
+          <div style="--c:var(--amber)" data-i="1"><b>指令名</b><span><code>ra</code> 检定，也可以写中文别名「检定」。</span></div>
+          <div style="--c:var(--gold)" data-i="2"><b>奖惩骰 *</b><span>COC 专用：<code>b2</code> 两颗奖励骰，<code>p1</code> 一颗惩罚骰。</span></div>
+          <div style="--c:var(--plum)" data-i="3"><b>技能名</b><span>不写数值就从当前角色卡读。</span></div>
+          <div style="--c:#5a8a7a" data-i="4"><b>修正 / 数值 *</b><span><code>+10</code> 临时修正；写 <code>70</code> 就直接用这个数。</span></div>
+          <div style="--c:var(--line2)"><b>* 可选</b><span>其余部分可省略，空格随意。</span></div>
+        </div>
+      </div>
+
+      <h2 id="d-basic"><span class="n">03</span>通用掷骰</h2>
+      <p>所有规则都能用。不写表达式就是一颗 D100。</p>
+      <div class="tblwrap"><table class="tbl dt"><tr><th>写法</th><th>说明</th></tr><tr><td><code data-copy="/rd 3d6+2d4-1">/rd 3d6+2d4-1</code></td><td>加减和常数</td></tr><tr><td><code data-copy="/rd (1d6+2)×2">/rd (1d6+2)×2</code></td><td>乘法和括号</td></tr><tr><td><code data-copy="/rd 4d6k3">/rd 4d6k3</code></td><td>掷 4 颗取最高 3 颗；<code>2d20kl1</code> 取最低 1 颗</td></tr><tr><td><code data-copy="/rd 3d6!">/rd 3d6!</code></td><td>爆骰：掷出最大值再掷一次</td></tr><tr><td><code data-copy="/rd 5#2d6">/rd 5#2d6</code></td><td>连掷 5 轮</td></tr><tr><td><code data-copy="/rd 伤害 2d6+3">/rd 伤害 2d6+3</code></td><td>在前面写原因</td></tr><tr><td><code data-copy="/rh 1d100">/rh 1d100</code></td><td>暗骰：结果私聊给你，群里只说一声（要先把你加进机器人白名单）</td></tr></table></div>
+
+      <h2 id="d-coc"><span class="n">04</span>COC7</h2>
+      <h3>检定</h3>
+      <div class="tblwrap"><table class="tbl dt"><tr><th>写法</th><th>说明</th></tr><tr><td><code data-copy="/ra 侦查">/ra 侦查</code></td><td>D100 检定；不写数值就取卡上的，没录过按规则书初始值</td></tr><tr><td><code data-copy="/ra 侦查 70">/ra 侦查 70</code></td><td>直接给数值</td></tr><tr><td><code data-copy="/ra b2 困难 射击">/ra b2 困难 射击</code></td><td>b 奖励骰、p 惩罚骰，困难 / 极难；<code>/rb</code>、<code>/rp</code> 是简写</td></tr><tr><td><code data-copy="/ra 侦查+10">/ra 侦查+10</code></td><td>临时修正</td></tr><tr><td><code data-copy="/ra 3#侦查">/ra 3#侦查</code></td><td>连掷 3 次</td></tr><tr><td><code data-copy="/ra 侦查 @某人">/ra 侦查 @某人</code></td><td>代骰，用 TA 的数值</td></tr><tr><td><code data-copy="/rav 力量 60 vs 力量 50">/rav 力量 60 vs 力量 50</code></td><td>对抗检定</td></tr><tr><td><code data-copy="/rah 侦查">/rah 侦查</code></td><td>暗检定</td></tr><tr><td><code data-copy="/setcoc 0-5">/setcoc 0-5</code></td><td>房规：大成功 / 大失败的范围</td></tr></table></div>
+      <h3>理智、疯狂、成长、制卡</h3>
+      <div class="tblwrap"><table class="tbl dt"><tr><th>写法</th><th>说明</th></tr><tr><td><code data-copy="/sc 1/1d6">/sc 1/1d6</code></td><td>理智检定；扣完自动写回卡上，一次掉 5 点以上会提醒做智力检定</td></tr><tr><td><code data-copy="/ti">/ti</code></td><td>临时疯狂症状；<code>/li</code> 总结疯狂症状</td></tr><tr><td><code data-copy="/恐惧症状">/恐惧症状</code></td><td>单掷一个恐惧症状；<code>/狂躁症状</code> 同理</td></tr><tr><td><code data-copy="/en 侦查">/en 侦查</code></td><td>成长检定，成长了自动写回</td></tr><tr><td><code data-copy="/en">/en</code></td><td>跑团模式下检定成功会记成长标记，团后发 <code>/en</code> 一次掷完</td></tr><tr><td><code data-copy="/coc 3">/coc 3</code></td><td>制卡：一次掷 3 组属性，带生命、魔法、理智、DB、体格、移动</td></tr></table></div>
+
+      <h2 id="d-dnd"><span class="n">05</span>DND5e</h2>
+      <div class="tblwrap"><table class="tbl dt"><tr><th>写法</th><th>说明</th></tr><tr><td><code data-copy="/ra 运动 +3 15">/ra 运动 +3 15</code></td><td>D20 + 修正对 DC（DC 可不写）；属性名会自动换算成调整值</td></tr><tr><td><code data-copy="/rb 运动">/rb 运动</code></td><td>优势；<code>/rp</code> 劣势，也可以在 /ra 后面写「优势」「劣势」</td></tr><tr><td><code data-copy="/at 长剑 +5 15 1d8+3">/at 长剑 +5 15 1d8+3</code></td><td>攻击：命中加值、AC、伤害；自然 20 暴击</td></tr><tr><td><code data-copy="/ri 名字 +2">/ri 名字 +2</code></td><td>加入先攻；<code>/ri</code> 看顺序，<code>/ri 清空</code></td></tr><tr><td><code data-copy="/dnd 3">/dnd 3</code></td><td>属性生成：6 项各 4D6 取高 3，掷 3 组</td></tr></table></div>
+
+      <h2 id="d-dg"><span class="n">06</span>绿色三角洲</h2>
+      <p>Delta Green 用的也是 D100，但判定和成长方式和 COC 不一样。切到这套规则后，机器人会按它的规矩判定。</p>
+      <div class="dgrid">
+        <div class="glass dgcard"><b>判定</b><p>D100 ≤ 技能值就是成功。</p><ul><li><b>01</b> 或<b>两位相同</b>（11、22、33……）：成功时是<em>大成功</em>，失败时是<em>大失败</em></li><li><b>00</b> 一定是大失败</li></ul></div>
+        <div class="glass dgcard"><b>修正</b><p>没有奖励骰、惩罚骰，也没有困难等级。</p><ul><li>用 <code>±20</code>、<code>±40</code> 调整，例如 <code>/ra 枪械+20</code></li><li>属性检定自动按<b>属性 × 5</b></li></ul></div>
+        <div class="glass dgcard"><b>理智</b><p>大成功损失取最小值，大失败取最大值。</p><ul><li>一次掉 5 点以上会提醒临时疯狂</li><li>掉到<b>崩溃点</b>会提醒，并把新崩溃点设成 理智 − 意志</li></ul></div>
+        <div class="glass dgcard"><b>成长</b><p>和 COC 相反：<b>检定失败</b>才记成长标记。</p><ul><li>团后 <code>/en</code>，每项 +1D4</li><li>克苏鲁神话、非自然不能靠检定成长</li></ul></div>
+      </div>
+      <div class="tblwrap"><table class="tbl dt"><tr><th>写法</th><th>说明</th></tr><tr><td><code data-copy="/ra 搜索">/ra 搜索</code></td><td>技能检定</td></tr><tr><td><code data-copy="/ra 力量">/ra 力量</code></td><td>属性检定，自动 ×5</td></tr><tr><td><code data-copy="/ra 枪械+20">/ra 枪械+20</code></td><td>±20 / ±40 修正</td></tr><tr><td><code data-copy="/sc 0/1d4">/sc 0/1d4</code></td><td>理智检定</td></tr><tr><td><code data-copy="/en">/en</code></td><td>团后掷成长，每项 +1D4</td></tr><tr><td><code data-copy="/dg 3">/dg 3</code></td><td>制卡：属性 4D6 取高 3，带生命、意志力、理智、崩溃点</td></tr><tr><td><code data-copy="/pc new 名字 dg">/pc new 名字 dg</code></td><td>建一张绿色三角洲的卡</td></tr></table></div>
+      <div class="callout"><p><b>派生数值：</b>生命上限 =（力量 + 体质）÷ 2 向上取整；意志力上限 = 意志；理智上限 = 99 − 非自然；初始理智 = 意志 × 5；崩溃点默认 = 意志 × 4。卡上写「意志力」「崩溃点」或 WP、BP 都认得。COC 专用的 ti、li、rav、setcoc、/coc 在这套规则下会提示你。</p></div>
+
+      <h2 id="d-card"><span class="n">07</span>角色卡</h2>
+      <p>卡跟着人走，换个跑团群也能用。一个人可以有多张卡，每个群各自选用哪一张。</p>
+      <div class="tblwrap"><table class="tbl dt"><tr><th>写法</th><th>说明</th></tr><tr><td><code data-copy="/st 力量60 敏捷70">/st 力量60 敏捷70</code></td><td>录属性</td></tr><tr><td><code data-copy="/st 生命-3">/st 生命-3</code></td><td>增减数值</td></tr><tr><td><code data-copy="/st">/st</code></td><td>看卡（含上限、DB）</td></tr><tr><td><code data-copy="/st del 力量">/st del 力量</code></td><td>删一项；<code>/st clr</code> 清空</td></tr><tr><td><code data-copy="/pc new 名字 coc">/pc new 名字 coc</code></td><td>再建一张卡，规则可写 coc / dnd / dg，不写就跟群规则</td></tr><tr><td><code data-copy="/pc list">/pc list</code></td><td>看自己的卡；<code>/pc 切换 名字</code>、<code>/pc del 名字</code></td></tr><tr><td><code data-copy="/nn 名字">/nn 名字</code></td><td>设你在 log 里显示的名字</td></tr><tr><td><code data-copy="/en list">/en list</code></td><td>看成长标记；<code>/en+ 侦查</code>、<code>/en- 侦查</code> 手动加减</td></tr><tr><td><code data-copy="/我是谁">/我是谁</code></td><td>看自己在这个群里用的是哪张卡</td></tr></table></div>
+
+      <h2 id="d-team"><span class="n">08</span>队伍</h2>
+      <div class="tblwrap"><table class="tbl dt"><tr><th>写法</th><th>说明</th></tr><tr><td><code data-copy="/team 调查员 add @甲 @乙">/team 调查员 add @甲 @乙</code></td><td>加人；不 @ 就是加自己，队伍不存在会自动建</td></tr><tr><td><code data-copy="/team 调查员 侦查 聆听">/team 调查员 侦查 聆听</code></td><td>列出全队的数值，按第一项排序</td></tr><tr><td><code data-copy="/team 调查员 ra 聆听">/team 调查员 ra 聆听</code></td><td>全队各掷一次</td></tr><tr><td><code data-copy="/team list">/team list</code></td><td>看本群的队伍；<code>/team 调查员 del @甲</code>、<code>/team 调查员 clear</code> 解散</td></tr></table></div>
+
+      <h2 id="d-log"><span class="n">09</span>跑团 log</h2>
+      <p>把一场团完整记下来，结束后给一个网页链接，有链接的人都能看。</p>
+      <div class="tblwrap"><table class="tbl dt"><tr><th>写法</th><th>说明</th></tr><tr><td><code data-copy="/log new 第一章">/log new 第一章</code></td><td>开始记；<code>/log off</code> 暂停，<code>/log on</code> 继续</td></tr><tr><td><code data-copy="/log on 第一章">/log on 第一章</code></td><td>接着记以前的一场</td></tr><tr><td><code data-copy="/log end">/log end</code></td><td>结束并生成网页链接；<code>/log halt</code> 强制停止，不给链接</td></tr><tr><td><code data-copy="/log stat 第一章">/log stat 第一章</code></td><td>发言统计；<code>/log list</code>、<code>/log get</code>、<code>/log export</code>、<code>/log del</code></td></tr><tr><td><code data-copy="/说 台词">/说 台词</code></td><td>记一条角色发言；别名 <code>/s</code>、<code>/演</code></td></tr><tr><td><code data-copy="/ob">/ob</code></td><td>切换旁观，旁观者不进 log</td></tr></table></div>
+      <div class="callout"><p><b>自动记录：</b>log 开着的时候，群里的发言会自动记下来，不用每句都发 <code>/说</code>；<code>/说</code> 适合想单独补记一句台词的时候。如果这个群也接了 QQ 小号，两边收到的同一句会自动去重。括号开头的话默认不记。网页链接要先在后台「小手机」页填好玩家访问网址。</p></div>
+
+      <h2 id="d-fun"><span class="n">10</span>小工具</h2>
+      <div class="tblwrap"><table class="tbl dt"><tr><th>写法</th><th>说明</th></tr><tr><td><code data-copy="/name 日 3 女">/name 日 3 女</code></td><td>随机人名：中 / 英 / 日、男 / 女、数量</td></tr><tr><td><code data-copy="/who 甲 乙 丙">/who 甲 乙 丙</code></td><td>随机排顺序</td></tr><tr><td><code data-copy="/draw 塔罗 3">/draw 塔罗 3</code></td><td>抽牌：塔罗、扑克、遭遇；不带参数看牌堆</td></tr><tr><td><code data-copy="/jrrp">/jrrp</code></td><td>今日人品</td></tr><tr><td><code data-copy="/录属性 力量60">/录属性 力量60</code></td><td>恋综模式的群里也能给角色记属性，检定时直接写属性名</td></tr></table></div>
+    </article>
+  </div>
+</section>
+
+<!-- ================= FAQ ================= -->
+<section class="page" data-page="faq">
+  <div class="wrap doc">
+    <aside class="toc"></aside>
+    <article>
+      <h1 class="ptitle">常见问题</h1>
+      <p class="psub">遇到问题先跑一次自检：Linux <code>sudo /opt/changri-bot/changri doctor</code>，Windows 双击 <code>Doctor.bat</code>。</p>
+      <h2 id="f-run"><span class="n">01</span>运行</h2>
+      <details class="qa"><summary>机器人一直不在线</summary><div>多半是 IP 白名单没加对。后台「机器人接入」点「检查连接」，它会告诉你该把哪个 IP 加进 QQ 开放平台。</div></details>
+      <details class="qa"><summary>打不开设置平台</summary><div>检查云服务商安全组是否放行了 TCP 5091；Linux 用 <code>systemctl status changri-bot</code> 看服务是否在跑。</div></details>
+      <details class="qa"><summary>玩家打不开小手机</summary><div>后台「小手机」页点「检查玩家能不能打开」。没通就是安全组没放行 5092。所有机器人共用这一个端口，玩家用激活码登录会自动进到自己的机器人。</div></details>
+      <details class="qa"><summary>一台服务器能跑几个机器人？</summary><div>可以同时接好几个，每个机器人是一套独立的系统，各管各的数据，在设置平台里增删即可，不用重启。</div></details>
+      <details class="qa"><summary>升级失败会不会丢数据？</summary><div>升级前会先备份所有数据库；新版本起不来会自动退回旧版本。</div></details>
+      <h2 id="f-play"><span class="n">02</span>玩法</h2>
+      <details class="qa"><summary>发了指令机器人没反应</summary><div>① 对应的扩展可能没开（后台「功能与设置」）；② 后台开了「指令必须带前缀」，需要在前面加 <code>/</code>；③ 这个群是跑团模式，恋综指令会静音；④ 你还没在个人群「创建新角色」。</div></details>
+      <details class="qa"><summary>短信发错人了</summary><div>2 分钟内在自己群里发 <code>撤回</code>，对方群里那条一起删，次数返还。超过 2 分钟请联系管理员。</div></details>
+      <details class="qa"><summary>复盘说「没有记到戏文」</summary><div>备用群里要有监听的 QQ 号，说话的人要用 <code>绑定qq 你的QQ号</code> 绑过，戏文要按「角色名：正文」写。漏记的可以用 <code>补录 R房间号</code> 补。</div></details>
+      <details class="qa"><summary>备用群池用完了怎么办</summary><div>新的私约、电话会开不成，机器人会告知玩家，不会排队。管理员可以多准备几个备用群，在里面发 <code>设为备用群池</code>。</div></details>
+    </article>
+  </div>
+</section>
+<!-- ================= HOW ================= -->
+<section class="page" data-page="how">
+  <div class="wrap doc">
+    <aside class="toc"></aside>
+    <article>
+      <h1 class="ptitle">工作原理</h1>
+      <p class="psub">长日bot 的主力是<b>官方机器人</b>：收指令、发消息、发通知、补录都靠它。<b>QQ 小号</b>是可选的帮手，本来就在各个群里，等着旁听房间、记下戏文，还能顺手改群名。中间由装在你服务器上的长日bot 指挥。</p>
+
+      <div class="arch">
+        <div class="node">
+          <span class="orbic"></span>
+          <h4>官方机器人</h4>
+          <p>QQ 开放平台创建，用 AppID / AppSecret 接入</p>
+          <ul><li>收玩家的指令</li><li>往个人群、公告群发消息</li><li>通知、播报、心动信派送</li></ul>
+        </div>
+        <div class="wire"><span>官方接口</span><i></i></div>
+        <div class="node core">
+          <span class="orbic big"></span>
+          <h4>长日bot</h4>
+          <p>装在你自己的服务器上</p>
+          <ul><li>角色、时间线、季度、数据库</li><li>设置平台 :5091 · 小手机 :5092</li><li>决定谁来说、谁来听</li></ul>
+        </div>
+        <div class="wire"><span>OneBot 11 · WebSocket + 口令</span><i></i></div>
+        <div class="node">
+          <span class="orbic silver"></span>
+          <h4>QQ 小号 <span class="tag x">可选</span></h4>
+          <p>登录在 NapCat / LLBot / SnowLuma 这类客户端里</p>
+          <ul><li>旁听备用群里的每一句</li><li>给备用群改群名</li><li>官方机器人不在的备用群里代为回话</li></ul>
+        </div>
+      </div>
+
+      <h2 id="h-why"><span class="n">01</span>为什么还要一个小号</h2>
+      <p>说话、指令、通知、补录，官方机器人都能做。小号的好处是<b>省事</b>：它本来就在群里，不用一个个拉机器人、开设置；而且它能改群名，这是官方机器人做不到的。</p>
+      <div class="tblwrap"><table class="tbl">
+        <tr><th>事情</th><th>官方机器人</th><th>QQ 小号</th></tr>
+        <tr><td>收指令、发通知</td><td>✓ 主力</td><td>只在官方机器人不在的备用群里，回结束私约、修改时间线这几句</td></tr>
+        <tr><td>进备用群</td><td>要把它拉进每一个备用群，并打开相应设置</td><td>✓ 本来在群里就行，比如以前给海豹骰用过的号</td></tr>
+        <tr><td>改群名</td><td>✗</td><td>✓ 要是群管理员或群主</td></tr>
+        <tr><td>认出真实群号</td><td>✗ 只有加密的群 ID，靠「认群码」绑定</td><td>✓ 后台直接勾选群，加进群号组</td></tr>
+        <tr><td>补录漏记的戏</td><td>✓ 在个人群回复那条合并转发，发 <code>补录 R12</code></td><td>✓ 在备用群里也能补</td></tr>
+        <tr><td>踢人、禁言、加好友</td><td>—</td><td>✗ 代码里直接禁止</td></tr>
+      </table></div>
+      <div class="callout"><p><b>小号是可选的。</b>不接小号，短信、心动信、关系线、季度都不受影响；约会房间就得把官方机器人拉进每个备用群并打开设置，群名也不会自动改。目前房间戏文的复盘由小号来记；让官方机器人在备用群里也能记，是接下来要做的。</p></div>
+
+      <h2 id="h-date"><span class="n">02</span>一场私约里，两个账号怎么配合</h2>
+      <ol class="steps relay">
+        <li><b>玩家发起 <span class="who k">官方机器人</span></b>阿林在自己的个人群发 <code>私约 1400-1500 咖啡厅 小满</code>，官方机器人收到，交给长日bot。</li>
+        <li><b>领一个房间 <span class="who c">长日bot</span></b>从备用群池里领一个空闲的备用群，记成 R12，写进两个人的时间线。备用群池用完了就无法开启，并告知玩家。</li>
+        <li><b>改群名 <span class="who q">小号</span></b>小号把群名改成「私约 D2 1400-1500 咖啡厅 阿林/小满」，谁进错群一眼就看得出来。</li>
+        <li><b>发邀请 <span class="who k">官方机器人</span></b>官方机器人在阿林和小满的个人群里各发一条邀请，告诉他们进哪个群。</li>
+        <li><b>旁听写戏 <span class="who q">小号</span></b>两个人在备用群里按「角色名：正文」写戏，小号听到每一句，记进 R12 的复盘，并统计字数。玩家要先发过 <code>绑定qq 自己的QQ号</code>，小号才认得出谁是谁。</li>
+        <li><b>结束 <span class="who q">小号</span></b>有人在备用群发 <code>结束私约</code>，小号听到后照常处理，并在群里回话。</li>
+        <li><b>归还 <span class="who q">小号</span></b>群名改回空闲时的名字，房间回到备用群池等下一场。<code>复盘 R12</code> 可以把这场戏画成长图。</li>
+        <li><b>补录 <span class="who k">官方机器人</span></b>小号掉线漏记了几句？把那段聊天记录合并转发到自己的个人群，回复它发 <code>补录 R12</code>，官方机器人会把缺的按顺序补进复盘。</li>
+      </ol>
+
+      <h2 id="h-safe"><span class="n">03</span>小号只做这些事</h2>
+      <ul>
+        <li><b>只看群号组里的群。</b>不在群号组里的群，消息在内存里就丢掉，不写进数据库；也不允许给它们改名。</li>
+        <li><b>只放行几种操作：</b>改群名、读群列表和群成员、读合并转发，以及在备用群里发提示。踢人、禁言这些在代码里就调不了。</li>
+        <li><b>只在本机连接：</b>默认连 <code>ws://127.0.0.1:3001</code>，带口令。客户端和长日bot 放在同一台服务器最省心。</li>
+        <li><b>不用它聊天：</b>平时收发消息、回指令的始终是官方机器人。小号只在官方机器人不在的备用群里，回几句房间指令。</li>
+      </ul>
+
+      <h2 id="h-down"><span class="n">04</span>小号掉线了怎么办</h2>
+      <ol class="steps">
+        <li><b>报警</b>小号掉线超过 2 分钟，官方机器人会在后台群（没设后台群就发在公告群）提醒主持人；恢复了再提醒一次。</li>
+        <li><b>自动转到小手机</b>「掉线备案」默认开着：通知所有玩家先暂停在 QQ 群回戏，自动打开小手机并发激活码。掉线期间在小手机上写的戏，进同一份复盘，接着原来的进度。</li>
+        <li><b>恢复后回到 QQ 群</b>所有小号都回来后，自动打开的小手机会关回去，并 @ 大家回 QQ 群接着写。漏记的戏可以用 <code>补录 R房间号</code> 补回来。</li>
+      </ol>
+
+      <h2 id="h-setup"><span class="n">05</span>接一个小号</h2>
+      <ol class="steps">
+        <li><b>准备小号</b>用一个不常用的 QQ 号，拉进所有备用群，并设成管理员（改群名需要）。</li>
+        <li><b>装客户端</b>在服务器上装 NapCat、LLBot 或 SnowLuma 这类 OneBot 11 客户端，用小号扫码登录，打开「正向 WebSocket」，设一个口令。</li>
+        <li><b>在后台连上</b>设置平台「连接群号组」页，添加 QQ 号连接：填地址（例如 <code>ws://127.0.0.1:3001</code>）和口令。可以连多个号。</li>
+        <li><b>把群放进群号组</b>连上后，小号在的群会列在页面上，勾选要用的备用群，放进一个群号组。</li>
+        <li><b>让玩家绑 QQ</b>每个玩家在自己的个人群发一次 <code>绑定qq 自己的QQ号</code>。</li>
+      </ol>
+      <div class="callout warn"><p><b>风险提醒：</b>个人 QQ 号用第三方客户端登录，有被 QQ 检测、警告甚至冻结的可能，所以请用小号，别用主号。这个号不能同时登录电脑版 QQ，否则会互相挤下线；客户端有时需要重新扫码。</p></div>
+    </article>
+  </div>
+</section>
+
+<!-- ================= APP ================= -->
+<section class="page" data-page="app">
+  <div class="wrap doc">
+    <aside class="toc"></aside>
+    <article>
+      <h1 class="ptitle">申请专属 App</h1>
+      <p class="psub">我们不提供通用的安卓安装包。每个团有自己的名字、颜色和图标，由我们按你的信息单独打包，再发给你。填好下面的信息，复制，发给我们就行。</p>
+      <h2 id="a-form"><span class="n">01</span>填写信息</h2>
+      <form id="appf" class="form glass" autocomplete="off">
+        <div class="row"><label for="team">团的名字 <small>也是 App 的名字</small></label><input id="team" type="text" maxlength="12" required placeholder="例如：长日将尽"></div>
+        <div class="row"><label for="host">你的服务器地址 <small>设置平台所在的服务器，网址或 IP 都可以</small></label><input id="host" type="text" required placeholder="例如：https://phone.example.com 或 http://1.2.3.4:5091"></div>
+        <div class="row"><label for="color">主题色</label><div class="colorrow"><input id="color" type="color" value="#7a6fe0"><span id="cv">#7a6fe0</span><span class="swatch" id="sw"></span></div></div>
+        <div class="row"><label for="icon">图标 <small>说明一下想要什么，或者说明你会把图片文件一起发来</small></label><textarea id="icon" rows="3" placeholder="例如：深蓝底，中间一个白色的月亮；图片我会另外发给你"></textarea></div>
+        <div class="row"><label for="qq">你的 QQ 号 <small>方便我们联系你</small></label><input id="qq" type="text" inputmode="numeric" required></div>
+        <button class="btn pri" type="submit">生成申请信息 <span aria-hidden="true">→</span></button>
+      </form>
+      <div id="appout" hidden>
+        <h2 id="a-send"><span class="n">02</span>复制并发送</h2>
+        <div class="cmdline" style="align-items:flex-start"><code id="appmsg" style="white-space:pre-wrap"></code><button class="copy" id="appcopy" type="button">复制</button></div>
+        <p style="color:var(--mute)">把上面这段发给 <b>QQ 3052553938</b>，我们会在收到后联系你。</p>
+      </div>
+    </article>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div><a class="brand" href="#/"><span class="mark"></span>长日<small>bot</small></a><p style="margin:10px 0 0">为群恋综而生的 QQ 官方机器人 · v@VERSION@</p></div>
+    <div style="text-align:right"><a href="@BASE@/install">下载安装包</a> · <a href="https://github.com/eren006/changri" target="_blank" rel="noopener">GitHub</a> · <a href="#/app">申请专属 App</a><p style="margin:10px 0 0">投诉举报 QQ：3052553938 · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener" style="color:inherit">浙ICP备2026078867号-1</a></p><p style="margin:2px 0 0">部分规则改编自「长日将尽」CC BY-NC-SA 作品</p></div>
+  </div>
+</footer>
+
+<div class="pal" id="pal" role="dialog" aria-label="搜索">
+  <div class="box">
+    <input id="palq" placeholder="搜索指令、章节…" autocomplete="off">
+    <ul id="pall"></ul>
+    <div class="foot"><span><kbd>↑</kbd> <kbd>↓</kbd> 选择</span><span><kbd>↵</kbd> 打开 / 复制</span><span><kbd>esc</kbd> 关闭</span></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+"use strict";
+// ---------- data: [名称, 别名, 用法, 说明, 谁(p 玩家 / a 管理员), 分组] ----------
+var G = [
+ ["start","入门与群","在任意群里","绑定角色、绑定群、认管理员和设置群用途。"],
+ ["social","短信与礼物","在自己的个人群里发","每天的次数、冷却在后台「功能与设置」调。"],
+ ["date","约会与时间线","私约 / 电话 / 踩点 / 官约","发起后从备用群池领房间，聊完结束，自动写进时间线。"],
+ ["love","心动信与关系线","夜间派送 · 关系细节",""],
+ ["season","季度与出场","主持人主导","季度推进、游戏天数、出场顺序、NPC。"],
+ ["ext","扩展玩法","在后台按需开启","论坛、心愿、前置电话、物品商城、晚餐、抽取池等。"],
+ ["dice","跑团骰子","跑团模式的群","COC7 / DND5e / 绿色三角洲 掷骰与角色卡。"]
+];
+var C = [
+ // start
+ ["创建新角色","","创建新角色 名字","在当前群创建角色，这个群成为你的个人群。","p","start"],
+ ["我的角色","我的群","我的角色","看自己的角色和绑了哪些群。","p","start"],
+ ["认群","","认群 6位认群码","用认群码把当前群绑给你的角色。","p","start"],
+ ["备用群码","","备用群码","生成备用群认群码（10 分钟有效）。","p","start"],
+ ["绑定备用群","","绑定备用群 码","在新群里绑成备用群；个人群发不出去时自动改投。","p","start"],
+ ["主群码 / 换主群","","主群码 → 换主群 码","把个人群换到一个新群。","p","start"],
+ ["解绑备用群","","解绑备用群 序号","序号看「我的群」。","p","start"],
+ ["手机码","","手机码","拿网页小手机的链接和激活码。","p","start"],
+ ["绑定qq","绑定QQ、绑QQ","绑定qq 你的QQ号","让监听号认出你，房间戏文才能记到你名下。","p","start"],
+ ["拉黑","","拉黑 角色名 [静默]","不再收到对方的短信。","p","start"],
+ ["取消拉黑 / 拉黑列表","","取消拉黑 角色名","","p","start"],
+ ["ping","","/ping","连通性测试，回「收到」。","p","start"],
+ ["认管理员","","认管理员 6位管理员码","码在设置平台「管理员」页生成。","a","start"],
+ ["设为公告群","取消公告群","设为公告群","全员大群：论坛、播报发这里。","a","start"],
+ ["设为后台群","设后台群、取消后台群","设为后台群","主持人内部群，接收系统提醒。","a","start"],
+ ["设为水群","设水群、取消水群","设为水群","闲聊群。","a","start"],
+ ["查看未认群","","查看未认群","机器人在、但还没绑给任何人的群。","a","start"],
+ // social
+ ["短信","【短信】","短信 收信人 内容","发一条短信到对方的个人群，可带一张图。","p","social"],
+ ["送礼","【送礼】","送礼 对象 礼物 [留言]","送一份礼物；礼品店里的可以直接写编号。","p","social"],
+ ["撤回","","撤回","撤回 2 分钟内最近一条短信 / 礼物，次数返还。","p","social"],
+ ["格式","格式短信、格式送礼、格式撤回","格式短信","拿可复制的写法模板。","p","social"],
+ ["寄信","","寄信 收件人 内容","寄一封信；开了混乱寄信时会出岔子。","p","social"],
+ ["我的图鉴","图鉴、我的礼物","我的图鉴","收到过的所有礼物。","p","social"],
+ ["礼品店","","礼品店","看礼物编号。","p","social"],
+ ["我的数量","","我的数量","今天还能发几条。","p","social"],
+ ["我的待回","","我的待回","还没处理的消息和邀请。","p","social"],
+ // date
+ ["私约","","私约 1400-1500 咖啡厅 小满/阿川","发起私约，多人用 / 隔开。","p","date"],
+ ["电话","","电话 2100-2200 小满","发起电话，不能中途加入。","p","date"],
+ ["踩点","","踩点 1400-1500 大图书馆","一个人去某个地点。","p","date"],
+ ["结束私约","结束电话、结束官约、结束踩点、结束心愿、结束约会","结束私约 [R12]","在房间里发结束；不在房间就带上房间号。","p","date"],
+ ["申请加入","","申请加入 小满 14:00","申请加入对方正在进行的约会。","p","date"],
+ ["同意加入 / 拒绝加入","加入请求","同意加入 编号","处理别人的加入申请。","p","date"],
+ ["复盘","","复盘 R12","把房间戏文画成长图。","p","date"],
+ ["补录","","（回复合并转发）补录 R12","补记监听号掉线期间漏掉的戏。","p","date"],
+ ["时间线","","时间线 [角色名]","看排期。","p","date"],
+ ["修改时间线","同意时间线、拒绝时间线","修改时间线 D1 1400-1500","全员同意后生效。","p","date"],
+ ["本场统计","我的统计","本场统计","这一季的数据。","p","date"],
+ ["发起官约","","发起官约 [D3] 1400-1500 [后山] 小满/阿林","节目组安排的约会。","a","date"],
+ ["发起官电","","发起官电 D2 2000-2100 小满/阿林","节目组安排的电话。","a","date"],
+ ["计划官约 / 执行官约","","计划官约 D2 1400-1500 后山 小满/阿林","先攒着，执行时一起发起；「计划官约 清空」重来。","a","date"],
+ ["取消官约","取消房间","取消官约 R12","当作没发生过。","a","date"],
+ ["强结私约","强结","强结私约 R12","强制结束卡住的房间。","a","date"],
+ ["删除时间线","","删除时间线 角色名 R12","连同复盘一起删掉一场。","a","date"],
+ ["设为备用群池","设为群池、取消备用群池、取消群池、查看备用群池、查看群池","设为备用群池","把当前空群加进备用群池。","a","date"],
+ // love
+ ["发送心动信","心动信","发送心动信\n【发送对象】小满\n【内容】想说的话\n【署名】选填","投进信箱，到点统一派送。","p","love"],
+ ["我的心动信","","我的心动信","还没送出的心动信。","p","love"],
+ ["撤回心动信","","撤回心动信 1","按序号撤回。","p","love"],
+ ["拉线","","拉线 对方名 内容","给关系线加一条细节，同步到对方群。","p","love"],
+ ["查看关系线","","查看关系线 [对方名]","你们之间的所有细节。","p","love"],
+ ["撤回关系","","撤回关系 对方名 内容","撤回自己写的一条细节。","p","love"],
+ ["确认关系线","","确认关系线 对方名","确认关系线完成。","p","love"],
+ ["提交公知 / 查看公知","","提交公知 内容","公开设定，可带图，生成长图。","p","love"],
+ ["提交二表 / 查看二表","","提交二表 内容","私密设定，只有本人和管理员能看。","p","love"],
+ ["统一送心动信","","统一送心动信","立刻派送信箱里的所有心动信。","a","love"],
+ ["设置信箱上限","","设置信箱上限 D0:3 D1:5","按天限制每人能收几封；「默认 4」「清空」。","a","love"],
+ ["信箱统计","","信箱统计","每人收到几封。","a","love"],
+ ["关系线统计","","关系线统计","每人拉了几根线。","a","love"],
+ // season
+ ["季度状态","","季度状态","现在在哪一步、下一步做什么。","a","season"],
+ ["预订季度","","预订季度 长日将尽 1115-1120 补戏1123","预订档期。","a","season"],
+ ["开始季度 / 结束季度","","开始季度","","a","season"],
+ ["收尾","","收尾 → 收尾 确认","预览并清空本季数据。","a","season"],
+ ["修改档期","","修改档期 1115-1121 [补戏1123]","","a","season"],
+ ["设置天数","开启自动天数、关闭自动天数","设置天数 D3","手动设游戏天数。","a","season"],
+ ["创建NPC","设为NPC、取消NPC、NPC列表","创建NPC 名字","没有个人群的角色。","a","season"],
+ ["设为戏群","取消戏群","设为戏群","出场发到这里。","a","season"],
+ ["抽取出场顺序","","抽取出场顺序","随机排出场顺序。","a","season"],
+ ["开始出场 / 跳过出场","","开始出场","","a","season"],
+ ["查看出场状态","","查看出场状态","","p","season"],
+ ["提交出场","","提交出场 角色名 内容","预存出场戏，轮到时自动发。","p","season"],
+ // ext
+ ["发帖","","发帖 署名 内容","在论坛匿名发帖。","p","ext"],
+ ["回复帖子","","回复帖子 001 [引用2|署名] 内容","","p","ext"],
+ ["点赞 / 点踩","点赞楼层、点踩楼层","点赞 001","","p","ext"],
+ ["查看帖子","","查看帖子 [贴号]","","p","ext"],
+ ["删帖 / 删楼层","","删帖 001","","a","ext"],
+ ["挂心愿","","挂心愿 1400-1500 花园 一起散步","挂出一个心愿等人来摘。","p","ext"],
+ ["悬赏心愿","","悬赏心愿 1400-1500 图书馆 陪我看书 | 滋补汤 1","带奖励的心愿。","p","ext"],
+ ["看心愿 / 摘心愿 / 撤心愿","","摘心愿 编号","摘走后自动开约会房间。","p","ext"],
+ ["提交前置电话","前置电话提交","提交前置电话 内容","","p","ext"],
+ ["拨打前置电话","拨打","拨打前置电话 编号","","p","ext"],
+ ["查看前置电话","前置电话、我的前置电话、撤回前置电话","查看前置电话","","p","ext"],
+ ["前置电话分组","可选、不可选、前置电话一览","前置电话分组 A组 3 5 8","","a","ext"],
+ ["背包","我的背包","背包","","p","ext"],
+ ["商城 / 购买 / 使用","道具商城","商城","看商品，再按提示购买、使用。","p","ext"],
+ ["赠送道具","赠送物品、转账、赠送货币","转账 小明 金币 50","","p","ext"],
+ ["角色卡","名片、我的名片","角色卡","你的角色名片。","p","ext"],
+ ["兑换 / 合成","兑换表、合成表","合成 编号 [次数]","","p","ext"],
+ ["地点","","地点","看可约会的地点。","p","ext"],
+ ["开始晚餐","结束晚餐","开始晚餐 5 现代西餐","","a","ext"],
+ ["入座 / 戳你一下","","入座 3","相邻座位可以戳。","p","ext"],
+ ["抽取","我的抽取次数、我的保底、查看池子","抽取 [池子] [次数]","","p","ext"],
+ ["发放抽取","","发放抽取 角色名 次数 [池子]","给所有人发：发放抽取 全体 1 新年池","a","ext"],
+ ["漂流瓶","","漂流瓶 内容","扔一个；「漂流瓶 编号 内容」回信。","p","ext"],
+ ["点歌","","点歌 歌名","发到公告群。","p","ext"],
+ ["提醒","我的提醒、删除提醒、再提醒我","提醒 时间 内容","","p","ext"],
+ ["收集","","收集 [内容]","看正在收集什么，或提交。","p","ext"],
+ // dice
+ ["rd","r","r 3d6+2 原因","通用掷骰。","p","dice"],
+ ["rh","暗骰","rh 1d100","结果私发。","p","dice"],
+ ["ra","检定","ra 侦查 [60]","技能检定。COC 可带 b/p 奖惩骰，绿色三角洲用 ±20。","p","dice"],
+ ["rah","暗检定","rah 聆听","","p","dice"],
+ ["rb / rp","","rb2","奖励骰 / 惩罚骰。","p","dice"],
+ ["rav","对抗","rav 力量 60 vs 力量 50","对抗检定。","p","dice"],
+ ["sc","理智检定","sc 1/1d6","扣完自动写回卡上。","p","dice"],
+ ["en","成长","en [技能]","成长检定；不带参数一次掷完标过的（绿色三角洲每项 +1D4）。","p","dice"],
+ ["ti / li","临时疯狂、总结疯狂","ti","","p","dice"],
+ ["恐惧症状 / 狂躁症状","phobia、mania","恐惧症状","","p","dice"],
+ ["coc","制卡、车卡","coc 5","COC7 随机属性。","p","dice"],
+ ["dnd","属性生成","dnd 3","DND 属性生成。","p","dice"],
+ ["dg","","dg [组数]","绿色三角洲制卡。","p","dice"],
+ ["ri","先攻","ri +2","先攻。","p","dice"],
+ ["at","攻击","at 长剑","","p","dice"],
+ ["st","录卡、看卡","st 力量60 敏捷70","录入当前角色卡。","p","dice"],
+ ["pc / nn","改名","pc new 名字 [coc|dnd|dg]","建卡、pc list 看卡、切换；nn 改名。","p","dice"],
+ ["我是谁","whoami","我是谁","","p","dice"],
+ ["team","队伍","team 调查员 ra 聆听","整队一起检定。","p","dice"],
+ ["log","","log new|on|off|end|get","跑团记录。","p","dice"],
+ ["说 / ob","s、演、旁观","说 内容","以角色身份说话 / 旁观。","p","dice"],
+ ["jrrp / draw / name / who","今日人品、抽牌、随机名字、随机顺序","jrrp","小工具。","p","dice"],
+ ["模式","切换模式","模式 跑团","在恋综 / 跑团模式间切换（需要机器人管理员）。","a","dice"],
+ ["切换规则","规则、setrule","切换规则 dnd","","a","dice"],
+ ["setcoc","房规","setcoc 1","COC 房规。","a","dice"],
+ ["骰子帮助","骰子、dicehelp","骰子帮助","机器人内的骰子说明。","p","dice"]
+];
+var DICE = {coc:["ra","rah","rb / rp","sc","en","ti / li","coc","rav"],dnd:["dnd","ri","at","ra"],card:["st","pc / nn","我是谁","team","log","说 / ob"]};
+
+var FEATS = [
+ ["短信与礼物","在个人群里发一句，自动送达对方，可带图，2 分钟内可撤回。",["短信","送礼","撤回"],'<path d="M4 6h16v10H8l-4 4z"/>'],
+ ["约会房间","私约、电话、踩点，从备用群池自动领房间，人到齐就开始。",["私约","电话","结束私约"],'<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>'],
+ ["心动信","白天投递，夜里统一派送，署名与否由你决定。",["发送心动信","撤回心动信"],'<path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/>'],
+ ["关系线","每一段关系的细节都有据可查，可同步给对方。",["拉线","查看关系线"],'<circle cx="6" cy="12" r="3"/><circle cx="18" cy="12" r="3"/><path d="M9 12h6"/>'],
+ ["季度与出场","预订档期、自动推进天数、抽出场顺序、一键收尾。",["季度状态","抽取出场顺序"],'<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>'],
+ ["网页小手机","玩家在手机浏览器里收发、邀约、看时间线。",["手机码"],'<rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/>']
+];
+
+var DEMO = [
+ ["me","短信 小满 今晚的月色很好"],
+ ["bot","✅ 已送达「小满」。今天还能发 4 条。"],
+ ["me","私约 1400-1500 咖啡厅 小满"],
+ ["bot","📌 私约已发起，房间号 R12\n14:00–15:00 · 咖啡厅\n等「小满」进群就开始。"],
+ ["me","发送心动信\n【发送对象】小满\n【内容】谢谢你借我的伞。"],
+ ["bot","💌 已投进信箱，今晚 22:00 统一送达。"]
+];
+
+// ---------- helpers ----------
+var $ = function(s,r){return (r||document).querySelector(s)};
+var $$ = function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s))};
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function hl(s,q){s=esc(s);if(!q)return s;var i=s.toLowerCase().indexOf(esc(q).toLowerCase());return i<0?s:s.slice(0,i)+"<mark>"+s.slice(i,i+q.length)+"</mark>"+s.slice(i+q.length)}
+var tt;function toast(m){var t=$("#toast");t.textContent=m;t.classList.add("on");clearTimeout(tt);tt=setTimeout(function(){t.classList.remove("on")},1600)}
+function copy(text){
+  var done=function(){toast("已复制："+text.split("\n")[0])};
+  if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(text).then(done,fallback)}else fallback();
+  function fallback(){var a=document.createElement("textarea");a.value=text;a.style.position="fixed";a.style.opacity="0";document.body.appendChild(a);a.select();try{document.execCommand("copy");done()}catch(e){toast("复制失败，请手动选择")}a.remove()}
+}
+function store(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){return null}}
+
+// ---------- theme ----------
+var saved=store("cr-theme");if(saved)document.documentElement.setAttribute("data-theme",saved);
+$("#theme").onclick=function(){
+  var cur=document.documentElement.getAttribute("data-theme")||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");
+  var n=cur==="dark"?"light":"dark";document.documentElement.setAttribute("data-theme",n);store("cr-theme",n);
+};
+
+// ---------- home ----------
+$("#feats").innerHTML=FEATS.map(function(f){
+  return '<div class="feat"><div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+f[3]+'</svg></div><h3>'+f[0]+'</h3><p>'+f[1]+'</p><div class="cmds">'+f[2].map(function(c){return '<span class="chip" data-copy="'+esc(c)+'">'+esc(c)+'</span>'}).join("")+'</div></div>';
+}).join("");
+var demoTimer=null;
+function runDemo(){
+  var box=$("#demo");if(!box)return;clearTimeout(demoTimer);box.innerHTML="";
+  var i=0;(function next(){
+    if(i>=DEMO.length){demoTimer=setTimeout(runDemo,4200);return}
+    var d=DEMO[i++],el=document.createElement("div");el.className="msg "+d[0];
+    el.innerHTML=(d[0]==="bot"?'<span class="who">机器人</span>':"")+esc(d[1]);box.appendChild(el);
+    requestAnimationFrame(function(){requestAnimationFrame(function(){el.classList.add("show")})});
+    demoTimer=setTimeout(next,d[0]==="me"?900:1700);
+  })();
+}
+
+// ---------- commands page ----------
+var state={q:"",w:"all",cat:"all"};
+$("#cats").innerHTML='<button class="on" data-c="all">全部 <span style="opacity:.6">'+C.length+'</span></button>'+G.map(function(g){
+  var n=C.filter(function(c){return c[5]===g[0]}).length;return '<button data-c="'+g[0]+'">'+g[1]+' <span style="opacity:.6">'+n+'</span></button>'}).join("");
+function cmdCard(c,q){
+  var tag=c[4]==="a"?'<span class="tag a">管理员</span>':'<span class="tag p">玩家</span>';
+  return '<div class="cmd"><div class="h"><span class="nm">'+hl(c[0],q)+'</span>'+tag+'</div>'+
+    (c[1]?'<div class="al">别名：'+hl(c[1],q)+'</div>':'')+
+    (c[3]?'<div class="d">'+hl(c[3],q)+'</div>':'<div style="height:8px"></div>')+
+    '<div class="u">'+esc(c[2])+'</div><button class="cp" data-copy="'+esc(c[2])+'">复制</button></div>';
+}
+function renderCmds(){
+  var q=state.q.trim().toLowerCase(),html="";
+  G.forEach(function(g){
+    if(state.cat!=="all"&&state.cat!==g[0])return;
+    var list=C.filter(function(c){
+      if(c[5]!==g[0])return false;
+      if(state.w!=="all"&&c[4]!==state.w)return false;
+      return !q||(c[0]+" "+c[1]+" "+c[2]+" "+c[3]).toLowerCase().indexOf(q)>=0;
+    });
+    if(!list.length)return;
+    html+='<div class="cgroup"><h3>'+g[1]+'<small>'+g[2]+'</small></h3>'+(g[3]?'<p>'+g[3]+'</p>':'')+'<div class="clist">'+list.map(function(c){return cmdCard(c,state.q.trim())}).join("")+'</div></div>';
+  });
+  $("#clist").innerHTML=html||'<div class="empty">没有找到「'+esc(state.q)+'」相关的指令。</div>';
+}
+$("#q").addEventListener("input",function(e){state.q=e.target.value;renderCmds()});
+$("#whoSeg").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;$$("#whoSeg button").forEach(function(x){x.classList.toggle("on",x===b)});state.w=b.dataset.w;renderCmds()});
+$("#cats").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;$$("#cats button").forEach(function(x){x.classList.toggle("on",x===b)});state.cat=b.dataset.c;renderCmds()});
+renderCmds();
+
+// dice cards
+$$("[data-dice]").forEach(function(el){
+  el.innerHTML=DICE[el.dataset.dice].map(function(n){var c=C.filter(function(x){return x[0]===n&&x[5]==="dice"})[0];return c?cmdCard(c,""):""}).join("");
+});
+// anatomy hover
+$$("#anat [data-i]").forEach(function(el){
+  el.addEventListener("mouseenter",function(){$$('#anat [data-i="'+el.dataset.i+'"]').forEach(function(x){x.classList.add("on")})});
+  el.addEventListener("mouseleave",function(){$$("#anat .on").forEach(function(x){x.classList.remove("on")})});
+});
+
+// ---------- role switch ----------
+function setRole(r){document.body.dataset.role=r;$$("#roleSeg button").forEach(function(b){b.classList.toggle("on",b.dataset.role===r)});store("cr-role",r);buildToc()}
+$("#roleSeg").addEventListener("click",function(e){var b=e.target.closest("button");if(b)setRole(b.dataset.role)});
+
+// ---------- tabs ----------
+$$("[data-tabs]").forEach(function(t){
+  t.addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;var k=t.dataset.tabs;
+    $$("button",t).forEach(function(x){x.classList.toggle("on",x===b)});
+    $$('[data-pane^="'+k+':"]').forEach(function(p){p.classList.toggle("on",p.dataset.pane===k+":"+b.dataset.t)});
+  });
+});
+if(/Windows/i.test(navigator.userAgent)){var wb=$('[data-tabs="os"] [data-t="win"]');wb&&wb.click()}
+
+// ---------- copy buttons ----------
+document.addEventListener("click",function(e){
+  var c=e.target.closest("[data-copy]");if(c){copy(c.dataset.copy);return}
+  var b=e.target.closest(".cmdline .copy");if(b){copy($("code",b.parentNode).textContent)}
+});
+
+// ---------- router + toc ----------
+var current=null,spy=null;
+function buildToc(){
+  var page=$('.page.on');if(!page)return;var toc=$(".toc",page);if(!toc)return;
+  var hs=$$("article h2[id]",page).filter(function(h){return h.offsetParent!==null});
+  toc.innerHTML='<p class="t">本页目录</p>'+hs.map(function(h){return '<a href="#'+h.id+'" data-id="'+h.id+'">'+esc(h.textContent.replace(/^\d+/,""))+'</a>'}).join("");
+  if(spy)spy.disconnect();
+  spy=new IntersectionObserver(function(es){es.forEach(function(en){if(en.isIntersecting){$$("a",toc).forEach(function(a){a.classList.toggle("on",a.dataset.id===en.target.id)})}})},{rootMargin:"-80px 0px -70% 0px"});
+  hs.forEach(function(h){spy.observe(h)});
+}
+function route(){
+  var h=location.hash||"#/";
+  if(h.indexOf("#/")!==0){ // in-page anchor
+    var t=document.getElementById(h.slice(1));if(t){t.scrollIntoView();return}
+    h="#/";
+  }
+  var parts=h.slice(2).split("#"),r=parts[0];
+  if(!$('.page[data-page="'+r+'"]'))r="";
+  if(r!==current){
+    $$(".page").forEach(function(p){p.classList.toggle("on",p.dataset.page===r)});
+    $$("#nav a").forEach(function(a){a.classList.toggle("on",a.dataset.r===r)});
+    current=r;window.scrollTo(0,0);buildToc();
+    if(r==="")runDemo();else clearTimeout(demoTimer);
+    document.title=(r?{install:"安装",season:"恋综指南",commands:"指令大全",dice:"跑团骰子",faq:"常见问题",app:"申请专属 App",how:"工作原理"}[r]+" · 长日系统":"长日系统 · 把恋综装进自己的 QQ 群");
+  }
+  if(parts[1]){var el=document.getElementById(parts[1]);el&&setTimeout(function(){el.scrollIntoView()},30)}
+  $("#drawer").classList.remove("on");
+}
+// toc links: keep route, scroll to anchor
+document.addEventListener("click",function(e){
+  var a=e.target.closest(".toc a");if(!a)return;e.preventDefault();
+  var el=document.getElementById(a.dataset.id);el&&el.scrollIntoView({behavior:"smooth"});
+  history.replaceState(null,"","#/"+current+"#"+a.dataset.id);
+});
+window.addEventListener("hashchange",route);
+$("#menu").onclick=function(){$("#drawer").classList.toggle("on")};
+
+// ---------- command palette ----------
+var PI=[];
+[["#/install","安装","Linux / Windows / 第一次使用"],["#/how","工作原理","官方机器人和 QQ 小号怎么配合"],["#/season","恋综指南","一季从头到尾"],["#/commands","指令大全","全部群指令"],["#/dice","跑团骰子","COC7 / DND5e / 绿色三角洲"],["#/faq","常见问题","不在线、打不开小手机…"],["#/app","申请专属 App","专属安卓 App 打包"]].forEach(function(p){PI.push({k:"页面",t:p[1],s:p[2],go:p[0]})});
+$$("[data-page] article h2[id]").forEach(function(h){var pg=h.closest("[data-page]").dataset.page;PI.push({k:"章节",t:h.textContent.replace(/^\d+/,""),s:{install:"安装",season:"恋综指南",dice:"跑团骰子",faq:"常见问题",app:"申请 App",how:"工作原理"}[pg],go:"#/"+pg+"#"+h.id})});
+C.forEach(function(c){PI.push({k:c[4]==="a"?"管理":"指令",t:c[0],s:c[2].split("\n")[0]+(c[1]?" · "+c[1]:""),cp:c[2],f:c[0]+c[1]+c[3]})});
+var sel=0,res=[];
+function palRender(){
+  var q=$("#palq").value.trim().toLowerCase();
+  res=PI.filter(function(p){return !q||(p.t+" "+p.s+" "+(p.f||"")).toLowerCase().indexOf(q)>=0}).slice(0,40);
+  sel=Math.min(sel,Math.max(res.length-1,0));
+  $("#pall").innerHTML=res.length?res.map(function(p,i){return '<li data-i="'+i+'" class="'+(i===sel?"on":"")+'"><span class="k">'+p.k+'</span><span class="t">'+hl(p.t,q)+'</span><span class="s">'+esc(p.s)+'</span></li>'}).join(""):'<li style="color:var(--faint)">没有结果</li>';
+  var on=$("#pall li.on");on&&on.scrollIntoView({block:"nearest"});
+}
+function palOpen(){$("#pal").classList.add("on");$("#palq").value="";sel=0;palRender();setTimeout(function(){$("#palq").focus()},10)}
+function palClose(){$("#pal").classList.remove("on")}
+function palGo(i){var p=res[i];if(!p)return;palClose();if(p.cp){copy(p.cp)}else{location.hash=p.go;route()}}
+$("#openPal").onclick=palOpen;
+$("#pal").addEventListener("click",function(e){if(e.target.id==="pal")palClose();var li=e.target.closest("li[data-i]");if(li)palGo(+li.dataset.i)});
+$("#palq").addEventListener("input",function(){sel=0;palRender()});
+document.addEventListener("keydown",function(e){
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){e.preventDefault();$("#pal").classList.contains("on")?palClose():palOpen();return}
+  if(e.key==="/"&&!/INPUT|TEXTAREA/.test(document.activeElement.tagName)){e.preventDefault();palOpen();return}
+  if(!$("#pal").classList.contains("on"))return;
+  if(e.key==="Escape")palClose();
+  else if(e.key==="ArrowDown"){e.preventDefault();sel=Math.min(sel+1,res.length-1);palRender()}
+  else if(e.key==="ArrowUp"){e.preventDefault();sel=Math.max(sel-1,0);palRender()}
+  else if(e.key==="Enter"){e.preventDefault();palGo(sel)}
+});
+
+// ---------- app application form ----------
+(function(){
+  var f=$("#appf");if(!f)return;
+  var col=$("#color");function sync(){$("#cv").textContent=col.value;$("#sw").style.background=col.value}
+  col.addEventListener("input",sync);sync();
+  f.addEventListener("submit",function(e){
+    e.preventDefault();
+    var v=function(id){return $("#"+id).value.trim()};
+    $("#appmsg").textContent=["【专属 App 申请】","团的名字："+v("team"),"服务器地址："+v("host"),"主题色："+col.value,"图标："+(v("icon")||"（未填）"),"联系 QQ："+v("qq")].join("\n");
+    $("#appout").hidden=false;buildToc();
+    $("#appout").scrollIntoView({behavior:"smooth",block:"nearest"});
+  });
+  $("#appcopy").addEventListener("click",function(){copy($("#appmsg").textContent)});
+})();
+
+setRole(store("cr-role")||"all");
+route();
+})();
+</script>
+</body>
+</html>

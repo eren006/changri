@@ -8,7 +8,7 @@ from nonebot.params import CommandArg
 from changri.core import admins, npc, season
 from changri.core.announce import get_announce
 from changri.core.db import get_config, per_bot, set_config
-from changri.core.qqsend import make_send
+from changri.core.qqsend import make_send, make_send_image
 
 nonebot.require("nonebot_plugin_apscheduler")
 from nonebot_plugin_apscheduler import scheduler  # noqa: E402
@@ -95,7 +95,7 @@ end_cmd = _cmd("结束季度")
 async def _(event: GroupMessageCreateEvent):
     if not _is_admin(event):
         await end_cmd.finish(NO)
-    ok, msg = await season.end_and_report(make_send())
+    ok, msg = await season.end_and_report(make_send(), make_send_image())
     await end_cmd.finish(msg if ok else "❌ " + msg)
 
 

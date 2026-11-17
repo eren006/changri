@@ -15,7 +15,7 @@ def group_line(room) -> str:
         return "这次约会在小手机的聊天室里进行：小手机 → 发现 → 邀约 → 进入聊天室。"
     if gi:
         return f"请申请入群：{gi[2]}"
-    return "群池暂时没有空群，已排队，轮到会再通知你们。"
+    return "备用群池暂时没有空群，请稍后再试。"
 
 
 def timeline_days(role_id: int) -> list[dict]:
@@ -37,7 +37,7 @@ def todo_items(role) -> list[str]:
                                "WHERE m.role_id=? AND r.status='open' ORDER BY r.id", (role["id"],)).fetchall()
     for r in open_rooms:
         if not r["pool_id"]:
-            items.append(f"R{r['id']} {r['kind']}（{slot_text(r)}）：群池没有空群，还在排队")
+            items.append(f"R{r['id']} {r['kind']}（{slot_text(r)}）：备用群池没有空群，还在等群")
         elif not r["entered_ts"]:
             items.append(f"R{r['id']} {r['kind']}（{slot_text(r)}）：你还没进群发言，{group_line(r)}")
         else:

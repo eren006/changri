@@ -7,6 +7,7 @@ from nonebot.adapters.qq import Bot, GroupMessageCreateEvent
 from nonebot.params import CommandArg
 
 from changri.core import precall, rooms, roles
+from changri.core.db import get_conn
 from changri.plugins.play import NEED_ROLE, NOT_ADMIN, _announce_in_room, _cmd, _invite, _is_admin, _me, _group_line, _push, _slot
 
 SHOW_MAX = 60
@@ -24,7 +25,11 @@ async def dial_flow(me, no: int) -> tuple[bool, str, int]:
         return True, f"{msg}（{precall.usage(me['id'])}）", 0
     room = rooms.get(rid)
     from changri.plugins.play import _ensure_clean
-    await _ensure_clean(rid)
+    if not await _ensure_clean(rid):                             # 分到的群里还有别的玩家、换不到干净的群：当没有空群，撤掉这次拨打
+        with get_conn() as c:
+            c.execute("DELETE FROM precall_calls WHERE room_id=?", (rid,))
+            c.execute("DELETE FROM precall_picks WHERE from_id=? AND to_id=?", (me["id"], precall.entry_of_no(no)["role_id"]))
+        return False, "备用群池暂时没有空闲的群，这次电话没能接通，请稍后再试，或联系管理员多准备几个备用群。", 0
     room = rooms.get(rid)
     for m in rooms.members(rid):
         if m["role_id"] != me["id"]:

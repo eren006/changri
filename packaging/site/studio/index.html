@@ -1,0 +1,130 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>studio</title>
+<style>
+body{margin:0;background:#efe9e1;font:13px system-ui;color:#333}
+#grid{display:flex;flex-wrap:wrap;gap:24px;padding:24px;align-items:center}
+#grid figure{margin:0;text-align:center}
+#grid img{display:block;filter:drop-shadow(0 18px 22px rgba(70,55,120,.28))}
+.dark{background:#141219;color:#ccc}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+</head><body>
+<div id="grid"></div>
+<script type="module">
+import * as THREE from "three";
+
+const R = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: false });
+R.toneMapping = THREE.ACESFilmicToneMapping; R.toneMappingExposure = 1.05;
+R.outputColorSpace = THREE.SRGBColorSpace;
+R.setPixelRatio(1);
+const pmrem = new THREE.PMREMGenerator(R);
+function studio(){
+  const sc = new THREE.Scene();
+  const room = new THREE.Mesh(new THREE.BoxGeometry(20, 14, 20), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.42, 0.40, 0.40), side: THREE.BackSide }));
+  sc.add(room);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.22, 0.21, 0.22) }));
+  floor.rotation.x = -Math.PI / 2; floor.position.y = -6.9; sc.add(floor);
+  const panel = (w, h, c, x, y, z, ry = 0, rx = 0) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide })); m.position.set(x, y, z); m.rotation.set(rx, ry, 0); sc.add(m); };
+  panel(9, 4, new THREE.Color(7, 7, 7), -2, 6.8, 2, 0, Math.PI / 2);          // big top softbox
+  panel(3, 8, new THREE.Color(5, 5, 5.2), -9.8, 1, 3, Math.PI / 2);           // left strip
+  panel(3, 7, new THREE.Color(2.2, 2.0, 3.6), 9.8, 0, 2, -Math.PI / 2);       // right lavender strip
+  panel(6, 3, new THREE.Color(3, 3, 3), 2, 2, 9.8, Math.PI);                  // front fill behind camera
+  panel(4, 2, new THREE.Color(1.6, 1.5, 2.4), 0, -3, -9.8);                   // soft back glow
+  return sc;
+}
+const ENV = pmrem.fromScene(studio(), 0.02).texture;
+
+function rnd(seed){ let s = seed>>>0; return () => (s = (s*1664525+1013904223)>>>0) / 4294967296; }
+
+// glitter: tiny facets with random normals
+function glitterNormal(seed=7, w=2048, h=1024, n=60000){
+  const c=document.createElement("canvas");c.width=w;c.height=h;const g=c.getContext("2d");
+  g.fillStyle="rgb(128,128,255)";g.fillRect(0,0,w,h);const r=rnd(seed);
+  for(let i=0;i<n;i++){const a=r()*Math.PI*2,t=0.35+r()*0.6;
+    const nx=Math.cos(a)*t,ny=Math.sin(a)*t,nz=Math.sqrt(Math.max(0,1-t*t));
+    g.fillStyle=`rgb(${(nx*.5+.5)*255|0},${(ny*.5+.5)*255|0},${(nz*.5+.5)*255|0})`;
+    const s=2+r()*3;g.fillRect(r()*w,r()*h,s,s*(0.6+r()*0.8));}
+  const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.NoColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=8;return t;}
+function noiseRough(seed=3,w=1024,h=512){const c=document.createElement("canvas");c.width=w;c.height=h;const g=c.getContext("2d");
+  const r=rnd(seed);const im=g.createImageData(w,h);for(let i=0;i<w*h;i++){const v=40+r()*120;im.data[i*4]=im.data[i*4+1]=im.data[i*4+2]=v;im.data[i*4+3]=255}
+  g.putImageData(im,0,0);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.NoColorSpace;return t;}
+
+const M = {
+  silver: () => new THREE.MeshPhysicalMaterial({ color: 0xd6d6de, metalness: 1, roughness: 0.26, roughnessMap: noiseRough(), normalMap: glitterNormal(), normalScale: new THREE.Vector2(2.4,2.4), clearcoat: 0.5, clearcoatRoughness: 0.12, envMapIntensity: 1.25 }),
+  pearl: () => new THREE.MeshPhysicalMaterial({ color: 0x6455d8, metalness: 0.05, roughness: 0.2, clearcoat: 1, clearcoatRoughness: 0.04, sheen: 0.6, sheenColor: new THREE.Color(0xcfc8ff), sheenRoughness: 0.35, iridescence: 0.35, iridescenceIOR: 1.35, envMapIntensity: 1.1 }),
+  glass: () => new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 0, roughness: 0.02, transmission: 1, thickness: 0.9, ior: 1.5, clearcoat: 1, clearcoatRoughness: 0, attenuationColor: new THREE.Color(0xe6e1ff), attenuationDistance: 2.5, envMapIntensity: 1.4, specularIntensity: 1 }),
+  frost: () => new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 0, roughness: 0.12, transmission: 1, thickness: 0.5, ior: 1.45, clearcoat: 1, clearcoatRoughness: 0.05, envMapIntensity: 1.5 }),
+};
+
+function stage(w, h, fov = 28, dist = 4.6){
+  R.setSize(w, h, false);
+  const scene = new THREE.Scene(); scene.environment = ENV;
+  const cam = new THREE.PerspectiveCamera(fov, w / h, 0.1, 100); cam.position.set(0, 0, dist);
+  const key = new THREE.DirectionalLight(0xffffff, 2.4); key.position.set(-3, 4, 5); scene.add(key);
+  const rim = new THREE.DirectionalLight(0xd9d4ff, 1.4); rim.position.set(4, -2, -3); scene.add(rim);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0xd8d0ff, 0.5));
+  return { scene, cam, w, h };
+}
+
+// difference matting: render on black and white, recover colour + alpha
+function matte({ scene, cam, w, h }){
+  const grab = (bg) => { scene.background = new THREE.Color(bg); R.render(scene, cam);
+    const c = document.createElement("canvas"); c.width = w; c.height = h; const g = c.getContext("2d");
+    g.drawImage(R.domElement, 0, 0); return g.getImageData(0, 0, w, h); };
+  const B = grab(0x000000), W = grab(0xffffff);
+  const out = new ImageData(w, h);
+  for (let i = 0; i < w * h * 4; i += 4){
+    const d = ((W.data[i] - B.data[i]) + (W.data[i+1] - B.data[i+1]) + (W.data[i+2] - B.data[i+2])) / 3;
+    const a = Math.min(1, Math.max(0, 1 - d / 255));
+    out.data[i+3] = Math.round(a * 255);
+    for (let k = 0; k < 3; k++) out.data[i+k] = a > 0.004 ? Math.min(255, Math.round(B.data[i+k] / a)) : 0;
+  }
+  const c = document.createElement("canvas"); c.width = w; c.height = h; c.getContext("2d").putImageData(out, 0, 0);
+  return c;
+}
+
+function sphere(mat, rotY = 0){ const m = new THREE.Mesh(new THREE.SphereGeometry(1, 160, 120), mat); m.rotation.y = rotY; m.rotation.x = 0.3; return m; }
+function squiggle(mat, waves = 1.5, amp = 0.55, len = 3.2, r = 0.2){
+  const pts = []; for (let i = 0; i <= 80; i++){ const t = i / 80; pts.push(new THREE.Vector3((t - .5) * len, Math.sin(t * Math.PI * 2 * waves) * amp, Math.cos(t * Math.PI * 2 * waves) * 0.15)); }
+  const g = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 300, r, 48, false);
+  const grp = new THREE.Group(); grp.add(new THREE.Mesh(g, mat));
+  for (const p of [pts[0], pts[pts.length - 1]]){ const cap = new THREE.Mesh(new THREE.SphereGeometry(r, 48, 32), mat); cap.position.copy(p); grp.add(cap); }
+  grp.rotation.set(0.35, -0.25, -0.12); return grp;
+}
+function beads(seed = 11){
+  const grp = new THREE.Group(), r = rnd(seed), mats = [M.silver(), M.glass(), M.pearl()];
+  for (let i = 0; i < 46; i++){
+    const k = r(), mat = k < .62 ? mats[0] : k < .9 ? mats[1] : mats[2];
+    const rad = 0.025 + Math.pow(r(), 2.2) * 0.11;
+    const m = new THREE.Mesh(new THREE.SphereGeometry(rad, 40, 28), mat);
+    const a = r() * Math.PI * 2, d = Math.pow(r(), .7) * 1.35;
+    m.position.set(Math.cos(a) * d * 1.4, Math.sin(a) * d * .85, (r() - .5) * .6); grp.add(m);
+  }
+  return grp;
+}
+
+const JOBS = [
+  ["orb-silver", 360, 360, s => s.scene.add(sphere(M.silver(), 0.6))],
+  ["orb-pearl", 300, 300, s => s.scene.add(sphere(M.pearl(), 0))],
+  ["orb-glass", 360, 360, s => { s.scene.add(sphere(M.glass(), 0)); }],
+  ["squiggle-lav", 520, 300, s => s.scene.add(squiggle(M.pearl()))],
+  ["squiggle-glass", 520, 300, s => s.scene.add(squiggle(M.frost(), 2, .4, 3.2, .16))],
+  ["beads", 640, 420, s => s.scene.add(beads())],
+];
+
+const grid = document.getElementById("grid");
+const done = {};
+for (const [name, w, h, build] of JOBS){
+  const s = stage(w, h); build(s);
+  const c = matte(s);
+  const url = c.toDataURL("image/webp", 0.9);
+  const img = new Image(); img.src = url; img.width = w / 2;
+  const fig = document.createElement("figure"); fig.append(img, Object.assign(document.createElement("figcaption"), { textContent: name })); grid.append(fig);
+  if (location.search.includes("save")){
+    const r = await fetch("/save?name=" + name + ".webp", { method: "POST", body: url }); done[name] = await r.text();
+  }
+}
+window.DONE = done;
+document.title = "studio ready";
+</script>
+</body></html>

@@ -139,6 +139,10 @@
         {% if f.kind == 'bool' %}
         <div class="srow"><div class="sl"><b>{{ f.label }}</b>{% if f.hint %}<div class="d">{{ f.hint }}</div>{% endif %}</div>
           <label class="sw"><input type="checkbox" name="{{ f.key }}" value="1" {{ 'checked' if f.checked }} aria-label="{{ f.label }}"><input type="hidden" name="{{ f.key }}" value="0"><i></i></label></div>
+        {% elif f.kind == 'choice' %}
+        <div class="srow"><label class="sl" for="{{ f.key }}"><b>{{ f.label }}</b>{% if f.hint %}<span class="d">{{ f.hint }}</span>{% endif %}</label>
+          <div class="sc"><select id="{{ f.key }}" name="{{ f.key }}">{% for v, n in f.options %}<option value="{{ v }}" {{ 'selected' if v == f.value }}>{{ n }}</option>{% endfor %}</select>
+          {% if f.preview %}<button class="btn sm ghost" type="button" onclick="window.open('{{ url_for(f.preview) }}?skin='+encodeURIComponent(document.getElementById('{{ f.key }}').value),'_blank')">预览海报</button>{% endif %}</div></div>
         {% else %}
         <div class="srow {{ 'stack' if f.kind != 'number' }}"><label class="sl" for="{{ f.key }}"><b>{{ f.label }}</b>{% if f.hint %}<span class="d">{{ f.hint }}</span>{% endif %}</label>
           {% if f.kind == 'number' %}<div class="sc"><input id="{{ f.key }}" type="number" inputmode="numeric" step="1" name="{{ f.key }}" value="{{ f.value }}">{% if f.unit %}<span class="unit">{{ f.unit }}</span>{% endif %}</div>

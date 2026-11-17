@@ -176,6 +176,10 @@ def dial(role_id: int, no: int) -> tuple[bool, str, int]:
     if cfg()["mutual"] and not back:
         return True, f"已选择 #{no}。对方也选了你，电话才会接通。", 0
     rid = rooms.create_call(role_id, e["role_id"], f"#{no}")
+    if not rid:                                                    # 备用群池没有空群：不排队，撤掉刚记的这一次「选」，让玩家稍后再拨
+        with get_conn() as c:
+            c.execute("DELETE FROM precall_picks WHERE from_id=? AND to_id=?", (role_id, e["role_id"]))
+        return False, "备用群池暂时没有空闲的群，这次电话没能接通，请稍后再试，或联系管理员多准备几个备用群。", 0
     with get_conn() as c:
         c.execute("INSERT INTO precall_calls(from_id, to_id, entry_no, room_id, ts) VALUES(?,?,?,?,?)", (role_id, e["role_id"], no, rid, int(time.time())))
     return True, f"已拨打 #{no}。", rid

@@ -136,7 +136,7 @@ async def _added(bot: Bot, event: GroupAddRobotEvent):
     pool.note_group(bot.self_id, event.group_openid)
 
 
-set_pool = _cmd("设为群池")
+set_pool = _cmd("设为备用群池", {"设为群池"})
 
 
 @set_pool.handle()
@@ -151,10 +151,10 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     ok, why = pool.set_in_pool(pool.is_pool_group(bot.self_id, event.group_openid)["id"], True)
     if not ok:
         await set_pool.finish(f"❌ {why}。")
-    await set_pool.finish("✅ 这个群已放进群池" + (f"（组「{set_name}」）" if set_name else "") + ("" if real else "。群号还没填，请在设置平台「群池」页补上，玩家要靠它申请入群。"))
+    await set_pool.finish("✅ 这个群已放进备用群池" + (f"（组「{set_name}」）" if set_name else "") + ("" if real else "。群号还没填，请在设置平台「群池」页补上，玩家要靠它申请入群。"))
 
 
-unset_pool = _cmd("取消群池")
+unset_pool = _cmd("取消备用群池", {"取消群池"})
 
 
 @unset_pool.handle()
@@ -163,12 +163,12 @@ async def _(bot: Bot, event: GroupMessageCreateEvent):
         await unset_pool.finish(NOT_ADMIN)
     g = pool.is_pool_group(bot.self_id, event.group_openid)
     if not g or not g["in_pool"]:
-        await unset_pool.finish("这个群不在群池里。")
+        await unset_pool.finish("这个群不在备用群池里。")
     ok, why = pool.set_in_pool(g["id"], False)
-    await unset_pool.finish("✅ 已移出群池。" if ok else f"❌ {why}。")
+    await unset_pool.finish("✅ 已移出备用群池。" if ok else f"❌ {why}。")
 
 
-show_pool = _cmd("查看群池")
+show_pool = _cmd("查看备用群池", {"查看群池"})
 
 
 @show_pool.handle()
@@ -176,7 +176,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent):
     if not _is_admin(bot, event):
         await show_pool.finish(NOT_ADMIN)
     c = pool.counts()
-    await show_pool.finish(f"群池：空闲 {c['free']}，占用 {c['occupied']}，待清场 {c['cleaning']}；排队中的房间 {c['waiting']} 个。\n详细管理在设置平台「群池」页。")
+    await show_pool.finish(f"备用群池：空闲 {c['free']}，占用 {c['occupied']}，待清场 {c['cleaning']}。\n详细管理在设置平台「群池」页。")
 
 
 # ================= 发起房间 =================
@@ -184,8 +184,8 @@ async def _(bot: Bot, event: GroupMessageCreateEvent):
 async def start_room(kind: str, me, targets: list, time_text: str, place: str = "", note: str = "") -> tuple[bool, str, int]:
     """发起私约/电话/微信并通知对方（QQ 指令和网页小手机共用）。返回 (成功, 文字, 房间号)。"""
     ok, info, room_id = rooms.create(kind, me["id"], [t["id"] for t in targets], time_text, place, note)
-    if room_id:
-        await _ensure_clean(room_id)
+    if room_id and not await _ensure_clean(room_id):
+        return False, NO_GROUP_TEXT.format(kind=kind), 0
     if not ok:
         return False, info, 0
     room = rooms.get(room_id)
@@ -296,8 +296,8 @@ async def launch_official(targets: list, time_text: str, place: str = "", day: i
         return False, f"{label}至少要两位角色。", 0
     kind = "电话" if call else "官约"
     ok, info, room_id = rooms.create(kind, targets[0]["id"], [t["id"] for t in targets[1:]], time_text, "" if call else place, "官电" if call else "", official=True, day=day)
-    if room_id:
-        await _ensure_clean(room_id)
+    if room_id and not await _ensure_clean(room_id):
+        return False, NO_GROUP_TEXT.format(kind=kind), 0
     if not ok:
         return False, info, 0
     room = rooms.get(room_id)
@@ -466,24 +466,31 @@ async def _warn_expiring() -> None:
                 await _push(m["role_id"], text)
 
 
-async def _ensure_clean(room_id: int) -> None:
+NO_GROUP_TEXT = "备用群池暂时没有空闲的群，这次{kind}没能开成，请稍后再试，或联系管理员多准备几个备用群。"
+
+
+async def _ensure_clean(room_id: int) -> bool:
     """分到的群如果是 QQ 号监听那条线的群，就查一遍群成员：还有别的玩家在里面，
-    这个群先放一边（等人退群），给房间换一个。问不到群成员就当没人。"""
+    这个群先放一边（等人退群），给房间换一个。问不到群成员就当没人。
+    换不到干净的群就当没有空群：房间删掉（不排队），返回 False；其余情况返回 True。"""
     for _ in range(8):
         room = rooms.get(room_id)
         if not room or room["status"] != "open" or not room["pool_id"]:
-            return
+            return True
         g = pool.get(room["pool_id"])
         if not g or not pool.is_qq_only(g):
-            return
+            return True
         members = await qqmanager.group_members(g["bot_id"], g["real_gid"])
         if members is None:
-            return
+            return True
         if not (members & pool.player_qqs()) - pool.room_qqs(room_id):
-            return
+            return True
         pool.reject(g["id"], room_id)
         if not pool.allocate(room_id):
-            return
+            with get_conn() as c:
+                c.execute("DELETE FROM rooms WHERE id=?", (room_id,))
+            return False
+    return True
 
 
 async def _sweep_cleaning() -> None:
