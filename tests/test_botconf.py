@@ -123,6 +123,18 @@ class BotPageTests(unittest.TestCase):
             c.post("/update/check", data={"_csrf": token(c, "/update")})
             html = c.get("/update").get_data(as_text=True)
         self.assertIn("9.9.9", html); self.assertIn("立即更新", html)
+        # 小红点：有新版本就亮（菜单里的「更新」和手机上的「菜单」按钮）；点「这次先不更新」后灭，出了更新的版本再亮
+        self.assertIn('class="reddot"', c.get("/bots").get_data(as_text=True))
+        self.assertNotIn('class="reddot"', a.get("/bots").get_data(as_text=True))               # 管理员看不到
+        info2 = dict(info, features=["新功能甲"], fixes=["修了乙"])
+        with mock.patch.object(updater, "check", return_value=info2):
+            html = c.get("/update").get_data(as_text=True)                                # 不用点「检查更新」，打开就列出来
+        self.assertIn("新功能甲", html); self.assertIn("修了乙", html); self.assertIn("这次先不更新", html)
+        c.post("/update/skip", data={"version": "9.9.9", "_csrf": token(c, "/update")})
+        self.assertNotIn('class="reddot"', c.get("/bots").get_data(as_text=True))
+        from changri.core.db import set_config
+        set_config("update_latest", "9.9.10")
+        self.assertIn('class="reddot"', c.get("/bots").get_data(as_text=True))
         with mock.patch.object(updater, "update_now", return_value={"from": "0.3.0", "to": "9.9.9", "backup": "x"}), \
              mock.patch.object(updater, "restart") as rs:
             r = c.post("/update/apply", data={"_csrf": token(c, "/update")})

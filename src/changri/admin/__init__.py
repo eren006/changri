@@ -130,11 +130,16 @@ def create_app() -> Flask:
         theme = request.cookies.get(THEME_COOKIE, "")
         ctx = {"admin_theme": theme if theme in THEMES else "", "me": session.get("name", ""), "is_owner": bool(session.get("owner")), "disabled_nav": ext_core.disabled_nav(),
                "in_bot": in_bot, "bot_id": request.environ.get("changri.bot", ""), "bots": [], "bot_label": "",
-               "root_url": lambda ep, **kw: url_for(ep, **kw)[len(request.script_root):]}
+               "root_url": lambda ep, **kw: url_for(ep, **kw)[len(request.script_root):], "update_dot": ""}
         if session.get("uid"):
             accs = botconf.list_accounts()
             ctx["bots"] = [(a["app_id"], _bot_label(a)) for a in accs]
             ctx["bot_label"] = next((_bot_label(a) for a in accs if a["app_id"] == ctx["bot_id"]), "")
+            if session.get("owner"):                  # 「更新」页只有主账号能开，小红点也只给主账号看
+                try:
+                    ctx["update_dot"] = updater.update_badge()
+                except Exception:  # noqa: BLE001
+                    pass
         return ctx
 
     @app.route("/setup", methods=["GET", "POST"])
@@ -423,17 +428,36 @@ def create_app() -> Flask:
     @owner_required
     def update_page():
         failed = DB_PATH.parent / "update_failed.txt"
-        return render_template("update.html", current=updater.current_version(), info=session.pop("update_info", None),
-                               done=request.args.get("done", ""), failed=failed.read_text(encoding="utf-8") if failed.exists() else "")
+        done, info = request.args.get("done", ""), None
+        # 点了「检查更新」，或者后台定时检查已经发现了新版本（小红点亮着）：打开页面就把这次更新了什么列出来
+        if not done and (request.args.get("check") or get_config("update_latest", "")):
+            try:
+                info = updater.check()
+                set_config("update_latest", info["version"] if info["newer"] else "")
+            except updater.UpdateError as e:
+                flash(str(e))
+        return render_template("update.html", current=updater.current_version(), info=info, done=done,
+                               skipped=get_config("update_skip", ""), failed=failed.read_text(encoding="utf-8") if failed.exists() else "")
 
     @app.post("/update/check")
     @owner_required
     def update_check():
         try:
-            session["update_info"] = updater.check()
-            set_config("update_latest", session["update_info"]["version"] if session["update_info"]["newer"] else "")
+            info = updater.check()
+            set_config("update_latest", info["version"] if info["newer"] else "")
         except updater.UpdateError as e:
             flash(str(e))
+            return redirect(url_for("update_page"))
+        return redirect(url_for("update_page", check=1))
+
+    @app.post("/update/skip")
+    @owner_required
+    def update_skip():
+        """「这次先不更新」：这个版本不再亮小红点，等有更新的版本出来再提醒。随时还能回「更新」页手动更新。"""
+        ver = request.form.get("version", "")
+        if updater.parse_version(ver):
+            set_config("update_skip", ver)
+            flash(f"好的，{ver} 先不更新。出了更新的版本会再提醒；想更新随时回这里点。")
         return redirect(url_for("update_page"))
 
     @app.post("/update/apply")

@@ -198,5 +198,18 @@ class UpdaterTests(unittest.TestCase):
         self.assertTrue((self.root / "runtime" / RT_OLD).is_dir())
 
 
+
+class ChangesTests(unittest.TestCase):
+    def test_parse_and_pending(self):
+        raw = [{"version": "0.21.9", "features": ["c"], "fixes": []}, {"version": "bad"}, "x",
+               {"version": "0.21.8", "fixes": ["b", ""], "date": "2026-11-20"}, {"version": "0.21.7", "features": ["a"]}]
+        ch = updater.parse_changes(raw)
+        self.assertEqual([c["version"] for c in ch], ["0.21.9", "0.21.8", "0.21.7"])
+        self.assertEqual(ch[1]["fixes"], ["b"])
+        self.assertEqual(updater.parse_changes(None), [])
+        self.assertEqual([c["version"] for c in updater.pending_changes(ch, "0.21.7", "0.21.9")], ["0.21.9", "0.21.8"])
+        self.assertEqual([c["version"] for c in updater.pending_changes(ch, "0.21.6", "0.21.8")], ["0.21.8", "0.21.7"])
+
+
 if __name__ == "__main__":
     unittest.main()

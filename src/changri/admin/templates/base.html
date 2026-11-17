@@ -106,6 +106,7 @@ tr:last-child td{border-bottom:0}
 .tag{font-size:12.5px;color:var(--mute)}
 .tabular{font-variant-numeric:tabular-nums}
 .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;vertical-align:1px;background:var(--mute)}
+.reddot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#e5484d;margin-left:6px;vertical-align:2px;box-shadow:0 0 0 2px rgba(229,72,77,.18)}
 .dot.ok{background:var(--ok)} .dot.bad{background:var(--bad)} .dot.warn{background:var(--warn)}
 .code{font:700 34px/1.1 var(--serif);letter-spacing:.14em;color:var(--dusk);margin:6px 0}
 .empty{color:var(--mute);padding:6px 0}
@@ -287,7 +288,7 @@ tr:last-child td{border-bottom:0}
     <div class="mbar">
       <a class="brand" href="{{ url_for('dashboard') }}{{ '?pick=1' if not in_bot }}"><b>长日</b><span>控制台</span></a>
       <span class="mtitle">{{ self.title() }}</span>
-      <button class="menubtn" id="menubtn" type="button" aria-expanded="false" aria-controls="msheet"><i aria-hidden="true"></i>菜单</button>
+      <button class="menubtn" id="menubtn" type="button" aria-expanded="false" aria-controls="msheet"><i aria-hidden="true"></i>菜单{% if update_dot %}<span class="reddot" aria-label="有新版本"></span>{% endif %}</button>
     </div>
     <div class="scrim" id="scrim" aria-hidden="true"></div>
     <div class="msheet" id="msheet" role="dialog" aria-label="导航菜单">
@@ -327,7 +328,7 @@ tr:last-child td{border-bottom:0}
         <h3>全部机器人共用</h3>
         <ul>
           <li><a href="{{ root_url('dashboard') }}?pick=1" {% if request.endpoint == 'dashboard' and not in_bot %}aria-current="page"{% endif %}>选择机器人</a></li>
-          {% for ep, label in [('wizard','安装向导'),('bots_page','机器人接入'),('accounts_page','账号'),('remote_page','远程访问'),('https_page','HTTPS'),('update_page','更新')] %}{% if (ep not in ('update_page','wizard','https_page')) or is_owner %}<li><a href="{{ root_url(ep) }}" {% if request.endpoint == ep %}aria-current="page"{% endif %}>{{ label }}</a></li>{% endif %}{% endfor %}
+          {% for ep, label in [('wizard','安装向导'),('bots_page','机器人接入'),('accounts_page','账号'),('remote_page','远程访问'),('https_page','HTTPS'),('update_page','更新')] %}{% if (ep not in ('update_page','wizard','https_page')) or is_owner %}<li><a href="{{ root_url(ep) }}" {% if request.endpoint == ep %}aria-current="page"{% endif %}>{{ label }}{% if ep == 'update_page' and update_dot %}<span class="reddot" title="有新版本 {{ update_dot }}" aria-label="有新版本 {{ update_dot }}"></span>{% endif %}</a></li>{% endif %}{% endfor %}
         </ul>
       </div>
     </nav>

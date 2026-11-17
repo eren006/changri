@@ -134,7 +134,38 @@ def fetch_manifest(url: str | None = None) -> dict:
         raise UpdateError("更新信息不完整，已忽略。")
     runtimes = {k: _item(url, v) for k, v in (data.get("runtimes") or {}).items()}
     return {"version": version, "notes": str(data.get("notes", ""))[:2000], "app": _item(url, data.get("app")),
-            "runtime": runtime, "runtimes": runtimes, "size": int((data.get("app") or {}).get("size") or 0)}
+            "runtime": runtime, "runtimes": runtimes, "size": int((data.get("app") or {}).get("size") or 0),
+            "changes": parse_changes(data.get("changes"))}
+
+
+def parse_changes(raw) -> list[dict]:
+    """latest.json 里的「changes」：最近几个版本各自的「新功能 / 修 bug」，新的在前（0.21.7 起才有）。格式不对的条目丢掉。"""
+    out = []
+    for e in (raw if isinstance(raw, list) else [])[:30]:
+        if not isinstance(e, dict) or not parse_version(str(e.get("version", ""))):
+            continue
+
+        def items(k):
+            v = e.get(k)
+            return [str(x).strip()[:300] for x in (v if isinstance(v, list) else [])[:30] if str(x).strip()]
+        out.append({"version": str(e["version"]), "date": str(e.get("date", ""))[:10], "features": items("features"), "fixes": items("fixes")})
+    return out
+
+
+def pending_changes(changes: list[dict], current: str, latest: str) -> list[dict]:
+    """从当前版本到最新版本之间（不含当前、含最新）每个版本的改动，新的在前。"""
+    cur, top = parse_version(current), parse_version(latest)
+    rows = [c for c in changes if cur < parse_version(c["version"]) <= top]
+    return sorted(rows, key=lambda c: parse_version(c["version"]), reverse=True)
+
+
+def update_badge() -> str:
+    """设置平台「更新」入口要不要出小红点：有比当前新的版本、而且主人没点过「这个版本先不更新」，返回那个版本号；否则空。"""
+    from .db import get_config
+    latest = get_config("update_latest", "")
+    if not latest or not is_newer(latest, current_version()):
+        return ""
+    return "" if get_config("update_skip", "") == latest else latest
 
 
 def check(url: str | None = None) -> dict:
@@ -142,7 +173,11 @@ def check(url: str | None = None) -> dict:
     cur = current_version()
     rt_needed = layout.INSTALLED and not (layout.RUNTIMES / m["runtime"]).is_dir()
     size = m["app"]["size"] + (m["runtimes"].get(layout.platform_tag(), {}).get("size", 0) if rt_needed else 0)
-    return {**m, "current": cur, "newer": is_newer(m["version"], cur), "size": size, "runtime_needed": rt_needed}
+    pend = pending_changes(m["changes"], cur, m["version"])
+    feats = [x for c in pend for x in c["features"]]           # 跳过了几个版本的，合成一份列出来，不按版本分
+    fixes = [x for c in pend for x in c["fixes"]]
+    return {**m, "current": cur, "newer": is_newer(m["version"], cur), "size": size, "runtime_needed": rt_needed, "pending": pend,
+            "features": feats, "fixes": fixes}
 
 
 # ---------- 下载 / 解压 ----------

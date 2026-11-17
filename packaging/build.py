@@ -446,6 +446,31 @@ def sign(key, message: bytes) -> str:
     return base64.b64encode(key.sign(message)).decode()
 
 
+# ---------- 更新说明 ----------
+
+CHANGELOG = ROOT / "packaging" / "changelog.json"
+
+
+def load_changelog() -> list[dict]:
+    """packaging/changelog.json：每个版本一条 {version, date, features:[新功能…], fixes:[修 bug…]}，新的在前。
+    最近 20 条随 latest.json 发出去，设置平台「更新」页按版本、按「新功能 / 修 bug」分开列。"""
+    try:
+        rows = json.loads(CHANGELOG.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    return [r for r in rows if isinstance(r, dict) and r.get("version")] if isinstance(rows, list) else []
+
+
+def notes_from(entry: dict) -> str:
+    """给 0.21.6 及更早的版本看的纯文字说明（它们只认 notes）。"""
+    parts = []
+    if entry.get("features"):
+        parts.append("新功能：\n" + "\n".join("· " + x for x in entry["features"]))
+    if entry.get("fixes"):
+        parts.append("修 bug：\n" + "\n".join("· " + x for x in entry["fixes"]))
+    return "\n\n".join(parts)
+
+
 # ---------- 主流程 ----------
 
 def main() -> None:
@@ -483,7 +508,12 @@ def main() -> None:
         for rel, data in sorted(app.items()):
             _zip_add(z, rel, data)
     app_sha = sha256_of(app_zip)
-    manifest = {"version": ver, "notes": a.notes, "runtime": rid,
+    changes = load_changelog()
+    entry = next((c for c in changes if c["version"] == ver), None)
+    notes = a.notes if a.notes and a.notes != ver else (notes_from(entry) if entry else a.notes)
+    if not entry:
+        log(f"  提示：packaging/changelog.json 里没有 {ver} 这一条，「更新」页只能显示 --notes 的文字。")
+    manifest = {"version": ver, "notes": notes, "changes": changes[:20], "runtime": rid,
                 "app": {"url": f"downloads/{app_zip.name}", "sha256": app_sha, "signature": sign(key, updater.sign_message(ver, app_sha)),
                         "size": app_zip.stat().st_size},
                 "runtimes": {}, "full": {}}

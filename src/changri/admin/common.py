@@ -274,8 +274,8 @@ def _dashboard() -> dict:
         top = late[0]
         todo.append(("warn", f"有 {len(late)} 条关系线超过 {relations_core.alert_hours():g} 小时没人回复", url_for("relations_page", view="relations"),
                      f"最久的：{top['a_name']} ⇄ {top['b_name']}，{top['waiting_on']} 已经 {top['hours']:.0f} 小时没回"))
-    latest = get_config("update_latest", "")
-    if latest and updater.is_newer(latest, updater.current_version()):
+    latest = updater.update_badge()                       # 点过「这次先不更新」的版本不再提醒
+    if latest:
         todo.append(("warn", f"有新版本 {latest} 可以更新", url_for("update_page"), "到「更新」页点一下就行，会备份并自动重启"))
     # 房间群：池子里空着、而且所属 QQ 号连着的，才是现在能马上分给新房间的
     pool_in = [g for g in pool_core.all_groups() if g["in_pool"]]
@@ -292,7 +292,7 @@ def _dashboard() -> dict:
 # 不属于任何一个机器人的页面（账号、更新、远程访问、机器人清单、登录）；其余页面都在 /b/<AppID>/ 下
 GLOBAL_ENDPOINTS = {"theme_set", "wizard", "bots_erase", "login", "logout", "setup", "static", "bots_page", "bots_add", "bots_test", "bots_secret", "bots_toggle", "bots_delete",
                     "accounts_page", "accounts_generate", "accounts_reset", "accounts_disable", "accounts_password", "accounts_delete",
-                    "update_page", "update_check", "update_apply", "remote_page", "remote_save", "dashboard",
+                    "update_page", "update_check", "update_skip", "update_apply", "remote_page", "remote_save", "dashboard",
                     "https_page", "https_status", "https_enable", "https_disable"}
 
 
