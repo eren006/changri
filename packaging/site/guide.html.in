@@ -82,6 +82,12 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line2);border-
 :root[data-theme="dark"] .ver{color:var(--btn-ink)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .ver{color:var(--btn-ink)}}
 .menu{display:none}
+/* 手机端右上角菜单：纯色金底（不要玻璃球高光）+ 外发光 + 一圈圈往外扩的光晕，点过一次就不再扩散 */
+.ibtn.menu{position:relative;color:#fff;background:#c9a043;border-color:transparent;backdrop-filter:none;-webkit-backdrop-filter:none;box-shadow:0 0 16px 4px rgba(212,169,74,.55)}
+.ibtn.menu:hover{color:#fff;filter:brightness(1.06)}
+.ibtn.menu::after{content:"";position:absolute;inset:-3px;border-radius:50%;border:2px solid rgba(222,180,80,.85);animation:menuGlow 2.2s ease-out infinite;pointer-events:none}
+.ibtn.menu.seen::after{animation:none;opacity:0}
+@keyframes menuGlow{0%{transform:scale(.9);opacity:.95}70%{transform:scale(1.45);opacity:0}100%{transform:scale(1.45);opacity:0}}
 
 /* ---------- decor ---------- */
 .orb{position:absolute;border-radius:50%;pointer-events:none;z-index:0}
@@ -1507,7 +1513,7 @@ document.addEventListener("click",function(e){
   history.replaceState(null,"","#/"+current+"#"+a.dataset.id);
 });
 window.addEventListener("hashchange",route);
-$("#menu").onclick=function(){$("#drawer").classList.toggle("on")};
+$("#menu").onclick=function(){$("#drawer").classList.toggle("on");this.classList.add("seen")};
 
 // ---------- command palette ----------
 var PI=[];
