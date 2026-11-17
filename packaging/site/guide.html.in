@@ -379,6 +379,12 @@ footer .brand{font-size:15px}
 .drawer.on{display:block}
 .drawer a{display:block;padding:12px 4px;color:var(--ink);border-bottom:1px solid var(--hair);font-weight:500}
 .drawer a:last-child{border-bottom:0}
+/* 「安装」入口发光：金色字 + 一呼一吸的柔光（扁平，不要玻璃球） */
+nav.main a.glow,.drawer a.glow{color:var(--accent);font-weight:600}
+nav.main a.glow{animation:navGlow 2.4s ease-in-out infinite}
+.drawer a.glow{animation:textGlow 2.4s ease-in-out infinite}
+@keyframes navGlow{0%,100%{box-shadow:0 0 0 1px rgba(201,160,67,.4) inset,0 0 6px 0 rgba(212,169,74,.25)}50%{box-shadow:0 0 0 1px rgba(201,160,67,.85) inset,0 0 16px 4px rgba(212,169,74,.55)}}
+@keyframes textGlow{0%,100%{text-shadow:0 0 4px rgba(212,169,74,.3)}50%{text-shadow:0 0 12px rgba(212,169,74,.95)}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}html{scroll-behavior:auto}}
 
 /* form */
@@ -532,7 +538,7 @@ body::after{content:"";position:fixed;inset:0;z-index:30;pointer-events:none;
     <a class="brand" href="#/"><span class="mark"></span>长日<small>bot</small></a>
     <nav class="main" id="nav">
       <a href="#/" data-r="">首页</a>
-      <a href="#/install" data-r="install">安装</a>
+      <a href="#/install" data-r="install" class="glow">安装</a>
       <a href="#/how" data-r="how">工作原理</a>
       <a href="#/season" data-r="season">恋综指南</a>
       <a href="#/commands" data-r="commands">指令大全</a>
@@ -549,7 +555,7 @@ body::after{content:"";position:fixed;inset:0;z-index:30;pointer-events:none;
   </div>
 </header>
 <div class="drawer" id="drawer">
-  <a href="#/">首页</a><a href="#/install">安装</a><a href="#/how">工作原理</a><a href="#/season">恋综指南</a><a href="#/commands">指令大全</a><a href="#/dice">跑团骰子</a><a href="#/faq">常见问题</a><a href="#/wishes">许愿池</a><a href="#/app">申请专属 App</a>
+  <a href="#/">首页</a><a href="#/install" class="glow">安装</a><a href="#/how">工作原理</a><a href="#/season">恋综指南</a><a href="#/commands">指令大全</a><a href="#/dice">跑团骰子</a><a href="#/faq">常见问题</a><a href="#/wishes">许愿池</a><a href="#/app">申请专属 App</a>
 </div>
 
 <main>
