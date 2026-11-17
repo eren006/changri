@@ -151,7 +151,7 @@ async def advance(send, announce_current: bool = False, send_image=None) -> None
 
 
 async def notify_at(role_id: int, name: str, text: str, send) -> tuple[bool, str]:
-    """通知角色本人：主群优先，失败试备用群；开头 @ 本人（有 member_openid 才 @）。返回 (是否送达, 说明)。"""
+    """通知角色本人：发到个人群；开头 @ 本人（有 member_openid 才 @）。返回 (是否送达, 说明)。"""
     errs = []
     for g in sorted(list_groups(role_id), key=lambda r: r["kind"] != "main"):
         if not g["group_openid"]:
@@ -159,7 +159,7 @@ async def notify_at(role_id: int, name: str, text: str, send) -> tuple[bool, str
         body = ("{{AT:%s:%s}}" % (g["member_openid"], name.replace("}", "")) + text) if g["member_openid"] else text
         try:
             await send(g["bot_id"], g["group_openid"], body)
-            return True, "主群" if g["kind"] == "main" else "备用群"
+            return True, "个人群"
         except Exception as e:  # noqa: BLE001
             errs.append(str(e)[:60])
     return False, "；".join(errs) or "没有可用的群"

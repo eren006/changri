@@ -6,7 +6,7 @@ from changri.core.db import get_conn
 
 def register(app, login_required):
     def _review_filters():
-        """tab：room = 私约/房间，msg = 短信和礼物，两边分开看；kind 只在 msg 页签里用来再分短信/礼物。"""
+        """tab：room = 约会/房间，msg = 短信和礼物，两边分开看；kind 只在 msg 页签里用来再分短信/礼物。"""
         f = {k: request.args.get(k, "").strip() for k in ("role", "kind", "q", "tab")}
         f["tab"] = "msg" if f["tab"] == "msg" else "room"
         f["kind"] = f["kind"] if f["tab"] == "msg" and f["kind"] in ("sms", "gift") else ""

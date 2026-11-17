@@ -13,21 +13,14 @@ def register(app, login_required):
     @app.post("/roles/<int:role_id>/slot")
     @login_required
     def add_slot(role_id):
-        ok, res = roles_core.add_slot(role_id, request.form.get("real_gid", "").strip(), request.form.get("kind", "backup"))
+        ok, res = roles_core.add_slot(role_id, request.form.get("real_gid", "").strip())
         if not ok:
             flash(res)
             return redirect(url_for("dashboard") + "#roles")
         with get_conn() as conn:
             name = conn.execute("SELECT name FROM roles WHERE id=?", (role_id,)).fetchone()["name"]
         flash("群位已登记，请到那个群里发认群码")
-        return redirect(url_for("dashboard", code=res, role=name, kind=request.form.get("kind", "backup")) + "#roles")
-
-    @app.post("/roles/<int:role_id>/slot/<int:slot_id>/delete")
-    @login_required
-    def delete_slot(role_id, slot_id):
-        with get_conn() as conn:
-            conn.execute("DELETE FROM role_groups WHERE id=? AND role_id=? AND kind='backup'", (slot_id, role_id))
-        return redirect(url_for("dashboard") + "#roles")
+        return redirect(url_for("dashboard", code=res, role=name) + "#roles")
 
     @app.post("/roles/<int:role_id>/delete")
     @login_required

@@ -44,7 +44,9 @@ async def _post_wish(matcher, bot, event, args, bounty: bool):
                 publicfeed.record("wish", line)
             except Exception as e:  # noqa: BLE001
                 logger.warning("心愿公开播报失败：{}", e)
-    await matcher.finish(f"✅ 心愿 #{info} 已挂出，等人来摘。" + ("\n（奖励只是登记，兑现靠你们自己，机器人不转物品。）" if reward else ""))
+    from changri.core import letters
+    paid = letters.paid_note(me["id"], "wish")
+    await matcher.finish(f"✅ 心愿 #{info} 已挂出，等人来摘。" + (f"\n{paid}" if paid else "") + ("\n（奖励只是登记，兑现靠你们自己，机器人不转物品。）" if reward else ""))
 
 
 wish_post = _cmd("挂心愿")

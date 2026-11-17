@@ -273,7 +273,7 @@ def add_rooms(bot_id: str, text: str, set_name: str = "", link_id: int = 0) -> t
 
 ROOM_NAME_AUTO = "auto"
 ROOM_NAME_PRESETS = [(ROOM_NAME_AUTO, "约会 D3 20:00-21:00 咖啡馆 小明、小红（跟长日系统一样）")]
-KIND_IN_NAME = {"私约": "约会"}      # 群名里的类型叫法：私约在群名上写成「约会」
+KIND_IN_NAME: dict[str, str] = {}      # 群名里的类型叫法要换的写在这里（0.21 起私约改名约会，不用再换）
 NAME_MAX = 30                       # QQ 群名长度上限（跟长日系统一致）
 NAME_CHARS = 5                      # 群名里每个人名最多取几个字
 

@@ -167,10 +167,6 @@ class SocialE2E(unittest.TestCase):
         asyncio.new_event_loop().run_until_complete(handle_event(self.bot, ev))
         self.assertTrue(any("[NEWG]" in o and "创建新角色" in o and "认群" in o for o in SENT))
         admins.claim(admins.make_code(), "B1", "ADMIN")
-        self.assertIn("所有群位都已认群", self.say("查看未认群", member="ADMIN")[0])
-        roles.add_slot(roles.get_role_by_name("甲")["id"], "123456", "backup")
-        self.assertIn("甲（备用群，登记群号 123456）", self.say("查看未认群", member="ADMIN")[0])
-        self.assertIn("权限不足", self.say("查看未认群")[0])
 
 
 if __name__ == "__main__":

@@ -219,9 +219,9 @@ class RoomGroups(unittest.TestCase):
         self.assertEqual(pool.counts()["occupied"], 1)
 
     def test_room_name_template(self):
-        self.assertEqual(qqpool.room_name({"kind": "私约", "id": 7, "day": 3, "start_hm": "20:00", "end_hm": "21:00", "place": "咖啡馆"}, ["小明", "小红"]), "约会 D3 20:00-21:00 咖啡馆 小明、小红")     # 私约在群名上写成「约会」
-        self.assertEqual(qqpool.room_name({"kind": "私约", "id": 7, "day": 3, "start_hm": "20:00", "end_hm": "21:00", "place": "海边的小咖啡馆旁边"}, ["莱昂内利", "卢克雷齐娅"]), "约会 D3 20:00-21:00 咖啡馆 莱昂内利、卢克雷齐娅"[:0] or qqpool.room_name({"kind": "私约", "id": 7, "day": 3, "start_hm": "20:00", "end_hm": "21:00", "place": "海边的小咖啡馆旁边"}, ["莱昂内利", "卢克雷齐娅"]))
-        self.assertLessEqual(len(qqpool.room_name({"kind": "私约", "id": 7, "day": 3, "start_hm": "20:00", "end_hm": "21:00", "place": "海边的小咖啡馆旁边"}, ["莱昂内利", "卢克雷齐娅"])), 30)
+        self.assertEqual(qqpool.room_name({"kind": "约会", "id": 7, "day": 3, "start_hm": "20:00", "end_hm": "21:00", "place": "咖啡馆"}, ["小明", "小红"]), "约会 D3 20:00-21:00 咖啡馆 小明、小红")     # 约会在群名上写成「约会」
+        self.assertEqual(qqpool.room_name({"kind": "约会", "id": 7, "day": 3, "start_hm": "20:00", "end_hm": "21:00", "place": "海边的小咖啡馆旁边"}, ["莱昂内利", "卢克雷齐娅"]), "约会 D3 20:00-21:00 咖啡馆 莱昂内利、卢克雷齐娅"[:0] or qqpool.room_name({"kind": "约会", "id": 7, "day": 3, "start_hm": "20:00", "end_hm": "21:00", "place": "海边的小咖啡馆旁边"}, ["莱昂内利", "卢克雷齐娅"]))
+        self.assertLessEqual(len(qqpool.room_name({"kind": "约会", "id": 7, "day": 3, "start_hm": "20:00", "end_hm": "21:00", "place": "海边的小咖啡馆旁边"}, ["莱昂内利", "卢克雷齐娅"])), 30)
         self.assertEqual(qqpool.fmt_names(["甲", "乙", "丙", "丁", "戊"]), "甲×乙等5人")
         set_config("qqlink_room_name", "R{id} {kind}")
         self.assertEqual(qqpool.room_name({"kind": "电话", "id": 7}, ["x"]), "R7 电话")
@@ -241,7 +241,7 @@ class RoomEntry(unittest.TestCase):
         qqpool.add_rooms("", "100001")
         with get_conn() as c:                                                      # 直接造一个领了群的房间
             pid = pool.is_pool_group("", "qq:100001")["id"]
-            rid = c.execute("INSERT INTO rooms(kind, creator_id, day, start_hm, end_hm, status, created_ts, pool_id) VALUES('私约',?,1,'10:00','11:00','open',1,?)", (a, pid)).lastrowid
+            rid = c.execute("INSERT INTO rooms(kind, creator_id, day, start_hm, end_hm, status, created_ts, pool_id) VALUES('约会',?,1,'10:00','11:00','open',1,?)", (a, pid)).lastrowid
             c.execute("INSERT INTO room_members(room_id, role_id) VALUES(?,?)", (rid, a))
             c.execute("INSERT INTO room_members(room_id, role_id) VALUES(?,?)", (rid, c2))
         self.assertFalse(rooms.note_qq_speech("", "100001", "555555"))            # 没认过的 QQ 号不算
@@ -270,7 +270,7 @@ class RoomEntry(unittest.TestCase):
         qqpool.add_rooms("", "100001")
         with get_conn() as c:
             pid = pool.is_pool_group("", "qq:100001")["id"]
-            rid = c.execute("INSERT INTO rooms(kind, creator_id, day, start_hm, end_hm, status, created_ts, pool_id) VALUES('私约',?,1,'10:00','11:00','open',1,?)", (a, pid)).lastrowid
+            rid = c.execute("INSERT INTO rooms(kind, creator_id, day, start_hm, end_hm, status, created_ts, pool_id) VALUES('约会',?,1,'10:00','11:00','open',1,?)", (a, pid)).lastrowid
             c.execute("INSERT INTO room_members(room_id, role_id) VALUES(?,?)", (rid, a))
             c.execute("INSERT INTO room_members(room_id, role_id) VALUES(?,?)", (rid, b))
         roles.bind_qq(a, "555555")
@@ -528,7 +528,7 @@ class Review(unittest.TestCase):
         qqpool.add_rooms("", "100001")
         with get_conn() as c:
             pid = pool.is_pool_group("", "qq:100001")["id"]
-            rid = c.execute("INSERT INTO rooms(kind, creator_id, day, start_hm, end_hm, place, status, created_ts, pool_id) VALUES('私约',?,1,'10:00','11:00','咖啡馆','open',1,?)", (a, pid)).lastrowid
+            rid = c.execute("INSERT INTO rooms(kind, creator_id, day, start_hm, end_hm, place, status, created_ts, pool_id) VALUES('约会',?,1,'10:00','11:00','咖啡馆','open',1,?)", (a, pid)).lastrowid
             c.execute("INSERT INTO room_members(room_id, role_id) VALUES(?,?)", (rid, a))
             c.execute("INSERT INTO room_members(room_id, role_id) VALUES(?,?)", (rid, b))
         roles.bind_qq(a, "555555")
@@ -536,7 +536,7 @@ class Review(unittest.TestCase):
         self.assertTrue(roomlog.record("", msg("555555", "甲：今天天气真好")))
         self.assertTrue(roomlog.record("", msg("555555", "哈哈哈")))
         self.assertTrue(roomlog.record("", msg("777777", "乙 你好呀")))                  # 没绑定：写昵称；乙是参与者名字，算戏文
-        self.assertFalse(roomlog.record("", msg("555555", "结束私约")))                   # 指令不记
+        self.assertFalse(roomlog.record("", msg("555555", "结束约会")))                   # 指令不记
         st = {x["name"]: x for x in roomlog.stats(rid)}
         self.assertEqual((st["甲"]["rp"], st["甲"]["chars"], st["甲"]["chat"]), (1, 6, 1))
         self.assertEqual(st["昵称777777"]["rp"], 1)
@@ -560,7 +560,7 @@ class Review(unittest.TestCase):
         c = create_app().test_client()
         tok = lambda p: re.search(r'name="_csrf" value="([^"]+)"', c.get(p).get_data(as_text=True)).group(1)   # noqa: E731
         c.post("/login", data={"username": "boss4", "password": "longenough1", "_csrf": tok("/login")})
-        self.assertIn("个私约/房间", c.get("/reviews?role=甲").get_data(as_text=True))
+        self.assertIn("个约会/房间", c.get("/reviews?role=甲").get_data(as_text=True))
         lab = roomlog.day_summary(roomlog.events())[0]["label"]
         self.assertIn("今天天气真好", c.get(f"/reviews/day/{lab}?role=甲").get_data(as_text=True))
         self.assertIn("R%d" % rid, c.get("/reviews/day/all").get_data(as_text=True))

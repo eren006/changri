@@ -52,7 +52,7 @@ def register(app, ctx):
         ids = [int(x) for x in f.getlist("to") if x.isdigit()]
         targets = [t for t in (phonecodes.role_by_id(i) for i in ids) if t]
         place = f.get("place", "").strip()
-        if kind not in ("私约", "电话", "微信") or not targets:
+        if kind not in ("约会", "电话", "微信") or not targets:
             flash("选一种约会，再选至少一位对象")
             return redirect(url_for("appoint_page"))
         if not extensions.is_enabled("groupchat" if kind == "微信" else "chatroom"):
@@ -62,7 +62,7 @@ def register(app, ctx):
             flash(why)
             return redirect(url_for("appoint_page"))
         try:
-            ok, text, rid = _hook("start")(kind, role, targets, f.get("time", "").strip(), "" if kind != "私约" else place)
+            ok, text, rid = _hook("start")(kind, role, targets, f.get("time", "").strip(), "" if kind != "约会" else place)
         except Exception as e:  # noqa: BLE001
             ok, text, rid = False, f"发起失败：{str(e)[:60]}", 0
         flash(text if ok else f"❌ {text}")

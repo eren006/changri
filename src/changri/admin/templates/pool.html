@@ -16,11 +16,11 @@ form.i{display:inline}
 </style>
 <h1>官方机器人的备用群池（高级）</h1>
 <p class="lede">只有不用「连接群号组」、靠官方机器人被拉进的空群来开房间时才需要这页。用了群号组就不用管。进行中的房间在总览里看。</p>
-<p class="note">私约、电话、官约、心愿约会都要一个群。官方机器人建不了群，所以这里放一批你提前建好、把机器人拉进去的空群：机器人被拉进群、或在群里有人说话后，群会自动出现在下面；你给它填上群号（玩家要靠群号申请入群）、放进池子就行。房间结束后群会「等人退群」，等你确认群里的人都退光了再放回池。</p>
+<p class="note">约会、电话、官约、心愿约会都要一个群。官方机器人建不了群，所以这里放一批你提前建好、把机器人拉进去的空群：机器人被拉进群、或在群里有人说话后，群会自动出现在下面；你给它填上群号（玩家要靠群号申请入群）、放进池子就行。房间结束后群会「等人退群」，等你确认群里的人都退光了再放回池。</p>
 <section>
   <h2>现在的情况</h2>
   <p>空闲 <b>{{ counts.free }}</b> · 占用 <b>{{ counts.occupied }}</b> · 等人退群 <b>{{ counts.cleaning }}</b> · 
-  {% if not counts.free %}<span style="color:var(--bad)">　没有空闲的群了，新的私约、电话会开不成（不排队）。多拉几个空群进来，或把等人退群的放回池。</span>{% endif %}</p>
+  {% if not counts.free %}<span style="color:var(--bad)">　没有空闲的群了，新的约会、电话会开不成（不排队）。多拉几个空群进来，或把等人退群的放回池。</span>{% endif %}</p>
   {% if unfilled %}<p class="note">有 {{ unfilled }} 个群还没填群号。</p>{% endif %}
   <span class="btns"><details class="panel"><summary class="btn ghost">{{ ic.tray() }}批量填群号</summary>
     <form class="form" method="post" action="{{ url_for('pool_bulk') }}">{{ csrf() }}
@@ -67,7 +67,7 @@ form.i{display:inline}
 {% if blocked %}
 <details class="pg" style="margin-top:20px">
   <summary style="cursor:pointer;font-weight:600">不能当房间的群（{{ blocked|length }} 个）</summary>
-  <p class="note" style="margin:8px 0">这些群已经是玩家的个人群、戏群或公告群，不会被分给私约，也不用填群号。点「删除」只是不再在这里列出，机器人下次在群里被看到还会再出现。</p>
+  <p class="note" style="margin:8px 0">这些群已经是玩家的个人群、戏群或公告群，不会被分给约会，也不用填群号。点「删除」只是不再在这里列出，机器人下次在群里被看到还会再出现。</p>
   <table class="rt">
     {% for g in blocked %}<tr><td>群 {{ g.group_openid[:8] }}…</td><td>{{ g.conflict }}{% if g.owner %}：{{ g.owner }}{% endif %}</td>
       <td><form class="i" method="post" action="{{ url_for('pool_delete', pid=g.id) }}" onsubmit="return confirm('从列表里删掉这个群？机器人下次在群里被看到还会再出现。')">{{ csrf() }}<button class="linkbtn">删除</button></form></td></tr>{% endfor %}

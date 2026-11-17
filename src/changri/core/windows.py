@@ -8,7 +8,7 @@ from .db import get_config
 # 功能名 → (设置键, 对玩家显示的名字)
 FEATURES = {
     "sms": ("window_sms", "短信与礼物"),
-    "date": ("window_date", "私约/电话/微信"),
+    "date": ("window_date", "约会/电话/微信"),
     "lovemail": ("window_lovemail", "心动信"),
     "wish": ("window_wish", "心愿"),
     "forum": ("window_forum", "论坛"),

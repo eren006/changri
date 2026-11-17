@@ -89,8 +89,8 @@ class LovemailTests(Base):
     def test_deliver_all(self):
         lovemail.add_mail(self.a, self.b, "小风", "给乙1"); lovemail.add_mail(self.c, self.b, "匿名", "给乙2")
         lovemail.add_mail(self.a, self.c, "匿名", "给丙")
-        roles.add_slot(self.c, "123456", "backup")
-        res = run(lovemail.deliver_all(self.sender(fail={"G3"}), ("B1", "ANN")))          # 丙的主群发不出去、备用群没认群
+        roles.add_slot(self.c, "123456")
+        res = run(lovemail.deliver_all(self.sender(fail={"G3"}), ("B1", "ANN")))          # 丙的个人群发不出去
         self.assertEqual((res["success"], res["fail"]), (2, 1))
         pkg = [t for g, t in self.sent if g == "G2"][0]
         self.assertIn("包含 2 封", pkg); self.assertIn("给乙1", pkg); self.assertIn("署名：小风", pkg)

@@ -32,6 +32,15 @@ class AutoReply(unittest.TestCase):
         base.update(kw)
         return A.pick(text, **base)
 
+    def test_all_off_and_on(self):
+        A.save_rule(rule(words="早"))
+        A.save_rule(rule(words="晚"))
+        self.assertEqual(A.set_all_enabled(False), 2)
+        self.assertFalse(any(r["enabled"] for r in A.list_rules()))
+        self.assertEqual(A.set_all_enabled(False), 0)
+        self.assertEqual(A.set_all_enabled(True), 2)
+        self.assertTrue(all(r["enabled"] for r in A.list_rules()))
+
     def test_modes(self):
         cases = [("contains", "祝晓", "你知道祝晓是谁吗", True), ("exact", "你好", "你好呀", False), ("exact", "你好", "你好", True),
                  ("prefix", "查", "查天气", True), ("prefix", "查", "我查", False), ("suffix", "吗", "好吗", True),

@@ -1,4 +1,4 @@
-"""核心玩法：私约/电话/官约/微信（约会房间）、时间线、我的待回。（论坛、心愿已拆成可开关的官方扩展 plugins/forum.py、plugins/wishes.py）
+"""核心玩法：约会/电话/官约/微信（约会房间）、时间线、我的待回。（论坛、心愿已拆成可开关的官方扩展 plugins/forum.py、plugins/wishes.py）
 规则和数据在 core/rooms.py、pool.py、wishes.py、pending.py；这里只管解析指令、回话、通知。
 官方机器人建不了群：房间从「群池」里领一个空群，群号由管理员在设置平台填；群池用完就排队。"""
 import json
@@ -182,7 +182,11 @@ async def _(bot: Bot, event: GroupMessageCreateEvent):
 # ================= 发起房间 =================
 
 async def start_room(kind: str, me, targets: list, time_text: str, place: str = "", note: str = "") -> tuple[bool, str, int]:
-    """发起私约/电话/微信并通知对方（QQ 指令和网页小手机共用）。返回 (成功, 文字, 房间号)。"""
+    """发起约会/电话/微信并通知对方（QQ 指令和网页小手机共用）。返回 (成功, 文字, 房间号)。"""
+    from changri.core import letters                  # 写信综开着、设了「发起约会要几个写信币」：不够就不让发，开成了才扣
+    why = letters.check_cost(me["id"], "date") if kind == "约会" else ""
+    if why:
+        return False, why, 0
     ok, info, room_id = rooms.create(kind, me["id"], [t["id"] for t in targets], time_text, place, note)
     if room_id and not await _ensure_clean(room_id):
         return False, NO_GROUP_TEXT.format(kind=kind), 0
@@ -193,6 +197,8 @@ async def start_room(kind: str, me, targets: list, time_text: str, place: str = 
         await _invite(t["id"], room, me["name"])
     await _announce_in_room(room_id)
     refused = info.partition("\n")[2]           # 多人邀约里有人拉黑了你：create 在提示后面附了一行
+    paid = letters.pay(me["id"], "date", f"发起约会 R{room_id}") if kind == "约会" else ""
+    refused = "\n".join(x for x in (refused, paid) if x)
     if kind in rooms.SOLO_KINDS:
         return True, f"✅ {kind}已发起，房间号 R{room_id}（只有你一个人）。\n{_slot(room)}\n{_group_line(room)}\n聊完在群里发「结束{kind}」。", room_id
     return True, f"✅ {kind}已发起，房间号 R{room_id}。\n{_slot(room)}\n{_group_line(room)}\n对方已收到通知。" + (f"\n{refused}" if refused else ""), room_id
@@ -223,15 +229,15 @@ async def _start_room(matcher, bot: Bot, event: GroupMessageCreateEvent, kind: s
     await matcher.finish(text if ok else f"❌ {text}")
 
 
-private = _cmd("私约")
+private = _cmd("约会", {"私约"})                 # 0.21 起私约改名约会，老叫法照样认
 
 
 @private.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     p = args.extract_plain_text().split(None, 2)
     if len(p) < 3:
-        await private.finish("用法：私约 时间 地点 对方（多人用 / 隔开）\n例：私约 1400-1500 咖啡厅 张三/李四")
-    await _start_room(private, bot, event, "私约", p[0], p[1], _names(p[2]))
+        await private.finish("用法：约会 时间 地点 对方（多人用 / 隔开）\n例：约会 1400-1500 咖啡厅 张三/李四")
+    await _start_room(private, bot, event, "约会", p[0], p[1], _names(p[2]))
 
 
 phone = _cmd("电话")
@@ -525,23 +531,23 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
         await review_cmd.finish("你不是这个房间的参与者。")
     text = roomlog.review_text(room["id"])
     if not text:
-        await review_cmd.finish("这场没有记到戏文。房间群里要有监听的 QQ 号，说话的人要绑定过 QQ，戏文要按「角色名：正文」的格式写。")
+        await review_cmd.finish("这场没有记到戏文。戏文要按「角色名：正文」的格式写；房间群里要有卡拉（开着「接收全部消息」），或者有监听的 QQ 号（说话的人要绑定过 QQ）。")
     await reply_long(review_cmd, IMG + text)
 
 
-end_room = _cmd("结束私约", {"结束电话", "结束官约", "结束微信", "结束心愿", "结束约会", "结束前置电话", "结束踩点"})
+end_room = _cmd("结束约会", {"结束私约", "结束电话", "结束官约", "结束微信", "结束心愿", "结束前置电话", "结束踩点"})
 
 
 @end_room.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     room = rooms.room_of_group(bot.self_id, event.group_openid)
     arg = _room_arg(args.extract_plain_text())
-    if not room and arg:                         # 房间群里没有卡拉：在自己的群里发「结束私约 R12」
+    if not room and arg:                         # 房间群里没有卡拉：在自己的群里发「结束约会 R12」
         room = rooms.get(arg)
         if room and room["status"] != "open":
             room = None
     if not room:
-        await end_room.finish("这里没有进行中的约会房间。在自己的群里结束，要带房间号：结束私约 R12。")
+        await end_room.finish("这里没有进行中的约会房间。在自己的群里结束，要带房间号：结束约会 R12。")
     me = _me(bot, event)
     if not me and not _is_admin(bot, event):
         await end_room.finish(NEED_ROLE)
@@ -555,19 +561,20 @@ backfill_cmd = _cmd("补录")
 
 @backfill_cmd.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
-    """卡拉在的房间群里补录：回复一条合并转发的聊天记录，发「补录 R房间号」。
+    """补录只由卡拉做：回复一条合并转发的聊天记录，发「补录 R号」（R 号是这次约会/电话/官约的编号，季度内不重复），
+    只补进进行中的季度。在自己的个人群里发就行，
+    房间群是不是卡拉的群都可以（小号的群卡拉不用进）；在卡拉的房间群里也可以不带编号。
     QQ 会把被引用的记录作为文字带过来（只有发送者和内容，没有时间），已有的跳过，缺的按顺序插进复盘。"""
     from changri.core import roomlog
     if get_config("qq_backfill_enabled", "1") != "1":
         await backfill_cmd.finish("补录没有打开（管理员在设置平台「连接群号组」页打开）。")
+    if not season.running():
+        await backfill_cmd.finish("现在没有进行中的季度，补录只能补进进行中的季度。")
     arg = _room_arg(args.extract_plain_text())
     room = rooms.get(arg) if arg else rooms.room_of_group(bot.self_id, event.group_openid)
-    g = pool.get(room["pool_id"]) if room and room["pool_id"] else None
-    # 卡拉看不到真实群号：房间用的是监听 QQ 号管的群（卡拉也在里面）时，没法核对是不是同一个群，只核对人
-    same_group = bool(g) and (pool.is_qq_only(g) or g["group_openid"] == event.group_openid)
-    if not room or not same_group:
-        logger.info(f"[补录·卡拉] 拒绝：房间 {arg} 不存在或不是这个群（{event.group_openid}）")
-        await backfill_cmd.finish("用法：回复那条合并转发的聊天记录，发「补录 R房间号」（要在这个房间用过的群里发）。")
+    if not room or room["status"] == "cancelled":
+        logger.info(f"[补录·卡拉] 拒绝：房间 {arg} 不存在（{event.group_openid}）")
+        await backfill_cmd.finish("用法：回复那条合并转发的聊天记录，发「补录 R房间号」（在自己的群里发就行）。")
     me = _me(bot, event)
     if not _is_admin(bot, event) and not (me and any(m["role_id"] == me["id"] for m in rooms.members(room["id"]))):
         await backfill_cmd.finish(f"只有 R{room['id']} 的参与者或管理员能补录。")
@@ -579,7 +586,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     res = roomlog.backfill_quoted(room["id"], items)
     logger.info(f"[补录·卡拉] R{room['id']}：{res}")
     await backfill_cmd.finish(f"📥 R{room['id']} 补录好了：补进 {res['added']} 条，已经有的 {res['skipped']} 条跳过。"
-                              "这条路拿不到原来的时间，缺的按顺序插在已有发言之间；同一个群用过好几场的话，转发时只选这一场的消息。")
+                              "拿不到原来的时间，缺的按顺序插在已有发言之间；同一个群用过好几场的话，转发时只选这一场的消息。")
 
 
 def _room_arg(text: str) -> int | None:
@@ -587,7 +594,7 @@ def _room_arg(text: str) -> int | None:
     return int(m[1]) if m else None
 
 
-force_end = _cmd("强结私约", {"强结"})
+force_end = _cmd("强结约会", {"强结", "强结私约"})
 
 
 @force_end.handle()
@@ -597,7 +604,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     rid = _room_arg(args.extract_plain_text())
     room = rooms.get(rid) if rid else None
     if not room or room["status"] != "open":
-        await force_end.finish("用法：强结私约 R房间号（只能结束进行中的）。")
+        await force_end.finish("用法：强结约会 R房间号（只能结束进行中的）。")
     await _finish_room(rid, "ended", "（管理员强制结束）")
     await force_end.finish(f"✅ R{rid} 已强制结束。")
 
@@ -824,13 +831,42 @@ async def _(bot: Bot, event: GroupMessageCreateEvent):
     lines = [f"📊 {me['name']} 今天（{season.day_label() if season.running() else '自然日'}）的数量"]
     for k, label in (("sms", "短信"), ("gift", "送礼")):
         lines.append(f"{label} {one(m.day_count(me['id'], k), m.daily_limit(k))}")
-    for k in ("私约", "电话", "微信") + (("踩点",) if rooms.stakeout_enabled() else ()):
+    for k in ("约会", "电话", "微信") + (("踩点",) if rooms.stakeout_enabled() else ()):
         lines.append(f"{k} {one(rooms.day_count(me['id'], k), rooms.daily_limit(k))}")
     from changri.core import extensions as _ext
     if _ext.is_enabled("wishes"):
         lines.append(f"挂心愿 {one(wishes.day_count(me['id'], 'post'), get_int('limit_挂心愿', 0))}")
         lines.append(f"摘心愿 {one(wishes.day_count(me['id'], 'take'), get_int('limit_摘心愿', 0))}")
     await my_count.finish("\n".join(lines))
+
+
+my_arc = _cmd("我的弧长")
+
+
+@my_arc.handle()
+async def _(bot: Bot, event: GroupMessageCreateEvent):
+    me = _me(bot, event)
+    if not me:
+        await my_arc.finish(NEED_ROLE)
+    from changri.core import arclen
+    await reply_long(my_arc, arclen.report(me["id"]))
+
+
+see_arc = _cmd("查看弧长")
+
+
+@see_arc.handle()
+async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
+    if not _is_admin(bot, event):
+        await see_arc.finish("只有管理员可以查看别人的弧长。自己的发「我的弧长」。")
+    name = args.extract_plain_text().strip()
+    if not name:
+        await see_arc.finish("用法：查看弧长 角色名")
+    r = roles.get_role_by_name(name)
+    if not r:
+        await see_arc.finish(f"没有叫「{name}」的角色。")
+    from changri.core import arclen
+    await reply_long(see_arc, arclen.report(r["id"]))
 
 
 # ================= 定时：过期结束、给排队的房间补群 =================
@@ -841,6 +877,9 @@ async def _tick():
     if not nonebot.get_bots():
         return
     try:
+        from changri.core import specials
+        for row in specials.take_outbox():                # 窃听器 / 截信器 / 回音壁抄到的、捕鼠器的提醒
+            await messaging.push_to_role(row["owner_id"], row["text"], make_send())
         await _warn_expiring()
         for r in rooms.expired():
             await _finish_room(r["id"], "ended", "", timeout=True)
@@ -895,7 +934,7 @@ async def _check_presence(only_gid: str = "") -> None:
             await _receipt_all_here(rooms.get(room["id"]))
 
 
-_ROOM_CMD = re.compile(r"[/.。]?(结束(?:私约|电话|官约|微信|心愿|约会|前置电话|踩点)|修改时间线|同意时间线|拒绝时间线)\s*(.*)")
+_ROOM_CMD = re.compile(r"[/.。]?(结束(?:约会|私约|电话|官约|微信|心愿|前置电话|踩点)|修改时间线|同意时间线|拒绝时间线)\s*(.*)")
 _LEAD_AT = re.compile(r"^(?:@\S+\s*)+")          # QQ 里「回复」一条消息会自动在开头 @ 原发送人
 
 
@@ -904,7 +943,7 @@ def _cmd_text(text: str) -> str:
 
 
 async def _listen_cmd(app_id, msg) -> bool:
-    """房间群里没有卡拉：有监听的 QQ 号时，群里发「结束私约 / 修改时间线 / 同意时间线 / 拒绝时间线」由 QQ 号听到，
+    """房间群里没有卡拉：有监听的 QQ 号时，群里发「结束约会 / 修改时间线 / 同意时间线 / 拒绝时间线」由 QQ 号听到，
     按发言人绑定的 QQ 认出他是房间的哪位参与者，照常处理，结果由 QQ 号在群里回。返回是否是房间指令。"""
     m = _ROOM_CMD.fullmatch(_cmd_text(msg.text))
     if not m:
@@ -951,65 +990,11 @@ async def _listen_cmd(app_id, msg) -> bool:
     return True
 
 
-_last_forward: dict[tuple[str, str, str], tuple[str, float]] = {}      # (机器人, 群, QQ) -> (刚转发的合并转发 id, 时间)
-_BACKFILL = re.compile(r"[/.。]?补录\s*(?:[Rr]?(\d+))?")
-
-
-async def _listen_backfill(app_id, msg) -> bool:
-    """补录：QQ 号掉线期间漏记的戏，事后把聊天记录合并转发到房间群，回复它发「补录 R3」（或转发后 10 分钟内直接发「补录 R3」）。
-    读出转发里的每一条，和已存的比：同一个人说过同样的话就跳过，没有的按原来的时间插回去。返回是否处理了。"""
-    import time as _t
-    key = (app_id, msg.group_id, msg.user_id)
-    if msg.forward_ids:
-        _last_forward[key] = (msg.forward_ids[0], _t.time())
-        return True
-    m = _BACKFILL.fullmatch(_cmd_text(msg.text))
-    if not m:
-        return False
-    gid = msg.group_id
-    say = lambda t: _to_group(app_id, pool.QQ_PREFIX + gid, t)       # noqa: E731
-    if get_config("qq_backfill_enabled", "1") != "1":
-        await say("补录没有打开（管理员在设置平台「连接群号组」页打开）。")
-        return True
-    room = rooms.get(int(m.group(1))) if m.group(1) else rooms.room_of_group(app_id, pool.QQ_PREFIX + gid)
-    g = pool.get(room["pool_id"]) if room and room["pool_id"] else None
-    if not room or not g or g["real_gid"] != gid:
-        await say("用法：回复那条合并转发，发「补录 R房间号」（要在这个房间用过的群里发）。")
-        return True
-    mine = {r["id"] for r in roles.roles_by_qq(msg.user_id)}
-    if not any(x["role_id"] in mine for x in rooms.members(room["id"])):
-        await say(f"只有 R{room['id']} 的参与者能补录：请先在自己的群里对卡拉发「/绑定QQ 你的QQ号」。")
-        return True
-    fid = ""
-    if not msg.reply_id:
-        fid, ts = _last_forward.get(key, ("", 0.0))
-        if not fid or _t.time() - ts > 600:
-            await say("先把聊天记录合并转发到这个群，再回复那条转发发「补录 R房间号」。")
-            return True
-    items, err = await qqmanager.read_forward(app_id, gid, msg.reply_id, fid)
-    logger.info(f"[补录·QQ号] R{room['id']}：reply={msg.reply_id or '-'} forward={fid or '-'} → {('读出 %d 条' % len(items)) if items is not None else ('失败：' + err)}")
-    if items is None:
-        await say(f"读不到这条合并转发：{err}")
-        return True
-    # 同一个群会被好几场房间轮流用：只收这场房间开始前 10 分钟到结束后 10 分钟之间的消息，别的场次说的不算
-    since = int(room["created_ts"]) - 600
-    until = int(room["ended_ts"] or _t.time()) + 600                        # 还没结束：到现在为止
-    items = [it for it in items if not it["ts"] or since <= it["ts"] <= until]
-    items = [it for it in items if not _BACKFILL.fullmatch(_cmd_text(it["text"]))]
-    from changri.core import roomlog
-    res = roomlog.backfill(room["id"], items)
-    logger.info(f"[补录·QQ号] R{room['id']}：{res}")
-    await say(f"📥 R{room['id']} 补录好了：补进 {res['added']} 条，已经有的 {res['skipped']} 条跳过。复盘里已按时间排好。")
-    return True
-
-
 async def _on_listened(app_id, msg) -> None:
     """QQ 号听到房间群里有人说话 = 到场（群里没有卡拉，靠这个补上）；最后一个人到了，私下回执给每个参与者。"""
     try:
         from changri.core import roomlog
-        roomlog.record(app_id, msg)                                  # 复盘：房间群里的发言存下来
-        if await _listen_backfill(app_id, msg):
-            return
+        roomlog.record(app_id, msg)                                  # 复盘：房间群里的发言存下来（补录只由卡拉做）
         if await _listen_cmd(app_id, msg):
             return
         res = rooms.note_qq_speech(app_id, msg.group_id, msg.user_id)
@@ -1046,3 +1031,17 @@ async def _(bot: Bot, event: GroupMessageCreateEvent):
     if not me:
         await my_stats.finish(NEED_ROLE)
     await my_stats.finish(mystats.build(me["id"]))
+
+
+# ================= 复盘：官方机器人在房间群里收到的发言 =================
+
+@on_message(priority=30, block=False).handle()
+async def _record_official(bot: Bot, event: GroupMessageCreateEvent):
+    """官方机器人在房间群里（大家默认开了「接收全部消息」）收到的发言记进复盘，不接 QQ 号也能复盘、统计字数。
+    优先级比所有指令都低、不拦截：被指令接走的话不会走到这里。一个群里只会有卡拉或小号其中一个，不会两边都记。"""
+    try:
+        from changri.core import roomlog
+        roomlog.record_official(bot.self_id, event.group_openid, event.author.member_openid,
+                                event.get_plaintext(), event_id=str(getattr(event, "id", "") or ""))
+    except Exception as e:  # noqa: BLE001 复盘出错不能影响别的功能
+        logger.warning(f"[复盘·卡拉] 记录出错：{e}")

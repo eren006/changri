@@ -8,7 +8,7 @@ from flask import Flask, Response, abort, flash, g, redirect, render_template, r
 from functools import wraps
 from markupsafe import Markup
 from changri import config as _config
-from changri.core import botconf, extensions as ext_core, loopbridge, netcheck, pool as pool_core, qqmanager as qqmanager_core, roles as roles_core, roomnotify as roomnotify_core, rooms as rooms_core, setupcode, updater, webusers
+from changri.core import botconf, extensions as ext_core, loopbridge, netcheck, pool as pool_core, qqmanager as qqmanager_core, roles as roles_core, roomnotify as roomnotify_core, rooms as rooms_core, season as season_core, setupcode, updater, webusers
 from changri.core.db import DB_PATH, current_bot, enter_bot, get_config, get_conn, init_db, leave_bot, list_bot_ids, set_config, use_bot
 from changri.admin.common import GLOBAL_ENDPOINTS, HIDDEN_FIELDS, LOCK_AFTER, LOCK_SECONDS, SECTIONS, SETTINGS, _bot_cards, _bot_label, _bot_status, _csrf_token, _dashboard, _fails, _secret_key, field_view, log
 
@@ -28,7 +28,9 @@ def create_app() -> Flask:
         log.warning("首次设置：从别的电脑打开设置平台时，需要验证码 %s（也在 data/.setup_code）", setupcode.code())
     app = Flask(__name__)
     app.secret_key = _secret_key()
-    app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax")
+    # cookie 起个专属名字：浏览器按 IP / 域名存 cookie、不分端口，同一台服务器上别的网站也叫默认的「session」时会互相冲掉，
+    # 冲掉以后提交表单对不上校验码，以前直接报 400 Bad Request（登录后跳不进去）
+    app.config.update(SESSION_COOKIE_NAME="changri_admin", SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax")
     app.jinja_env.filters["datetimefmt"] = lambda ts: time.strftime("%m-%d %H:%M", time.localtime(ts))
     app.jinja_env.globals["csrf"] = lambda: Markup(f'<input type="hidden" name="_csrf" value="{_csrf_token()}">')
 
@@ -63,13 +65,27 @@ def create_app() -> Flask:
     from changri.features import registry as _registry
     _guards = _registry.url_guards()
 
+    def _csrf_failed():
+        """表单校验码对不上：页面开太久、服务重启过、或者浏览器没把 cookie 带回来。不再报 400，回到原页面说清楚，换一个新的校验码。"""
+        no_cookie = app.config["SESSION_COOKIE_NAME"] not in request.cookies
+        session.pop("csrf", None)
+        log.warning("表单校验码对不上：%s %s（%s）", request.method, request.path, "浏览器没带 cookie" if no_cookie else "校验码过期")
+        flash("浏览器没有保存登录信息：请确认没有禁用 cookie，或者换个浏览器试试。" if no_cookie
+              else "页面过期了（开太久或者服务刚重启过），已经刷新，请再操作一次。")
+        if request.endpoint in ("login", "setup"):
+            return redirect(url_for(request.endpoint))
+        from urllib.parse import urlparse
+        ref = urlparse(request.referrer or "")
+        back = (ref.path or "/") + (f"?{ref.query}" if ref.query else "") if ref.netloc == request.host else url_for("dashboard")
+        return redirect(back)
+
     @app.before_request
     def guard():
         for prefix, ext_id in _guards:      # 扩展关了，页面网址也一并关掉（前缀在各功能的 FEATURE["url_prefixes"] 里）
             if request.path.startswith(prefix) and not ext_core.is_enabled(ext_id):
                 abort(404)
-        if request.method == "POST" and not secrets.compare_digest(request.form.get("_csrf", ""), session.get("csrf", "-")):
-            abort(400)
+        if request.method == "POST" and not secrets.compare_digest(request.form.get("_csrf", "").encode(), session.get("csrf", "-").encode()):
+            return _csrf_failed()
 
     def login_required(view):
         @wraps(view)
@@ -201,8 +217,9 @@ def create_app() -> Flask:
                        "who": "、".join(m["name"] for m in rooms_core.members(r["id"])),
                        "grp": (pool_core.get(r["pool_id"]) if r["pool_id"] else None)} for r in live]
         return render_template("dashboard.html", d=_dashboard(), errors=errlog.recent(30), err_url=errlog.report_url(), role_items=role_items,
+                               cal=season_core.month_grid(request.args.get("cal", "")), cal_line=season_core.upcoming_line(),
                                live_rooms=live_rooms, waiting_rooms=sum(1 for r in live_rooms if not r["grp"]),
-                               code=request.args.get("code", ""), code_role=request.args.get("role", ""), code_kind=request.args.get("kind", ""))
+                               code=request.args.get("code", ""), code_role=request.args.get("role", ""))
 
     @app.post("/rooms/notify")
     @login_required

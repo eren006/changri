@@ -513,7 +513,9 @@ def main() -> None:
         return f'<a class="btn" href="{base}/{it["url"]}">{label}（{it["size"] / 1048576:.0f} MB）</a>' if it else ""
     page = fill((HERE / "site" / "install.html.in").read_text(encoding="utf-8"), BASE=base, VERSION=ver,
                 WINDOWS_LINK=link("windows-x64", "下载 Windows 版") or "（这个版本没有 Windows 包）",
-                LINUX_LINKS=" ".join(x for x in (link("linux-x64", "x86_64"), link("linux-arm64", "arm64")) if x) or "（这个版本没有 Linux 包）")
+                LINUX_LINKS=" ".join(x for x in (link("linux-x64", "x86_64"), link("linux-arm64", "arm64")) if x) or "（这个版本没有 Linux 包）",
+                SHA_TABLE="\n".join(f'<tr><td>{label}</td><td><code>{Path(full[p]["url"]).name}</code><br><code style="word-break:break-all">{full[p]["sha256"]}</code></td></tr>'
+                                    for p, label in (("windows-x64", "Windows"), ("linux-x64", "Linux x86_64"), ("linux-arm64", "Linux arm64")) if p in full))
     (site / "install").mkdir(exist_ok=True)
     (site / "install" / "index.html").write_text(page, encoding="utf-8")      # 网址是 /install（nginx 不会自动补 .html）
     # 主页就是使用手册（安装、恋综指南、指令大全、申请专属 App）；/guide 是旧链接，跳回主页

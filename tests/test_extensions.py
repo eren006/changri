@@ -142,11 +142,11 @@ class ExtensionCoreTests(_PatchedDir):
         E.set_enabled("sighting", True)
         E.set_enabled("precall", True)
         self.assertEqual(E.disabled_nav(), set())
-        self.assertEqual(E.disabled_groups(), {"心愿", "漂流瓶", "混乱寄信", "晚餐", "点歌"})   # 这些默认关（朋友圈、目击已在上面打开）
+        self.assertEqual(E.disabled_groups(), {"心愿", "漂流瓶", "混乱短信", "晚餐", "点歌", "写信综"})   # 这些默认关（朋友圈、目击已在上面打开）
         E.set_enabled("lovemail", False)
         E.set_enabled("dice", False)
         self.assertIn("lovemail_page", E.disabled_nav())
-        self.assertEqual(E.disabled_groups(), {"心动信", "跑团骰子", "心愿", "漂流瓶", "混乱寄信", "晚餐", "点歌"})
+        self.assertEqual(E.disabled_groups(), {"心动信", "跑团骰子", "心愿", "漂流瓶", "混乱短信", "晚餐", "点歌", "写信综"})
         E.set_enabled("entrance", False)
         self.assertNotIn("season_page", E.disabled_nav())                      # 季度是核心，页面一直在
         self.assertNotIn("season", [e["id"] for e in E.OFFICIAL])
@@ -156,7 +156,7 @@ class ExtensionCoreTests(_PatchedDir):
         bad = {"__init__.py": b"import sys\nsys.exit(1)\n"}
         self.assertTrue(E.check_code(bad)[0])
         self.assertTrue(E.check_code({"__init__.py": b"def x(:\n"})[0])
-        self.assertTrue(E.check_code({"__init__.py": "from changri_api import on_command\nc = on_command('私约')\n".encode()})[0])      # 和主程序重名
+        self.assertTrue(E.check_code({"__init__.py": "from changri_api import on_command\nc = on_command('约会')\n".encode()})[0])      # 和主程序重名
         self.assertTrue(E.check_code({"__init__.py": "from changri_api import on_command\nc = on_command('小游戏', aliases={'时间线'})\n".encode()})[0])
         errs, warns = E.check_code({"__init__.py": b"import time, requests\nfrom core import db\ntime.sleep(1)\n"})
         self.assertEqual(errs, [])

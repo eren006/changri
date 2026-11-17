@@ -1,4 +1,5 @@
-"""房间复盘：QQ 号在房间群里听到的发言存下来，事后按房间、按人查看。
+"""房间复盘：房间群里的发言存下来，事后按房间、按人查看。两条路进来：QQ 号听到的（record），
+官方机器人在房间群里收到的（record_official，大家默认开了「接收全部消息」）。一个群里只会有其中一个，都按 R 号存。
 戏文格式跟长日系统一致：首行「角色名」+ 换行/空格/冒号（：或:）+ 正文才算戏文（计字数），其余是闲聊，只存不计。
 只记正在进行的房间群；房间被清掉（季度收尾）时发言一起清掉，要留的话先在后台导出文本。"""
 import difflib
@@ -9,7 +10,7 @@ from . import pool, rooms
 from .db import get_conn, get_int
 
 _RP = re.compile(r"^\s*(\S{1,12}?)\s*[：:\s]\s*(.+)$", re.S)
-_ROOM_CMD = re.compile(r"(?:@\S+\s*)*[/.。]?(结束(?:私约|电话|官约|微信|心愿|约会|前置电话)|修改时间线|同意时间线|拒绝时间线|绑定qq|绑定QQ|补录)\s*.*", re.S)
+_ROOM_CMD = re.compile(r"(?:@\S+\s*)*[/.。]?(结束(?:约会|私约|电话|官约|微信|心愿|前置电话)|修改时间线|同意时间线|拒绝时间线|绑定qq|绑定QQ|补录)\s*.*", re.S)
 
 
 def parse_rp(text: str, names: set[str]) -> tuple[str, str] | None:
@@ -42,6 +43,44 @@ def record(app_id: str, msg) -> bool:
         c.execute("INSERT INTO room_lines(room_id, ts, qq, role_id, name, text, is_rp, chars, msg_id) VALUES(?,?,?,?,?,?,?,?,?)",
                   (room["id"], ts, msg.user_id, who["role_id"] if who else None, name, text,
                    int(bool(rp)), len(rp[1]) if rp else 0, getattr(msg, "message_id", "") or ""))
+    from . import specials
+    specials.on_room_line(room["id"], who["role_id"] if who else None, name, text)      # 窃听器
+    return True
+
+
+OFFICIAL = "o:"           # 官方机器人那条路记的行：qq 列存「o:member_openid」，msg_id 存「o:事件id」
+
+
+def record_official(bot_id: str, group_openid: str, member_openid: str, text: str, event_id: str = "", ts: int | None = None) -> bool:
+    """官方机器人在房间群里收到一条发言：房间在进行中、不是房间指令，就存下来。返回是否存了。
+    发言人按 openid 认角色（每人同期只有一个活跃角色）。"""
+    from . import qqpool, roles
+    text = (text or "").strip()
+    if not text or _ROOM_CMD.fullmatch(text):
+        return False
+    room = rooms.room_of_group(bot_id, group_openid)
+    if not room:
+        return False
+    skip = qqpool.skip_users()
+    if skip:
+        with get_conn() as c:
+            if any(r["qq"] in skip for r in c.execute("SELECT qq FROM person_qq WHERE member_openid=?", (member_openid,))):
+                return False
+    mem = rooms.members(room["id"])
+    r = roles.find_role_for_sender(bot_id, group_openid, member_openid)       # 每人同期只有一个活跃角色
+    who = {"role_id": r["id"], "name": r["name"]} if r else None
+    names = {m["name"] for m in mem}
+    rp = parse_rp(text, names)
+    name = who["name"] if who else "群友" + member_openid[-4:]
+    key = OFFICIAL + member_openid
+    ts = int(ts or time.time())
+    with get_conn() as c:
+        _drop_near_duplicate(c, room["id"], key, text, ts)
+        c.execute("INSERT INTO room_lines(room_id, ts, qq, role_id, name, text, is_rp, chars, msg_id) VALUES(?,?,?,?,?,?,?,?,?)",
+                  (room["id"], ts, key, who["role_id"] if who else None, name, text,
+                   int(bool(rp)), len(rp[1]) if rp else 0, (OFFICIAL + event_id) if event_id else ""))
+    from . import specials
+    specials.on_room_line(room["id"], who["role_id"] if who else None, name, text)      # 窃听器
     return True
 
 
@@ -287,49 +326,10 @@ def day_summary(evts: list[dict]) -> list[dict]:
     return out
 
 
-# ---------- 合并转发补录：QQ 号掉线期间漏记的发言，事后从合并转发里补回来 ----------
+# ---------- 补录（只由官方机器人做）：漏记的发言，事后回复合并转发补回来 ----------
 
 def _norm(text: str) -> str:
     return re.sub(r"\s+", "", text or "")
-
-
-def backfill(room_id: int, items: list[dict]) -> dict:
-    """items：[{ts, qq, nickname, text}]（来自合并转发）。同一个人说过同样的话就跳过，没有的按原来的时间插进去。
-    认人：发言人的 QQ 绑定了房间里的哪位参与者就记在谁名下，否则记昵称。返回 {added, skipped, empty}。"""
-    from . import roles
-    room = rooms.get(room_id)
-    if not room:
-        return {"added": 0, "skipped": 0, "empty": 0}
-    mem = rooms.members(room_id)
-    names = {m["name"] for m in mem}
-    by_role = {m["role_id"]: m["name"] for m in mem}
-    have: set[tuple[str, str]] = set()
-    for ln in lines(room_id):
-        key = str(ln["role_id"]) if ln["role_id"] else (ln["qq"] or ln["name"])
-        have.add((key, _norm(ln["text"])))
-        if ln["qq"]:
-            have.add((ln["qq"], _norm(ln["text"])))
-    added = skipped = empty = 0
-    with get_conn() as c:
-        for it in sorted(items, key=lambda x: int(x.get("ts") or 0)):
-            text = (it.get("text") or "").strip()
-            if not text:
-                empty += 1
-                continue
-            qq = str(it.get("qq") or "")
-            who = next((r["id"] for r in roles.roles_by_qq(qq) if r["id"] in by_role), None) if qq else None
-            keys = {(str(who), _norm(text))} if who else set()
-            keys.add((qq or it.get("nickname") or "", _norm(text)))
-            if keys & have:
-                skipped += 1
-                continue
-            rp = parse_rp(text, names)
-            c.execute("INSERT INTO room_lines(room_id, ts, qq, role_id, name, text, is_rp, chars, msg_id) VALUES(?,?,?,?,?,?,?,?,?)",
-                      (room_id, int(it.get("ts") or time.time()), qq, who, by_role.get(who) or it.get("nickname") or qq, text,
-                       int(bool(rp)), len(rp[1]) if rp else 0, ""))
-            have |= keys
-            added += 1
-    return {"added": added, "skipped": skipped, "empty": empty}
 
 
 # ---------- 官方机器人群里的补录：回复合并转发时，QQ 把被引用的聊天记录作为文字带过来（没有时间、没有 QQ 号） ----------

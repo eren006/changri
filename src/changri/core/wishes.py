@@ -39,10 +39,16 @@ def post(poster_id: int, time_text: str, place: str, content: str, reward: str =
     hit = rooms.conflict(poster_id, day, hm[0], hm[1])
     if hit:
         return False, f"你在 D{day} {hit['start_hm']}-{hit['end_hm']} 已经有安排了。"
+    from . import letters                       # 写信综开着、设了「挂心愿要几个写信币」时先看够不够
+    why = letters.check_cost(poster_id, "wish")
+    if why:
+        return False, why
     with get_conn() as c:
         cur = c.execute("INSERT INTO wishes(poster_id, day, start_hm, end_hm, place, content, reward, sign, dkey, created_ts) VALUES(?,?,?,?,?,?,?,?,?,?)",
                         (poster_id, day, hm[0], hm[1], place.strip(), content.strip(), reward.strip(), sign.strip(), season.day_key(), int(time.time())))
-    return True, str(cur.lastrowid)
+        wid = cur.lastrowid
+    letters.pay(poster_id, "wish", f"挂心愿 #{wid}")
+    return True, str(wid)
 
 
 def get(wish_id: int):

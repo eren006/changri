@@ -59,7 +59,7 @@ async def send_group(bot_id: str, group_openid: str, text: str):
 
 
 async def send_to_role(role_id: int, text: str) -> bool:
-    """发到某个角色：主群优先，失败试备用群。返回是否送达。"""
+    """发到某个角色：发到个人群。返回是否送达。"""
     ok, _ = await _messaging.push_to_role(role_id, text, _make_send())
     return ok
 

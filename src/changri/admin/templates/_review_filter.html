@@ -1,5 +1,5 @@
 <nav class="tabs" style="display:flex;gap:8px;margin:0 0 14px">
-  <a class="btn {{ '' if f.tab == 'room' else 'ghost' }}" href="{{ url_for(request.endpoint, **dict(request.view_args or {}, tab='room', role=f.role, q=f.q)) }}">私约 / 房间</a>
+  <a class="btn {{ '' if f.tab == 'room' else 'ghost' }}" href="{{ url_for(request.endpoint, **dict(request.view_args or {}, tab='room', role=f.role, q=f.q)) }}">约会 / 房间</a>
   <a class="btn {{ '' if f.tab == 'msg' else 'ghost' }}" href="{{ url_for(request.endpoint, **dict(request.view_args or {}, tab='msg', role=f.role, q=f.q)) }}">短信 / 礼物</a>
 </nav>
 <form method="get" class="inline" style="margin:0 0 14px">

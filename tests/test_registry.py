@@ -10,7 +10,7 @@ from changri.features import registry  # noqa: E402
 class RegistryTests(unittest.TestCase):
     def test_lists_are_collected_in_order(self):
         core = [f["id"] for f in registry.core_cards()]
-        self.assertEqual(core, ["base", "season", "social", "gift", "letter", "play"])
+        self.assertEqual(core, ["base", "season", "social", "gift", "play"])
         off = registry.official()
         self.assertEqual([f["order"] for f in off], sorted(f["order"] for f in off))
         self.assertEqual(off[0]["id"], "entrance")

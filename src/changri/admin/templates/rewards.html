@@ -5,6 +5,7 @@
 <select name="{{ name }}"><option value="">（选一个）</option>
   <optgroup label="物品和货币">{% for x in items %}<option value="i:{{ x.code }}" {{ 'selected' if selected == 'i:' ~ x.code }}>{{ x.name }}</option>{% endfor %}</optgroup>
   {% if with_attrs and attrs %}<optgroup label="属性（直接加减）">{% for a in attrs %}<option value="a:{{ a.name }}" {{ 'selected' if selected == 'a:' ~ a.name }}>{{ a.name }}</option>{% endfor %}</optgroup>{% endif %}
+  {% if with_attrs and gacha_pools %}<optgroup label="抽取机会（发到抽取池，次数）">{% for g in gacha_pools %}<option value="g:{{ g.id }}" {{ 'selected' if selected == 'g:' ~ g.id }}>抽取「{{ g.name }}」</option>{% endfor %}</optgroup>{% endif %}
 </select>
 {% endmacro %}
 {% macro rule_form(r=None) %}
@@ -36,7 +37,7 @@
   <p class="note">满足条件的人，每一行各按自己的概率抽一次：写 100% 就是一定发，30% 就是三成机会。数量不限，每人都有。</p>
   <div class="rows" data-rows="fx">
     {% for f in (r.fixed if r and r.fixed else [{}]) %}
-    <div class="rl fx">{{ item_select('fx_ref', ('a:' if f.type == 'attr' else 'i:') ~ f.ref if f else '') }}<span class="x">{{ '＋' if f and f.type == 'attr' else '×' }}</span><input type="number" name="fx_n" aria-label="数量" value="{{ f.n if f else 1 }}"><span class="x w">概率</span><input type="number" min="0" max="100" name="fx_p" aria-label="概率百分比" value="{{ f.p if f and f.p is defined else 100 }}"><span class="x">%</span></div>
+    <div class="rl fx">{{ item_select('fx_ref', ({'attr': 'a:', 'gacha': 'g:'}.get(f.type, 'i:')) ~ f.ref if f else '') }}<span class="x">{{ '＋' if f and f.type == 'attr' else '×' }}</span><input type="number" name="fx_n" aria-label="数量" value="{{ f.n if f else 1 }}"><span class="x w">概率</span><input type="number" min="0" max="100" name="fx_p" aria-label="概率百分比" value="{{ f.p if f and f.p is defined else 100 }}"><span class="x">%</span></div>
     {% endfor %}
   </div>
   <button class="btn ghost sm" type="button" data-more="fx">＋ 再加一项</button>

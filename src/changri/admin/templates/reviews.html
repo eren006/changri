@@ -17,7 +17,7 @@
 </style>
 <h1>弧长与复盘</h1>
 {% include "_collect_tabs.html" %}
-<p class="lede">私约、官约、电话、微信、心愿（都是房间）和短信/礼物分开看，都按「第几天」整理。点进某一天，里面的事按发生的先后从上往下排；每个私约点编号可以单独打开，看里面的全部发言。上面的筛选可以只看某个人参与的。房间的聊天是房间群里监听的 QQ 号听到的，发言人靠绑定的 QQ 认出来。季度「收尾」会清空这些记录，要留的先导出。</p>
+<p class="lede">约会、官约、电话、微信、心愿（都是房间）和短信/礼物分开看，都按「第几天」整理。点进某一天，里面的事按发生的先后从上往下排；每个约会点编号可以单独打开，看里面的全部发言。上面的筛选可以只看某个人参与的。房间的聊天是房间群里监听的 QQ 号听到的，发言人靠绑定的 QQ 认出来。季度「收尾」会清空这些记录，要留的先导出。</p>
 <section class="arc">
   <div class="sec-head keep"><h2>弧长<span class="n">回复间隔</span></h2></div>
   <p class="note">弧长 = 对方说完之后，你隔了多久才回。按房间群里的发言算，NPC 不计。{% if arc.limit %}超过 {{ fmt_h(arc.limit) }} 的标红；{% else %}还没设「最长弧长」，不标红；{% endif %}上限在「功能与设置 → 约会」里改。</p>
@@ -40,11 +40,11 @@
 <section>
   {% include "_review_filter.html" %}
   {% if days %}
-  <p class="note">{{ f.role or '所有人' }}　共 {{ total }} {{ '个私约/房间' if f.tab == 'room' else '条短信和礼物' }}，分在 {{ days|length }} 天。<a href="{{ url_for('review_day', label='all', role=f.role, kind=f.kind, q=f.q, tab=f.tab) }}">不分天，全部列出来</a></p>
+  <p class="note">{{ f.role or '所有人' }}　共 {{ total }} {{ '个约会/房间' if f.tab == 'room' else '条短信和礼物' }}，分在 {{ days|length }} 天。<a href="{{ url_for('review_day', label='all', role=f.role, kind=f.kind, q=f.q, tab=f.tab) }}">不分天，全部列出来</a></p>
   <div class="daylist">
     {% for d in days %}<a class="dl" href="{{ url_for('review_day', label=d.label, role=f.role, kind=f.kind, q=f.q, tab=f.tab) }}">
       <b>{{ d.label }}</b>
-      <span class="ct">{% if f.tab == 'room' %}{{ d.room }} 个私约/房间{% else %}短信 {{ d.sms }} · 礼物 {{ d.gift }}{% endif %}</span>
+      <span class="ct">{% if f.tab == 'room' %}{{ d.room }} 个约会/房间{% else %}短信 {{ d.sms }} · 礼物 {{ d.gift }}{% endif %}</span>
       <i class="go" aria-hidden="true"></i></a>{% endfor %}
   </div>
   {% else %}<p class="empty">没有符合的记录。</p>{% endif %}

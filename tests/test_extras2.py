@@ -1,4 +1,4 @@
-"""NPC 标记、漂流瓶、混乱寄信、加百列闹钟、晚餐、上帝模式删时段、一键通知候选、合成。"""
+"""NPC 标记、漂流瓶、混乱短信、加百列闹钟、晚餐、上帝模式删时段、一键通知候选、合成。"""
 import asyncio
 import os
 import random
@@ -111,7 +111,7 @@ class Extras(unittest.TestCase):
 
     def _room(self, with_lines=True):
         with get_conn() as c:
-            rid = c.execute("INSERT INTO rooms(kind,creator_id,day,start_hm,end_hm,status,created_ts) VALUES('私约',?,1,'1400','1500','ended',?)",
+            rid = c.execute("INSERT INTO rooms(kind,creator_id,day,start_hm,end_hm,status,created_ts) VALUES('约会',?,1,'1400','1500','ended',?)",
                             (self.r["甲"]["id"], int(time.time()) - 5 * 3600)).lastrowid
             for n in "甲乙":
                 c.execute("INSERT INTO room_members(room_id, role_id) VALUES(?,?)", (rid, self.r[n]["id"]))
@@ -209,7 +209,7 @@ class Extras(unittest.TestCase):
     def test_roomnotify_candidates(self):
         with get_conn() as c:
             pid = c.execute("INSERT INTO pool_groups(bot_id, group_openid, real_gid, state, in_pool, added_ts) VALUES('B','G9','123','occupied',1,0)").lastrowid
-            rid = c.execute("INSERT INTO rooms(kind,creator_id,day,start_hm,end_hm,status,pool_id,created_ts) VALUES('私约',?,1,'1400','1500','open',?,?)",
+            rid = c.execute("INSERT INTO rooms(kind,creator_id,day,start_hm,end_hm,status,pool_id,created_ts) VALUES('约会',?,1,'1400','1500','open',?,?)",
                             (self.r["甲"]["id"], pid, int(time.time()) - 5 * 3600)).lastrowid
             c.execute("INSERT INTO room_members(room_id, role_id) VALUES(?,?)", (rid, self.r["甲"]["id"]))
         self.assertEqual(len(roomnotify.candidates(2, "idle")), 1)

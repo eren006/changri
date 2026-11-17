@@ -174,9 +174,9 @@ class DiceE2E(unittest.TestCase):
         set_config("dice_enabled", "0")
         self.assertEqual(self.say("/rd d20"), [])
 
-    def test_long_output_goes_as_image(self):
-        out = self.say("/骰子帮助")                                                     # 目录也超过 200 字，照常发图
-        self.assertTrue(out and all(x == "<图>" for x in out))
+    def test_fits_one_message_goes_as_text(self):
+        out = self.say("/骰子帮助")                                                     # 目录几百字，一条发得完：发文字，不画图
+        self.assertTrue(out and all(x != "<图>" for x in out))
 
     def test_help_is_a_menu_then_sections(self):
         set_config("long_as_image", "0")

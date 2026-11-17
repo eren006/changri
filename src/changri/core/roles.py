@@ -135,7 +135,7 @@ def get_role_by_name(name: str):
 
 
 def list_groups(role_id: int) -> list:
-    """主群在前，备用群按登记先后。包含还没认群的群位（group_openid 为空）。"""
+    """角色的群（现在只有一个个人群）。包含还没认群的群位（group_openid 为空）。"""
     with get_conn() as conn:
         return conn.execute(
             "SELECT * FROM role_groups WHERE role_id=? ORDER BY (kind='main') DESC, id", (role_id,)
@@ -153,56 +153,41 @@ def _new_code(conn, role_id: int, kind: str, slot_id, ttl: int) -> str:
     return code
 
 
-def make_player_code(role_id: int, kind: str) -> str:
-    """玩家在已绑定的群里生成码：kind='backup' 加备用群，'main' 换主群。同一角色同一时间只留一个。"""
+def make_player_code(role_id: int) -> str:
+    """玩家在已绑定的群里生成换绑码。同一角色同一时间只留一个。"""
     with get_conn() as conn:
         conn.execute("DELETE FROM bind_codes WHERE (role_id=? AND slot_id IS NULL) OR expires_ts<?", (role_id, int(time.time())))
-        return _new_code(conn, role_id, kind, None, PLAYER_CODE_TTL)
+        return _new_code(conn, role_id, "main", None, PLAYER_CODE_TTL)
 
 
-def add_slot(role_id: int, real_gid: str, kind: str) -> tuple[bool, str]:
-    """后台登记一个群号（群位）并生成认群码。备用群受数量上限限制；主群位会在认群时替换现有主群。"""
+def add_slot(role_id: int, real_gid: str) -> tuple[bool, str]:
+    """后台登记个人群的群号（群位）并生成认群码；认群时会替换现有的个人群。"""
     if not GID_RE.fullmatch(real_gid):
         return False, "群号要是 5~12 位数字。"
-    if kind not in ("main", "backup"):
-        return False, "类型不对。"
     with get_conn() as conn:
         if not conn.execute("SELECT 1 FROM roles WHERE id=?", (role_id,)).fetchone():
             return False, "没有这个角色。"
-        if kind == "backup":
-            n = conn.execute("SELECT COUNT(*) FROM role_groups WHERE role_id=? AND kind='backup'", (role_id,)).fetchone()[0]
-            if n >= get_int("max_backup_groups", 3):
-                return False, "备用群已经到上限了。"
-            cur = conn.execute(
-                "INSERT INTO role_groups(role_id, real_gid, kind, created_ts) VALUES(?,?,'backup',?)",
-                (role_id, real_gid, int(time.time())),
-            )
-            slot_id = cur.lastrowid
+        # 每个角色只有一个个人群，已有的就改它的群号标签，认群时再替换 openid
+        row = conn.execute("SELECT id FROM role_groups WHERE role_id=? AND kind='main'", (role_id,)).fetchone()
+        if row:
+            slot_id = row["id"]
+            conn.execute("UPDATE role_groups SET real_gid=? WHERE id=?", (real_gid, slot_id))
         else:
-            # 主群位：每个角色只有一个主群，已有的就改它的群号标签，认群时再替换 openid
-            row = conn.execute("SELECT id FROM role_groups WHERE role_id=? AND kind='main'", (role_id,)).fetchone()
-            if row:
-                slot_id = row["id"]
-                conn.execute("UPDATE role_groups SET real_gid=? WHERE id=?", (real_gid, slot_id))
-            else:
-                slot_id = conn.execute(
-                    "INSERT INTO role_groups(role_id, real_gid, kind, created_ts) VALUES(?,?,'main',?)",
-                    (role_id, real_gid, int(time.time())),
-                ).lastrowid
-        code = _new_code(conn, role_id, kind, slot_id, ADMIN_CODE_TTL)
+            slot_id = conn.execute(
+                "INSERT INTO role_groups(role_id, real_gid, kind, created_ts) VALUES(?,?,'main',?)",
+                (role_id, real_gid, int(time.time())),
+            ).lastrowid
+        code = _new_code(conn, role_id, "main", slot_id, ADMIN_CODE_TTL)
     return True, code
 
 
-def consume_bind_code(code: str, bot_id: str, group_openid: str, member_openid: str, expect_kind: str | None = None) -> tuple[bool, str]:
-    """在群里用认群码：把这个群的 openid 绑到对应的群位上。expect_kind 不为空时，码的类型必须一致。"""
+def consume_bind_code(code: str, bot_id: str, group_openid: str, member_openid: str) -> tuple[bool, str]:
+    """在群里用认群码：把这个群的 openid 绑到对应角色的个人群上（已有就替换）。"""
     now = int(time.time())
     with get_conn() as conn:
         row = conn.execute("SELECT * FROM bind_codes WHERE code=? AND expires_ts>=?", (code, now)).fetchone()
         if not row:
             return False, "认群码不对或已过期。"
-        if expect_kind and row["kind"] != expect_kind:
-            return False, ("这是个人群的码，换个人群请用「换主群 码」。" if row["kind"] == "main"
-                           else "这是备用群的码，绑备用群请用「绑定备用群 码」。")
         exist = conn.execute(
             "SELECT r.name FROM role_groups g JOIN roles r ON r.id=g.role_id WHERE g.bot_id=? AND g.group_openid=?", (bot_id, group_openid)
         ).fetchone()
@@ -214,32 +199,13 @@ def consume_bind_code(code: str, bot_id: str, group_openid: str, member_openid: 
                 "UPDATE role_groups SET bot_id=?, group_openid=?, member_openid=? WHERE id=?",
                 (bot_id, group_openid, member_openid, row["slot_id"]),
             )
-        elif row["kind"] == "backup":
-            n = conn.execute("SELECT COUNT(*) FROM role_groups WHERE role_id=? AND kind='backup'", (row["role_id"],)).fetchone()[0]
-            if n >= get_int("max_backup_groups", 3):
-                return False, "备用群已经到上限了，先用「解绑备用群 序号」解绑一个。"
-            conn.execute(
-                "INSERT INTO role_groups(role_id, bot_id, group_openid, member_openid, kind, created_ts) VALUES(?,?,?,?,'backup',?)",
-                (row["role_id"], bot_id, group_openid, member_openid, now),
-            )
-        else:  # 玩家换主群
+        else:  # 玩家换绑
             conn.execute(
                 "UPDATE role_groups SET bot_id=?, group_openid=?, member_openid=?, real_gid='' WHERE role_id=? AND kind='main'",
                 (bot_id, group_openid, member_openid, row["role_id"]),
             )
         conn.execute("DELETE FROM bind_codes WHERE code=?", (code,))
-    what = "个人群" if row["kind"] == "main" else "备用群"
-    return True, f"已把这个群绑为「{role['name']}」的{what}。"
-
-
-def unbind_backup(role_id: int, index: int) -> tuple[bool, str]:
-    """index 是「我的群」列表里的序号（从 1 开始，1 一定是主群，主群不能解绑）。"""
-    groups = list_groups(role_id)
-    if index < 1 or index > len(groups) or groups[index - 1]["kind"] == "main":
-        return False, "序号不对。主群不能解绑，只能解绑备用群。"
-    with get_conn() as conn:
-        conn.execute("DELETE FROM role_groups WHERE id=?", (groups[index - 1]["id"],))
-    return True, f"已解绑第 {index} 个群。"
+    return True, f"已把这个群绑为「{role['name']}」的个人群。"
 
 
 def delete_role(role_id: int) -> None:

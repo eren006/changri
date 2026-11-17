@@ -66,6 +66,7 @@ a.tile:active{transform:scale(.97)}
   {%- elif name == 'link' -%}<svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>
   {%- elif name == 'bell' -%}<svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15z"/><path d="M10 21h4"/></svg>
   {%- elif name == 'door' -%}<svg viewBox="0 0 24 24"><path d="M5 21V4a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v17"/><path d="M3 21h18"/><circle cx="12.5" cy="12" r=".8"/></svg>
+  {%- elif name == 'calendar' -%}<svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>
   {%- elif name == 'alert' -%}<svg viewBox="0 0 24 24"><path d="M12 3 2.5 20h19z"/><path d="M12 10v4"/><circle cx="12" cy="17" r=".8"/></svg>
   {%- elif name == 'check' -%}<svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
   {%- endif -%}
@@ -131,22 +132,31 @@ a.tile:active{transform:scale(.97)}
   </div>
 </div>
 
+<details class="card dcard" id="cal"{% if request.args.get('cal') %} open{% endif %}>
+  <summary><span class="ico c-purple" aria-hidden="true">{{ icon('calendar') }}</span>
+    <div class="tx"><b>季度日历</b><span>{{ cal_line }}</span></div><i class="chev" aria-hidden="true"></i></summary>
+  <div class="body">
+    {% with cal_base=url_for('dashboard'), cal_pick=False %}{% include "_season_cal.html" %}{% endwith %}
+    <p class="note"><a href="{{ url_for('season_page') }}">去「季度与出场」预订、管理季度 →</a></p>
+  </div>
+</details>
+
 <details class="card dcard" id="rooms"{% if live_rooms|length %} open{% endif %}>
   <summary><span class="ico c-teal" aria-hidden="true">{{ icon('door') }}</span>
-    <div class="tx"><b>进行中的房间</b><span>玩家私约和微信房间</span></div>
+    <div class="tx"><b>进行中的房间</b><span>玩家约会和微信房间</span></div>
     <span class="badge">{{ live_rooms|length }}</span><i class="chev" aria-hidden="true"></i></summary>
   <div class="body">
     {% with live=live_rooms %}{% include "_rooms_block.html" %}{% endwith %}
-    <p class="note">玩家在房间群里发「结束私约」、管理员发「强结私约 R号」可以结束并通知大家；这里的「结束」只改状态，不通知。房间用的群在「连接群号组」里管理。</p>
+    <p class="note">玩家在房间群里发「结束约会」、管理员发「强结约会 R号」可以结束并通知大家；这里的「结束」只改状态，不通知。房间用的群在「连接群号组」里管理。</p>
   </div>
 </details>
 
 <details class="card dcard" id="roles"{% if code %} open{% endif %}>
   <summary><span class="ico c-pink" aria-hidden="true">{{ icon('users') }}</span>
-    <div class="tx"><b>角色与群</b><span>主群和备用群</span></div>
+    <div class="tx"><b>角色与群</b><span>个人群</span></div>
     <span class="badge">{{ role_items|length }}</span><i class="chev" aria-hidden="true"></i></summary>
   <div class="body">
-    <p class="note" style="margin:0 0 16px">玩家在自己的个人群里发「创建新角色 名字」就会出现在这里。每个角色有一个主群，还可以有备用群，消息先发主群，发不出去再试备用群。</p>
+    <p class="note" style="margin:0 0 16px">玩家在自己的个人群里发「创建新角色 名字」就会出现在这里。每个角色有一个个人群，消息都发到这里。</p>
     {% with items=role_items %}{% include "_roles_block.html" %}{% endwith %}
   </div>
 </details>

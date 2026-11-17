@@ -20,7 +20,7 @@ class RewardsTest(unittest.TestCase):
         with get_conn() as c:
             ids = [r["id"] for r in c.execute("SELECT id FROM roles ORDER BY id")]
             self.ia, self.ib = ids[:2]
-            c.execute("INSERT INTO rooms(id,kind,status,created_ts) VALUES(1,'私约','ended',?)", (int(time.time()),))
+            c.execute("INSERT INTO rooms(id,kind,status,created_ts) VALUES(1,'约会','ended',?)", (int(time.time()),))
             c.executemany("INSERT INTO room_members(room_id,role_id) VALUES(1,?)", [(self.ia,), (self.ib,)])
             now = int(time.time())
             for i in range(4):

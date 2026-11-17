@@ -10,67 +10,67 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#efe9e1;--bg2:#e8e1d7;--ink:#1d1b22;--mute:#67626f;--faint:#9b95a2;
-  --line:rgba(255,255,255,.75);--line2:rgba(120,110,160,.22);--hair:rgba(40,30,60,.08);
+  --bg:#f5eedd;--bg2:#eee5cf;--ink:#231c0e;--mute:#6f6450;--faint:#9a8f78;
+  --line:rgba(255,255,255,.75);--line2:rgba(120,110,160,.22);--hair:rgba(35,28,14,.08);
   --glass:rgba(255,255,255,.42);--glass2:rgba(255,255,255,.62);--card:rgba(255,255,255,.5);
-  --lav:#7a6fe0;--lav2:#a79ff0;--lav3:#d9d4fb;--accent:#6a5fd6;--accent-ink:#fff;--rose:#6a5fd6;--gold:#8f86e8;--plum:#5a4fc0;--amber:#c48a5c;
-  --code:rgba(255,255,255,.55);--btn:#1b1a20;--btn-ink:#fff;
-  --lavgrad:linear-gradient(135deg,rgba(143,134,232,.88) 0%,rgba(167,159,240,.62) 45%,rgba(217,212,251,.35) 100%);
-  --sun:linear-gradient(120deg,#5a4fc0,#8f86e8 60%,#b9b2f2);
-  --shadow:0 1px 0 rgba(255,255,255,.9) inset,0 0 0 1px rgba(255,255,255,.55) inset,0 24px 50px -24px rgba(70,55,120,.28),0 4px 14px -6px rgba(70,55,120,.12);
+  --lav:#b8892a;--lav2:#d4a94a;--lav3:#f1e2b8;--accent:#a87a1a;--accent-ink:#fff;--rose:#a87a1a;--gold:#c9a043;--plum:#8a6414;--amber:#c48a5c;
+  --code:rgba(255,255,255,.55);--btn:#231c0e;--btn-ink:#fff;
+  --lavgrad:linear-gradient(135deg,rgba(201,160,67,.88) 0%,rgba(212,169,74,.62) 45%,rgba(217,212,251,.35) 100%);
+  --sun:linear-gradient(120deg,#8a6414,#c9a043 60%,#e8cf8a);
+  --shadow:0 1px 0 rgba(255,255,255,.9) inset,0 0 0 1px rgba(255,255,255,.55) inset,0 24px 50px -24px rgba(90,65,15,.28),0 4px 14px -6px rgba(90,65,15,.12);
   --sans:"Inter",system-ui,-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
   --serif:var(--sans);--latin:var(--sans);--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   color-scheme:light;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --bg:#141219;--bg2:#1a1721;--ink:#eeeaf4;--mute:#a7a0b4;--faint:#77708a;
-  --line:rgba(255,255,255,.12);--line2:rgba(180,170,255,.2);--hair:rgba(255,255,255,.07);
-  --glass:rgba(40,36,54,.45);--glass2:rgba(52,47,70,.6);--card:rgba(44,40,60,.5);
-  --lav:#a79ff0;--lav2:#8f86e8;--lav3:#3a3460;--accent:#b5adf6;--accent-ink:#141219;--rose:#b5adf6;--gold:#a79ff0;--plum:#c7c0fa;
-  --code:rgba(255,255,255,.07);--btn:#eeeaf4;--btn-ink:#141219;
-  --lavgrad:linear-gradient(135deg,rgba(122,111,224,.55) 0%,rgba(122,111,224,.25) 50%,rgba(122,111,224,.08) 100%);
-  --sun:linear-gradient(120deg,#b9b2f2,#8f86e8 60%,#d9d4fb);
+  --bg:#15120b;--bg2:#1c170d;--ink:#f3ecdc;--mute:#b3a78e;--faint:#8a7d63;
+  --line:rgba(255,255,255,.12);--line2:rgba(230,196,106,.2);--hair:rgba(255,255,255,.07);
+  --glass:rgba(33,28,16,.45);--glass2:rgba(42,36,20,.6);--card:rgba(38,32,18,.5);
+  --lav:#d4a94a;--lav2:#c9a043;--lav3:#4a3d1a;--accent:#e6c46a;--accent-ink:#15120b;--rose:#e6c46a;--gold:#d4a94a;--plum:#f0d994;
+  --code:rgba(255,255,255,.07);--btn:#f3ecdc;--btn-ink:#15120b;
+  --lavgrad:linear-gradient(135deg,rgba(184,137,42,.55) 0%,rgba(184,137,42,.25) 50%,rgba(184,137,42,.08) 100%);
+  --sun:linear-gradient(120deg,#e8cf8a,#c9a043 60%,#f1e2b8);
   --shadow:0 1px 0 rgba(255,255,255,.08) inset,0 0 0 1px rgba(255,255,255,.06) inset,0 30px 60px -28px rgba(0,0,0,.7);color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#141219;--bg2:#1a1721;--ink:#eeeaf4;--mute:#a7a0b4;--faint:#77708a;
-  --line:rgba(255,255,255,.12);--line2:rgba(180,170,255,.2);--hair:rgba(255,255,255,.07);
-  --glass:rgba(40,36,54,.45);--glass2:rgba(52,47,70,.6);--card:rgba(44,40,60,.5);
-  --lav:#a79ff0;--lav2:#8f86e8;--lav3:#3a3460;--accent:#b5adf6;--accent-ink:#141219;--rose:#b5adf6;--gold:#a79ff0;--plum:#c7c0fa;
-  --code:rgba(255,255,255,.07);--btn:#eeeaf4;--btn-ink:#141219;
-  --lavgrad:linear-gradient(135deg,rgba(122,111,224,.55) 0%,rgba(122,111,224,.25) 50%,rgba(122,111,224,.08) 100%);
-  --sun:linear-gradient(120deg,#b9b2f2,#8f86e8 60%,#d9d4fb);
+  --bg:#15120b;--bg2:#1c170d;--ink:#f3ecdc;--mute:#b3a78e;--faint:#8a7d63;
+  --line:rgba(255,255,255,.12);--line2:rgba(230,196,106,.2);--hair:rgba(255,255,255,.07);
+  --glass:rgba(33,28,16,.45);--glass2:rgba(42,36,20,.6);--card:rgba(38,32,18,.5);
+  --lav:#d4a94a;--lav2:#c9a043;--lav3:#4a3d1a;--accent:#e6c46a;--accent-ink:#15120b;--rose:#e6c46a;--gold:#d4a94a;--plum:#f0d994;
+  --code:rgba(255,255,255,.07);--btn:#f3ecdc;--btn-ink:#15120b;
+  --lavgrad:linear-gradient(135deg,rgba(184,137,42,.55) 0%,rgba(184,137,42,.25) 50%,rgba(184,137,42,.08) 100%);
+  --sun:linear-gradient(120deg,#e8cf8a,#c9a043 60%,#f1e2b8);
   --shadow:0 1px 0 rgba(255,255,255,.08) inset,0 0 0 1px rgba(255,255,255,.06) inset,0 30px 60px -28px rgba(0,0,0,.7);color-scheme:dark}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth;scroll-padding-top:84px}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.8 var(--sans);-webkit-font-smoothing:antialiased;overflow-x:hidden;position:relative}
 /* soft ambient light behind all the glass */
 body::before{content:"";position:fixed;inset:-10%;z-index:-1;pointer-events:none;
-  background:radial-gradient(40% 35% at 18% 22%,rgba(167,159,240,.38),transparent 70%),
+  background:radial-gradient(40% 35% at 18% 22%,rgba(212,169,74,.38),transparent 70%),
              radial-gradient(35% 30% at 85% 15%,rgba(255,255,255,.9),transparent 70%),
-             radial-gradient(45% 40% at 75% 80%,rgba(143,134,232,.25),transparent 70%),
+             radial-gradient(45% 40% at 75% 80%,rgba(201,160,67,.25),transparent 70%),
              radial-gradient(30% 30% at 10% 90%,rgba(255,240,225,.8),transparent 70%)}
-:root[data-theme="dark"] body::before{background:radial-gradient(40% 35% at 18% 22%,rgba(122,111,224,.28),transparent 70%),radial-gradient(45% 40% at 80% 75%,rgba(90,79,192,.22),transparent 70%)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) body::before{background:radial-gradient(40% 35% at 18% 22%,rgba(122,111,224,.28),transparent 70%),radial-gradient(45% 40% at 80% 75%,rgba(90,79,192,.22),transparent 70%)}}
+:root[data-theme="dark"] body::before{background:radial-gradient(40% 35% at 18% 22%,rgba(184,137,42,.28),transparent 70%),radial-gradient(45% 40% at 80% 75%,rgba(138,100,20,.22),transparent 70%)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) body::before{background:radial-gradient(40% 35% at 18% 22%,rgba(184,137,42,.28),transparent 70%),radial-gradient(45% 40% at 80% 75%,rgba(138,100,20,.22),transparent 70%)}}
 a{color:var(--accent);text-decoration:none}
 a:hover{text-decoration:underline;text-underline-offset:3px}
 code{font-family:var(--mono);font-size:.86em;background:var(--code);border:1px solid var(--hair);padding:.08em .45em;border-radius:6px}
-::selection{background:rgba(143,134,232,.3)}
+::selection{background:rgba(201,160,67,.3)}
 .wrap{max-width:1180px;margin:0 auto;padding:0 24px}
 .glass,.feat,.cmd,.tbl,.gloss div,.callout,.anat,.phone,.season,.ex .chat,.kbtn,.ibtn,.search{
-  background:var(--glass);backdrop-filter:blur(22px) saturate(1.5);-webkit-backdrop-filter:blur(22px) saturate(1.5);
+  background:var(--glass);
   border:1px solid var(--line);box-shadow:var(--shadow)}
 
 /* ---------- top bar ---------- */
 .top{position:sticky;top:0;z-index:40;padding:12px 0}
-.top .wrap{display:flex;align-items:center;gap:18px;height:56px;background:var(--glass2);backdrop-filter:blur(24px) saturate(1.6);-webkit-backdrop-filter:blur(24px) saturate(1.6);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:0 10px 0 18px;max-width:1150px}
+.top .wrap{display:flex;align-items:center;gap:18px;height:56px;background:var(--glass2);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:0 10px 0 18px;max-width:1150px}
 .brand{display:flex;align-items:center;gap:9px;color:var(--ink);font-weight:700;font-size:17px;letter-spacing:.02em;white-space:nowrap}
 .brand:hover{text-decoration:none}
-.brand .mark{width:22px;height:22px;border-radius:50%;flex:none;background:radial-gradient(circle at 32% 28%,#fff 0,#d9d4fb 22%,#8f86e8 58%,#4b3fa6 100%);box-shadow:0 3px 8px -2px rgba(75,63,166,.5)}
+.brand .mark{width:22px;height:22px;border-radius:50%;flex:none;background:radial-gradient(circle at 32% 28%,#fff 0,#f1e2b8 22%,#c9a043 58%,#6d4e0e 100%);box-shadow:0 3px 8px -2px rgba(109,78,14,.5)}
 .brand small{font-weight:500;color:var(--faint);font-size:14px}
 nav.main{display:flex;gap:2px;margin-left:8px}
 nav.main a{color:var(--mute);padding:6px 13px;border-radius:999px;font-size:14px;white-space:nowrap;font-weight:500}
 nav.main a:hover{color:var(--ink);text-decoration:none;background:rgba(255,255,255,.35)}
-nav.main a.on{color:var(--ink);background:var(--glass2);box-shadow:0 0 0 1px var(--line) inset,0 2px 8px -4px rgba(70,55,120,.3)}
+nav.main a.on{color:var(--ink);background:var(--glass2);box-shadow:0 0 0 1px var(--line) inset,0 2px 8px -4px rgba(90,65,15,.3)}
 .top .sp{flex:1}
 .kbtn{display:flex;align-items:center;gap:10px;color:var(--faint);border-radius:999px;padding:6px 8px 6px 14px;font:inherit;font-size:13px;cursor:pointer;min-width:190px;box-shadow:none}
 .kbtn:hover{color:var(--mute)}
@@ -85,12 +85,12 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line2);border-
 
 /* ---------- decor ---------- */
 .orb{position:absolute;border-radius:50%;pointer-events:none;z-index:0}
-.orb.silver{background:repeating-conic-gradient(from 10deg,rgba(255,255,255,.55) 0 3deg,rgba(255,255,255,0) 3deg 9deg),radial-gradient(circle at 32% 28%,#fff 0,#e9e9ee 22%,#b9b9c4 58%,#7e7e8c 100%);box-shadow:0 18px 30px -12px rgba(60,55,80,.45),inset -6px -8px 16px rgba(60,55,80,.25)}
-.orb.pearl{background:radial-gradient(circle at 32% 26%,#fff 0,#e3dffc 14%,#9d94ec 48%,#5a4fc0 85%,#463b9e 100%);box-shadow:0 16px 28px -10px rgba(75,63,166,.55)}
-.orb.bubble{background:radial-gradient(circle at 30% 26%,rgba(255,255,255,.95) 0,rgba(255,255,255,.35) 18%,rgba(255,255,255,.06) 55%,rgba(255,255,255,.25) 100%);border:1px solid rgba(255,255,255,.85);box-shadow:0 20px 30px -14px rgba(70,55,120,.35),inset 0 -8px 18px rgba(143,134,232,.18);backdrop-filter:blur(3px)}
-.squig{position:absolute;pointer-events:none;z-index:0;filter:drop-shadow(0 8px 10px rgba(90,79,192,.3))}
+.orb.silver{background:repeating-conic-gradient(from 10deg,rgba(255,255,255,.55) 0 3deg,rgba(255,255,255,0) 3deg 9deg),radial-gradient(circle at 32% 28%,#fff 0,#f0e9d6 22%,#c9bc98 58%,#8f8061 100%);box-shadow:0 18px 30px -12px rgba(80,65,30,.45),inset -6px -8px 16px rgba(80,65,30,.25)}
+.orb.pearl{background:radial-gradient(circle at 32% 26%,#fff 0,#f6ecd0 14%,#d4a94a 48%,#8a6414 85%,#6d4e0e 100%);box-shadow:0 16px 28px -10px rgba(109,78,14,.55)}
+.orb.bubble{background:radial-gradient(circle at 30% 26%,rgba(255,255,255,.95) 0,rgba(255,255,255,.35) 18%,rgba(255,255,255,.06) 55%,rgba(255,255,255,.25) 100%);border:1px solid rgba(255,255,255,.85);box-shadow:0 20px 30px -14px rgba(90,65,15,.35),inset 0 -8px 18px rgba(201,160,67,.18);}
+.squig{position:absolute;pointer-events:none;z-index:0;filter:drop-shadow(0 8px 10px rgba(138,100,20,.3))}
 .dust{position:absolute;pointer-events:none;z-index:0;
-  background-image:radial-gradient(circle,rgba(130,125,150,.75) 0 1.1px,transparent 1.6px),radial-gradient(circle,rgba(255,255,255,1) 0 1.3px,transparent 1.8px);
+  background-image:radial-gradient(circle,rgba(150,130,80,.75) 0 1.1px,transparent 1.6px),radial-gradient(circle,rgba(255,255,255,1) 0 1.3px,transparent 1.8px);
   background-size:13px 11px,17px 19px;background-position:0 0,6px 4px;
   -webkit-mask:radial-gradient(closest-side,#000 20%,transparent);mask:radial-gradient(closest-side,#000 20%,transparent)}
 .float{animation:float 7s ease-in-out infinite}
@@ -99,22 +99,22 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line2);border-
 
 /* ---------- hero ---------- */
 .hero{position:relative;padding:36px 0 72px}
-.frame{position:relative;border-radius:34px;padding:56px;background:rgba(255,255,255,.22);border:1px solid var(--line);box-shadow:var(--shadow);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.frame{position:relative;border-radius:34px;padding:56px;background:rgba(255,255,255,.22);border:1px solid var(--line);box-shadow:var(--shadow);}
 .frame .inner{position:relative;z-index:1;display:grid;grid-template-columns:1.1fr .9fr;gap:40px;align-items:center}
-.lavcard{position:relative;border-radius:26px;padding:44px 40px;background:var(--lavgrad);border:1px solid rgba(255,255,255,.7);box-shadow:var(--shadow);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);overflow:hidden}
+.lavcard{position:relative;border-radius:26px;padding:44px 40px;background:var(--lavgrad);border:1px solid rgba(255,255,255,.7);box-shadow:var(--shadow);overflow:hidden}
 .lavcard::after{content:"";position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(circle,rgba(255,255,255,.9) 0 1px,transparent 1.5px);background-size:23px 29px;opacity:.5;-webkit-mask:linear-gradient(120deg,transparent 30%,#000);mask:linear-gradient(120deg,transparent 30%,#000)}
 .eyebrow{font-size:12.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--plum);margin:0 0 16px;display:inline-flex;align-items:center;gap:8px;padding:4px 12px;border-radius:999px;background:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.8)}
 :root[data-theme="dark"] .eyebrow{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.12)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .eyebrow{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.12)}}
 .hero h1{font-weight:700;font-size:clamp(32px,4.4vw,52px);line-height:1.2;letter-spacing:-.005em;margin:0 0 18px}
-.hero h1 em{font-style:normal;color:#fff;text-shadow:0 2px 18px rgba(75,63,166,.45)}
+.hero h1 em{font-style:normal;color:#fff;text-shadow:0 2px 18px rgba(109,78,14,.45)}
 :root[data-theme="dark"] .hero h1 em{color:var(--plum);text-shadow:none}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .hero h1 em{color:var(--plum);text-shadow:none}}
 .hero p.lead{font-size:15.5px;color:color-mix(in srgb,var(--ink) 75%,transparent);max-width:32em;margin:0 0 28px}
 .cta{display:flex;gap:10px;flex-wrap:wrap;position:relative;z-index:1}
 .btn{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border-radius:999px;font-weight:600;font-size:14.5px;border:1px solid transparent;cursor:pointer;font-family:inherit;transition:transform .15s,box-shadow .15s}
 .btn:hover{text-decoration:none;transform:translateY(-1px)}
-.btn.pri{background:var(--btn);color:var(--btn-ink);box-shadow:0 10px 20px -10px rgba(20,15,35,.6)}
+.btn.pri{background:var(--btn);color:var(--btn-ink);box-shadow:0 10px 20px -10px rgba(35,28,14,.6)}
 .btn.sec{background:rgba(255,255,255,.35);color:var(--ink);border-color:rgba(29,27,34,.55)}
 :root[data-theme="dark"] .btn.sec{border-color:rgba(255,255,255,.35);background:rgba(255,255,255,.06)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn.sec{border-color:rgba(255,255,255,.35);background:rgba(255,255,255,.06)}}
@@ -127,7 +127,7 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line2);border-
 /* chat demo */
 .phone{position:relative;border-radius:26px;overflow:hidden}
 .phone .bar{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--hair);font-size:13.5px}
-.phone .bar .av{width:30px;height:30px;border-radius:50%;background:radial-gradient(circle at 32% 28%,#fff 0,#d9d4fb 20%,#8f86e8 60%,#4b3fa6);color:#fff;display:grid;place-items:center;font-weight:700;font-size:12px}
+.phone .bar .av{width:30px;height:30px;border-radius:50%;background:radial-gradient(circle at 32% 28%,#fff 0,#f1e2b8 20%,#c9a043 60%,#6d4e0e);color:#fff;display:grid;place-items:center;font-weight:700;font-size:12px}
 .phone .bar small{color:var(--faint);display:block;font-size:11.5px;line-height:1.3}
 .chat{padding:18px;display:flex;flex-direction:column;gap:10px;min-height:340px}
 .msg{max-width:86%;padding:9px 13px;border-radius:16px;font-size:13.5px;line-height:1.6;white-space:pre-wrap;opacity:0;transform:translateY(6px);transition:opacity .35s,transform .35s}
@@ -149,7 +149,7 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line2);border-
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
 .feat{border-radius:22px;padding:24px 22px 22px;position:relative;transition:transform .25s,box-shadow .25s}
 .feat:hover{transform:translateY(-3px)}
-.feat .ic{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;color:#fff;margin-bottom:16px;background:radial-gradient(circle at 32% 28%,#fff 0,#cfc9fa 16%,#8f86e8 55%,#5a4fc0);box-shadow:0 10px 18px -8px rgba(75,63,166,.6)}
+.feat .ic{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;color:#fff;margin-bottom:16px;background:radial-gradient(circle at 32% 28%,#fff 0,#ecdba8 16%,#c9a043 55%,#8a6414);box-shadow:0 10px 18px -8px rgba(109,78,14,.6)}
 .feat h3{font-size:17px;margin:0 0 6px;font-weight:600}
 .feat p{margin:0;color:var(--mute);font-size:14px}
 .feat .cmds{margin-top:14px;display:flex;flex-wrap:wrap;gap:6px}
@@ -161,13 +161,13 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line2);border-
 .season{display:grid;grid-template-columns:repeat(5,1fr);gap:0;border-radius:24px;overflow:hidden}
 .season > div{padding:24px 22px;border-right:1px solid var(--hair);position:relative}
 .season > div:last-child{border-right:0}
-.season .d{display:inline-grid;place-items:center;width:38px;height:38px;border-radius:50%;font-size:13px;font-weight:700;color:#fff;background:radial-gradient(circle at 32% 28%,#fff 0,#cfc9fa 14%,#8f86e8 55%,#5a4fc0)}
+.season .d{display:inline-grid;place-items:center;width:38px;height:38px;border-radius:50%;font-size:13px;font-weight:700;color:#fff;background:radial-gradient(circle at 32% 28%,#fff 0,#ecdba8 14%,#c9a043 55%,#8a6414)}
 .season h4{margin:14px 0 4px;font-size:15.5px;font-weight:600}
 .season p{margin:0;color:var(--mute);font-size:13.5px}
 
 /* ---------- doc layout ---------- */
 .doc{display:grid;grid-template-columns:230px minmax(0,1fr);gap:48px;padding-top:28px;padding-bottom:96px}
-.toc{position:sticky;top:96px;align-self:start;max-height:calc(100vh - 120px);overflow:auto;font-size:13.5px;padding:16px 10px;border-radius:20px;background:var(--glass);border:1px solid var(--line);box-shadow:var(--shadow);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+.toc{position:sticky;top:96px;align-self:start;max-height:calc(100vh - 120px);overflow:auto;font-size:13.5px;padding:16px 10px;border-radius:20px;background:var(--glass);border:1px solid var(--line);box-shadow:var(--shadow);}
 .toc .t{font-size:11.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--lav);margin:0 0 8px 10px}
 .toc a{display:block;color:var(--mute);padding:6px 10px;border-radius:10px;line-height:1.45}
 .toc a:hover{color:var(--ink);text-decoration:none;background:rgba(255,255,255,.35)}
@@ -177,7 +177,7 @@ article{min-width:0;max-width:800px;position:relative}
 .ptitle{font-weight:700;font-size:clamp(30px,3.6vw,42px);line-height:1.25;margin:0 0 12px}
 .psub{color:var(--mute);font-size:16px;margin:0 0 36px;max-width:38em}
 article h2{font-size:23px;font-weight:700;margin:60px 0 16px;padding-top:8px;display:flex;align-items:center;gap:12px}
-article h2 .n{display:inline-grid;place-items:center;width:32px;height:32px;border-radius:50%;font-size:12px;font-weight:700;color:#fff;flex:none;background:radial-gradient(circle at 32% 28%,#fff 0,#cfc9fa 14%,#8f86e8 55%,#5a4fc0);box-shadow:0 6px 12px -6px rgba(75,63,166,.6)}
+article h2 .n{display:inline-grid;place-items:center;width:32px;height:32px;border-radius:50%;font-size:12px;font-weight:700;color:#fff;flex:none;background:radial-gradient(circle at 32% 28%,#fff 0,#ecdba8 14%,#c9a043 55%,#8a6414);box-shadow:0 6px 12px -6px rgba(109,78,14,.6)}
 article h3{font-size:17.5px;margin:32px 0 10px;font-weight:600}
 article p,article li{color:color-mix(in srgb,var(--ink) 84%,var(--mute))}
 article ul,article ol{padding-left:1.3em}
@@ -185,12 +185,12 @@ article li{margin:5px 0}
 hr.orn{border:0;height:1px;background:linear-gradient(90deg,transparent,var(--line2),transparent);margin:52px 0}
 
 .callout{border-radius:18px;padding:15px 18px 15px 50px;position:relative;margin:20px 0;font-size:14.5px}
-.callout::before{content:"";position:absolute;left:18px;top:18px;width:18px;height:18px;border-radius:50%;background:radial-gradient(circle at 32% 28%,#fff 0,#cfc9fa 16%,#8f86e8 55%,#5a4fc0)}
+.callout::before{content:"";position:absolute;left:18px;top:18px;width:18px;height:18px;border-radius:50%;background:radial-gradient(circle at 32% 28%,#fff 0,#ecdba8 16%,#c9a043 55%,#8a6414)}
 .callout.warn::before{background:radial-gradient(circle at 32% 28%,#fff 0,#f3d9c3 18%,#d39a6a 60%,#a86a3e)}
 .callout b{color:var(--ink)}
 .callout p{margin:0}
 
-.cmdline{display:flex;align-items:center;gap:10px;background:#1b1a20;color:#eeeaf4;border-radius:16px;padding:12px 12px 12px 18px;font-family:var(--mono);font-size:13.5px;margin:14px 0;overflow-x:auto;box-shadow:0 18px 30px -18px rgba(20,15,35,.6)}
+.cmdline{display:flex;align-items:center;gap:10px;background:#231c0e;color:#f3ecdc;border-radius:16px;padding:12px 12px 12px 18px;font-family:var(--mono);font-size:13.5px;margin:14px 0;overflow-x:auto;box-shadow:0 18px 30px -18px rgba(35,28,14,.6)}
 .cmdline .pr{color:var(--lav2);user-select:none}
 .cmdline code{background:none;border:0;padding:0;color:inherit;white-space:pre;flex:1}
 .copy{flex:none;font:600 12px var(--sans);border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:inherit;border-radius:999px;padding:5px 12px;cursor:pointer}
@@ -205,7 +205,7 @@ hr.orn{border:0;height:1px;background:linear-gradient(90deg,transparent,var(--li
 .steps > li > b:first-child{display:block;font-size:15.5px;font-weight:600;color:var(--ink);margin-bottom:2px;padding-top:5px}
 
 /* tabs */
-.tabs{display:inline-flex;gap:4px;padding:4px;background:var(--glass);border:1px solid var(--line);border-radius:999px;margin:8px 0 18px;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+.tabs{display:inline-flex;gap:4px;padding:4px;background:var(--glass);border:1px solid var(--line);border-radius:999px;margin:8px 0 18px;}
 .tabs button{font:inherit;font-size:13.5px;border:0;background:transparent;color:var(--mute);padding:6px 18px;border-radius:999px;cursor:pointer;font-weight:600}
 .tabs button.on{background:var(--btn);color:var(--btn-ink)}
 .pane{display:none}.pane.on{display:block}
@@ -229,10 +229,10 @@ hr.orn{border:0;height:1px;background:linear-gradient(90deg,transparent,var(--li
 .roleswitch > span:first-child{color:var(--ink);font-weight:600}
 body[data-role="player"] .only-admin,body[data-role="admin"] .only-player{display:none!important}
 .tag{display:inline-block;font-size:11px;font-weight:600;padding:1px 9px;border-radius:999px;vertical-align:2px;margin-left:6px;white-space:nowrap}
-.tag.a{color:#fff;background:#1b1a20}
-:root[data-theme="dark"] .tag.a{color:#141219;background:#eeeaf4}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .tag.a{color:#141219;background:#eeeaf4}}
-.tag.p{color:var(--plum);background:rgba(143,134,232,.2)}
+.tag.a{color:#fff;background:#231c0e}
+:root[data-theme="dark"] .tag.a{color:#15120b;background:#f3ecdc}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .tag.a{color:#15120b;background:#f3ecdc}}
+.tag.p{color:var(--plum);background:rgba(201,160,67,.2)}
 .tag.x{color:var(--amber);background:rgba(196,138,92,.15)}
 
 /* example pair */
@@ -262,11 +262,11 @@ body[data-role="player"] .only-admin,body[data-role="admin"] .only-player{displa
 .cbar .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .search{flex:1;min-width:220px;display:flex;align-items:center;gap:10px;border-radius:999px;padding:0 18px;height:46px;background:var(--glass2)}
 .search input{border:0;outline:0;background:transparent;font:inherit;color:var(--ink);flex:1;height:100%;min-width:0}
-.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:3px;background:var(--glass2);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);box-shadow:var(--shadow)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:3px;background:var(--glass2);box-shadow:var(--shadow)}
 .seg button{font:inherit;font-size:13px;border:0;background:transparent;color:var(--mute);padding:7px 14px;border-radius:999px;cursor:pointer;white-space:nowrap;font-weight:500}
 .seg button.on{background:var(--btn);color:var(--btn-ink)}
 .cats{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
-.cats button{font:inherit;font-size:12.5px;border:1px solid var(--line);background:var(--glass);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);color:var(--mute);padding:4px 13px;border-radius:999px;cursor:pointer;white-space:nowrap}
+.cats button{font:inherit;font-size:12.5px;border:1px solid var(--line);background:var(--glass);color:var(--mute);padding:4px 13px;border-radius:999px;cursor:pointer;white-space:nowrap}
 .cats button.on{background:var(--lavgrad);color:var(--ink);border-color:rgba(255,255,255,.8);font-weight:600}
 .cgroup{margin:34px 0 0}
 .cgroup h3{font-size:19px;font-weight:700;margin:0 0 4px;display:flex;align-items:baseline;gap:10px}
@@ -283,20 +283,20 @@ body[data-role="player"] .only-admin,body[data-role="admin"] .only-player{displa
 .cmd .cp{position:absolute;top:13px;right:13px;font:600 11.5px var(--sans);border:0;background:var(--btn);color:var(--btn-ink);border-radius:999px;padding:4px 11px;cursor:pointer}
 .cmd .cp:hover{opacity:.85}
 .empty{padding:60px 0;text-align:center;color:var(--faint)}
-mark{background:rgba(143,134,232,.35);color:inherit;border-radius:3px;padding:0 1px}
+mark{background:rgba(201,160,67,.35);color:inherit;border-radius:3px;padding:0 1px}
 
 /* faq */
-details.qa{border-radius:18px;padding:2px 20px;margin:10px 0;background:var(--glass);border:1px solid var(--line);box-shadow:var(--shadow);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+details.qa{border-radius:18px;padding:2px 20px;margin:10px 0;background:var(--glass);border:1px solid var(--line);box-shadow:var(--shadow);}
 details.qa summary{cursor:pointer;list-style:none;padding:15px 36px 15px 0;font-weight:600;font-size:15.5px;position:relative}
 details.qa summary::-webkit-details-marker{display:none}
-details.qa summary::after{content:"+";position:absolute;right:0;top:9px;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:18px;color:#fff;background:radial-gradient(circle at 32% 28%,#fff 0,#cfc9fa 14%,#8f86e8 55%,#5a4fc0);transition:transform .2s}
+details.qa summary::after{content:"+";position:absolute;right:0;top:9px;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:18px;color:#fff;background:radial-gradient(circle at 32% 28%,#fff 0,#ecdba8 14%,#c9a043 55%,#8a6414);transition:transform .2s}
 details.qa[open] summary::after{transform:rotate(45deg)}
 details.qa > div{padding:0 0 16px;color:var(--mute)}
 
 /* palette */
-.pal{position:fixed;inset:0;z-index:80;background:rgba(40,30,60,.22);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:none;align-items:flex-start;justify-content:center;padding:12vh 16px 16px}
+.pal{position:fixed;inset:0;z-index:80;background:rgba(35,28,14,.22);display:none;align-items:flex-start;justify-content:center;padding:12vh 16px 16px}
 .pal.on{display:flex}
-.pal .box{width:min(620px,100%);background:var(--glass2);backdrop-filter:blur(30px) saturate(1.6);-webkit-backdrop-filter:blur(30px) saturate(1.6);border:1px solid var(--line);border-radius:24px;box-shadow:0 40px 90px -30px rgba(40,30,80,.55);overflow:hidden}
+.pal .box{width:min(620px,100%);background:var(--glass2);border:1px solid var(--line);border-radius:24px;box-shadow:0 40px 90px -30px rgba(40,30,80,.55);overflow:hidden}
 .pal input{width:100%;border:0;border-bottom:1px solid var(--hair);background:transparent;font:inherit;font-size:16px;padding:18px 22px;outline:0;color:var(--ink)}
 .pal ul{list-style:none;margin:0;padding:8px;max-height:52vh;overflow:auto}
 .pal li{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:14px;cursor:pointer}
@@ -349,7 +349,7 @@ footer .brand{font-size:15px}
   .roleswitch{margin-top:0}
   .cbar{top:72px}
 }
-.drawer{position:fixed;top:76px;left:16px;right:16px;z-index:39;background:var(--glass2);backdrop-filter:blur(26px);-webkit-backdrop-filter:blur(26px);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);padding:8px 14px;display:none}
+.drawer{position:fixed;top:76px;left:16px;right:16px;z-index:39;background:var(--glass2);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);padding:8px 14px;display:none}
 .drawer.on{display:block}
 .drawer a{display:block;padding:12px 4px;color:var(--ink);border-bottom:1px solid var(--hair);font-weight:500}
 .drawer a:last-child{border-bottom:0}
@@ -360,26 +360,26 @@ footer .brand{font-size:15px}
 .form .row{margin:0 0 16px}
 .form label{display:block;font-size:14px;font-weight:600;margin-bottom:6px}
 .form label small{font-weight:400;color:var(--faint);margin-left:6px}
-.form input[type=text],.form textarea{width:100%;font:inherit;font-size:15px;color:var(--ink);background:var(--glass2);border:1px solid var(--line);border-radius:14px;padding:10px 14px;outline:0;box-shadow:0 1px 2px rgba(70,55,120,.06) inset;resize:vertical}
-.form input[type=text]:focus,.form textarea:focus{border-color:var(--lav2);box-shadow:0 0 0 4px rgba(143,134,232,.18)}
+.form input[type=text],.form textarea{width:100%;font:inherit;font-size:15px;color:var(--ink);background:var(--glass2);border:1px solid var(--line);border-radius:14px;padding:10px 14px;outline:0;box-shadow:0 1px 2px rgba(90,65,15,.06) inset;resize:vertical}
+.form input[type=text]:focus,.form textarea:focus{border-color:var(--lav2);box-shadow:0 0 0 4px rgba(201,160,67,.18)}
 .colorrow{display:flex;align-items:center;gap:12px}
 .colorrow input[type=color]{width:46px;height:40px;border:1px solid var(--line);border-radius:12px;background:var(--glass2);padding:3px;cursor:pointer}
 .colorrow #cv{font-family:var(--mono);font-size:13px;color:var(--mute)}
 .colorrow .swatch{width:28px;height:28px;border-radius:50%;box-shadow:inset -4px -5px 10px rgba(0,0,0,.25),inset 3px 3px 6px rgba(255,255,255,.6)}
 /* architecture */
 .arch{display:grid;grid-template-columns:1fr 92px 1.05fr 92px 1fr;align-items:center;margin:8px 0 12px}
-.arch .node{position:relative;border-radius:24px;padding:22px 20px 18px;background:var(--glass);border:1px solid var(--line);box-shadow:var(--shadow);backdrop-filter:blur(22px) saturate(1.5);-webkit-backdrop-filter:blur(22px) saturate(1.5)}
+.arch .node{position:relative;border-radius:24px;padding:22px 20px 18px;background:var(--glass);border:1px solid var(--line);box-shadow:var(--shadow);}
 .arch .node.core{background:var(--lavgrad);border-color:rgba(255,255,255,.8);padding:28px 22px 22px}
 .arch h4{margin:12px 0 2px;font-size:16px}
 .arch .node > p{margin:0 0 10px;color:var(--mute);font-size:12.5px;line-height:1.55}
 .arch ul{margin:0;padding:0;list-style:none;font-size:13.2px}
 .arch li{padding:5px 0;border-top:1px solid var(--hair);color:color-mix(in srgb,var(--ink) 82%,var(--mute))}
-.orbic{display:block;width:30px;height:30px;border-radius:50%;background:radial-gradient(circle at 32% 26%,#fff 0,#e3dffc 14%,#9d94ec 48%,#5a4fc0 85%);box-shadow:0 10px 18px -8px rgba(75,63,166,.6)}
+.orbic{display:block;width:30px;height:30px;border-radius:50%;background:radial-gradient(circle at 32% 26%,#fff 0,#f6ecd0 14%,#d4a94a 48%,#8a6414 85%);box-shadow:0 10px 18px -8px rgba(109,78,14,.6)}
 .orbic.big{width:40px;height:40px}
-.orbic.silver,.ic.silver{background:repeating-conic-gradient(from 10deg,rgba(255,255,255,.55) 0 3deg,rgba(255,255,255,0) 3deg 9deg),radial-gradient(circle at 32% 28%,#fff 0,#e9e9ee 22%,#b9b9c4 58%,#7e7e8c 100%)!important;box-shadow:0 10px 18px -8px rgba(60,55,80,.5)}
+.orbic.silver,.ic.silver{background:repeating-conic-gradient(from 10deg,rgba(255,255,255,.55) 0 3deg,rgba(255,255,255,0) 3deg 9deg),radial-gradient(circle at 32% 28%,#fff 0,#f0e9d6 22%,#c9bc98 58%,#8f8061 100%)!important;box-shadow:0 10px 18px -8px rgba(80,65,30,.5)}
 .wire{position:relative;height:2px;margin:0 6px;background:linear-gradient(90deg,var(--lav2),var(--lav))}
 .wire span{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);font-size:10.5px;line-height:1.35;color:var(--mute);text-align:center;width:120px}
-.wire i{position:absolute;top:-3px;left:0;width:8px;height:8px;border-radius:50%;background:#fff;box-shadow:0 0 0 3px rgba(143,134,232,.45);animation:pulse 2.6s linear infinite}
+.wire i{position:absolute;top:-3px;left:0;width:8px;height:8px;border-radius:50%;background:#fff;box-shadow:0 0 0 3px rgba(201,160,67,.45);animation:pulse 2.6s linear infinite}
 @keyframes pulse{0%{left:0}50%{left:calc(100% - 8px)}100%{left:0}}
 .duo{display:grid;grid-template-columns:1fr 140px 1fr;align-items:center;gap:0}
 .duo .feat{color:inherit;text-decoration:none}
@@ -387,12 +387,12 @@ footer .brand{font-size:15px}
 .duo-mid::before{content:"";position:absolute;top:20px;left:-10px;right:-10px;height:2px;background:linear-gradient(90deg,var(--lav2),var(--lav),var(--lav2));z-index:-1}
 .duo-mid b{font-size:14px;margin-top:4px}.duo-mid small{color:var(--faint);font-size:12px}
 .relay .who{display:inline-block;font-size:11px;font-weight:600;padding:0 9px;border-radius:999px;margin-left:8px;vertical-align:2px}
-.relay .who.k{color:#fff;background:#1b1a20}
-.relay .who.c{color:var(--plum);background:rgba(143,134,232,.22)}
+.relay .who.k{color:#fff;background:#231c0e}
+.relay .who.c{color:var(--plum);background:rgba(201,160,67,.22)}
 .relay .who.q{color:#5d5d6b;background:rgba(160,160,175,.25)}
-:root[data-theme="dark"] .relay .who.k{color:#141219;background:#eeeaf4}
-:root[data-theme="dark"] .relay .who.q{color:#c9c9d4}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .relay .who.k{color:#141219;background:#eeeaf4}:root:not([data-theme="light"]) .relay .who.q{color:#c9c9d4}}
+:root[data-theme="dark"] .relay .who.k{color:#15120b;background:#f3ecdc}
+:root[data-theme="dark"] .relay .who.q{color:#c9bc98}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .relay .who.k{color:#15120b;background:#f3ecdc}:root:not([data-theme="light"]) .relay .who.q{color:#c9bc98}}
 @media (max-width:1100px){
   .arch{grid-template-columns:1fr;gap:0}
   .wire{width:2px;height:56px;margin:0 auto;background:linear-gradient(var(--lav2),var(--lav))}
@@ -406,7 +406,7 @@ footer .brand{font-size:15px}
 
 /* dice */
 .rules{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:0 0 8px}
-.rule{border-radius:22px;padding:20px 18px 16px;background:var(--glass);border:1px solid var(--line);box-shadow:var(--shadow);backdrop-filter:blur(22px) saturate(1.5);-webkit-backdrop-filter:blur(22px) saturate(1.5);display:flex;flex-direction:column}
+.rule{border-radius:22px;padding:20px 18px 16px;background:var(--glass);border:1px solid var(--line);box-shadow:var(--shadow);display:flex;flex-direction:column}
 .rule.dg{background:var(--lavgrad);border-color:rgba(255,255,255,.8)}
 .rule h4{margin:12px 0 4px;font-size:16px}
 .rule p{margin:0 0 14px;font-size:13px;color:var(--mute);line-height:1.6;flex:1}
@@ -432,11 +432,11 @@ footer .brand{font-size:15px}
 }
 
 /* ---------- rendered 3D assets + deeper glass ---------- */
-:root{--pearl-img:url(assets/orb-pearl.webp);--silver-img:url(assets/orb-silver.webp);
+:root{--pearl-img:url(assets/orb-gold.webp);--silver-img:url(assets/orb-red.webp);
   --noise:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .09 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
   --glass:linear-gradient(140deg,rgba(255,255,255,.66) 0%,rgba(255,255,255,.34) 45%,rgba(255,255,255,.2) 100%);
   --glass2:linear-gradient(140deg,rgba(255,255,255,.82),rgba(255,255,255,.5));
-  --shadow:inset 1.5px 1.5px 0 rgba(255,255,255,.95),inset -1px -1px 0 rgba(255,255,255,.35),inset 0 0 22px rgba(255,255,255,.35),0 34px 60px -30px rgba(70,55,120,.38),0 10px 22px -12px rgba(70,55,120,.18)}
+  --shadow:inset 1.5px 1.5px 0 rgba(255,255,255,.95),inset -1px -1px 0 rgba(255,255,255,.35),inset 0 0 22px rgba(255,255,255,.35),0 34px 60px -30px rgba(90,65,15,.38),0 10px 22px -12px rgba(90,65,15,.18)}
 :root[data-theme="dark"]{--glass:linear-gradient(140deg,rgba(255,255,255,.1),rgba(255,255,255,.03));--glass2:linear-gradient(140deg,rgba(255,255,255,.14),rgba(255,255,255,.06));
   --shadow:inset 1.5px 1.5px 0 rgba(255,255,255,.18),inset -1px -1px 0 rgba(255,255,255,.04),inset 0 0 22px rgba(255,255,255,.04),0 34px 60px -30px rgba(0,0,0,.75)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--glass:linear-gradient(140deg,rgba(255,255,255,.1),rgba(255,255,255,.03));--glass2:linear-gradient(140deg,rgba(255,255,255,.14),rgba(255,255,255,.06));
@@ -445,16 +445,16 @@ footer .brand{font-size:15px}
 .top .wrap{background-image:var(--noise),var(--glass2)!important}
 .arch .node.core,.rule.dg,.roleswitch{background-image:var(--noise),var(--lavgrad)!important}
 /* violet cloud inside the hero card, like light trapped in glass */
-.lavcard{background:var(--noise),radial-gradient(70% 80% at 72% 40%,rgba(98,84,214,.78),rgba(140,128,232,.45) 45%,rgba(220,214,250,.25) 75%,rgba(255,255,255,.18) 100%)!important;box-shadow:var(--shadow)}
-.frame{background:var(--noise),linear-gradient(140deg,rgba(255,255,255,.42),rgba(255,255,255,.12))!important;box-shadow:inset 2px 2px 0 rgba(255,255,255,.9),inset -1px -1px 0 rgba(255,255,255,.3),inset 0 0 40px rgba(255,255,255,.3),0 50px 90px -40px rgba(70,55,120,.35)!important}
+.lavcard{background:var(--noise),radial-gradient(70% 80% at 72% 40%,rgba(184,137,42,.78),rgba(212,169,74,.45) 45%,rgba(241,226,184,.25) 75%,rgba(255,255,255,.18) 100%)!important;box-shadow:var(--shadow)}
+.frame{background:var(--noise),linear-gradient(140deg,rgba(255,255,255,.42),rgba(255,255,255,.12))!important;box-shadow:inset 2px 2px 0 rgba(255,255,255,.9),inset -1px -1px 0 rgba(255,255,255,.3),inset 0 0 40px rgba(255,255,255,.3),0 50px 90px -40px rgba(90,65,15,.35)!important}
 :root[data-theme="dark"] .frame{background:var(--noise),linear-gradient(140deg,rgba(255,255,255,.08),rgba(255,255,255,.02))!important}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .frame{background:var(--noise),linear-gradient(140deg,rgba(255,255,255,.08),rgba(255,255,255,.02))!important}}
 .slab{position:absolute;z-index:0;left:24%;top:9%;width:42%;height:86%;border-radius:44px;pointer-events:none;
   background:var(--noise),linear-gradient(150deg,rgba(255,255,255,.5),rgba(255,255,255,.12));border:1px solid rgba(255,255,255,.7);
-  box-shadow:inset 2px 2px 0 rgba(255,255,255,.9),inset 0 0 30px rgba(255,255,255,.35),0 30px 60px -30px rgba(70,55,120,.3);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
-:root[data-theme="dark"] .slab{background:linear-gradient(150deg,rgba(255,255,255,.035),rgba(255,255,255,.01));border-color:rgba(255,255,255,.05);box-shadow:none}:root[data-theme="dark"] .lavcard{background:var(--noise),radial-gradient(70% 80% at 72% 40%,rgba(110,96,230,.55),rgba(90,79,192,.28) 50%,rgba(40,34,70,.35) 100%)!important}:root[data-theme="dark"] .phone{background-image:var(--noise),linear-gradient(140deg,rgba(40,36,56,.75),rgba(28,25,40,.7))!important}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .slab{background:linear-gradient(150deg,rgba(255,255,255,.035),rgba(255,255,255,.01));border-color:rgba(255,255,255,.05);box-shadow:none}:root:not([data-theme="light"]) .lavcard{background:var(--noise),radial-gradient(70% 80% at 72% 40%,rgba(110,96,230,.55),rgba(90,79,192,.28) 50%,rgba(40,34,70,.35) 100%)!important}:root:not([data-theme="light"]) .phone{background-image:var(--noise),linear-gradient(140deg,rgba(40,36,56,.75),rgba(28,25,40,.7))!important}}
-.deco{position:absolute;z-index:2;pointer-events:none;height:auto;filter:drop-shadow(0 16px 18px rgba(70,55,120,.28))}
+  box-shadow:inset 2px 2px 0 rgba(255,255,255,.9),inset 0 0 30px rgba(255,255,255,.35),0 30px 60px -30px rgba(90,65,15,.3);}
+:root[data-theme="dark"] .slab{background:linear-gradient(150deg,rgba(255,255,255,.035),rgba(255,255,255,.01));border-color:rgba(255,255,255,.05);box-shadow:none}:root[data-theme="dark"] .lavcard{background:var(--noise),radial-gradient(70% 80% at 72% 40%,rgba(201,160,67,.55),rgba(138,100,20,.28) 50%,rgba(30,25,12,.35) 100%)!important}:root[data-theme="dark"] .phone{background-image:var(--noise),linear-gradient(140deg,rgba(38,32,18,.75),rgba(33,28,16,.7))!important}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .slab{background:linear-gradient(150deg,rgba(255,255,255,.035),rgba(255,255,255,.01));border-color:rgba(255,255,255,.05);box-shadow:none}:root:not([data-theme="light"]) .lavcard{background:var(--noise),radial-gradient(70% 80% at 72% 40%,rgba(201,160,67,.55),rgba(138,100,20,.28) 50%,rgba(30,25,12,.35) 100%)!important}:root:not([data-theme="light"]) .phone{background-image:var(--noise),linear-gradient(140deg,rgba(38,32,18,.75),rgba(33,28,16,.7))!important}}
+.deco{position:absolute;z-index:2;pointer-events:none;height:auto;filter:drop-shadow(0 16px 18px rgba(90,65,15,.28))}
 .band .wrap{position:relative}
 .hero,.band{overflow-x:clip}
 html{overflow-x:clip}
@@ -464,9 +464,39 @@ html{overflow-x:clip}
 .orbic.silver,.feat .ic.silver{background:var(--silver-img) center/cover no-repeat!important}
 .callout.warn::before{background:radial-gradient(circle at 32% 28%,#fff 0,#f3d9c3 18%,#d39a6a 60%,#a86a3e)!important}
 @media (max-width:640px){.deco,.slab{display:none}.frame .deco.m1,.frame .deco.m2,.frame .deco.m3{display:block}.frame .deco.m1{width:58px!important;right:-10px!important;top:-20px!important}.frame .deco.m2{width:52px!important;left:auto!important;right:22px!important;bottom:-22px!important}.frame .deco.m3{width:26px!important;right:auto!important;left:18px!important;bottom:-10px!important}}
-.hero h1 em{color:#4f43b8!important;text-shadow:0 1px 0 rgba(255,255,255,.6)!important}
-:root[data-theme="dark"] .hero h1 em{color:#cfc8ff!important;text-shadow:none!important}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .hero h1 em{color:#cfc8ff!important;text-shadow:none!important}}
+.hero h1 em{color:#6d4e0e!important;text-shadow:0 1px 0 rgba(255,255,255,.6)!important}
+:root[data-theme="dark"] .hero h1 em{color:#f0d994!important;text-shadow:none!important}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .hero h1 em{color:#f0d994!important;text-shadow:none!important}}
+
+/* ===== 金色主题：去掉毛玻璃模糊，卡片改近乎不透明；其余版式保持原样 ===== */
+:root,:root[data-theme="light"]{--glass:linear-gradient(140deg,rgba(255,251,240,.96),rgba(250,241,219,.92));--glass2:linear-gradient(140deg,rgba(255,252,244,.98),rgba(252,244,224,.95))}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--glass:linear-gradient(140deg,rgba(40,34,20,.96),rgba(30,25,14,.94));--glass2:linear-gradient(140deg,rgba(48,41,24,.97),rgba(36,30,17,.95))}}
+:root[data-theme="dark"]{--glass:linear-gradient(140deg,rgba(40,34,20,.96),rgba(30,25,14,.94));--glass2:linear-gradient(140deg,rgba(48,41,24,.97),rgba(36,30,17,.95))}
+*,*::before,*::after{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+.deco,.squig{filter:drop-shadow(0 10px 12px rgba(90,40,20,.28))!important}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .eyebrow{background:#2a2314!important;color:#e6c46a!important}}
+:root[data-theme="dark"] .eyebrow{background:#2a2314!important;color:#e6c46a!important}
+
+/* ===== 圣诞主题：亮片球、雪花、冬青、花环、飘雪 ===== */
+.twinkle{animation:twinkle 3.2s ease-in-out infinite}
+.twinkle.b{animation-delay:-1.4s}
+@keyframes twinkle{0%,100%{opacity:.55;transform:scale(.85) rotate(0)}50%{opacity:1;transform:scale(1.1) rotate(12deg)}}
+.top .wrap{position:relative}
+.top .wrap::after{content:"";position:absolute;left:22px;right:22px;top:calc(100% - 4px);height:26px;pointer-events:none;background:url(assets/garland.svg) 0 0/400px 26px repeat-x;filter:drop-shadow(0 3px 3px rgba(60,30,10,.25))}
+body::after{content:"";position:fixed;inset:0;z-index:30;pointer-events:none;
+  background-image:radial-gradient(circle,#fff 0 1.6px,rgba(150,175,200,.5) 2.2px,transparent 3px),radial-gradient(circle,#fff 0 1.1px,rgba(150,175,200,.45) 1.7px,transparent 2.4px),radial-gradient(circle,#fff 0 2.2px,rgba(150,175,200,.5) 2.9px,transparent 3.8px);
+  background-size:230px 230px,170px 170px,340px 340px;background-position:0 0,60px 40px,120px 90px;
+  animation:snow 22s linear infinite}
+@keyframes snow{to{background-position:30px 230px,-20px 170px,60px 340px}}
+.hero h1 em{color:#b3262f!important}
+:root[data-theme="dark"] .hero h1 em{color:#ff8d8d!important}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .hero h1 em{color:#ff8d8d!important}}
+.eyebrow{color:#1f6b43!important}
+:root[data-theme="dark"] .eyebrow{color:#8fd9ac!important}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .eyebrow{color:#8fd9ac!important}}
+@media (max-width:640px){.top .wrap::after{left:12px;right:12px}}
+@media (prefers-reduced-motion:reduce){body::after,.twinkle,.float{animation:none!important}}
+
 </style>
 </head>
 <body data-role="all">
@@ -502,20 +532,20 @@ html{overflow-x:clip}
     <div class="wrap">
   <div class="frame">
     <span class="slab"></span>
-    <img class="deco float" src="assets/orb-silver.webp" alt="" aria-hidden="true" style="width:58px;left:-24px;top:64px">
-    <img class="deco float b m1" src="assets/orb-silver.webp" alt="" aria-hidden="true" style="width:96px;right:-34px;top:22px">
-    <img class="deco float b m3" src="assets/orb-pearl.webp" alt="" aria-hidden="true" style="width:44px;right:43%;bottom:-18px">
-    <img class="deco float m2" src="assets/orb-glass.webp" alt="" aria-hidden="true" style="width:86px;left:38%;bottom:-40px">
-    <img class="deco float b" src="assets/orb-glass.webp" alt="" aria-hidden="true" style="width:26px;right:34%;top:14px">
-    <img class="deco float" src="assets/squiggle-lav.webp" alt="" aria-hidden="true" style="width:92px;left:44%;top:-22px">
-    <img class="deco float b" src="assets/squiggle-glass.webp" alt="" aria-hidden="true" style="width:130px;left:-34px;bottom:42px">
-    <img class="deco" src="assets/beads.webp" alt="" aria-hidden="true" style="width:220px;right:-40px;bottom:-30px;opacity:.9">
-    <img class="deco" src="assets/beads.webp" alt="" aria-hidden="true" style="width:190px;left:18%;top:-46px;opacity:.75;transform:scaleX(-1)">
+    <img class="deco float" src="assets/orb-red.webp" alt="" aria-hidden="true" style="width:58px;left:-24px;top:64px">
+    <img class="deco float b m1" src="assets/orb-gold.webp" alt="" aria-hidden="true" style="width:96px;right:-34px;top:22px">
+    <img class="deco float b m3" src="assets/orb-green.webp" alt="" aria-hidden="true" style="width:44px;right:43%;bottom:-18px">
+    <img class="deco float m2" src="assets/orb-gold.webp" alt="" aria-hidden="true" style="width:62px;left:38%;bottom:-30px">
+    <img class="deco twinkle b" src="assets/star.svg" alt="" aria-hidden="true" style="width:30px;right:34%;top:10px">
+    <img class="deco float" src="assets/snowflake.svg" alt="" aria-hidden="true" style="width:46px;left:44%;top:-24px">
+    <img class="deco float b" src="assets/holly.svg" alt="" aria-hidden="true" style="width:120px;left:-30px;bottom:34px">
+    <img class="deco" src="assets/holly.svg" alt="" aria-hidden="true" style="width:130px;right:-24px;bottom:-34px;transform:scaleX(-1) rotate(-8deg)">
+    <img class="deco twinkle" src="assets/star.svg" alt="" aria-hidden="true" style="width:22px;left:22%;top:-12px">
     <div class="inner">
       <div class="lavcard">
         <p class="eyebrow">✦ The Remains of the Day</p>
         <h1>让一整季的心动，<br><em>有条不紊</em>地发生。</h1>
-        <p class="lead">长日bot 是为群恋综而生的 QQ 官方机器人：角色、短信、礼物、私约、心动信、关系线、季度，外加一部玩家用的网页小手机。装好以后全在网页后台管理，不用写一行代码。</p>
+        <p class="lead">长日bot 是为群恋综而生的 QQ 官方机器人：角色、短信、礼物、约会、心动信、关系线、季度，外加一部玩家用的网页小手机。装好以后全在网页后台管理，不用写一行代码。</p>
         <div class="cta">
           <a class="btn pri" href="#/install">开始安装 <span aria-hidden="true">→</span></a>
           <a class="btn sec" href="#/season">读恋综指南</a>
@@ -541,7 +571,7 @@ html{overflow-x:clip}
         <div><span class="num">Features · 能做什么</span><h2>一场恋综需要的，<br>它都替你做。</h2></div>
         <p>主持人不再对着表格手动转发短信、核对时间线。玩家在自己的群里发一句话，剩下的交给机器人。</p>
       </div>
-      <img class="deco float b" src="assets/orb-glass.webp" alt="" aria-hidden="true" style="width:70px;right:-10px;top:-30px">
+      <img class="deco float b" src="assets/snowflake.svg" alt="" aria-hidden="true" style="width:58px;right:-6px;top:-30px">
       <div class="grid3" id="feats"></div>
     </div>
   </div>
@@ -566,12 +596,12 @@ html{overflow-x:clip}
         <div><span class="num">A Season · 一季的样子</span><h2>从预订档期，到收尾封存。</h2></div>
         <p><a href="#/season">恋综指南</a>按这个顺序，分「玩家」和「主持人」两条线讲清楚每一步该发什么。</p>
       </div>
-      <img class="deco float" src="assets/orb-silver.webp" alt="" aria-hidden="true" style="width:56px;left:-18px;bottom:-24px;z-index:3">
-      <img class="deco" src="assets/beads.webp" alt="" aria-hidden="true" style="width:200px;right:-20px;bottom:-60px;opacity:.7">
+      <img class="deco float" src="assets/orb-red.webp" alt="" aria-hidden="true" style="width:56px;left:-18px;bottom:-24px;z-index:3">
+      <img class="deco" src="assets/holly.svg" alt="" aria-hidden="true" style="width:110px;right:-14px;bottom:-40px">
       <div class="season">
         <div><span class="d">01</span><h4>开季之前</h4><p>预订季度、设公告群和备用群池；玩家建群、创建角色。</p></div>
         <div><span class="d">02</span><h4>出场</h4><p>抽取出场顺序，轮到谁，戏群里就出现谁。</p></div>
-        <div><span class="d">03</span><h4>日常</h4><p>短信、送礼、寄信、私约、电话，时间线自动记。</p></div>
+        <div><span class="d">03</span><h4>日常</h4><p>短信、送礼、约会、电话，时间线自动记。</p></div>
         <div><span class="d">04</span><h4>夜里</h4><p>心动信统一派送，关系线一根根拉起来。</p></div>
         <div><span class="d">05</span><h4>结季</h4><p>结束季度、复盘长图、收尾清空，等下一季。</p></div>
       </div>
@@ -601,11 +631,11 @@ html{overflow-x:clip}
         <p>登录服务器（腾讯云可以点「登录」打开网页终端），粘贴这一行，回车：</p>
         <div class="cmdline"><span class="pr">$</span><code>curl -fsSL @BASE@/get.sh | sudo sh</code><button class="copy">复制</button></div>
         <p>它会自动下载、校验签名、装到 <code>/opt/changri-bot</code>、设为开机自启并启动，最后打印<b>设置平台网址</b>和<b>首次设置验证码</b>。装过 0.19 及以前老版本的，会自动把数据搬过来。</p>
-        <div class="callout"><p>想手动下载安装包，或看 x86_64 / arm64 的直链：<a href="@BASE@/install">下载页 →</a></p></div>
+        <div class="callout"><p>想手动下载安装包：<a href="@BASE@/downloads/changri-bot-@VERSION@-linux-x64.tar.gz">x86_64</a> · <a href="@BASE@/downloads/changri-bot-@VERSION@-linux-arm64.tar.gz">arm64</a>（<a href="@BASE@/install">下载页 →</a>）。海外也可以到 <a href="https://github.com/eren006/changri/releases/tag/v@VERSION@" target="_blank" rel="noopener">GitHub Releases</a> 下。</p></div>
       </div>
       <div class="pane" data-pane="os:win">
         <ol class="steps">
-          <li><b>下载</b>到 <a href="@BASE@/install">下载页</a> 下 Windows 版 zip。</li>
+          <li><b>下载</b><a href="@BASE@/downloads/changri-bot-@VERSION@-windows-x64.zip">下载 Windows 版 zip</a>（也可以到 <a href="@BASE@/install">下载页</a>，或海外用 <a href="https://github.com/eren006/changri/releases/tag/v@VERSION@" target="_blank" rel="noopener">GitHub Releases</a>）。</li>
           <li><b>解除锁定</b>右键 zip →「属性」→ 勾选最下面的「解除锁定」→ 确定。跳过这步，启动时会弹安全提示。</li>
           <li><b>解压到固定位置</b>例如 <code>D:\changri-bot</code>。解压完压缩包可以删掉。</li>
           <li><b>启动</b>双击 <code>Start-Changri.bat</code>，浏览器会自动打开设置平台。若弹出「Windows 已保护你的电脑」，点「更多信息」→「仍要运行」。</li>
@@ -661,7 +691,7 @@ html{overflow-x:clip}
         <div><dt>个人群</dt><dd>每个玩家自己建的小群，拉机器人进去。短信、礼物、邀请都送到这里。</dd></div>
         <div><dt>公告群</dt><dd>全员大群。论坛、播报、点歌等公开内容发在这里。</dd></div>
         <div><dt>戏群</dt><dd>出场时用的群，轮到谁，机器人就把谁的出场戏发进来。</dd></div>
-        <div><dt>备用群池</dt><dd>预先建好的一批空群（备用群）。私约、电话开房间时，从这里领一个；没有空群时新的房间开不成，不排队。</dd></div>
+        <div><dt>备用群池</dt><dd>预先建好的一批空群（备用群）。约会、电话开房间时，从这里领一个；没有空群时新的房间开不成，不排队。</dd></div>
         <div><dt>房间 R12</dt><dd>一次约会 / 电话 / 官约就是一个房间，带编号，复盘、结束都靠它。</dd></div>
         <div><dt>D几 · 时间</dt><dd>游戏内第几天，时间写成 <code>1400-1500</code>。不写 D 就是今天。</dd></div>
       </dl>
@@ -682,7 +712,6 @@ html{overflow-x:clip}
         <ol class="steps">
           <li><b>建群并拉机器人</b>自己建一个 QQ 群，把机器人拉进去，它会发一段欢迎语。</li>
           <li><b>创建角色</b>在这个群里发 <code>创建新角色 名字</code>，这个群就成了你的个人群。</li>
-          <li><b>备用群（可选）</b>在个人群发 <code>备用群码</code> 拿 6 位码，到新群发 <code>绑定备用群 码</code>。个人群发不出去时会自动改投备用群。</li>
           <li><b>小手机（可选）</b>发 <code>手机码</code>，拿网页链接和激活码，在手机浏览器里打开。</li>
           <li><b>拿模板</b>发 <code>格式短信</code> <code>格式送礼</code>，拿到能直接复制的写法。</li>
         </ol>
@@ -691,7 +720,7 @@ html{overflow-x:clip}
             <div class="msg me">创建新角色 阿林</div>
             <div class="msg bot"><span class="who">机器人</span>✅ 角色「阿林」创建好了，这个群就是你的个人群。</div>
           </div>
-          <p class="note">名字就是别人给你发短信、约你时要写的名字，起好再发。换群用 <code>主群码</code> + <code>换主群 码</code>。</p>
+          <p class="note">名字就是别人给你发短信、约你时要写的名字，起好再发。想换个人群：在原群发 <code>换绑码</code>，到新群发 <code>认群 码</code>。</p>
         </div>
       </div>
 
@@ -703,7 +732,7 @@ html{overflow-x:clip}
         <li class="only-player"><span class="tag p">玩家</span> 在个人群提前发 <code>提交出场 阿林 内容</code>（可以带图），轮到你时自动发到戏群。也可以轮到时直接在戏群发「阿林 内容」，算你已出场。</li>
       </ul>
 
-      <h2 id="s-daily"><span class="n">03</span>日常：短信、送礼、寄信</h2>
+      <h2 id="s-daily"><span class="n">03</span>日常：短信、送礼</h2>
       <p>在<b>自己的个人群</b>里发，机器人会转到对方的个人群。每天的次数和冷却由主持人在后台设定。</p>
       <div class="ex">
         <div class="chat static">
@@ -721,16 +750,16 @@ html{overflow-x:clip}
         </div>
       </div>
       <ul>
-        <li><code>寄信 收件人 内容</code>：比短信更慢、更有仪式感的信。开了「混乱寄信」扩展时，信可能错字、丢半截、被误投……</li>
+        <li>开了「混乱短信」扩展时，短信可能错字、丢半截、被误投、被撕成两半……</li>
         <li><code>我的图鉴</code>：看看收到过哪些礼物。<code>礼品店</code>：送礼时可以直接写编号。</li>
         <li><code>我的数量</code>：今天还剩几次。<code>我的待回</code>：还有哪些消息、邀请没处理。</li>
       </ul>
 
-      <h2 id="s-date"><span class="n">04</span>约会：私约、电话、踩点</h2>
-      <p>发起后机器人从备用群池领一个空群当「房间」，通知对方进群。人到齐就开始，聊完在房间里发「结束私约」。</p>
+      <h2 id="s-date"><span class="n">04</span>约会、电话、踩点</h2>
+      <p>发起后机器人从备用群池领一个空群当「房间」，通知对方进群。人到齐就开始，聊完在房间里发「结束约会」。</p>
       <div class="tblwrap"><table class="tbl">
         <tr><th>类型</th><th>写法</th><th>说明</th></tr>
-        <tr><td>私约</td><td><code>私约 1400-1500 咖啡厅 小满</code></td><td>多人用 <code>/</code> 隔开：<code>小满/阿川</code></td></tr>
+        <tr><td>约会</td><td><code>约会 1400-1500 咖啡厅 小满</code></td><td>多人用 <code>/</code> 隔开：<code>小满/阿川</code></td></tr>
         <tr><td>电话</td><td><code>电话 2100-2200 小满</code></td><td>不需要地点，别人不能中途加入</td></tr>
         <tr><td>踩点</td><td><code>踩点 1400-1500 大图书馆</code></td><td>一个人去某个地方，看看会遇到谁</td></tr>
         <tr><td>多人群聊</td><td>小手机 → 发现 → 邀约</td><td>原「微信」已搬到小手机里</td></tr>
@@ -738,7 +767,7 @@ html{overflow-x:clip}
       <h3>房间里</h3>
       <div class="callout"><p><b>戏文格式：</b>首行写角色名，再跟换行 / 空格 / 冒号，后面是正文，例如「阿林：你也来了？」。不按格式的算闲聊，不计入存档和字数。</p></div>
       <ul>
-        <li><code>结束私约</code>（电话、官约也用这一条）：聊完结束，写进双方时间线。</li>
+        <li><code>结束约会</code>（电话、官约也用这一条）：聊完结束，写进双方时间线。</li>
         <li><code>申请加入 小满 14:00</code>：想加入别人正在进行的约会；对方用 <code>同意加入 编号</code> / <code>拒绝加入 编号</code>。</li>
         <li><code>复盘 R12</code>：把一场房间的戏文画成长图，只有参与者和管理员能看。</li>
         <li><code>补录 R12</code>：监听的 QQ 号掉线漏记了？把聊天记录合并转发到备用群，回复它发这一句。</li>
@@ -752,10 +781,10 @@ html{overflow-x:clip}
           <li><span class="tag a">管理员</span> <code>发起官约 D3 1400-1500 后山 小满/阿林</code>：立即发起（地点可省）。</li>
           <li><code>发起官电 D2 2000-2100 小满/阿林</code>：节目组安排的电话。</li>
           <li><b>批量排：</b>先多次 <code>计划官约 …</code> 攒着，再发一次 <code>执行官约</code> 一起发出；<code>计划官约 清空</code> 重来。</li>
-          <li><code>取消官约 R12</code> 当作没发生过；<code>强结私约 R12</code> 结束卡住的房间；<code>删除时间线 角色名 R12</code> 彻底删掉一场。</li>
+          <li><code>取消官约 R12</code> 当作没发生过；<code>强结约会 R12</code> 结束卡住的房间；<code>删除时间线 角色名 R12</code> 彻底删掉一场。</li>
         </ul>
       </div>
-      <p class="only-player"><span class="tag p">玩家</span> 收到官约邀请后，和私约一样进房间、按格式写戏、结束时发 <code>结束私约</code>。</p>
+      <p class="only-player"><span class="tag p">玩家</span> 收到官约邀请后，和约会一样进房间、按格式写戏、结束时发 <code>结束约会</code>。</p>
 
       <h2 id="s-lovemail"><span class="n">06</span>心动信</h2>
       <p>每晚的重头戏：白天悄悄投递，到点统一派送。收信人不知道是谁写的，除非你署名。</p>
@@ -922,7 +951,7 @@ html{overflow-x:clip}
       <details class="qa"><summary>发了指令机器人没反应</summary><div>① 对应的扩展可能没开（后台「功能与设置」）；② 后台开了「指令必须带前缀」，需要在前面加 <code>/</code>；③ 这个群是跑团模式，恋综指令会静音；④ 你还没在个人群「创建新角色」。</div></details>
       <details class="qa"><summary>短信发错人了</summary><div>2 分钟内在自己群里发 <code>撤回</code>，对方群里那条一起删，次数返还。超过 2 分钟请联系管理员。</div></details>
       <details class="qa"><summary>复盘说「没有记到戏文」</summary><div>备用群里要有监听的 QQ 号，说话的人要用 <code>绑定qq 你的QQ号</code> 绑过，戏文要按「角色名：正文」写。漏记的可以用 <code>补录 R房间号</code> 补。</div></details>
-      <details class="qa"><summary>备用群池用完了怎么办</summary><div>新的私约、电话会开不成，机器人会告知玩家，不会排队。管理员可以多准备几个备用群，在里面发 <code>设为备用群池</code>。</div></details>
+      <details class="qa"><summary>备用群池用完了怎么办</summary><div>新的约会、电话会开不成，机器人会告知玩家，不会排队。管理员可以多准备几个备用群，在里面发 <code>设为备用群池</code>。</div></details>
     </article>
   </div>
 </section>
@@ -961,7 +990,7 @@ html{overflow-x:clip}
       <p>说话、指令、通知、补录，官方机器人都能做。小号的好处是<b>省事</b>：它本来就在群里，不用一个个拉机器人、开设置；而且它能改群名，这是官方机器人做不到的。</p>
       <div class="tblwrap"><table class="tbl">
         <tr><th>事情</th><th>官方机器人</th><th>QQ 小号</th></tr>
-        <tr><td>收指令、发通知</td><td>✓ 主力</td><td>只在官方机器人不在的备用群里，回结束私约、修改时间线这几句</td></tr>
+        <tr><td>收指令、发通知</td><td>✓ 主力</td><td>只在官方机器人不在的备用群里，回结束约会、修改时间线这几句</td></tr>
         <tr><td>进备用群</td><td>要把它拉进每一个备用群，并打开相应设置</td><td>✓ 本来在群里就行，比如以前给海豹骰用过的号</td></tr>
         <tr><td>改群名</td><td>✗</td><td>✓ 要是群管理员或群主</td></tr>
         <tr><td>认出真实群号</td><td>✗ 只有加密的群 ID，靠「认群码」绑定</td><td>✓ 后台直接勾选群，加进群号组</td></tr>
@@ -970,14 +999,14 @@ html{overflow-x:clip}
       </table></div>
       <div class="callout"><p><b>小号是可选的。</b>不接小号，短信、心动信、关系线、季度都不受影响；约会房间就得把官方机器人拉进每个备用群并打开设置，群名也不会自动改。目前房间戏文的复盘由小号来记；让官方机器人在备用群里也能记，是接下来要做的。</p></div>
 
-      <h2 id="h-date"><span class="n">02</span>一场私约里，两个账号怎么配合</h2>
+      <h2 id="h-date"><span class="n">02</span>一场约会里，两个账号怎么配合</h2>
       <ol class="steps relay">
-        <li><b>玩家发起 <span class="who k">官方机器人</span></b>阿林在自己的个人群发 <code>私约 1400-1500 咖啡厅 小满</code>，官方机器人收到，交给长日bot。</li>
+        <li><b>玩家发起 <span class="who k">官方机器人</span></b>阿林在自己的个人群发 <code>约会 1400-1500 咖啡厅 小满</code>，官方机器人收到，交给长日bot。</li>
         <li><b>领一个房间 <span class="who c">长日bot</span></b>从备用群池里领一个空闲的备用群，记成 R12，写进两个人的时间线。备用群池用完了就无法开启，并告知玩家。</li>
-        <li><b>改群名 <span class="who q">小号</span></b>小号把群名改成「私约 D2 1400-1500 咖啡厅 阿林/小满」，谁进错群一眼就看得出来。</li>
+        <li><b>改群名 <span class="who q">小号</span></b>小号把群名改成「约会 D2 1400-1500 咖啡厅 阿林/小满」，谁进错群一眼就看得出来。</li>
         <li><b>发邀请 <span class="who k">官方机器人</span></b>官方机器人在阿林和小满的个人群里各发一条邀请，告诉他们进哪个群。</li>
         <li><b>旁听写戏 <span class="who q">小号</span></b>两个人在备用群里按「角色名：正文」写戏，小号听到每一句，记进 R12 的复盘，并统计字数。玩家要先发过 <code>绑定qq 自己的QQ号</code>，小号才认得出谁是谁。</li>
-        <li><b>结束 <span class="who q">小号</span></b>有人在备用群发 <code>结束私约</code>，小号听到后照常处理，并在群里回话。</li>
+        <li><b>结束 <span class="who q">小号</span></b>有人在备用群发 <code>结束约会</code>，小号听到后照常处理，并在群里回话。</li>
         <li><b>归还 <span class="who q">小号</span></b>群名改回空闲时的名字，房间回到备用群池等下一场。<code>复盘 R12</code> 可以把这场戏画成长图。</li>
         <li><b>补录 <span class="who k">官方机器人</span></b>小号掉线漏记了几句？把那段聊天记录合并转发到自己的个人群，回复它发 <code>补录 R12</code>，官方机器人会把缺的按顺序补进复盘。</li>
       </ol>
@@ -1021,7 +1050,7 @@ html{overflow-x:clip}
       <form id="appf" class="form glass" autocomplete="off">
         <div class="row"><label for="team">团的名字 <small>也是 App 的名字</small></label><input id="team" type="text" maxlength="12" required placeholder="例如：长日将尽"></div>
         <div class="row"><label for="host">你的服务器地址 <small>设置平台所在的服务器，网址或 IP 都可以</small></label><input id="host" type="text" required placeholder="例如：https://phone.example.com 或 http://1.2.3.4:5091"></div>
-        <div class="row"><label for="color">主题色</label><div class="colorrow"><input id="color" type="color" value="#7a6fe0"><span id="cv">#7a6fe0</span><span class="swatch" id="sw"></span></div></div>
+        <div class="row"><label for="color">主题色</label><div class="colorrow"><input id="color" type="color" value="#b8892a"><span id="cv">#b8892a</span><span class="swatch" id="sw"></span></div></div>
         <div class="row"><label for="icon">图标 <small>说明一下想要什么，或者说明你会把图片文件一起发来</small></label><textarea id="icon" rows="3" placeholder="例如：深蓝底，中间一个白色的月亮；图片我会另外发给你"></textarea></div>
         <div class="row"><label for="qq">你的 QQ 号 <small>方便我们联系你</small></label><input id="qq" type="text" inputmode="numeric" required></div>
         <button class="btn pri" type="submit">生成申请信息 <span aria-hidden="true">→</span></button>
@@ -1059,7 +1088,7 @@ html{overflow-x:clip}
 var G = [
  ["start","入门与群","在任意群里","绑定角色、绑定群、认管理员和设置群用途。"],
  ["social","短信与礼物","在自己的个人群里发","每天的次数、冷却在后台「功能与设置」调。"],
- ["date","约会与时间线","私约 / 电话 / 踩点 / 官约","发起后从备用群池领房间，聊完结束，自动写进时间线。"],
+ ["date","约会与时间线","约会 / 电话 / 踩点 / 官约","发起后从备用群池领房间，聊完结束，自动写进时间线。"],
  ["love","心动信与关系线","夜间派送 · 关系细节",""],
  ["season","季度与出场","主持人主导","季度推进、游戏天数、出场顺序、NPC。"],
  ["ext","扩展玩法","在后台按需开启","论坛、心愿、前置电话、物品商城、晚餐、抽取池等。"],
@@ -1070,10 +1099,7 @@ var C = [
  ["创建新角色","","创建新角色 名字","在当前群创建角色，这个群成为你的个人群。","p","start"],
  ["我的角色","我的群","我的角色","看自己的角色和绑了哪些群。","p","start"],
  ["认群","","认群 6位认群码","用认群码把当前群绑给你的角色。","p","start"],
- ["备用群码","","备用群码","生成备用群认群码（10 分钟有效）。","p","start"],
- ["绑定备用群","","绑定备用群 码","在新群里绑成备用群；个人群发不出去时自动改投。","p","start"],
- ["主群码 / 换主群","","主群码 → 换主群 码","把个人群换到一个新群。","p","start"],
- ["解绑备用群","","解绑备用群 序号","序号看「我的群」。","p","start"],
+ ["换绑码","","换绑码 → 在新群发 认群 码","把个人群换到一个新群（码 10 分钟有效）。","p","start"],
  ["手机码","","手机码","拿网页小手机的链接和激活码。","p","start"],
  ["绑定qq","绑定QQ、绑QQ","绑定qq 你的QQ号","让监听号认出你，房间戏文才能记到你名下。","p","start"],
  ["拉黑","","拉黑 角色名 [静默]","不再收到对方的短信。","p","start"],
@@ -1083,22 +1109,20 @@ var C = [
  ["设为公告群","取消公告群","设为公告群","全员大群：论坛、播报发这里。","a","start"],
  ["设为后台群","设后台群、取消后台群","设为后台群","主持人内部群，接收系统提醒。","a","start"],
  ["设为水群","设水群、取消水群","设为水群","闲聊群。","a","start"],
- ["查看未认群","","查看未认群","机器人在、但还没绑给任何人的群。","a","start"],
  // social
  ["短信","【短信】","短信 收信人 内容","发一条短信到对方的个人群，可带一张图。","p","social"],
  ["送礼","【送礼】","送礼 对象 礼物 [留言]","送一份礼物；礼品店里的可以直接写编号。","p","social"],
  ["撤回","","撤回","撤回 2 分钟内最近一条短信 / 礼物，次数返还。","p","social"],
  ["格式","格式短信、格式送礼、格式撤回","格式短信","拿可复制的写法模板。","p","social"],
- ["寄信","","寄信 收件人 内容","寄一封信；开了混乱寄信时会出岔子。","p","social"],
  ["我的图鉴","图鉴、我的礼物","我的图鉴","收到过的所有礼物。","p","social"],
  ["礼品店","","礼品店","看礼物编号。","p","social"],
  ["我的数量","","我的数量","今天还能发几条。","p","social"],
  ["我的待回","","我的待回","还没处理的消息和邀请。","p","social"],
  // date
- ["私约","","私约 1400-1500 咖啡厅 小满/阿川","发起私约，多人用 / 隔开。","p","date"],
+ ["约会","","约会 1400-1500 咖啡厅 小满/阿川","发起约会，多人用 / 隔开。","p","date"],
  ["电话","","电话 2100-2200 小满","发起电话，不能中途加入。","p","date"],
  ["踩点","","踩点 1400-1500 大图书馆","一个人去某个地点。","p","date"],
- ["结束私约","结束电话、结束官约、结束踩点、结束心愿、结束约会","结束私约 [R12]","在房间里发结束；不在房间就带上房间号。","p","date"],
+ ["结束约会","结束电话、结束官约、结束踩点、结束心愿、结束约会","结束约会 [R12]","在房间里发结束；不在房间就带上房间号。","p","date"],
  ["申请加入","","申请加入 小满 14:00","申请加入对方正在进行的约会。","p","date"],
  ["同意加入 / 拒绝加入","加入请求","同意加入 编号","处理别人的加入申请。","p","date"],
  ["复盘","","复盘 R12","把房间戏文画成长图。","p","date"],
@@ -1110,7 +1134,7 @@ var C = [
  ["发起官电","","发起官电 D2 2000-2100 小满/阿林","节目组安排的电话。","a","date"],
  ["计划官约 / 执行官约","","计划官约 D2 1400-1500 后山 小满/阿林","先攒着，执行时一起发起；「计划官约 清空」重来。","a","date"],
  ["取消官约","取消房间","取消官约 R12","当作没发生过。","a","date"],
- ["强结私约","强结","强结私约 R12","强制结束卡住的房间。","a","date"],
+ ["强结约会","强结","强结约会 R12","强制结束卡住的房间。","a","date"],
  ["删除时间线","","删除时间线 角色名 R12","连同复盘一起删掉一场。","a","date"],
  ["设为备用群池","设为群池、取消备用群池、取消群池、查看备用群池、查看群池","设为备用群池","把当前空群加进备用群池。","a","date"],
  // love
@@ -1199,7 +1223,7 @@ var DICE = {coc:["ra","rah","rb / rp","sc","en","ti / li","coc","rav"],dnd:["dnd
 
 var FEATS = [
  ["短信与礼物","在个人群里发一句，自动送达对方，可带图，2 分钟内可撤回。",["短信","送礼","撤回"],'<path d="M4 6h16v10H8l-4 4z"/>'],
- ["约会房间","私约、电话、踩点，从备用群池自动领房间，人到齐就开始。",["私约","电话","结束私约"],'<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>'],
+ ["约会房间","约会、电话、踩点，从备用群池自动领房间，人到齐就开始。",["约会","电话","结束约会"],'<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>'],
  ["心动信","白天投递，夜里统一派送，署名与否由你决定。",["发送心动信","撤回心动信"],'<path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/>'],
  ["关系线","每一段关系的细节都有据可查，可同步给对方。",["拉线","查看关系线"],'<circle cx="6" cy="12" r="3"/><circle cx="18" cy="12" r="3"/><path d="M9 12h6"/>'],
  ["季度与出场","预订档期、自动推进天数、抽出场顺序、一键收尾。",["季度状态","抽取出场顺序"],'<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>'],
@@ -1209,8 +1233,8 @@ var FEATS = [
 var DEMO = [
  ["me","短信 小满 今晚的月色很好"],
  ["bot","✅ 已送达「小满」。今天还能发 4 条。"],
- ["me","私约 1400-1500 咖啡厅 小满"],
- ["bot","📌 私约已发起，房间号 R12\n14:00–15:00 · 咖啡厅\n等「小满」进群就开始。"],
+ ["me","约会 1400-1500 咖啡厅 小满"],
+ ["bot","📌 约会已发起，房间号 R12\n14:00–15:00 · 咖啡厅\n等「小满」进群就开始。"],
  ["me","发送心动信\n【发送对象】小满\n【内容】谢谢你借我的伞。"],
  ["bot","💌 已投进信箱，今晚 22:00 统一送达。"]
 ];

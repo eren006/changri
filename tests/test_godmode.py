@@ -34,28 +34,28 @@ class GodModeTest(unittest.TestCase):
         set_config("game_day", "")
 
     def test_perm_blocks_creator_and_invitee(self):
-        godmode.set_perm(self.a, "私约", False)
-        ok, info, _ = rooms.create("私约", self.a, [self.b], "1400-1500", "花园")
+        godmode.set_perm(self.a, "约会", False)
+        ok, info, _ = rooms.create("约会", self.a, [self.b], "1400-1500", "花园")
         self.assertFalse(ok)
-        self.assertIn("私约", info)
-        ok, info, _ = rooms.create("私约", self.b, [self.a], "1400-1500", "花园")        # 不能被邀请
+        self.assertIn("约会", info)
+        ok, info, _ = rooms.create("约会", self.b, [self.a], "1400-1500", "花园")        # 不能被邀请
         self.assertFalse(ok)
         self.assertIn("「甲」", info)
         ok, _, _ = rooms.create("电话", self.b, [self.a], "1400-1500")                  # 别的功能照常
         self.assertTrue(ok)
-        godmode.set_perm(self.a, "私约", True)
-        self.assertEqual(godmode.check(self.a, "私约"), "")
+        godmode.set_perm(self.a, "约会", True)
+        self.assertEqual(godmode.check(self.a, "约会"), "")
 
     def test_time_lock(self):
         ok, _ = godmode.add_lock(self.a, 1, "1400-1500", "录像")
         self.assertTrue(ok)
         self.assertFalse(godmode.add_lock(self.a, 1, "乱写")[0])
-        ok, info, _ = rooms.create("私约", self.b, [self.a], "1430-1530", "花园")
+        ok, info, _ = rooms.create("约会", self.b, [self.a], "1430-1530", "花园")
         self.assertFalse(ok)
         self.assertIn("管理员锁定", info)
-        self.assertTrue(rooms.create("私约", self.b, [self.a], "1600-1700", "花园")[0])
+        self.assertTrue(rooms.create("约会", self.b, [self.a], "1600-1700", "花园")[0])
         godmode.remove_lock(godmode.locks()[0]["id"])
-        self.assertTrue(rooms.create("私约", self.c, [self.a], "1430-1530", "花园")[0])
+        self.assertTrue(rooms.create("约会", self.c, [self.a], "1430-1530", "花园")[0])
 
     def test_reset_today_counts(self):
         from changri.core import messaging
@@ -69,17 +69,17 @@ class GodModeTest(unittest.TestCase):
         self.assertEqual(godmode.today_counts(self.a)["sms"], 1)
 
     def test_global_off_and_global_lock(self):
-        godmode.set_global("私约", False)
-        ok, info, _ = rooms.create("私约", self.a, [self.b], "1400-1500", "花园")
+        godmode.set_global("约会", False)
+        ok, info, _ = rooms.create("约会", self.a, [self.b], "1400-1500", "花园")
         self.assertFalse(ok)
         self.assertIn("所有人", info)
-        godmode.set_global("私约", True)
+        godmode.set_global("约会", True)
         self.assertTrue(godmode.add_global_lock(None, "1400-1500", "停电")[0])
-        ok, info, _ = rooms.create("私约", self.a, [self.b], "1430-1530", "花园")
+        ok, info, _ = rooms.create("约会", self.a, [self.b], "1430-1530", "花园")
         self.assertFalse(ok)
         self.assertIn("管理员锁定", info)
         godmode.remove_global_lock(godmode.global_locks()[0]["id"])
-        self.assertTrue(rooms.create("私约", self.a, [self.b], "1430-1530", "花园")[0])
+        self.assertTrue(rooms.create("约会", self.a, [self.b], "1430-1530", "花园")[0])
 
     def test_forum_blocked_by_global_even_if_personal_on(self):
         from changri.core import forum

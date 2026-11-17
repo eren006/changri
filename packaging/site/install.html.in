@@ -7,17 +7,17 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#efe9e1;--ink:#1d1b22;--mute:#67626f;--faint:#9b95a2;--line:rgba(255,255,255,.75);--hair:rgba(40,30,60,.08);--glass:rgba(255,255,255,.42);--glass2:rgba(255,255,255,.62);--accent:#6a5fd6;--code:rgba(255,255,255,.55);--btn:#1b1a20;--btn-ink:#fff;
-  --shadow:0 1px 0 rgba(255,255,255,.9) inset,0 0 0 1px rgba(255,255,255,.55) inset,0 24px 50px -24px rgba(70,55,120,.28),0 4px 14px -6px rgba(70,55,120,.12);
-  --pearl:radial-gradient(circle at 32% 28%,#fff 0,#cfc9fa 14%,#8f86e8 55%,#5a4fc0);--glow:radial-gradient(40% 35% at 18% 22%,rgba(167,159,240,.38),transparent 70%),radial-gradient(35% 30% at 85% 15%,rgba(255,255,255,.9),transparent 70%),radial-gradient(45% 40% at 75% 80%,rgba(143,134,232,.25),transparent 70%)}
-@media (prefers-color-scheme:dark){:root{--bg:#141219;--ink:#eeeaf4;--mute:#a7a0b4;--faint:#77708a;--line:rgba(255,255,255,.12);--hair:rgba(255,255,255,.07);--glass:rgba(40,36,54,.45);--glass2:rgba(52,47,70,.6);--accent:#b5adf6;--code:rgba(255,255,255,.07);--btn:#eeeaf4;--btn-ink:#141219;
-  --shadow:0 1px 0 rgba(255,255,255,.08) inset,0 30px 60px -28px rgba(0,0,0,.7);--glow:radial-gradient(40% 35% at 18% 22%,rgba(122,111,224,.28),transparent 70%),radial-gradient(45% 40% at 80% 75%,rgba(90,79,192,.22),transparent 70%)}}
+:root{--bg:#f5eedd;--ink:#231c0e;--mute:#6f6450;--faint:#9a8f78;--line:rgba(255,255,255,.75);--hair:rgba(35,28,14,.08);--glass:rgba(255,255,255,.42);--glass2:rgba(255,255,255,.62);--accent:#a87a1a;--code:rgba(255,255,255,.55);--btn:#231c0e;--btn-ink:#fff;
+  --shadow:0 1px 0 rgba(255,255,255,.9) inset,0 0 0 1px rgba(255,255,255,.55) inset,0 24px 50px -24px rgba(90,65,15,.28),0 4px 14px -6px rgba(90,65,15,.12);
+  --pearl:radial-gradient(circle at 32% 28%,#fff 0,#ecdba8 14%,#c9a043 55%,#8a6414);--glow:radial-gradient(40% 35% at 18% 22%,rgba(212,169,74,.38),transparent 70%),radial-gradient(35% 30% at 85% 15%,rgba(255,255,255,.9),transparent 70%),radial-gradient(45% 40% at 75% 80%,rgba(201,160,67,.25),transparent 70%)}
+@media (prefers-color-scheme:dark){:root{--bg:#15120b;--ink:#f3ecdc;--mute:#b3a78e;--faint:#8a7d63;--line:rgba(255,255,255,.12);--hair:rgba(255,255,255,.07);--glass:rgba(33,28,16,.45);--glass2:rgba(42,36,20,.6);--accent:#e6c46a;--code:rgba(255,255,255,.07);--btn:#f3ecdc;--btn-ink:#15120b;
+  --shadow:0 1px 0 rgba(255,255,255,.08) inset,0 30px 60px -28px rgba(0,0,0,.7);--glow:radial-gradient(40% 35% at 18% 22%,rgba(184,137,42,.28),transparent 70%),radial-gradient(45% 40% at 80% 75%,rgba(138,100,20,.22),transparent 70%)}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.8 "Inter",system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;-webkit-font-smoothing:antialiased}
 body::before{content:"";position:fixed;inset:-10%;z-index:-1;background:var(--glow);pointer-events:none}
 a{color:var(--accent)}
 .bar{max-width:800px;margin:12px auto 0;padding:0 16px}
-.bar div{display:flex;align-items:center;justify-content:space-between;height:54px;padding:0 10px 0 18px;border-radius:18px;background:var(--glass2);border:1px solid var(--line);box-shadow:var(--shadow);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px)}
+.bar div{display:flex;align-items:center;justify-content:space-between;height:54px;padding:0 10px 0 18px;border-radius:18px;background:var(--glass2);border:1px solid var(--line);box-shadow:var(--shadow);}
 .brand{display:flex;align-items:center;gap:9px;color:var(--ink);font-weight:700;font-size:17px;text-decoration:none}
 .brand i{width:22px;height:22px;border-radius:50%;background:var(--pearl)}
 .bar nav a{color:var(--mute);text-decoration:none;font-size:14px;padding:6px 12px;border-radius:999px}
@@ -25,14 +25,14 @@ a{color:var(--accent)}
 main{max-width:800px;margin:0 auto;padding:48px 16px 40px}
 h1{font-size:clamp(30px,5vw,40px);margin:0 0 6px;font-weight:700}
 .sub{color:var(--mute);margin:0 0 32px}
-section{background:var(--glass);border:1px solid var(--line);box-shadow:var(--shadow);backdrop-filter:blur(22px) saturate(1.5);-webkit-backdrop-filter:blur(22px) saturate(1.5);border-radius:24px;padding:22px 26px;margin:0 0 18px}
+section{background:var(--glass);border:1px solid var(--line);box-shadow:var(--shadow);border-radius:24px;padding:22px 26px;margin:0 0 18px}
 h2{font-size:18px;margin:0 0 12px;display:flex;align-items:center;gap:10px}
 h2::before{content:"";width:16px;height:16px;border-radius:50%;background:var(--pearl);flex:none}
 ol{padding-left:22px;margin:8px 0}
 li{margin:6px 0}
 code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13.5px}
 code{background:var(--code);border:1px solid var(--hair);padding:1px 6px;border-radius:6px}
-pre{background:#1b1a20;color:#eeeaf4;padding:13px 16px;border-radius:14px;overflow-x:auto;margin:10px 0;white-space:pre-wrap;word-break:break-all}
+pre{background:#231c0e;color:#f3ecdc;padding:13px 16px;border-radius:14px;overflow-x:auto;margin:10px 0;white-space:pre-wrap;word-break:break-all}
 .btn{display:inline-block;background:var(--btn);color:var(--btn-ink);text-decoration:none;padding:9px 18px;border-radius:999px;font-weight:600;font-size:14px;margin:4px 8px 4px 0}
 .note{color:var(--mute);font-size:14px}
 table{border-collapse:collapse;width:100%;font-size:14.5px}
@@ -42,6 +42,15 @@ td:first-child{white-space:nowrap;font-weight:600;width:7em}
 footer{max-width:800px;margin:0 auto;padding:8px 16px 40px;color:var(--faint);font-size:13px;text-align:center}
 footer a{color:inherit}
 @media (max-width:560px){td:first-child{white-space:normal}section{padding:18px}}
+
+/* ===== 金色主题：去掉毛玻璃模糊，卡片改近乎不透明；其余版式保持原样 ===== */
+:root,:root[data-theme="light"]{--glass:linear-gradient(140deg,rgba(255,251,240,.96),rgba(250,241,219,.92));--glass2:linear-gradient(140deg,rgba(255,252,244,.98),rgba(252,244,224,.95))}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--glass:linear-gradient(140deg,rgba(40,34,20,.96),rgba(30,25,14,.94));--glass2:linear-gradient(140deg,rgba(48,41,24,.97),rgba(36,30,17,.95))}}
+:root[data-theme="dark"]{--glass:linear-gradient(140deg,rgba(40,34,20,.96),rgba(30,25,14,.94));--glass2:linear-gradient(140deg,rgba(48,41,24,.97),rgba(36,30,17,.95))}
+*,*::before,*::after{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+.deco,.squig{filter:drop-shadow(0 10px 12px rgba(90,40,20,.28))!important}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .eyebrow{background:#2a2314!important;color:#e6c46a!important}}
+:root[data-theme="dark"] .eyebrow{background:#2a2314!important;color:#e6c46a!important}
 </style>
 </head>
 <body>
@@ -64,12 +73,12 @@ footer a{color:inherit}
 <p>登录服务器（腾讯云可以点「登录」打开网页终端），粘贴这一行，回车：</p>
 <pre>curl -fsSL @BASE@/get.sh | sudo sh</pre>
 <p class="note">会自动下载、校验、装到 /opt/changri-bot、设为开机自启并启动，最后打印设置平台的网址和首次设置验证码。装过老版本的会自动把数据搬过来。</p>
-<p>也可以手动下载：@LINUX_LINKS@</p>
+<p>也可以手动下载：@LINUX_LINKS@ <span class="muted">· 海外可用 <a href="https://github.com/eren006/changri/releases/tag/v@VERSION@" target="_blank" rel="noopener">GitHub Releases</a></span></p>
 </section>
 
 <section>
 <h2>Windows：解压就能用</h2>
-<p>@WINDOWS_LINK@</p>
+<p>@WINDOWS_LINK@ <span class="muted">· 海外可用 <a href="https://github.com/eren006/changri/releases/tag/v@VERSION@" target="_blank" rel="noopener">GitHub Releases</a></span></p>
 <ol>
 <li>解压前先<b>解除锁定</b>：右键下载的 zip →「属性」→ 勾选最下面的「解除锁定」→ 确定。不做这一步，双击启动时 Windows 会弹安全提示。</li>
 <li>解压到一个固定的位置，例如 <code>D:\changri-bot</code>。解压完压缩包就可以删了。</li>
@@ -77,6 +86,14 @@ footer a{color:inherit}
 <li>想开机自动运行：右键 <code>Install-Autostart.bat</code> →「以管理员身份运行」。</li>
 </ol>
 <p class="note">有的杀毒软件会对 .bat 弹提示：这些是普通文本脚本，可以用记事本打开看内容。</p>
+</section>
+
+<section>
+<h2>校验下载（可选）</h2>
+<p class="note">下载走的是镜像站。想确认文件没被改过，下载后算一下 sha256，和下面对一下：Windows 在 PowerShell 里运行 <code>certutil -hashfile 文件名 SHA256</code>，Linux / macOS 运行 <code>sha256sum 文件名</code>。用一条命令安装、或在设置平台里升级时，程序会自动校验，不用手动做。</p>
+<table>
+@SHA_TABLE@
+</table>
 </section>
 
 <section>

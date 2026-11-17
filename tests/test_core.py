@@ -39,42 +39,25 @@ class RoleTests(Base):
         self.assertEqual(roles.find_role_for_sender("B1", "OTHER", "M1")["name"], "甲")  # 跨群按人认
         self.assertIsNone(roles.find_role_for_sender("B1", "G1", "NOBODY"))
 
-    def test_player_codes_backup_and_main(self):
-        roles.create_role("甲", "B1", "G1", "M1")
-        rid = roles.get_role_by_name("甲")["id"]
-        code = roles.make_player_code(rid, "backup")
-        self.assertFalse(roles.consume_bind_code(code, "B1", "G2", "M1", "main")[0])   # 类型不符
-        self.assertTrue(roles.consume_bind_code(code, "B1", "G2", "M1", "backup")[0])
-        self.assertFalse(roles.consume_bind_code(code, "B1", "G3", "M1")[0])           # 码只能用一次
-        self.assertEqual([g["kind"] for g in roles.list_groups(rid)], ["main", "backup"])
-        code = roles.make_player_code(rid, "main")
-        self.assertTrue(roles.consume_bind_code(code, "B1", "G9", "M1", "main")[0])
-        self.assertEqual(roles.list_groups(rid)[0]["group_openid"], "G9")
-        self.assertEqual(roles.unbind_backup(rid, 1)[0], False)                  # 主群不能解绑
-        self.assertTrue(roles.unbind_backup(rid, 2)[0])
-
-    def test_backup_limit_and_taken_group(self):
-        set_config("max_backup_groups", "1")
+    def test_player_change_code(self):
         roles.create_role("甲", "B1", "G1", "M1"); roles.create_role("乙", "B1", "G2", "M2")
         rid = roles.get_role_by_name("甲")["id"]
-        c1 = roles.make_player_code(rid, "backup")
-        self.assertFalse(roles.consume_bind_code(c1, "B1", "G2", "M1")[0])             # G2 已属于乙
-        self.assertTrue(roles.consume_bind_code(c1, "B1", "G3", "M1")[0])
-        c2 = roles.make_player_code(rid, "backup")
-        self.assertFalse(roles.consume_bind_code(c2, "B1", "G4", "M1")[0])             # 到上限
-        set_config("max_backup_groups", "3")
+        code = roles.make_player_code(rid)
+        self.assertFalse(roles.consume_bind_code(code, "B1", "G2", "M1")[0])             # G2 已属于乙
+        self.assertTrue(roles.consume_bind_code(code, "B1", "G3", "M1")[0])              # 换绑：个人群换成 G3
+        groups = roles.list_groups(rid)
+        self.assertEqual([(g["kind"], g["group_openid"]) for g in groups], [("main", "G3")])
 
     def test_admin_slot_by_real_gid(self):
         roles.create_role("甲", "B1", "G1", "M1")
         rid = roles.get_role_by_name("甲")["id"]
-        self.assertFalse(roles.add_slot(rid, "abc", "backup")[0])
-        ok, code = roles.add_slot(rid, "987654321", "backup")
+        self.assertFalse(roles.add_slot(rid, "abc")[0])
+        ok, code = roles.add_slot(rid, "987654321")
         self.assertTrue(ok)
-        slot = roles.list_groups(rid)[1]
-        self.assertIsNone(slot["group_openid"]); self.assertEqual(slot["real_gid"], "987654321")
-        self.assertTrue(roles.consume_bind_code(code, "B1", "GB", "MX", "backup")[0])
-        slot = roles.list_groups(rid)[1]
-        self.assertEqual((slot["group_openid"], slot["real_gid"]), ("GB", "987654321"))
+        self.assertEqual(len(roles.list_groups(rid)), 1)
+        self.assertTrue(roles.consume_bind_code(code, "B1", "GB", "MX")[0])
+        g = roles.list_groups(rid)[0]
+        self.assertEqual((g["group_openid"], g["real_gid"]), ("GB", "987654321"))
 
 
 class MessagingTests(Base):
@@ -91,17 +74,7 @@ class MessagingTests(Base):
             self.sent.append((group, text))
         return send
 
-    def test_main_then_backup_fallback(self):
-        code = roles.make_player_code(self.b, "backup"); roles.consume_bind_code(code, "B1", "G2B", "M2")
-        mid = messaging.queue_message("sms", self.a, self.b, "", "你好")
-        self.assertTrue(run(messaging.deliver(mid, self.sender(fail={"G2"}))))   # 主群失败，备用群成功
-        self.assertEqual(self.sent[0][0], "G2B")
-        self.assertIn("甲", self.sent[0][1]); self.assertIn("你好", self.sent[0][1])
-        with get_conn() as c:
-            self.assertEqual(c.execute("SELECT status, delivered_group FROM messages").fetchone()[:], ("sent", "G2B"))
-
-    def test_unclaimed_slot_skipped_and_retry_then_fail(self):
-        roles.add_slot(self.b, "111111", "backup")                                # 未认群的群位，不能拿来发
+    def test_retry_then_fail(self):
         mid = messaging.queue_message("gift", self.a, self.b, "玫瑰", "给你")
         self.assertFalse(run(messaging.deliver(mid, self.sender(fail={"G2"}))))
         with get_conn() as c:

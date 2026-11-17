@@ -77,7 +77,7 @@ class SeasonTests(unittest.TestCase):
         season.start("", now="2026-11-15")
         key = season.day_key()
         line = season.day_summary_line()
-        self.assertIn("私约 0 场", line); self.assertIn("短信 0 条", line)
+        self.assertIn("约会 0 场", line); self.assertIn("短信 0 条", line)
         r, sent = self.run_tick("2026-11-16", "23:59")
         self.assertEqual(r, "advanced")
         self.assertIn("🌐 全员今天：", sent[-1][2])

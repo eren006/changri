@@ -513,7 +513,7 @@ async def _(event: MessageEvent, args=CommandArg()):
     if text and not text.isdigit():           # 「coc7 规则……」这类聊天不当指令
         await coc_cmd.finish()
     await _need_coc(coc_cmd, event)
-    await reply_long(coc_cmd, dice.coc_stats(text))
+    await reply_long(coc_cmd, dice.coc_stats(text), as_image=False)     # 制卡结果发文字，方便复制去录卡
 
 
 @dg_cmd.handle()
@@ -523,13 +523,13 @@ async def _(event: MessageEvent, args=CommandArg()):
         await dg_cmd.finish()
     if _rule(event) != "dg":
         await dg_cmd.finish("这是绿色三角洲的制卡指令，先 /切换规则 绿色三角洲。")
-    await reply_long(dg_cmd, dice.dg_stats(text))
+    await reply_long(dg_cmd, dice.dg_stats(text), as_image=False)
 
 
 @dnd_cmd.handle()
 async def _(event: MessageEvent, args=CommandArg()):
     await _need_dnd(dnd_cmd, event)
-    await reply_long(dnd_cmd, dice.dnd_stats(args.extract_plain_text()))
+    await reply_long(dnd_cmd, dice.dnd_stats(args.extract_plain_text()), as_image=False)
 
 
 @ri_cmd.handle()

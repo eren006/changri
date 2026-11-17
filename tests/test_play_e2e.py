@@ -1,4 +1,4 @@
-"""核心玩法：房间（私约/电话/官约/微信）、群池、时间线、待回、心愿、论坛，走真正的 NoneBot 事件分发。"""
+"""核心玩法：房间（约会/电话/官约/微信）、群池、时间线、待回、心愿、论坛，走真正的 NoneBot 事件分发。"""
 import asyncio
 import os
 import sys
@@ -140,18 +140,19 @@ class PlayE2E(unittest.TestCase):
     # ---------- 房间 ----------
     def test_private_appointment_flow(self):
         self.add_pool(1)
-        self.assertIn("用法", self.say("私约 1400-1500")[0])
-        self.assertIn("找不到角色", self.say("私约 1400-1500 咖啡厅 路人")[0])
-        self.assertIn("时间格式", self.say("私约 下午 咖啡厅 乙")[0])
-        self.assertIn("不能约自己", self.say("私约 1400-1500 咖啡厅 甲")[0])
-        out = self.say("私约 1400-1500 咖啡厅 乙")
+        self.assertIn("用法", self.say("约会 1400-1500")[0])
+        self.assertIn("用法", self.say("私约 1400-1500")[0])                     # 0.21 前叫私约，老叫法照样认
+        self.assertIn("找不到角色", self.say("约会 1400-1500 咖啡厅 路人")[0])
+        self.assertIn("时间格式", self.say("约会 下午 咖啡厅 乙")[0])
+        self.assertIn("不能约自己", self.say("约会 1400-1500 咖啡厅 甲")[0])
+        out = self.say("约会 1400-1500 咖啡厅 乙")
         self.assertTrue(any("已发起" in o and "R" in o and "1234560" in o for o in out))
-        self.assertTrue(any("[P1]" in o and "向你发起了私约" in o for o in out))          # 对方个人群收到通知
+        self.assertTrue(any("[P1]" in o and "向你发起了约会" in o for o in out))          # 对方个人群收到通知
         self.assertTrue(any("[POOL0]" in o and "参与者" in o for o in out))               # 房间群里发了说明
         # 时间撞了
-        self.assertIn("撞了", self.say("私约 1430-1530 花园 丙")[0])
+        self.assertIn("撞了", self.say("约会 1430-1530 花园 丙")[0])
         # 时间线
-        self.assertIn("14:00-15:00 私约 @咖啡厅 与 乙", self.say("时间线")[0])
+        self.assertIn("14:00-15:00 约会 @咖啡厅 与 乙", self.say("时间线")[0])
         self.assertIn("只有管理员", self.say("时间线 乙")[0])
         self.assertIn("乙 的时间线", self.say("时间线 乙", member="ADMIN", group="ADM")[0])
         self.assertIn("找不到角色", self.say("删除时间线 路人 R1", member="ADMIN", group="ADM")[0])
@@ -161,7 +162,7 @@ class PlayE2E(unittest.TestCase):
         self.say("大家好", member="M0", group="POOL0")
         self.assertNotIn("还没进群", self.say("我的待回")[0])
         # 结束
-        out = self.say("结束私约", member="M1", group="POOL0")
+        out = self.say("结束约会", member="M1", group="POOL0")
         self.assertTrue(any("已经结束" in o and "请退群" in o for o in out))
         self.assertFalse(any("[P0]" in o and "已结束" in o for o in out))                       # 正常结束不再往个人群发通知
         self.assertEqual(pool.counts()["cleaning"], 0)                                           # 结束后群直接放回池
@@ -213,7 +214,7 @@ class PlayE2E(unittest.TestCase):
             return members[gid]
         old, qqmanager.group_members = qqmanager.group_members, fake
         try:
-            out = self.say("私约 1400-1500 咖啡厅 乙")
+            out = self.say("约会 1400-1500 咖啡厅 乙")
             self.assertFalse(any("请申请入群" in o and "100001" in o for o in out), out)     # 有人的群不能分给房间
             self.assertTrue(any("备用群池暂时没有空闲的群" in o for o in out), out)            # 当没有空群：不排队
             self.assertEqual(pool.counts()["waiting"], 0)
@@ -222,18 +223,18 @@ class PlayE2E(unittest.TestCase):
             members["100001"] = set()                                    # 人退光了
             asyncio.run(play._sweep_cleaning())
             self.assertEqual(st(), "free")
-            out = self.say("私约 1400-1500 咖啡厅 乙")
+            out = self.say("约会 1400-1500 咖啡厅 乙")
             self.assertTrue(any("请申请入群" in o and "100001" in o for o in out), out)
         finally:
             qqmanager.group_members = old
 
     def test_listener_room_commands_in_qq_group(self):
-        """房间群没有卡拉：监听的 QQ 号听到「结束私约」「修改时间线」等，按绑定的 QQ 认人，由 QQ 号在群里回。"""
+        """房间群没有卡拉：监听的 QQ 号听到「结束约会」「修改时间线」等，按绑定的 QQ 认人，由 QQ 号在群里回。"""
         from changri.core import qqmanager, qqpool
         from changri.core.qqlink import GroupMsg
         from changri.plugins import play
         qqpool.add_rooms("B1", "100001", "A组")
-        out = self.say("私约 1400-1500 咖啡厅 乙")
+        out = self.say("约会 1400-1500 咖啡厅 乙")
         self.assertTrue(any("请申请入群" in o and "100001" in o for o in out))
         roles.bind_qq(roles.get_role_by_name("甲")["id"], "555555")
         said = []
@@ -247,11 +248,11 @@ class PlayE2E(unittest.TestCase):
         try:
             run = lambda text, uid: asyncio.new_event_loop().run_until_complete(play._listen_cmd("B1", GroupMsg("9", "100001", uid, "x", text, 1, "1")))   # noqa: E731
             self.assertFalse(run("你好", "555555"))                                  # 不是房间指令
-            self.assertTrue(run("结束私约", "999999"))                               # 没绑定：提示先绑定
+            self.assertTrue(run("结束约会", "999999"))                               # 没绑定：提示先绑定
             self.assertIn("绑定QQ", said[-1][1])
             self.assertTrue(run("修改时间线 D1 1600-1700", "555555"))
             self.assertIn("申请把时间线改成", said[-1][1])
-            self.assertTrue(run("结束私约", "555555"))
+            self.assertTrue(run("结束约会", "555555"))
         finally:
             qqmanager.room_say = orig
         self.assertTrue(any("已经结束，请退群" in t for _, t in said))
@@ -271,9 +272,9 @@ class PlayE2E(unittest.TestCase):
         set_config("phone_open_cap", "1")
         self.say("电话 1400-1500 乙")
         self.assertIn("还没结束", self.say("电话 1600-1700 丙")[0])
-        set_config("limit_私约", "1")
-        self.say("私约 1000-1100 咖啡厅 丙")
-        self.assertIn("次数用完", self.say("私约 1200-1300 咖啡厅 丙")[0])
+        set_config("limit_约会", "1")
+        self.say("约会 1000-1100 咖啡厅 丙")
+        self.assertIn("次数用完", self.say("约会 1200-1300 咖啡厅 丙")[0])
 
     def test_stakeout_solo_room(self):
         self.add_pool(1)
@@ -284,7 +285,7 @@ class PlayE2E(unittest.TestCase):
         self.assertTrue(any("踩点已发起" in o and "只有你一个人" in o and "1234560" in o for o in out))
         rid = rooms.open_rooms()[0]["id"]
         self.assertEqual([m["name"] for m in rooms.members(rid)], ["甲"])
-        self.assertIn("撞了", self.say("私约 1430-1530 咖啡厅 乙")[0])            # 踩点占时间线
+        self.assertIn("撞了", self.say("约会 1430-1530 咖啡厅 乙")[0])            # 踩点占时间线
         a, b = (roles.get_role_by_name(n)["id"] for n in ("甲", "乙"))
         self.assertIn("不能带别人", rooms.create("踩点", b, [a], "1600-1700", "花园")[1])
         self.assertIn("要写地点", rooms.create("踩点", b, [], "1600-1700", "")[1])
@@ -317,22 +318,22 @@ class PlayE2E(unittest.TestCase):
         self.add_pool(2)
         a, b, c = (roles.get_role_by_name(n)["id"] for n in ("甲", "乙", "丙"))
         blocks.block(b, a, False)
-        out = self.say("私约 1400-1500 咖啡厅 乙/丙")
-        self.assertTrue(any("私约已发起" in o for o in out), out)
+        out = self.say("约会 1400-1500 咖啡厅 乙/丙")
+        self.assertTrue(any("约会已发起" in o for o in out), out)
         self.assertTrue(any("乙 已拒绝你的联系" in o for o in out), out)
         room = rooms.get(1)
         self.assertEqual({m["role_id"] for m in rooms.members(1)}, {a, c})            # 乙没进房间
         blocks.block(c, a, True)
-        out = self.say("私约 1600-1700 咖啡厅 乙/丙")
+        out = self.say("约会 1600-1700 咖啡厅 乙/丙")
         self.assertTrue(any("邀约对象都不可用" in o for o in out), out)                  # 两个都拉黑了：失败，不建群
         self.assertEqual(len(rooms.open_rooms()), 1)
         with get_conn() as cn:                                                        # 刚拉黑的要满 2 小时才能解除，测试里直接删
             cn.execute("DELETE FROM blocks WHERE blocker_id=? AND blocked_id=?", (b, a))
-        out = self.say("私约 1600-1700 咖啡厅 乙/丙")
-        self.assertTrue(any("私约已发起" in o for o in out), out)
+        out = self.say("约会 1600-1700 咖啡厅 乙/丙")
+        self.assertTrue(any("约会已发起" in o for o in out), out)
         self.assertFalse(any("已拒绝" in o for o in out), out)                        # 丙静默拉黑：悄悄剔掉，不留痕迹
         self.assertEqual({m["role_id"] for m in rooms.members(2)}, {a, b})
-        self.assertIn("发起失败", self.say("私约 1800-1900 咖啡厅 丙")[0])              # 只邀丙一个人：单人邀约，直接失败
+        self.assertIn("发起失败", self.say("约会 1800-1900 咖啡厅 丙")[0])              # 只邀丙一个人：单人邀约，直接失败
 
     def test_block_wechat_and_join(self):
         from changri.core import blocks
@@ -386,7 +387,7 @@ class PlayE2E(unittest.TestCase):
 
     def test_change_timeline_needs_everyone(self):
         self.add_pool(1)
-        self.say("私约 1400-1500 咖啡厅 乙")
+        self.say("约会 1400-1500 咖啡厅 乙")
         rid = rooms.timeline(roles.get_role_by_name("甲")["id"])[0]["id"]
         self.assertIn("申请", self.say("修改时间线 D1 1600-1700", member="M0", group="POOL0")[0])
         self.assertIn("同意时间线", self.say("我的待回", member="M1", group="P1")[0])
@@ -400,7 +401,7 @@ class PlayE2E(unittest.TestCase):
 
     def test_not_playing_blocked(self):
         self.say("结束季度", member="ADMIN", group="ADM")
-        self.assertIn("不是进行中", self.say("私约 1400-1500 咖啡厅 乙")[0])
+        self.assertIn("不是进行中", self.say("约会 1400-1500 咖啡厅 乙")[0])
 
     # ---------- 群池 ----------
     def test_pool_admin_commands_and_conflict(self):
@@ -415,11 +416,15 @@ class PlayE2E(unittest.TestCase):
 
     def test_wipe_frees_pool(self):
         self.add_pool(1)
-        self.say("私约 1400-1500 咖啡厅 乙")
+        self.say("约会 1400-1500 咖啡厅 乙")
         self.assertEqual(pool.counts()["occupied"], 1)
         self.say("结束季度", member="ADMIN", group="ADM")
         self.say("收尾 确认", member="ADMIN", group="ADM")
         self.assertEqual(pool.counts()["free"], 1)
+        with get_conn() as c:                                                    # 新季度的 R 号从 1 重新开始
+            self.assertIsNone(c.execute("SELECT seq FROM sqlite_sequence WHERE name='rooms'").fetchone())
+            c.execute("INSERT INTO rooms(kind, created_ts) VALUES('约会', 0)")
+            self.assertEqual(c.execute("SELECT MAX(id) FROM rooms").fetchone()[0], 1)
 
     def test_expire(self):
         """到时间强制结群：默认关；打开后到点结束，文案是「结戏限时已到」；提前 4 小时 @ 参与者提醒收尾，只提醒一次。"""
@@ -427,7 +432,7 @@ class PlayE2E(unittest.TestCase):
         from changri.core import qqmanager, qqpool
         from changri.plugins import play
         qqpool.add_rooms("B1", "100001", "A组")
-        self.say("私约 1400-1500 咖啡厅 乙")
+        self.say("约会 1400-1500 咖啡厅 乙")
         roles.bind_qq(roles.get_role_by_name("甲")["id"], "555555")
         rid = rooms.open_rooms()[0]["id"]
         with get_conn() as c:
@@ -471,7 +476,7 @@ class PlayE2E(unittest.TestCase):
         from changri.phone.app import create_phone_app
         from changri.plugins import qqwatch
         qqpool.add_rooms("B1", "100001", "A组")
-        self.say("私约 1400-1500 咖啡厅 乙")
+        self.say("约会 1400-1500 咖啡厅 乙")
         rid = rooms.open_rooms()[0]["id"]
         set_config("phone_base_url", "http://9.9.9.9:5092")
         set_config("phone_net_last", json.dumps({"state": "ok"}))
@@ -523,75 +528,12 @@ class PlayE2E(unittest.TestCase):
         finally:
             qqwatch._notify, phoneserver.start = old_notify, old_start
 
-    def test_backfill_from_merged_forward(self):
-        """合并转发补录：回复转发发「补录 R号」，已有的跳过、缺的按原时间插回去；只有参与者能补；结束了的房间也能补；关掉后不处理。"""
-        import asyncio
-        from changri.core import qqmanager, qqpool, roomlog
-        from changri.core.qqlink import GroupMsg
-        from changri.plugins import play
-        qqpool.add_rooms("B1", "100001", "A组")
-        self.say("私约 1400-1500 咖啡厅 乙")
-        room = rooms.open_rooms()[0]
-        rid, t0 = room["id"], int(room["created_ts"])
-        roles.bind_qq(roles.get_role_by_name("甲")["id"], "555555")
-        roles.bind_qq(roles.get_role_by_name("乙")["id"], "666666")
-        with get_conn() as c:                                                        # QQ 号掉线前记下来的一句
-            c.execute("INSERT INTO room_lines(room_id, ts, qq, role_id, name, text, is_rp, chars, msg_id) VALUES(?,?,?,?,?,?,1,4,'')",
-                      (rid, t0 + 60, "555555", roles.get_role_by_name("甲")["id"], "甲", "甲：你来了啊"))
-        forward = [{"ts": t0 + 60, "qq": "555555", "nickname": "阿甲", "text": "甲：你来了啊"},       # 已经有：跳过
-                   {"ts": t0 + 120, "qq": "666666", "nickname": "阿乙", "text": "乙：路上堵车"},
-                   {"ts": t0 + 90, "qq": "555555", "nickname": "阿甲", "text": "甲 坐吧"},
-                   {"ts": t0 - 9999, "qq": "666666", "nickname": "阿乙", "text": "很久以前的别的戏"},   # 比房间还早：不算
-                   {"ts": t0 + 999999, "qq": "666666", "nickname": "阿乙", "text": "以后别的场次在这个群说的"}]
-        said, asked = [], []
-
-        async def fake_say(app, gid, text, ats):
-            said.append(text)
-            return ""
-
-        async def fake_read(app, gid, reply_id="", forward_id=""):
-            asked.append((reply_id, forward_id))
-            return list(forward), ""
-        old = qqmanager.room_say, qqmanager.read_forward
-        qqmanager.room_say, qqmanager.read_forward = fake_say, fake_read
-        run = lambda text, uid, **kw: asyncio.new_event_loop().run_until_complete(play._listen_backfill("B1", GroupMsg("9", "100001", uid, "x", text, 1, "7", **kw)))   # noqa: E731
-        try:
-            self.assertFalse(run("随便聊聊", "555555"))
-            self.assertTrue(run("补录 R" + str(rid), "999999", reply_id="42"))
-            self.assertIn("只有", said[-1])                                          # 不是参与者
-            self.assertTrue(run("补录", "666666"))                                   # 没回复、也没刚转发过
-            self.assertIn("先把聊天记录合并转发", said[-1])
-            self.assertTrue(run("", "666666", forward_ids=["F1"]))                  # 刚转发了一条（本身不进复盘）
-            self.assertTrue(run(f"补录 R{rid}", "666666"))
-            self.assertEqual(asked[-1], ("", "F1"))
-            self.assertIn("补进 2 条", said[-1])
-            self.assertIn("1 条跳过", said[-1])
-            texts = [ln["text"] for ln in roomlog.lines(rid)]
-            self.assertEqual(texts, ["甲：你来了啊", "甲 坐吧", "乙：路上堵车"])     # 按时间排好
-            lines = roomlog.lines(rid)
-            self.assertEqual(lines[2]["name"], "乙")                                  # 认出是参与者，记在角色名下
-            self.assertTrue(lines[2]["is_rp"])
-            self.assertTrue(run(f"补录 R{rid}", "555555", reply_id="42"))           # 再补一次：全部跳过
-            self.assertEqual(asked[-1], ("42", ""))
-            self.assertIn("补进 0 条", said[-1])
-            self.assertTrue(run(f"@阿乙 补录 R{rid}", "555555", reply_id="42"))     # QQ 里「回复」会自动在开头 @ 原发送人
-            self.assertIn("补录好了", said[-1])
-            asyncio.run(play._finish_room(rid, "ended", ""))
-            self.assertTrue(run(f"补录 R{rid}", "555555", reply_id="42"))           # 结束了也能补
-            self.assertIn("补录好了", said[-1])
-            self.assertNotIn("以后别的场次在这个群说的", [ln["text"] for ln in roomlog.lines(rid)])   # 房间结束后很久的：别的场次，不补
-            set_config("qq_backfill_enabled", "0")
-            self.assertTrue(run(f"补录 R{rid}", "555555", reply_id="42"))
-            self.assertIn("没有打开", said[-1])
-        finally:
-            qqmanager.room_say, qqmanager.read_forward = old
-
     def test_backfill_in_official_group_from_quoted_forward(self):
         """卡拉在的房间群：回复合并转发发「补录 R号」，QQ 把引用的记录作为文字带过来（日志里抓到的真实格式）。
         已有的跳过，缺的按顺序插在已有发言之间；戏文开头是参与者名字的记在角色名下。"""
         from changri.core import roomlog
         self.add_pool(1)
-        self.say("私约 1400-1500 咖啡厅 乙")
+        self.say("约会 1400-1500 咖啡厅 乙")
         room = rooms.open_rooms()[0]
         rid, grp = room["id"], pool.get(room["pool_id"])["group_openid"]
         jia = roles.get_role_by_name("甲")["id"]
@@ -617,10 +559,51 @@ class PlayE2E(unittest.TestCase):
         self.assertIn("补进 0 条", self.say(f"补录 R{rid}", group=grp, **extra)[0])      # 再补一次：全部跳过
         self.assertIn("没读到", self.say(f"补录 R{rid}", group=grp)[0])                   # 没回复转发
 
+    def test_official_bot_records_room_lines(self):
+        """卡拉在房间群里（大家开着「接收全部消息」）：群里的发言记进复盘，戏文按参与者名算字数；
+        指令被别的功能接走、不记；别的群不记；房间结束后不记。"""
+        from changri.core import roomlog
+        self.add_pool(1)
+        self.say("约会 1400-1500 咖啡厅 乙")
+        room = rooms.open_rooms()[0]
+        rid, grp = room["id"], pool.get(room["pool_id"])["group_openid"]
+        jia, yi = roles.get_role_by_name("甲")["id"], roles.get_role_by_name("乙")["id"]
+        self.say("甲：你来了啊", group=grp)
+        self.say("路上有点堵", member="M1", group=grp)
+        self.say("乙 坐吧，喝点什么", member="M1", group=grp)
+        self.say("随便聊聊")                                                      # 甲的个人群：不是房间群，不记
+        self.say("我的待回", group=grp)                                           # 指令：被指令接走，不记
+        self.say("乙：来了", member="M1", group=grp)
+        ls = roomlog.lines(rid)
+        self.assertEqual([ln["text"] for ln in ls], ["甲：你来了啊", "路上有点堵", "乙 坐吧，喝点什么", "乙：来了"])
+        self.assertEqual([ln["role_id"] for ln in ls], [jia, yi, yi, yi])
+        self.assertEqual([(ln["is_rp"], ln["chars"]) for ln in ls], [(1, 4), (0, 0), (1, 7), (1, 2)])
+        self.assertTrue(ls[0]["qq"].startswith(roomlog.OFFICIAL))
+        self.assertIn("甲：你来了啊", roomlog.review_text(rid))
+        self.say("结束约会", group=grp)
+        self.assertEqual(len(roomlog.lines(rid)), 4)                              # 「结束约会」不进复盘
+        self.assertEqual({x["name"]: x["chars"] for x in roomlog.stats(rid) if x["rp"]}, {"甲": 4, "乙": 9})
+        self.say("甲：结束后再说的", group=grp)                                   # 房间结束了：不记
+        self.assertEqual(len(roomlog.lines(rid)), 4)
+
+    def test_backfill_from_personal_group_for_qq_only_room(self):
+        """补录只由卡拉做：小号的房间群卡拉不在，参与者在自己的群里回复合并转发发「补录 R号」就能补。"""
+        from changri.core import qqpool, roomlog
+        qqpool.add_rooms("B1", "100001", "A组")
+        self.say("约会 1400-1500 咖啡厅 乙")
+        rid = rooms.open_rooms()[0]["id"]
+        quoted = "--- 第1条 ---\n    [消息内容] 甲：你来了啊\n    [发送者] 阿甲\n--- 第2条 ---\n    [消息内容] 乙：路上堵车\n    [发送者] 阿乙\n"
+        extra = {"message_type": 103, "msg_elements": [{"content": quoted}]}
+        self.assertIn("只有", self.say(f"补录 R{rid}", member="M2", group="P2", **extra)[0])         # 丙不是参与者
+        self.assertIn("补进 2 条", self.say(f"补录 R{rid}", group="P0", **extra)[0])               # 甲在自己的群里补
+        self.assertEqual([ln["text"] for ln in roomlog.lines(rid)], ["甲：你来了啊", "乙：路上堵车"])
+        season.end()
+        self.assertIn("没有进行中的季度", self.say(f"补录 R{rid}", group="P0", **extra)[0])      # 只补进进行中的季度
+
     # ---------- 申请加入 ----------
     def test_join_flow(self):
         self.add_pool(1)
-        self.say("私约 1400-1500 咖啡厅 乙")
+        self.say("约会 1400-1500 咖啡厅 乙")
         self.assertIn("找不到角色", self.say("申请加入 路人", member="M2", group="P2")[0])
         self.assertIn("没有可以加入", self.say("申请加入 丙", member="M2", group="P2")[0])
         self.assertIn("你已经在这个房间", self.say("申请加入 甲", member="M1", group="P1")[0])
@@ -640,11 +623,11 @@ class PlayE2E(unittest.TestCase):
     def test_join_conflict_and_reject(self):
         self.add_pool(4)
         roles.create_role("丁", "B1", "P3", "M3")
-        self.say("私约 1400-1500 咖啡厅 乙")
-        self.say("私约 1430-1530 花园 丁", member="M2", group="P2")        # 丙 14:30-15:30 已有安排
+        self.say("约会 1400-1500 咖啡厅 乙")
+        self.say("约会 1430-1530 花园 丁", member="M2", group="P2")        # 丙 14:30-15:30 已有安排
         out = self.say("申请加入 甲", member="M2", group="P2")
         self.assertIn("已经有安排", out[0])
-        self.say("私约 1000-1100 花园 乙", member="M0", group="P0")
+        self.say("约会 1000-1100 花园 乙", member="M0", group="P0")
         self.assertTrue(any("申请已发出" in o for o in self.say("申请加入 乙 10:00", member="M2", group="P2")))
         qid = rooms.pending_requests(roles.get_role_by_name("乙")["id"])[0]["id"]
         out = self.say(f"拒绝加入 {qid}", member="M1", group="P1")
@@ -666,11 +649,11 @@ class PlayE2E(unittest.TestCase):
         self.assertIn("已清空", self.say("计划官约 清空", member="ADMIN", group="ADM")[0])
 
     def test_my_count(self):
-        set_config("limit_私约", "3")
+        set_config("limit_约会", "3")
         self.add_pool(1)
-        self.say("私约 1400-1500 咖啡厅 乙")
+        self.say("约会 1400-1500 咖啡厅 乙")
         out = self.say("我的数量")[0]
-        self.assertIn("私约 1/3", out); self.assertIn("电话 0（不限）", out)
+        self.assertIn("约会 1/3", out); self.assertIn("电话 0（不限）", out)
 
     def test_forum_delete(self):
         from changri.core import forum

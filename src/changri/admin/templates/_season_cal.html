@@ -1,0 +1,54 @@
+{# 季度月历。传入：cal（season.month_grid）、cal_base（翻月用的页面地址）、cal_pick（True=可以点两下日期填预订表单）、cal_line（一句话） #}
+<style>
+.scal .sc-head{display:flex;align-items:center;gap:10px;margin:0 0 8px}
+.scal .sc-head b{font-size:16px;flex:1}
+.scal .sc-head a{padding:4px 10px;border:1px solid var(--line);border-radius:8px;text-decoration:none;color:inherit;font-size:14px}
+.scal .sc-line{color:var(--mute);font-size:13px;margin:0 0 10px}
+.scal table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:12px}
+.scal th{padding:4px 0;text-align:center;font-weight:500;color:var(--mute);border:0}
+.scal td{height:76px;padding:3px;vertical-align:top;border:1px solid var(--line);border-width:0 1px 1px 0;overflow:hidden}
+.scal td:first-child{border-left-width:1px}.scal tr:nth-of-type(2) td{border-top-width:1px}
+.scal td.off{background:var(--soft)} .scal td.off .dn{color:var(--mute)}
+.scal td.today .dn{background:var(--dusk);color:var(--dusk-ink);border-radius:999px;padding:0 6px}
+.scal td.picked{background:color-mix(in srgb,var(--dusk) 14%,transparent)}
+.scal.pick td.free{cursor:pointer}
+.scal .dn{display:inline-block;font-size:12px;margin-bottom:2px}
+.scal .bar{display:block;margin:0 -3px 2px;padding:1px 5px;min-height:17px;line-height:15px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-decoration:none;background:var(--dusk);color:var(--surface)}
+.scal .bar.running{background:var(--ok)} .scal .bar.ended{background:var(--mute)}
+.scal .bar.supp{background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.28) 0 4px,transparent 4px 8px)}
+.scal .bar.cont{color:transparent}
+.scal .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--mute)}
+.scal .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+@media (max-width:560px){.scal td{height:60px}.scal .bar{font-size:10px;padding:1px 3px}}
+</style>
+{% set sep = '&' if '?' in cal_base else '?' %}
+<div class="scal{{ ' pick' if cal_pick }}" id="scal">
+  <div class="sc-head"><a href="{{ cal_base }}{{ sep }}cal={{ cal.prev }}#scal" aria-label="上个月">‹</a><b>{{ cal.label }}</b>
+    <a href="{{ cal_base }}{{ sep }}cal={{ cal.this }}#scal">本月</a>
+    <a href="{{ cal_base }}{{ sep }}cal={{ cal.next }}#scal" aria-label="下个月">›</a></div>
+  {% if cal_line %}<p class="sc-line">{{ cal_line }}{% if cal_pick %}　·　点两下空白日期选档期，会填进「预订季度」{% endif %}</p>{% endif %}
+  <table>
+    <tr>{% for w in ['一','二','三','四','五','六','日'] %}<th>{{ w }}</th>{% endfor %}</tr>
+    {% for week in cal.weeks %}<tr>{% for d in week %}
+      <td data-date="{{ d.date }}" class="{{ 'off' if not d.in_month }} {{ 'today' if d.today }} {{ 'free' if not d['items'] }}"><span class="dn">{{ d.day }}</span>
+        {% for it in d['items'] %}<a class="bar {{ it.status }} {{ it.kind }} {{ '' if it.first else 'cont' }}" title="{{ it.name }}{{ '（补戏期）' if it.kind == 'supp' }}"
+          href="{{ url_for('season_view', season_id=it.id) if it.status == 'ended' else url_for('season_page') + '#booked' }}">{{ it.name }}{{ '·补' if it.kind == 'supp' and it.first }}</a>{% endfor %}</td>
+    {% endfor %}</tr>{% endfor %}
+  </table>
+  <div class="legend"><span><i style="background:var(--ok)"></i>进行中</span><span><i style="background:var(--dusk)"></i>已预订</span><span><i style="background:var(--mute)"></i>已结束</span><span>斜纹 = 补戏期</span></div>
+</div>
+{% if cal_pick %}<script>
+(function(){
+  var root=document.getElementById('scal'),a=null;
+  function paint(from,to){root.querySelectorAll('td[data-date]').forEach(function(td){var x=td.dataset.date;td.classList.toggle('picked',!!from&&x>=from&&x<=(to||from));});}
+  root.addEventListener('click',function(e){
+    var td=e.target.closest('td.free');if(!td)return;var d=td.dataset.date;
+    if(!a){a=d;paint(a);return;}
+    var s=a<d?a:d,t=a<d?d:a;a=null;paint(s,t);
+    var bs=document.getElementById('bs'),be=document.getElementById('be');if(!bs||!be)return;
+    bs.value=s;be.value=t;
+    var p=bs.closest('details');if(p)p.open=true;
+    (document.getElementById('bn')||bs).focus();
+  });
+})();
+</script>{% endif %}

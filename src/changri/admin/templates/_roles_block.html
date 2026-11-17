@@ -3,7 +3,7 @@
 <section>
   <h3>「{{ code_role }}」的认群码</h3>
   <div class="code">{{ code }}</div>
-  <p class="note">24 小时内有效，只能用一次。把对应的机器人拉进那个群，在群里发：{{ '换主群' if code_kind == 'main' else '绑定备用群' }} {{ code }}</p>
+  <p class="note">24 小时内有效，只能用一次。把对应的机器人拉进那个群，在群里发：认群 {{ code }}</p>
 </section>
 {% endif %}
 
@@ -15,18 +15,16 @@
   <div class="rowlist">
     {% for g in it.groups %}
     <div class="row">
-      <div class="nm"><span class="kind {{ 'ok' if g.kind == 'main' else '' }}">{{ '主群' if g.kind == 'main' else '备用群' }}</span>
+      <div class="nm"><span class="kind ok">个人群</span>
         <b class="tabular">{{ g.real_gid or '未填群号' }}</b>{% if g.bot_id %} <span class="muted tabular">机器人 {{ g.bot_id }}</span>{% endif %}</div>
       <div>{% if g.group_openid %}<span class="dot ok"></span>已认群{% else %}<span class="dot warn"></span>等待认群{% endif %}</div>
-      {% if g.kind == 'backup' %}<form method="post" action="{{ url_for('delete_slot', role_id=it.role.id, slot_id=g.id) }}" onsubmit="return confirm('移除这个备用群？')">{{ csrf() }}<button class="linkbtn">移除</button></form>{% endif %}
     </div>
     {% endfor %}
   </div>
-  <span class="btns"><details class="panel"><summary class="btn ghost">{{ ic.plus() }}登记群</summary>
+  <span class="btns"><details class="panel"><summary class="btn ghost">{{ ic.plus() }}换绑群号</summary>
     <form class="form" method="post" action="{{ url_for('add_slot', role_id=it.role.id) }}">{{ csrf() }}
       <div class="fields">
         <div><label for="g{{ it.role.id }}">群号</label><input id="g{{ it.role.id }}" type="text" name="real_gid" required pattern="\d{5,12}" inputmode="numeric"></div>
-        <div><label for="k{{ it.role.id }}">用途</label><select id="k{{ it.role.id }}" name="kind"><option value="backup">备用群</option><option value="main">换主群</option></select></div>
       </div>
       <div class="actions"><button class="btn" type="submit">生成认群码</button><button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
     </form></details></span>

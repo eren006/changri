@@ -159,7 +159,14 @@ class AdminTests(unittest.TestCase):
 
     def test_login_csrf_and_lockout(self):
         webusers.create_user("boss", "longenough1", "owner")
-        self.assertEqual(self.c.post("/login", data={"username": "boss", "password": "longenough1"}).status_code, 400)   # 没带 CSRF
+        r = self.c.post("/login", data={"username": "boss", "password": "longenough1"})          # 没带 CSRF：不登录，回登录页说清楚（以前是 400）
+        self.assertEqual(r.status_code, 302)
+        self.assertTrue(r.headers["Location"].endswith("/login"))
+        self.assertEqual(self.c.get("/roles").status_code, 302)                   # 没登进去
+        token(self.c)                                                             # 有了 cookie 以后，校验码过期的提示
+        html = self.c.post("/login", data={"username": "boss", "password": "longenough1", "_csrf": "过期的"}, follow_redirects=True).get_data(as_text=True)
+        self.assertIn("页面过期了", html)
+        self.assertIsNotNone(self.c.get_cookie("changri_admin"))                  # cookie 用专属名字，不和同一台服务器上的别的网站抢「session」
         self.assertIn("不对", self.c.post("/login", data={"username": "boss", "password": "bad", "_csrf": token(self.c)}, follow_redirects=True).get_data(as_text=True))
         self.assertEqual(self.login().status_code, 302)
         self.c.post("/logout", data={"_csrf": token(self.c, "/accounts")})

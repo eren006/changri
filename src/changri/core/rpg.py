@@ -27,9 +27,10 @@ def seed_defaults(force: bool = False) -> list[str]:
     """恋综里一直有的基础内容：HP（0–100）和金币。只在第一次自动补，之后你改、你删都算数；
     force=True（一键初始化）才会把缺的补回来，已有的不动。返回补了什么。"""
     from .db import get_config, set_config
+    from . import specials
+    made = [f"道具 {n}" for n in specials.ensure(force)]        # 特殊道具系统自带：老机器升级后也补一次
     if not force and get_config("rpg_seeded", "") == "1":
-        return []
-    made = []
+        return made
     with get_conn() as c:
         have_attr = {r["name"] for r in c.execute("SELECT name FROM rpg_attr_defs")}
         have_item = {r["code"] for r in c.execute("SELECT code FROM rpg_items")}

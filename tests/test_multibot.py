@@ -30,24 +30,21 @@ class MultiBotTests(unittest.TestCase):
         self.assertTrue(roles.create_role("乙", "B2", "G1", "M1")[0])              # 另一个机器人下撞了 openid 也互不影响
         self.assertEqual(roles.find_role_for_sender("B2", "G1", "M1")["name"], "乙")
 
-    def test_same_player_binds_group_of_second_bot(self):
+    def test_same_player_rebinds_to_group_of_second_bot(self):
         roles.create_role("甲", "B1", "G1", "M1")
         rid = roles.get_role_by_name("甲")["id"]
-        code = roles.make_player_code(rid, "backup")
-        self.assertTrue(roles.consume_bind_code(code, "B2", "H9", "N7", "backup")[0])   # 在第二个机器人的群里认群
+        code = roles.make_player_code(rid)
+        self.assertTrue(roles.consume_bind_code(code, "B2", "H9", "N7")[0])             # 在第二个机器人的群里换绑
         self.assertEqual(roles.find_role_for_sender("B2", "H9", "N7")["name"], "甲")    # 之后用第二个机器人也认得他
-        self.assertEqual([(g["bot_id"], g["group_openid"]) for g in roles.list_groups(rid)], [("B1", "G1"), ("B2", "H9")])
+        self.assertEqual([(g["bot_id"], g["group_openid"]) for g in roles.list_groups(rid)], [("B2", "H9")])
 
-    def test_delivery_uses_the_groups_own_bot_and_falls_over(self):
-        roles.create_role("甲", "B1", "G1", "M1"); roles.create_role("乙", "B1", "G2", "M2")
+    def test_delivery_uses_the_groups_own_bot(self):
+        roles.create_role("甲", "B1", "G1", "M1"); roles.create_role("乙", "B2", "H2", "N2")
         a, b = roles.get_role_by_name("甲")["id"], roles.get_role_by_name("乙")["id"]
-        roles.consume_bind_code(roles.make_player_code(b, "backup"), "B2", "H2", "N2", "backup")
         calls = []
 
         async def send(bot, group, text):
             calls.append((bot, group))
-            if bot == "B1":
-                raise RuntimeError("B1 离线")
 
         mid = messaging.queue_message("sms", a, b, "", "hi")
         loop = asyncio.new_event_loop()
@@ -55,7 +52,7 @@ class MultiBotTests(unittest.TestCase):
             self.assertTrue(loop.run_until_complete(messaging.deliver(mid, send)))
         finally:
             loop.close()
-        self.assertEqual(calls, [("B1", "G2"), ("B2", "H2")])                         # 先试主群所属的机器人，失败换备用群所属的机器人
+        self.assertEqual(calls, [("B2", "H2")])                                       # 用收件人个人群所属的机器人发
 
     def test_admin_per_bot_and_announce(self):
         code = admins.make_code()
@@ -117,8 +114,8 @@ class MigrationTests(unittest.TestCase):
             db.init_db(); db.init_db()                                              # 重复执行也安全
             conn = db.get_conn()
             rows = conn.execute("SELECT id, bot_id, group_openid FROM role_groups ORDER BY id").fetchall()
-            self.assertEqual([tuple(r) for r in rows], [(1, "B9", "G1"), (2, "B9", "G2"), (3, "", None)])   # 有群的归到第一个机器人，未认群的群位保持为空
-            self.assertEqual(conn.execute("SELECT COUNT(*) FROM bind_codes").fetchone()[0], 1)             # 重建表没有把认群码级联删掉
+            self.assertEqual([tuple(r) for r in rows], [(1, "B9", "G1"), (2, "B9", "G2")])   # 有群的归到第一个机器人；旧的备用群被 0006 清掉
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM bind_codes").fetchone()[0], 0)             # 备用群的认群码跟着清掉
             self.assertEqual(tuple(conn.execute("SELECT bot_id, member_openid, note FROM admins").fetchone()), ("B9", "MA", "站长"))
             self.assertEqual(conn.execute("SELECT COUNT(*) FROM roles").fetchone()[0], 2)
             self.assertEqual([tuple(r) for r in conn.execute("SELECT username, role, disabled FROM web_users ORDER BY id")], [("boss", "owner", 0), ("second", "admin", 0)])   # 最早的账号升为主账号

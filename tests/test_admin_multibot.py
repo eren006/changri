@@ -227,7 +227,7 @@ class AdminMultiBot(unittest.TestCase):
         r = self.c.get(base + "/rewards")
         self.assertEqual(r.status_code, 200)
         self.assertIn("结戏奖励", r.get_data(as_text=True))
-        self.c.post(f"{base}/rewards/save", data={"name": "认真演", "kinds": ["私约", "电话", "官约", "微信", "心愿"], "segs_min": "3", "fx_ref": ["a:力量"], "fx_n": ["2"], "fx_p": ["100"], "_csrf": self._csrf(f"{base}/rewards")})
+        self.c.post(f"{base}/rewards/save", data={"name": "认真演", "kinds": ["约会", "电话", "官约", "微信", "心愿"], "segs_min": "3", "fx_ref": ["a:力量"], "fx_n": ["2"], "fx_p": ["100"], "_csrf": self._csrf(f"{base}/rewards")})
         page = self.c.get(base + "/rewards").get_data(as_text=True)
         self.assertIn("认真演", page)
         self.assertIn("戏文段数 ≥ 3段", page)

@@ -39,6 +39,14 @@ def register(app, login_required):
         autoreply_core.set_enabled(rule_id, bool(request.form.get("on")))
         return redirect(url_for("autoreply_page"))
 
+    @app.post("/autoreply/all")
+    @login_required
+    def autoreply_all():
+        on = request.form.get("on") == "1"
+        n = autoreply_core.set_all_enabled(on)
+        flash((f"已全部打开（{n} 条）" if on else f"已全部关闭（{n} 条），规则都还在，随时可以再打开") if n else ("本来就都开着" if on else "本来就都关着"))
+        return redirect(url_for("autoreply_page"))
+
     @app.post("/autoreply/<int:rule_id>/move")
     @login_required
     def autoreply_move(rule_id):

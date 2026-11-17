@@ -46,13 +46,21 @@ class LongReplyTests(unittest.TestCase):
         self.assertEqual(m.sent, ["短短一句"])
 
     def test_long_goes_as_image(self):
-        m = self.Matcher(); self.run_(self.long.reply_long(m, "很长的内容。" * 30))
+        m = self.Matcher(); self.run_(self.long.reply_long(m, "很长的内容。" * 150))     # 900 字：一条发不完才发图
         self.assertTrue(m.sent and all(not isinstance(x, str) for x in m.sent))
+
+    def test_fits_one_message_goes_as_text(self):
+        m = self.Matcher(); self.run_(self.long.reply_long(m, "很长的内容。" * 30))      # 180 字：一条发得完，发文字
+        self.assertEqual(m.sent, ["很长的内容。" * 30])
+
+    def test_force_text(self):
+        m = self.Matcher(); self.run_(self.long.reply_long(m, "很长的内容。" * 150, as_image=False))
+        self.assertTrue(m.sent and all(isinstance(x, str) for x in m.sent))
 
     def test_render_failure_falls_back_to_text(self):
         m = self.Matcher()
         with mock.patch.object(self.long, "_render", side_effect=RuntimeError("no font")):
-            self.run_(self.long.reply_long(m, "很长的内容。" * 30))
+            self.run_(self.long.reply_long(m, "很长的内容。" * 150))
         self.assertTrue(m.sent and all(isinstance(x, str) for x in m.sent))
 
     def test_switch_off_means_text(self):

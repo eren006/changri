@@ -70,7 +70,7 @@ document.getElementById('find').addEventListener('input', function () {
 {{ tabs_nav() }}
 
 {% if tab == 'perm' %}
-<p class="note" style="margin-top:0">关着的功能，这个人就用不了。私约、电话、微信关了，既不能发起，也不能被别人邀请。点一下立刻生效。标着「全体已关」的，是在「全体」里对所有人关掉了：个人这里开着也用不了，要先在「全体」里打开。</p>
+<p class="note" style="margin-top:0">关着的功能，这个人就用不了。约会、电话、微信关了，既不能发起，也不能被别人邀请。点一下立刻生效。标着「全体已关」的，是在「全体」里对所有人关掉了：个人这里开着也用不了，要先在「全体」里打开。</p>
 <form method="post" action="{{ url_for('god_perm', role_id=role.id) }}" class="swgrid">{{ csrf() }}<input type="hidden" name="tab" value="perm">
   {% for k, label in god.FEATURES.items() %}
   <label class="check"><span class="sw"><input type="checkbox" name="on" value="{{ k }}" {{ 'checked' if k not in perms }} onchange="this.form.submit()"><i></i></span>{{ label }}{% if god.global_off(k) %}<span class="tag" title="全体关着时，这里开着也用不了">全体已关</span>{% endif %}</label>

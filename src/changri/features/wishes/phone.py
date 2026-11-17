@@ -46,7 +46,8 @@ def register(app, ctx):
                     publicfeed.record("wish", "📌 新心愿 " + line)
                 except Exception:  # noqa: BLE001
                     pass
-        flash(f"✅ 心愿 #{info} 已挂出，等人来摘。")
+        from changri.core import letters
+        flash(f"✅ 心愿 #{info} 已挂出，等人来摘。" + letters.paid_note(role["id"], "wish"))
         return redirect(url_for("wishes_page"))
 
     @app.post("/p/me/wishes/<int:wid>/withdraw")

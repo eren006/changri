@@ -1,5 +1,6 @@
-"""混乱寄信（额外）：寄出去的信会按概率出岔子——错字、丢失后半截、涂黑、句子乱序、落款写错、送错人、信被撕成两半。
-每种出岔子的概率（百分数）在设置里调，全是 0 就是普通寄信。"""
+"""混乱短信（额外）：发出去的短信会按概率出岔子——错字、丢失后半截、涂黑、句子乱序、落款写错、送错人、被撕成两半。
+每种出岔子的概率（百分数）在设置里调，全是 0 就是普通短信。接在 core/sendmsg.py 的短信发送里（群里和小手机共用）。
+（以前有单独的「寄信」指令，0.21 起并进了短信；表名 chaos_letters 沿用，只记出了岔子的短信。）"""
 import random
 import re
 import time
@@ -70,7 +71,7 @@ def pick_others(exclude: set[int], rng=random) -> int | None:
 
 
 def plain(me, to, content: str) -> dict:
-    """没开「混乱寄信」：信原样送到。"""
+    """没开「混乱短信」：原样送到。"""
     return {"shown": content, "sign": me["name"], "true_to": to["id"], "torn": None, "effects": []}
 
 
@@ -96,7 +97,7 @@ def compose(me, to, content: str, rng=random) -> dict:
         third = pick_others({me["id"], true_to}, rng)
         if third:
             torn = (third, shown[cut:])
-            shown = shown[:cut] + "……（后半页被撕走了）"
+            shown = shown[:cut] + "……（后半截被撕走了）"
             effects.append("撕成两半")
     return {"shown": shown, "sign": sign, "true_to": true_to, "torn": torn, "effects": effects}
 

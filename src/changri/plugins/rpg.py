@@ -94,7 +94,15 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     me = _me(bot, event)
     if not me:
         await buy.finish(NEED_ROLE)
-    parts = args.extract_plain_text().strip().rsplit(maxsplit=1)
+    raw = args.extract_plain_text().strip()
+    words = raw.split()
+    if words:                                            # 特殊道具：使用 道具名 目标 [参数]
+        from changri.core import specials
+        it = rpg.find_item(words[0])
+        if specials.is_special(it):
+            ok, text = specials.use(me, it, words[1:])
+            await use.finish(text if ok else "❌ " + text)
+    parts = raw.rsplit(maxsplit=1)
     has_count = len(parts) == 2 and parts[1].isdigit()
     count = int(parts[1]) if has_count else 1
     name = parts[0] if has_count else " ".join(parts)

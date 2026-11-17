@@ -4,6 +4,12 @@ from flask import flash, redirect, render_template, request, url_for
 from changri.core import loopbridge, rewards as rewards_core, rooms as rooms_core, rpg as rpg_core
 
 
+def _gacha_pools() -> list:
+    """「抽取池」扩展开着才能选「给抽取机会」。"""
+    from changri.core import extensions, gacha
+    return gacha.pools() if extensions.is_enabled("gacha") else []
+
+
 def register(app, login_required):
     def _reward_rows():
         f = request.form
@@ -20,7 +26,7 @@ def register(app, login_required):
         rooms_ = rewards_core.recent_rooms()
         sel = rid or (rooms_[0]["id"] if rooms_ else None)
         return render_template("rewards.html", rules=rewards_core.rules(), rewards=rewards_core, kinds=list(rooms_core.KINDS),
-                               items=[x for x in rpg_core.items()], attrs=rpg_core.attr_defs(), rooms=rooms_, sel=sel,
+                               items=[x for x in rpg_core.items()], attrs=rpg_core.attr_defs(), rooms=rooms_, sel=sel, gacha_pools=_gacha_pools(),
                                status=rewards_core.room_status(sel) if sel else [])
 
     @app.post("/rewards/save")

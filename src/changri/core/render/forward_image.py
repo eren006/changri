@@ -137,7 +137,7 @@ def _wrap(draw, text: str, font, maxw: int) -> list[str]:
 
 
 def _parse_event(lines_: list[str]):
-    """时间线里一个日程：「【D1 12:00-13:00】 / 私约 · 进行中 / 地点：家里 / 伙伴：周屿 / 当前进度：3v2」。认不出返回 None"""
+    """时间线里一个日程：「【D1 12:00-13:00】 / 约会 · 进行中 / 地点：家里 / 伙伴：周屿 / 当前进度：3v2」。认不出返回 None"""
     m = _EVENT_HEAD.match(lines_[0]) if lines_ else None
     if not m or len(lines_) < 2:
         return None

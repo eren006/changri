@@ -187,3 +187,40 @@ async def send_all(send: Send, send_image=None) -> tuple[int, int]:
         if send_image and PAUSE:
             await asyncio.sleep(PAUSE)
     return ok, bad
+
+
+# ---------- 后台下载海报 ----------
+
+def live_players() -> list[dict]:
+    """现在库里（本季还没收尾）有互动的玩家：[{id, name, data}]。"""
+    with get_conn() as c:
+        rows = c.execute("SELECT id, name FROM roles WHERE is_npc=0 ORDER BY id").fetchall()
+    out = []
+    for r in rows:
+        d = stats(r["id"])
+        if d:
+            out.append({"id": r["id"], "name": r["name"], "data": d})
+    return out
+
+
+def poster_bytes(data: dict, show_name: str, skin_id: str = "") -> bytes:
+    from .render import season_poster
+    season_poster.prefetch(skin_id or skin())
+    return season_poster.render(dict(data, show_name=show_name), skin_id or skin())
+
+
+def zip_posters(items: list[tuple[str, dict]], show_name: str, skin_id: str = "") -> bytes:
+    """items = [(文件名不带后缀, 海报数据)] → zip。画不出来的那张跳过，zip 里放一个说明。"""
+    import io
+    import zipfile
+    buf, bad = io.BytesIO(), []
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as z:          # JPEG 本来就压过，不再压
+        for name, data in items:
+            try:
+                z.writestr(f"{name}.jpg", poster_bytes(data, show_name, skin_id))
+            except Exception as e:  # noqa: BLE001
+                log.warning("海报画不出来（%s）：%s", name, e)
+                bad.append(name)
+        if bad:
+            z.writestr("没画出来的.txt", "\n".join(bad))
+    return buf.getvalue()

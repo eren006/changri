@@ -66,7 +66,7 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
     cur = trpg.get_mode(event.group_openid)
     if not text:
         await mode_cmd.finish(f"这个群现在是「{trpg.MODES[cur]}模式」。\n切换：/模式 跑团 或 /模式 恋综（需要机器人管理员）。\n"
-                              "跑团模式：用 /st 录角色卡属性，恋综的指令（短信、礼物、私约……）不响应。")
+                              "跑团模式：用 /st 录角色卡属性，恋综的指令（短信、礼物、约会……）不响应。")
     new = trpg.MODE_ALIASES.get(text)
     if new is None:
         await mode_cmd.finish("只有「跑团」和「恋综」两种。")

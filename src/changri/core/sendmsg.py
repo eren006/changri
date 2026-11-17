@@ -48,7 +48,12 @@ async def send(me, target, kind: str, gift: str, content: str, sign: str, send_f
     sign = sign if sign and sign != me["name"] else ""
     lim = messaging.daily_limit(kind)
     used = messaging.day_count(me["id"], kind)
-    mid = messaging.queue_message(kind, me["id"], target["id"], gift, content, sign)
+    chaos = _chaos(me, target, kind, content, sign)
+    to_id = target["id"]
+    if chaos:
+        content, to_id = chaos["shown"], chaos["true_to"]
+        sign = chaos["sign"] if chaos["sign"] != me["name"] else sign
+    mid = messaging.queue_message(kind, me["id"], to_id, gift, content, sign)
     for data in images:
         msgimages.save(mid, data)
     tail = f"（今天 {used + 1}/{lim}）" if lim > 0 else ""
@@ -60,5 +65,44 @@ async def send(me, target, kind: str, gift: str, content: str, sign: str, send_f
             return True, ok_text
         return False, f"❌ {target['name']} 已拒绝你的联络。"
     if await messaging.deliver(mid, send_fn):
+        if kind == "sms":                                     # 截信器（发件人身上）、回音壁（收件人身上）
+            from . import roles, specials
+            got = roles.get_role(to_id)
+            specials.on_sms(me["id"], to_id, sign or me["name"], (got["name"] if got else target["name"]), content)
+        if chaos:
+            await _chaos_after(me, target, chaos, sign, send_fn)
         return True, ok_text
     return True, f"「{target['name']}」那边暂时收不到，已记下，稍后会自动重试。"
+
+
+# ---------- 混乱短信（额外）：开着时短信可能出岔子 ----------
+
+def _chaos(me, target, kind: str, content: str, sign: str):
+    """开了「混乱短信」就按概率改这条短信；没出岔子（或没开、不是短信、只有图片）返回 None。"""
+    from . import chaosletter, extensions
+    if kind != "sms" or not content.strip() or not extensions.is_enabled("chaos_letter"):
+        return None
+    shown_from = dict(me) if not sign else {**dict(me), "name": sign}       # 自定义署名的，落款写错时换掉的是署名
+    c = chaosletter.compose(shown_from, target, content)
+    if not c["effects"]:
+        return None
+    chaosletter.log(me["id"], target["id"], c, content)
+    return c
+
+
+async def _chaos_after(me, target, c, sign: str, send_fn) -> None:
+    """撕成两半的后半截送到第三个人；按设置公开播报出了什么岔子。都是锦上添花，失败不影响短信本身。"""
+    import random
+
+    from . import announce
+    try:
+        if c["torn"]:
+            third, tail = c["torn"]
+            await messaging.push_to_role(third, f"📩 一条撕坏的短信飘到了你这里\n……{tail}\n落款：{c['sign'] or sign or me['name']}", send_fn)
+        if get_config("letter_public_send", "1") == "1" and random.random() * 100 < get_int("letter_public_chance", 50):
+            ann = announce.get_announce()
+            if ann:
+                await send_fn(ann[0], ann[1], f"📰 信号出了岔子：{sign or me['name']} 发给 {target['name']} 的短信，{'、'.join(c['effects'])}。")
+    except Exception as e:  # noqa: BLE001
+        import logging
+        logging.getLogger(__name__).warning("[混乱短信] 后续处理失败：%s", e)

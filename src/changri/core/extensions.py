@@ -23,7 +23,7 @@ USER_DIR = Path(os.environ.get("CHANGRI_EXT_DIR") or DATA_DIR / "extensions")   
 API_VERSION = 1
 
 # 核心：别的功能的地基，不能关
-CORE_MODULES = ["changri.plugins.ping", "changri.plugins.botsync", "changri.plugins.social", "changri.plugins.core_admin", "changri.plugins.season", "changri.plugins.play", "changri.plugins.autoreply", "changri.plugins.letter", "changri.plugins.trpg", "changri.plugins.trpglog", "changri.plugins.prefix", "changri.plugins.qqwatch"]  # 季度与游戏天数是地基：短信礼物、心动信的每日次数都按它算「今天」
+CORE_MODULES = ["changri.plugins.ping", "changri.plugins.botsync", "changri.plugins.social", "changri.plugins.core_admin", "changri.plugins.season", "changri.plugins.play", "changri.plugins.autoreply", "changri.plugins.trpg", "changri.plugins.trpglog", "changri.plugins.prefix", "changri.plugins.qqwatch"]  # 季度与游戏天数是地基：短信礼物、心动信的每日次数都按它算「今天」
 
 # 官方扩展：随包带的可选功能。settings_group = 设置页里属于它的那一组；nav = 左侧菜单里属于它的页面
 OFFICIAL = registry.official()        # 每个功能在 features/<功能>/__init__.py 里写 FEATURE 声明自己
@@ -479,7 +479,7 @@ def ai_prompt() -> str:
         "2. manifest.json 的 id 用小写字母、数字、下划线，字母开头。\n"
         "3. 只从 changri_api 导入，不要 import core / plugins / admin。\n"
         "4. 不能用 sys.exit / os._exit / time.sleep / requests；等待用 await asyncio.sleep，联网用 httpx 异步。\n"
-        "5. 指令名不要和主程序已有的重名（私约、电话、时间线、心愿、发帖、短信、送礼 等）。\n"
+        "5. 指令名不要和主程序已有的重名（约会、私约、电话、时间线、心愿、发帖、短信、送礼 等）。\n"
         "6. 每条指令都要有回复，出错时回一句人话。\n"
         "7. 凡是玩家/管理员可能想调的数字、开关、文字（次数上限、冷却、开关、回复内容……），不要写死在代码里：写进 manifest.json 的 settings，"
         "每项带 label（人话）、desc（一句说明，数字注明 0 代表什么）、default，数字可加 unit；代码里用 setting(EXT_ID, key) 读。\n"

@@ -30,8 +30,8 @@
     <form method="post" action="{{ url_for('appoint_new') }}" style="padding:12px 20px">
       <input type="hidden" name="_csrf" value="{{ csrf() }}">
       <label for="apKind">类型</label>
-      <select id="apKind" name="kind" onchange="document.getElementById('apPlaceBox').hidden=this.value!=='私约'">
-        <option>私约</option><option>电话</option></select>
+      <select id="apKind" name="kind" onchange="document.getElementById('apPlaceBox').hidden=this.value!=='约会'">
+        <option>约会</option><option>电话</option></select>
       <div><label for="apTime">时间（游戏里的几点，今天 D{{ today or '—' }}）</label><input id="apTime" name="time" placeholder="1400-1500"></div>
       <div id="apPlaceBox"><label for="apPlace">地点</label><input id="apPlace" name="place" maxlength="30" placeholder="可不填"></div>
       <div class="wish-label">对象（可多选）</div>

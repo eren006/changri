@@ -101,6 +101,12 @@ def delete_rule(rule_id: int) -> None:
         c.execute("DELETE FROM autoreplies WHERE id=?", (rule_id,))
 
 
+def set_all_enabled(on: bool) -> int:
+    """一键全关 / 全开。返回改了几条。"""
+    with get_conn() as c:
+        return c.execute("UPDATE autoreplies SET enabled=? WHERE enabled!=?", (1 if on else 0, 1 if on else 0)).rowcount
+
+
 def set_enabled(rule_id: int, on: bool) -> None:
     with get_conn() as c:
         c.execute("UPDATE autoreplies SET enabled=? WHERE id=?", (1 if on else 0, rule_id))

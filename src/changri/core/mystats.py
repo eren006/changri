@@ -22,14 +22,14 @@ def build(role_id: int) -> str:
             if to or fr:
                 sec.append(f"【{label}】" + (f"\n{in_t}\n{fr}" if fr else "") + (f"\n{out_t}\n{to}" if to else ""))
         mine = _top(c, "SELECT r.name, COUNT(*) AS n FROM rooms x JOIN room_members m ON m.room_id=x.id JOIN roles r ON r.id=m.role_id "
-                       "WHERE x.creator_id=? AND m.role_id!=? AND x.kind IN ('私约','电话') AND x.status!='cancelled' GROUP BY m.role_id ORDER BY n DESC, r.id LIMIT 3", (role_id, role_id))
+                       "WHERE x.creator_id=? AND m.role_id!=? AND x.kind IN ('约会','电话') AND x.status!='cancelled' GROUP BY m.role_id ORDER BY n DESC, r.id LIMIT 3", (role_id, role_id))
         theirs = _top(c, "SELECT r.name, COUNT(*) AS n FROM rooms x JOIN room_members m ON m.room_id=x.id JOIN roles r ON r.id=x.creator_id "
-                         "WHERE m.role_id=? AND x.creator_id!=? AND x.kind IN ('私约','电话') AND x.status!='cancelled' GROUP BY x.creator_id ORDER BY n DESC, r.id LIMIT 3", (role_id, role_id))
+                         "WHERE m.role_id=? AND x.creator_id!=? AND x.kind IN ('约会','电话') AND x.status!='cancelled' GROUP BY x.creator_id ORDER BY n DESC, r.id LIMIT 3", (role_id, role_id))
         # 心愿：发起人 = wishes.poster_id，摘走的人 = wishes.taker_id（只算已经被摘走的）
         took_mine = _top(c, "SELECT r.name, COUNT(*) AS n FROM wishes w JOIN roles r ON r.id=w.taker_id WHERE w.poster_id=? AND w.status='taken' GROUP BY w.taker_id ORDER BY n DESC, r.id LIMIT 3", (role_id,))
         i_took = _top(c, "SELECT r.name, COUNT(*) AS n FROM wishes w JOIN roles r ON r.id=w.poster_id WHERE w.taker_id=? AND w.status='taken' GROUP BY w.poster_id ORDER BY n DESC, r.id LIMIT 3", (role_id,))
         if mine or theirs:
-            sec.append("【约会】" + (f"\n📅 最喜欢约你（私约/电话）：\n{theirs}" if theirs else "") + (f"\n💌 你最喜欢约（私约/电话）：\n{mine}" if mine else ""))
+            sec.append("【约会】" + (f"\n📅 最喜欢约你（约会/电话）：\n{theirs}" if theirs else "") + (f"\n💌 你最喜欢约（约会/电话）：\n{mine}" if mine else ""))
     if took_mine or i_took:
         sec.append("【心愿】" + (f"\n🌠 最喜欢摘你心愿：\n{took_mine}" if took_mine else "") + (f"\n✨ 你最喜欢摘谁的心愿：\n{i_took}" if i_took else ""))
     arc = next((p for p in arclen.stats()["people"] if p["id"] == role_id), None)

@@ -104,7 +104,7 @@ class SeasonReportPosterTest(unittest.TestCase):
             for frm, to, kind, sign in ((self.a, self.b, "sms", ""), (self.a, self.b, "sms", ""), (self.a, self.c, "sms", ""),
                                         (self.b, self.a, "sms", "神秘人"), (self.c, self.a, "gift", "")):
                 c.execute("INSERT INTO messages(kind,from_role_id,to_role_id,created_ts,status,sign) VALUES(?,?,?,?, 'sent', ?)", (kind, frm, to, ts, sign))
-            c.execute("INSERT INTO rooms(id,kind,status,created_ts) VALUES(1,'私约','ended',?)", (ts,))
+            c.execute("INSERT INTO rooms(id,kind,status,created_ts) VALUES(1,'约会','ended',?)", (ts,))
             c.executemany("INSERT INTO room_members(room_id,role_id) VALUES(1,?)", [(self.a,), (self.b,)])
             for i, (rid, name, text) in enumerate(((self.a, "甲", "甲：雨停了。"), (self.b, "乙", "乙：嗯。"), (self.a, "甲", "（场外）等我一下"))):
                 c.execute("INSERT INTO room_lines(room_id,ts,role_id,name,text,is_rp,chars) VALUES(1,?,?,?,?,?,?)",

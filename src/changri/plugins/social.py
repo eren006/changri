@@ -66,35 +66,23 @@ async def _(event: GroupMessageCreateEvent):
         await my_role.finish("你还没有角色。在你的个人群里发「创建新角色 名字」。")
     lines = [f"角色：{role['name']}"]
     for i, g in enumerate(roles.list_groups(role["id"]), 1):
-        kind = "主群" if g["kind"] == "main" else "备用群"
+        kind = "个人群"
         tag = f"群号 {g['real_gid']}" if g["real_gid"] else "未登记群号"
         state = "" if g["group_openid"] else "（还没认群）"
         lines.append(f"{i}. {kind} · {tag}{state}")
     await my_role.finish("\n".join(lines))
 
 
-backup_code = _cmd("备用群码")
+change_code = _cmd("换绑码")
 
 
-@backup_code.handle()
+@change_code.handle()
 async def _(event: GroupMessageCreateEvent):
     role = _sender_role(event)
     if not role:
-        await backup_code.finish("你还没有角色。")
-    code = roles.make_player_code(role["id"], "backup")
-    await backup_code.finish(f"备用群认群码：{code}（10 分钟内有效）\n把机器人拉进备用群，在那个群里发「绑定备用群 {code}」。")
-
-
-main_code = _cmd("主群码")
-
-
-@main_code.handle()
-async def _(event: GroupMessageCreateEvent):
-    role = _sender_role(event)
-    if not role:
-        await main_code.finish("你还没有角色。")
-    code = roles.make_player_code(role["id"], "main")
-    await main_code.finish(f"换个人群的认群码：{code}（10 分钟内有效）\n在新群里发「换主群 {code}」，原来的个人群会被替换。")
+        await change_code.finish("你还没有角色。")
+    code = roles.make_player_code(role["id"])
+    await change_code.finish(f"换绑码：{code}（10 分钟内有效）\n把机器人拉进新群，在新群里发「认群 {code}」，原来的个人群会被换掉。")
 
 
 claim = _cmd("认群")
@@ -107,34 +95,6 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
         await claim.finish("用法：认群 6位认群码")
     _, msg = roles.consume_bind_code(code, _bid(), event.group_openid, _sender(event))
     await claim.finish(msg)
-
-
-def _kind_claim(name: str, kind: str, usage: str):
-    cmd = _cmd(name)
-
-    @cmd.handle()
-    async def _(event: GroupMessageCreateEvent, args=CommandArg()):
-        code = args.extract_plain_text().strip()
-        if not code.isdigit() or len(code) != 6:
-            await cmd.finish(usage)
-        _, msg = roles.consume_bind_code(code, _bid(), event.group_openid, _sender(event), kind)
-        await cmd.finish(msg)
-
-
-_kind_claim("绑定备用群", "backup", "用法：绑定备用群 6位认群码\n码在你已绑定的群里发「备用群码」生成，或由管理员在后台登记群号后给你。")
-_kind_claim("换主群", "main", "用法：换主群 6位认群码\n码在你已绑定的群里发「主群码」生成。")
-
-unbind = _cmd("解绑备用群")
-
-
-@unbind.handle()
-async def _(event: GroupMessageCreateEvent, args=CommandArg()):
-    role = _sender_role(event)
-    text = args.extract_plain_text().strip()
-    if not role or not text.isdigit():
-        await unbind.finish("用法：解绑备用群 序号（序号看「我的群」）")
-    _, msg = roles.unbind_backup(role["id"], int(text))
-    await unbind.finish(msg)
 
 
 # ---------- 短信 / 礼物 ----------
@@ -248,7 +208,7 @@ DEFAULT_WELCOME = (
     "你好，我是{brand}的机器人。\n"
     "· 还没有角色：发「创建新角色 名字」，这个群就成为你的个人群\n"
     "· 管理员或你自己生成了认群码：发「认群 6位码」，把这个群绑给你的角色\n"
-    "· 想绑备用群：在已绑好的群里发「备用群码」，到新群发「绑定备用群 码」\n"
+    "· 想换个人群：在已绑好的群里发「换绑码」，到新群发「认群 码」\n"
     "· 发「我的群」可以看自己绑了哪些群；发「格式短信」「格式送礼」拿写法模板"
 )
 
@@ -260,23 +220,6 @@ async def _(bot: Bot, event: GroupAddRobotEvent):
         await bot.send_to_group(group_openid=event.group_openid, message=text)
     except Exception as e:  # noqa: BLE001
         logger.warning(f"[欢迎] 发欢迎语失败：{e}")
-
-
-unclaimed = _cmd("查看未认群")
-
-
-@unclaimed.handle()
-async def _(event: GroupMessageCreateEvent):
-    if not admins.is_admin(_bid(), _sender(event)):
-        await unclaimed.finish("❌ 权限不足，仅管理员可用。")
-    with get_conn() as conn:
-        rows = conn.execute(
-            "SELECT r.name, g.kind, g.real_gid FROM role_groups g JOIN roles r ON r.id=g.role_id WHERE g.group_openid IS NULL ORDER BY r.id").fetchall()
-        n_roles = conn.execute("SELECT COUNT(*) FROM roles").fetchone()[0]
-    if not rows:
-        await unclaimed.finish(f"所有群位都已认群（共 {n_roles} 个角色）。")
-    lines = [f"{r['name']}（{'主群' if r['kind'] == 'main' else '备用群'}，登记群号 {r['real_gid'] or '未填'}）" for r in rows]
-    await reply_long(unclaimed, f"还没认群的群位（{len(rows)} 个）：\n" + "\n".join(lines) + "\n\n在设置平台「角色与群」给对应角色生成认群码，发给 TA 在新群里「认群 码」。")
 
 
 # ---------- 重试 ----------

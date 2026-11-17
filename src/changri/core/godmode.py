@@ -10,8 +10,8 @@ from . import rooms, season, storycal
 from .db import get_config, get_conn, set_config
 
 # 功能 → 给玩家看的名字。官约是管理员发起的，不在里面
-FEATURES = {"sms": "短信", "gift": "礼物", "私约": "私约", "电话": "电话", "微信": "微信", "lovemail": "心动信", "wish": "心愿", "forum": "论坛"}
-ROOM_KINDS = ("私约", "电话", "微信")
+FEATURES = {"sms": "短信", "gift": "礼物", "约会": "约会", "电话": "电话", "微信": "微信", "lovemail": "心动信", "wish": "心愿", "forum": "论坛"}
+ROOM_KINDS = ("约会", "电话", "微信")
 
 
 # ---------- 功能权限 ----------
@@ -120,11 +120,11 @@ def _counters():
     from . import lovemail, messaging, wishes
     return {"sms": ("短信", lambda r: messaging.day_count(r, "sms")), "gift": ("礼物", lambda r: messaging.day_count(r, "gift")),
             "lovemail": ("心动信", lovemail.day_count),
-            "私约": ("私约", lambda r: rooms.day_count(r, "私约")), "电话": ("电话", lambda r: rooms.day_count(r, "电话")), "微信": ("微信", lambda r: rooms.day_count(r, "微信")),
+            "约会": ("约会", lambda r: rooms.day_count(r, "约会")), "电话": ("电话", lambda r: rooms.day_count(r, "电话")), "微信": ("微信", lambda r: rooms.day_count(r, "微信")),
             "wish_post": ("挂心愿", lambda r: wishes.day_count(r, "post")), "wish_take": ("摘心愿", lambda r: wishes.day_count(r, "take"))}
 
 
-RESET_KINDS = {"sms": "短信", "gift": "礼物", "lovemail": "心动信", "私约": "私约", "电话": "电话", "微信": "微信", "wish_post": "挂心愿", "wish_take": "摘心愿"}
+RESET_KINDS = {"sms": "短信", "gift": "礼物", "lovemail": "心动信", "约会": "约会", "电话": "电话", "微信": "微信", "wish_post": "挂心愿", "wish_take": "摘心愿"}
 
 
 def today_counts(role_id: int) -> dict[str, int]:

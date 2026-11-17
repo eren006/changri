@@ -96,6 +96,10 @@ details.edit>summary::-webkit-details-marker{display:none}
 {% block body %}
 <h1>自定义回复</h1>
 <p class="lede">群里有人说了某个词，机器人自动回一句。游戏指令永远优先，不会被这里抢走；一句话命中多条规则时，只发排在最前面的那条。</p>
+{% if rules %}<div class="btns" style="margin:0 0 14px">
+  <form method="post" action="{{ url_for('autoreply_all') }}" onsubmit="return confirm('把 {{ rules|length }} 条自定义回复全部关掉？规则不会删，之后可以再打开。')">{{ csrf() }}<input type="hidden" name="on" value="0"><button class="btn ghost" type="submit">一键全关</button></form>
+  <form method="post" action="{{ url_for('autoreply_all') }}">{{ csrf() }}<input type="hidden" name="on" value="1"><button class="btn ghost" type="submit">全部打开</button></form>
+</div>{% endif %}
 
 <section class="tester" style="border-top:1px solid var(--line);padding:16px 18px">
   <p class="cap" style="margin-top:0">试一试：假如群里有人说</p>

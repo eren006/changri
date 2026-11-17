@@ -37,8 +37,8 @@ class SightingTest(unittest.TestCase):
         set_config("game_day", "")
 
     def _two_rooms(self, place2="花园", t2="1430-1530"):
-        self.assertTrue(rooms.create("私约", self.a, [self.b], "1400-1500", "花园")[0])
-        return rooms.create("私约", self.c, [self.d], t2, place2)
+        self.assertTrue(rooms.create("约会", self.a, [self.b], "1400-1500", "花园")[0])
+        return rooms.create("约会", self.c, [self.d], t2, place2)
 
     def test_off_by_default(self):
         self._two_rooms()
@@ -78,8 +78,8 @@ class SightingTest(unittest.TestCase):
     def test_overlap_threshold_and_daily_cap(self):
         set_config("ext:sighting", "1")
         set_config("sighting_overlap_pct", "80")
-        self.assertTrue(rooms.create("私约", self.a, [self.b], "1400-1500", "花园")[0])
-        rooms.create("私约", self.c, [self.d], "1430-1530", "花园")        # 只重叠 50%
+        self.assertTrue(rooms.create("约会", self.a, [self.b], "1400-1500", "花园")[0])
+        rooms.create("约会", self.c, [self.d], "1430-1530", "花园")        # 只重叠 50%
         self.assertEqual(sighting.stats()["n"], 0)
         set_config("sighting_overlap_pct", "30")
         set_config("sighting_daily_limit", "1")

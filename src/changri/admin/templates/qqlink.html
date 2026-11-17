@@ -114,7 +114,7 @@
       </form></details>
     <details class="panel"><summary class="btn ghost">{{ ic.sliders() }}群名怎么起</summary>
       <form class="form" method="post" action="{{ url_for('qqlink_roomname') }}">{{ csrf() }}
-        <p class="note">房间占用时的群名（例子：小明和小红的私约，房间号 12）</p>
+        <p class="note">房间占用时的群名（例子：小明和小红的约会，房间号 12）</p>
         {% for t, ex in presets %}<label class="check" style="display:flex;gap:8px;align-items:center;color:var(--ink);margin:6px 0"><input type="radio" name="preset" value="{{ t }}" {{ 'checked' if t == tpl }}> <span>{{ ex }}</span></label>{% endfor %}
         <label class="check" style="display:flex;gap:8px;align-items:center;color:var(--ink);margin:6px 0;flex-wrap:wrap"><input type="radio" name="preset" value="custom" {{ 'checked' if not is_preset }}> <span>自己写</span>
           <input type="text" name="custom" value="{{ '' if is_preset else tpl }}" placeholder="{kind} {day} {time} {place} {names}" style="flex:1 1 200px"></label>
@@ -178,7 +178,7 @@
         <p class="note">人齐回执、房间群里的发言记录都要靠这个绑定才认得出谁是谁：参与房间的每个人都得绑过。玩家自己绑就在群里发 /绑定QQ，你也可以在这里替他绑。</p>
         <div class="actions"><button class="btn" type="submit">绑定</button>{{ cancel() }}</div>
       </form></details></span></div>
-  <p class="note">这里是「哪个 QQ 号是哪位玩家」的对照表，房间群和跑团群里的发言靠它认出是谁说的。玩家在群里发 /绑定QQ 自己的QQ号 就会出现在这里。绑定按「人」认、永久有效：这个人以后再建的新角色、新的跑团卡，也自动算他的。角色本身和它的主群、备用群在总览的「角色与群」里看。</p>
+  <p class="note">这里是「哪个 QQ 号是哪位玩家」的对照表，房间群和跑团群里的发言靠它认出是谁说的。玩家在群里发 /绑定QQ 自己的QQ号 就会出现在这里。绑定按「人」认、永久有效：这个人以后再建的新角色、新的跑团卡，也自动算他的。角色本身和它的个人群在总览的「角色与群」里看。</p>
   <div class="rowlist">
     {% set seen = [] %}
     {% for b in binds %}{% set _ = seen.append(b.qq) %}
@@ -203,7 +203,7 @@
       <div><label class="check"><span class="sw"><input type="checkbox" name="fallback" value="1" {{ 'checked' if fb_on }}><i></i></span>掉线时自动切到小手机</label>
         <p class="note">@ 所有玩家暂停在 QQ 群回戏，自动打开小手机，把各自的激活码发到个人群；掉线的房间在小手机上接着写，进同一份复盘。QQ 号恢复后自动关回去、通知大家回 QQ 群。</p></div>
       <div><label class="check"><span class="sw"><input type="checkbox" name="backfill" value="1" {{ 'checked' if backfill_on }}><i></i></span>合并转发补录</label>
-        <p class="note">不切小手机也行：QQ 号恢复后，参与者把漏记的聊天记录合并转发到房间群，回复那条转发发「补录 R房间号」。已经存过的跳过，缺的按原来的时间补进复盘。</p></div>
+        <p class="note">不切小手机也行：参与者把漏记的聊天记录合并转发到自己的群，回复那条转发对卡拉发「补录 R房间号」。补录只由卡拉做，小号的群卡拉不用进。已经存过的跳过，缺的按顺序补进复盘。</p></div>
     </div>
     <div class="actions"><button class="btn" type="submit">保存</button></div>
   </form>

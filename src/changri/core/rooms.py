@@ -1,4 +1,4 @@
-"""约会房间：私约、电话、官约、微信、心愿约会、踩点（一个人的群，默认关）。房间 = 一个时间线条目 + 一个群池里的群。
+"""房间：约会、电话、官约、微信、心愿约会、踩点（一个人的群，默认关）。房间 = 一个时间线条目 + 一个群池里的群。
 时间说的是游戏里的「几点到几点」（1400-1500），不是真实时钟；房间真实存活时间由 room_expire_hours 管。"""
 import json
 import re
@@ -7,8 +7,8 @@ import time
 from . import blocks, pool, rpg, season, windows
 from .db import get_conn, get_config, get_int
 
-ROOM_KINDS_GATED = ("私约", "电话", "微信")
-KINDS = {"私约": True, "电话": False, "官约": True, "微信": False, "心愿": True, "前置电话": False, "踩点": True}   # 值：是否需要地点
+ROOM_KINDS_GATED = ("约会", "电话", "微信")
+KINDS = {"约会": True, "电话": False, "官约": True, "微信": False, "心愿": True, "前置电话": False, "踩点": True}   # 值：是否需要地点
 NO_TIMELINE = {"微信", "前置电话"}                                                            # 微信不占时间线
 SOLO_KINDS = {"踩点"}                                                                       # 只有发起人自己的房间
 
@@ -369,10 +369,10 @@ def vote_change(room_id: int, role_id: int, agree: bool) -> tuple[str, dict | No
 # ---------- 申请加入别人正在进行的约会 ----------
 
 def find_joinable(target_id: int, start_hm: str = "") -> list:
-    """对方现在参与的、可以申请加入的房间（私约/官约/心愿，不含电话和微信）。"""
+    """对方现在参与的、可以申请加入的房间（约会/官约/心愿，不含电话和微信）。"""
     with get_conn() as c:
         rs = c.execute("SELECT r.* FROM rooms r JOIN room_members m ON m.room_id=r.id WHERE m.role_id=? AND r.status='open' "
-                       "AND r.kind IN ('私约','官约','心愿') ORDER BY r.id", (target_id,)).fetchall()
+                       "AND r.kind IN ('约会','官约','心愿') ORDER BY r.id", (target_id,)).fetchall()
     if start_hm:
         a = parse_hm(f"{start_hm}-23:59") if re.fullmatch(r"\d{1,2}:?\d{2}", start_hm) else None
         rs = [r for r in rs if a and r["start_hm"] == a[0]]

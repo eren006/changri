@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}{{ s.name }}{% endblock %}
+{% block body %}
+<style>
+.ui .pl{width:100%;border-collapse:collapse;font-size:14px}
+.ui .pl th,.ui .pl td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+.ui .pl th:first-child,.ui .pl td:first-child{text-align:left}
+.ui .tblwrap{overflow-x:auto}
+</style>
+<p><a href="{{ url_for('season_page') }}">← 季度与出场</a></p>
+<h1>{{ s.name }}</h1>
+<p class="lede tabular">档期 {{ s.start_date }} ~ {{ s.end_date }}{% if s.supp_end %} · 补戏到 {{ s.supp_end }}{% endif %}　·　已结束</p>
+
+{% if not arc %}
+<div class="callout">这一季没有复盘存档（它是在加存档功能之前收尾的，当时数据已经清空）。以后结束的季度会自动存档。</div>
+{% else %}
+<section>
+  <div class="sec-head keep"><h2>这一季的信息</h2></div>
+  <div class="stats">
+    <div class="stat"><b>{{ counts.roles }}</b><span>玩家角色{% if counts.npcs %}（另有 NPC {{ counts.npcs }}）{% endif %}</span></div>
+    <div class="stat"><b>{{ counts.rooms }}</b><span>场约会</span></div>
+    <div class="stat"><b>{{ counts.sms }}</b><span>短信</span></div>
+    <div class="stat"><b>{{ counts.gift }}</b><span>礼物</span></div>
+    <div class="stat"><b>{{ counts.lovemail }}</b><span>心动信</span></div>
+    <div class="stat"><b>{{ counts.relations }}</b><span>关系线</span></div>
+  </div>
+  <p class="note">存档时间：{{ arc.created_ts|ts }}。{% if s.started_ts %}实际开始 {{ s.started_ts|ts }}，{% endif %}{% if s.ended_ts %}结束 {{ s.ended_ts|ts }}。{% endif %}</p>
+</section>
+
+<section>
+  <div class="sec-head keep"><h2>每个人的数据<span class="n">{{ players|length }} 人</span></h2>
+    {% if poster_idx %}<span class="btns"><a class="btn sm" href="{{ url_for('season_posters_archived_zip', season_id=s.id) }}">季末海报全部打包下载</a></span>{% endif %}</div>
+  <div class="tblwrap"><table class="pl">
+    <tr><th>角色</th><th>约会</th><th>戏文字数</th><th>短信 发/收</th><th>礼物 送/收</th><th>心动信 写/收</th><th>最常互动</th><th>海报</th></tr>
+    {% for p in players %}<tr><td>{{ p.name }}{% if p.npc %} <span class="muted">NPC</span>{% endif %}</td><td>{{ p.sessions }}</td><td>{{ p.chars }}</td>
+      <td>{{ p.sms_sent }} / {{ p.sms_recv }}</td><td>{{ p.gift_sent }} / {{ p.gift_recv }}</td><td>{{ p.lovemail_sent }} / {{ p.lovemail_recv }}</td><td>{{ p.time_title or '—' }}</td>
+      <td>{% if p.name in poster_idx %}<a href="{{ url_for('season_poster_archived', season_id=s.id, idx=poster_idx[p.name]) }}">下载</a>{% else %}—{% endif %}</td></tr>
+    {% else %}<tr><td colspan="8" class="empty">没有角色记录。</td></tr>{% endfor %}
+  </table></div>
+</section>
+
+<section>
+  <div class="sec-head keep"><h2>房间复盘<span class="n">{{ rooms|length }} 场</span></h2></div>
+  <div class="rowlist">
+    {% for r in rooms %}<div class="row"><div class="nm"><b><a href="{{ url_for('season_room', season_id=s.id, rid=r.id) }}">R{{ r.id }} {{ r.kind }}</a></b>
+      <div class="muted">{% if r.day is not none %}D{{ r.day }} · {% endif %}{{ r.members|join('、') }}{% if r.place %} · {{ r.place }}{% endif %}</div></div>
+      <div class="muted tabular">{{ r.lines|length }} 条发言</div></div>
+    {% else %}<p class="empty">这一季没有房间记录。</p>{% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section>
+  <div class="sec-head keep"><h2>管理</h2></div>
+  <div class="btns">
+    <details class="panel"><summary class="btn ghost">改名</summary>
+      <form class="form" method="post" action="{{ url_for('season_rename', season_id=s.id) }}">{{ csrf() }}
+        <div class="fields"><div><label for="rn">新名字</label><input id="rn" name="name" required maxlength="30" value="{{ s.name }}"></div></div>
+        <div class="actions"><button class="btn" type="submit">保存</button></div></form></details>
+    <form method="post" action="{{ url_for('season_delete_history', season_id=s.id) }}" style="margin:0"
+      onsubmit="return confirm('删除历史季度「{{ s.name }}」？{{ '它的复盘存档会一起删掉，' if arc }}删了找不回来。')">{{ csrf() }}
+      <input type="hidden" name="confirm" value="{{ s.name }}"><button class="btn ghost" type="submit" style="color:var(--bad)">删除这个历史季度</button></form>
+  </div>
+</section>
+{% endblock %}

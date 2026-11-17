@@ -34,6 +34,11 @@
 <p class="lede">先预订季度，开始后筹备期玩家创建角色，档期开始日自动进入 D0，之后每天 23:59 自动加一天。</p>
 
 <section>
+  <div class="sec-head keep"><h2>日历</h2></div>
+  {% with cal_base=url_for('season_page'), cal_pick=True %}{% include "_season_cal.html" %}{% endwith %}
+</section>
+
+<section>
   <div class="sec-head keep"><h2>现在</h2></div>
   {% if running %}
     <div class="nowcard">
@@ -64,7 +69,7 @@
   {% endif %}
 </section>
 
-<section>
+<section id="booked">
   <div class="sec-head keep"><h2>预订的季度<span class="n">{{ booked|length }} 个</span></h2>
     <span class="btns"><details class="panel"><summary class="btn">{{ ic.plus() }}预订季度</summary>
       <form class="form" method="post" action="{{ url_for('season_book') }}">{{ csrf() }}
@@ -87,9 +92,57 @@
           <button class="btn sm">开始</button></form>{% endif %}
         <form method="post" action="{{ url_for('season_delete', season_id=b.id) }}" onsubmit="return confirm('删除这个预订？')">{{ csrf() }}<button class="linkbtn">删除</button></form>
       </div>
+      <details class="panel" style="flex:1 1 100%"><summary class="linkbtn">修改</summary>
+        <form class="form" method="post" action="{{ url_for('season_edit', season_id=b.id) }}">{{ csrf() }}
+          <div class="fields">
+            <div><label>名字</label><input name="name" required maxlength="30" value="{{ b.name }}"></div>
+            <div><label>开始日</label><input type="date" name="start" required value="{{ b.start_date }}"></div>
+            <div><label>结束日</label><input type="date" name="end" required value="{{ b.end_date }}"></div>
+            <div><label>补戏截止（可空）</label><input type="date" name="supp" value="{{ b.supp_end }}"></div>
+          </div>
+          <div class="actions"><button class="btn" type="submit">保存</button>{{ cancel() }}</div></form></details>
     </div>
     {% else %}<p class="empty">还没有预订。点上面的「预订季度」。</p>{% endfor %}
   </div>
+</section>
+
+<section id="report">
+  <style>
+  .ui .rp-steps{margin:0 0 14px;padding-left:20px;line-height:1.8}
+  .ui .skins{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;margin:10px 0}
+  .ui .skin{border:2px solid var(--line);border-radius:12px;padding:6px;background:var(--surface);text-align:center;cursor:pointer;font:inherit;color:inherit}
+  .ui .skin.on{border-color:var(--dusk)}
+  .ui .skin img{width:100%;aspect-ratio:3/4;object-fit:cover;object-position:top;border-radius:8px;background:var(--line);display:block}
+  .ui .skin span{display:block;font-size:13px;margin-top:6px}
+  .ui .skin a{font-size:12px;color:var(--mute)}
+  .ui .dl{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+  </style>
+  <div class="sec-head keep"><h2>季末报告</h2></div>
+  <ol class="rp-steps">
+    <li><b>打开</b>：打开后，点「结束季度」时，每位有互动的玩家会在个人群里收到一句话 + 一张本季结算海报（约会场次、短信礼物心动信、互动最多的人、最常互动的时间、最精彩的一场戏）。</li>
+    <li><b>选样式</b>：点下面的缩略图选一款；点「看大图」用示例数据预览。第一次用某款会从主站下载花边素材，下载不了就用素色纸。</li>
+    <li><b>下载</b>：想自己存档或另外发，可以在这里下载每个人的海报（收尾之前）；收尾以后到下面「历史季度 → 查看」里下载。</li>
+  </ol>
+  <form method="post" action="{{ url_for('season_report_save') }}" class="kv" style="max-width:560px">{{ csrf() }}<input type="hidden" name="on" value="{{ 0 if report.on else 1 }}">
+    <span>结束季度时给玩家发季末报告</span>
+    <button class="sw-btn {{ 'on' if report.on }}" type="submit" aria-pressed="{{ 'true' if report.on else 'false' }}"><i></i><em>{{ '开' if report.on else '关' }}</em></button></form>
+  <div class="skins">
+    {% for sid, nm in report.skins %}
+    <form method="post" action="{{ url_for('season_report_save') }}" style="margin:0">{{ csrf() }}<input type="hidden" name="skin" value="{{ sid }}">
+      <button class="skin {{ 'on' if sid == report.skin }}" type="submit" title="用「{{ nm }}」">
+        <img loading="lazy" src="{{ url_for('season_poster_preview', skin=sid) }}" alt="{{ nm }}样式预览">
+        <span>{{ nm }}{% if sid == report.skin %} ✓{% endif %}</span></button>
+      <a href="{{ url_for('season_poster_preview', skin=sid) }}" target="_blank" rel="noopener">看大图</a>
+    </form>{% endfor %}
+  </div>
+  <h3 style="font-size:15px;margin:16px 0 4px">下载这一季的海报</h3>
+  {% if report.live %}
+    <div class="dl"><a class="btn" href="{{ url_for('season_poster_live_zip') }}">全部打包下载（{{ report.live|length }} 张）</a></div>
+    <div class="dl">{% for p in report.live %}<a class="btn sm ghost" href="{{ url_for('season_poster_live', role_id=p.id) }}">{{ p.name }}</a>{% endfor %}</div>
+    <p class="note">按现在选的样式画，人多时打包要等一会儿。</p>
+  {% else %}
+    <p class="empty">现在没有可以出海报的玩家（季度还没开始、大家还没互动，或者已经收尾）。收尾过的季度到「历史季度 → 查看」里下载。</p>
+  {% endif %}
 </section>
 
 <section>
@@ -123,10 +176,43 @@
 </section>
 
 {% if past %}
-<section>
+<section id="past">
+  <style>
+  .ui .hrow{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--line)}
+  .ui .hrow .nm{flex:1;min-width:180px}
+  .ui .hrow .hacts{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .ui .hrow .hacts .btn{min-width:72px;justify-content:center}
+  .ui .hrow details>summary{list-style:none}
+  .ui .hrow details>summary::-webkit-details-marker{display:none}
+  .ui .hrow .hpanel{flex:1 1 100%}
+  .ui .hrow .hpanel:empty{display:none}
+  </style>
   <div class="sec-head keep"><h2>历史季度<span class="n">{{ past|length }} 个</span></h2></div>
-  <div class="rowlist">
-    {% for p in past %}<div class="row"><div class="nm"><b>{{ p.name }}</b></div><div class="muted tabular">{{ p.start_date }} ~ {{ p.end_date }}</div></div>{% endfor %}
-  </div>
+  {% for p in past %}<div class="hrow" id="h{{ p.id }}">
+    <div class="nm"><b>{{ p.name }}</b>
+      <div class="muted tabular">{{ p.start_date }} ~ {{ p.end_date }}{% if p.supp_end %} · 补戏到 {{ p.supp_end }}{% endif %}　·　{{ '有复盘存档' if p.id in archived else '无存档' }}</div></div>
+    <div class="hacts">
+      <a class="btn ghost" href="{{ url_for('season_view', season_id=p.id) }}">查看</a>
+      <button class="btn ghost" type="button" onclick="hOpen({{ p.id }},'e')">编辑</button>
+      <form method="post" action="{{ url_for('season_delete_history', season_id=p.id) }}" style="margin:0"
+        onsubmit="return confirm('删除历史季度「{{ p.name }}」？{{ '它的复盘存档会一起删掉，' if p.id in archived }}删了找不回来。')">{{ csrf() }}
+        <input type="hidden" name="back" value="list"><input type="hidden" name="confirm" value="{{ p.name }}"><button class="btn ghost danger" type="submit">删除</button></form>
+    </div>
+    <div class="hpanel" id="he{{ p.id }}" hidden>
+      <form class="form" method="post" action="{{ url_for('season_rename', season_id=p.id) }}">{{ csrf() }}<input type="hidden" name="back" value="list">
+        <div class="fields">
+          <div><label>名字</label><input name="name" required maxlength="30" value="{{ p.name }}"></div>
+          <div><label>开始日</label><input type="date" name="start" required value="{{ p.start_date }}"></div>
+          <div><label>结束日</label><input type="date" name="end" required value="{{ p.end_date }}"></div>
+          <div><label>补戏截止（可空）</label><input type="date" name="supp" value="{{ p.supp_end }}"></div>
+        </div>
+        <div class="actions"><button class="btn" type="submit">保存</button><button class="btn ghost" type="button" onclick="hOpen({{ p.id }},'')">取消</button></div></form>
+    </div>
+  </div>{% endfor %}
+  <script>
+  function hOpen(id,which){
+    ['e'].forEach(function(k){var el=document.getElementById('h'+k+id);var show=k===which&&el.hidden;el.hidden=!show;if(show){var i=el.querySelector('input:not([type=hidden])');if(i)i.focus();}});
+  }
+  </script>
 </section>{% endif %}
 {% endblock %}

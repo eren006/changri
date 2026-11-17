@@ -199,8 +199,8 @@ class TimelineTodoPages(Phone):
         self.assertIn("没有要回的事", self.c.get("/p/me/todo").get_data(as_text=True))
         self.assertIn("时间线", self.c.get("/p/me/discover").get_data(as_text=True))
         self.assertEqual(overview.todo_items(self.a), [])
-        with get_conn() as c:                                      # 一个排队中的私约：时间线和待回都该看到
-            c.execute("INSERT INTO rooms(id, kind, creator_id, day, start_hm, end_hm, place, created_ts) VALUES (901,'私约',?,1,'1400','1500','花园',1)", (self.a["id"],))
+        with get_conn() as c:                                      # 一个排队中的约会：时间线和待回都该看到
+            c.execute("INSERT INTO rooms(id, kind, creator_id, day, start_hm, end_hm, place, created_ts) VALUES (901,'约会',?,1,'1400','1500','花园',1)", (self.a["id"],))
             for r in (self.a, self.b):
                 c.execute("INSERT INTO room_members(room_id, role_id) VALUES (901, ?)", (r["id"],))
         tl = self.c.get("/p/me/timeline").get_data(as_text=True)
@@ -535,7 +535,7 @@ class PhoneExtras(Phone):
         self.login(phonecodes.code_for_role(self.a["id"]))
         self.assertEqual(self.c.get("/p/me/appoint").status_code, 200)
         tok = self.csrf("/p/me/appoint")
-        r = self.c.post("/p/me/appoint/new", data={"kind": "私约", "to": str(self.b["id"]), "time": "1400-1500", "place": "花园", "_csrf": tok})
+        r = self.c.post("/p/me/appoint/new", data={"kind": "约会", "to": str(self.b["id"]), "time": "1400-1500", "place": "花园", "_csrf": tok})
         self.assertEqual(r.status_code, 302)
         rid = rooms.my_open(self.a["id"])[0]["id"]
         self.assertTrue(r.headers["Location"].endswith(f"/p/me/room/{rid}"))
@@ -565,7 +565,7 @@ class PhoneExtras(Phone):
         set_config("ext:chatroom", "0")
         self.assertEqual(self.c.get("/p/me/appoint").status_code, 404)
         set_config("ext:groupchat", "1")
-        self.assertEqual(self.c.post("/p/me/appoint/new", data={"kind": "私约", "to": str(self.b["id"]), "time": "1600-1700", "_csrf": tok}).status_code, 404)
+        self.assertEqual(self.c.post("/p/me/appoint/new", data={"kind": "约会", "to": str(self.b["id"]), "time": "1600-1700", "_csrf": tok}).status_code, 404)
         r2 = self.c.post("/p/me/appoint/new", data={"kind": "微信", "to": [str(self.b["id"]), str(c_["id"])], "_csrf": tok})
         self.assertEqual(r2.status_code, 302)
         gid = rooms.my_open(self.a["id"])[0]["id"]
@@ -775,7 +775,7 @@ class PhoneArchive(Phone):
         pool.register("B1", "POOLX", real_gid="990001", set_name="A组")
         pool.set_in_pool(pool.is_pool_group("B1", "POOLX")["id"], True)
         a, b = self.a["id"], self.b["id"]
-        ok, _, rid = rooms.create("私约", a, [b], "1400-1500", "")
+        ok, _, rid = rooms.create("约会", a, [b], "1400-1500", "")
         self.assertTrue(ok)
         now = int(time.time())
         with get_conn() as c:

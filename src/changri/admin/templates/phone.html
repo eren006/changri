@@ -103,7 +103,7 @@
   <p class="label">小手机里的功能</p>
   <form class="card" method="post" action="{{ url_for('phone_features') }}">{{ csrf() }}
     <div class="group">
-      {% for k, nm, desc in [('moments','朋友圈','发文字和图片、点赞评论；开了才有入口'),('masquerade','匿名舞会','戴面具起昵称的特别群聊；开了还要到管理页开场'),('games','小游戏','发现页里的小游戏和排行榜'),('groupchat','多人群聊','在小手机里拉几个人建一个群聊，代替原来的「微信」指令（机器人这边不再做）'),('chatroom','聊天室','开着：私约、官约、电话都在小手机网页里聊，不再拉 QQ 群（机器人掉线也能约）；关着：照旧走 QQ 群')] %}
+      {% for k, nm, desc in [('moments','朋友圈','发文字和图片、点赞评论；开了才有入口'),('masquerade','匿名舞会','戴面具起昵称的特别群聊；开了还要到管理页开场'),('games','小游戏','发现页里的小游戏和排行榜'),('groupchat','多人群聊','在小手机里拉几个人建一个群聊，代替原来的「微信」指令（机器人这边不再做）'),('chatroom','聊天室','开着：约会、官约、电话都在小手机网页里聊，不再拉 QQ 群（机器人掉线也能约）；关着：照旧走 QQ 群')] %}
       <label class="grow" style="cursor:pointer;color:var(--ink);font-size:inherit;margin:0"><div class="tx"><b>{{ nm }}</b><span>{{ desc }}</span></div><span class="sw"><input type="checkbox" name="feat_{{ k }}" value="1" {{ 'checked' if feats[k] }}><i></i></span></label>
       {% endfor %}
     </div>

@@ -14,9 +14,11 @@ IMG = "{{IMG}}"        # 文本开头带这个标记：不管多长都画成图�
 
 
 def _image_wanted(text: str) -> bool:
+    """一条消息发得完（≤ textutil.CHUNK 字）就发文字；要拆成好几条时才画成图（后台可以关掉，或再调高字数下限）。"""
     if text.startswith(IMG):
         return True
-    return get_config("long_as_image", "1") == "1" and len(text) > get_int("image_min_chars", 200)
+    return (get_config("long_as_image", "1") == "1" and len(chunk_text(text)) > 1
+            and len(text) > get_int("image_min_chars", 200))
 
 
 def _strip_img(text: str) -> str:
@@ -51,14 +53,14 @@ async def send_to_group(bot, group_openid: str, text: str) -> str:
     return getattr(r, "id", "") or ""
 
 
-async def reply_long(matcher, text: str) -> None:
-    """回复触发指令的人：够长就发图，否则按 5 条以内的文字发。"""
+async def reply_long(matcher, text: str, as_image: bool = True) -> None:
+    """回复触发指令的人：够长就发图，否则按 5 条以内的文字发。as_image=False 时不管多长都发文字（制卡这类要能复制的）。"""
     try:
         from changri.plugins._logtap import tap_reply
         tap_reply(matcher, text)                  # 跑团 log 在记时，骰子回复也进 log
     except Exception as e:  # noqa: BLE001 记 log 出错不能影响回复
         logger.warning(f"[跑团log] 记录回复出错：{e}")
-    wanted = _image_wanted(text)
+    wanted = as_image and _image_wanted(text)
     text = _strip_img(text)
     if wanted:
         sent = 0

@@ -36,13 +36,12 @@ SECTIONS = [
         "hello_text": ("/ping 的回复", "收到。"),
         "welcome_text": ("机器人被拉进新群时发的欢迎语（留空用默认）", ""),
         "error_report_url": ("报错接收地址（http/https 网址；留空 = 报错只存在本机。程序崩溃或出错、恢复后会自动把报错文字发到这里，不含聊天内容和群号。默认发到主站 system.changri.work）", "https://system.changri.work/api/errors"),
-        "max_backup_groups": ("每个角色最多几个备用群（短信、礼物、心动信、通知默认发到角色的主群；主群发不出去时依次改发备用群。玩家在自己群里生成码就能加备用群，这里限制最多加几个）", "3"),
-        "season_report": ("季末报告（1 开 / 0 关；开了以后，结束季度时会给每位有互动的玩家的个人群先发一句话、再单独发一张本季结算海报：约会场次、短信礼物心动信、互动最多的人、最常互动的时间、最精彩的一场戏。海报画不出来就改发文字小结。机器人要还在个人群里才发得出去）", "0"),
+        "season_report": ("季末报告（1 开 / 0 关；开了以后，结束季度时会给每位有互动的玩家的个人群先发一句话、再单独发一张本季结算海报：约会场次、短信礼物心动信、互动最多的人、最常互动的时间、最精彩的一场戏。海报画不出来就改发文字小结。机器人要还在个人群里才发得出去。「季度与出场」页的「季末报告」里也能开关、看样式缩略图、下载每个人的海报）", "0"),
         "season_poster_skin": ("季末海报的样式（第一次用某款时从主站下载花边素材，下载不了就用素色纸）", "antique"),
         "block_undo_hours": ("拉黑满几小时才能解除", "2"),
         "brand_name": ("系统名称（画在长图左上角，留空用默认）", ""),
-        "long_as_image": ("长内容发图片（1 开 / 0 关，关了就拆成文字）", "1"),
-        "image_min_chars": ("超过多少字才发图片", "200"),
+        "long_as_image": ("长内容发图片（1 开 / 0 关；开着时，一条消息发不完、要拆成好几条的才画成图，一条发得完的照样发文字；关了就全拆成文字）", "1"),
+        "image_min_chars": ("至少多少字才发图片（另外还要一条发不完才发图）", "200"),
         "require_prefix": ("指令必须带前缀（1 开 / 0 关；打开后所有指令都要以 / . 。 开头，不带的不响应；关闭时带不带都行）", "0"),
     }),
     ("短信", {
@@ -61,11 +60,11 @@ SECTIONS = [
         "gift_public_chance": ("礼物公开概率（%）", "50"),
     }),
     ("约会房间", {
-        "window_date": ("私约/电话/微信开放时段（写成 10-23 或 20:00-02:00，留空 = 全天开放）", ""),
+        "window_date": ("约会/电话/微信开放时段（写成 10-23 或 20:00-02:00，留空 = 全天开放）", ""),
         "room_dedup_similarity": ("复盘里同一个人 30 分钟内发的、和自己上一条相似度达到多少 % 的发言，只留后一条（8 字以上才算；0 = 不处理）", "90"),
         "arc_max_hours": ("最长弧长（小时）：房间里谁回得比这更慢，或正在等的回复已经超过它，「弧长与复盘」页顶上标红；0 = 不标", "12"),
         "window_forum": ("论坛开放时段（写成 10-23 或 20:00-02:00，留空 = 全天开放）", ""),
-        "limit_私约": ("每人每天最多发起几次私约（0 = 不限）", "0"),
+        "limit_约会": ("每人每天最多发起几次约会（0 = 不限）", "0"),
         "limit_电话": ("每人每天最多发起几次电话（0 = 不限）", "0"),
         "limit_微信": ("每人每天最多发起几次微信（0 = 不限）", "0"),
         "stakeout_enabled": ("踩点（1 开 / 0 关；开了以后玩家可以发「踩点 时间 地点」开一个只有自己的群，占时间线、要地点，结束发「结束踩点」）", "0"),
@@ -99,20 +98,30 @@ SECTIONS = [
         "song_daily_limit": ("每人每天最多点几首歌（0 = 不限；没发到公告群的不算）", "3"),
         "song_card": ("公告群发图文卡片（1 开 / 0 关；关了只发带链接的文字）", "1"),
     }),
-    ("信件", {
-        "letter_daily_limit": ("每人每天最多寄几封信（0 = 不限）", "5"),
-        "letter_cooldown_min": ("寄信冷却（分钟，0 = 不冷却）", "2"),
-        "letter_public_send": ("信出了岔子时公开播报到公告群（1 开 / 0 关；要先开「混乱寄信」才会出岔子）", "1"),
-        "letter_public_chance": ("公开播报的概率（%）", "50"),
+    ("特殊道具", {
+        "item_tracker_success_rate": ("追踪器的成功率（%，失败也算用掉）", "70"),
+        "item_tracker_show_partner": ("追踪器显示对方和谁在一起（1 开 / 0 关）", "1"),
+        "tap_count": ("窃听器 / 截信器 / 回音壁每个最多抄几条", "10"),
+        "tap_blur": ("抄到的内容被干扰的概率（%，被干扰的有三成字看不清）", "30"),
     }),
-    ("混乱寄信", {
+    ("写信综", {
+        "wl_daily_limit": ("每人每天最多寄几封信（0 = 不限）", "5"),
+        "wl_cooldown_min": ("两封信之间的冷却（分钟，0 = 不冷却）", "0"),
+        "wl_reward": ("每封信给几个写信币（0 = 不发）", "0"),
+        "wl_min_chars": ("拿写信币至少要写多少字（0 = 不限）", "0"),
+        "wl_wish_cost": ("挂心愿要花几个写信币（0 = 不收）", "0"),
+        "wl_date_cost": ("发起约会要花几个写信币（0 = 不收；电话、微信不收）", "0"),
+    }),
+    ("混乱短信", {
+        "letter_public_send": ("短信出了岔子时公开播报到公告群（1 开 / 0 关）", "1"),
+        "letter_public_chance": ("公开播报的概率（%）", "50"),
         "chaos_typo": ("错字概率（%，0–100，下面几项一样）", "10"),
         "chaos_lose": ("丢失后半截概率（%）", "5"),
         "chaos_blackout": ("涂黑概率（%）", "10"),
         "chaos_reverse": ("句子乱序概率（%）", "5"),
         "chaos_sign": ("落款写错概率（%）", "5"),
         "chaos_mis": ("误投给别人的概率（%）", "5"),
-        "chaos_torn": ("信被撕成两半的概率（%，后半页飘到第三个人手里）", "5"),
+        "chaos_torn": ("短信被撕成两半的概率（%，后半截飘到第三个人手里）", "5"),
     }),
     ("晚餐", {
         "dinner_poke_cooldown_min": ("「戳你一下」冷却（分钟，0 = 不冷却）", "5"),
@@ -142,7 +151,7 @@ SECTIONS = [
         "dice_card": ("检定结果发 Markdown 小卡片（1 开 / 0 关；QQ 没开 Markdown 权限时会自动退回文字，一小时后再试）", "1"),
     }),
     ("地点", {
-        "place_system_enabled": ("只能使用预设地点约会（1 开 / 0 关；开了之后，私约等约会的地点必须是「地点」页里建好的，需要钥匙的还要持有钥匙；关了随便填地点）", "0"),
+        "place_system_enabled": ("只能使用预设地点约会（1 开 / 0 关；开了之后，约会、官约等的地点必须是「地点」页里建好的，需要钥匙的还要持有钥匙；关了随便填地点）", "0"),
         "allow_private_rooms": ("允许使用「某某的房间」（1 开 / 0 关）", "1"),
     }),
     ("房间复盘", {
@@ -225,7 +234,6 @@ def _dashboard() -> dict:
     announce = get_announce()
     with get_conn() as conn:
         n_main = conn.execute("SELECT COUNT(*) FROM role_groups WHERE kind='main' AND group_openid IS NOT NULL").fetchone()[0]
-        n_slots = conn.execute("SELECT COUNT(*) FROM role_groups WHERE group_openid IS NULL").fetchone()[0]
         n_roles = conn.execute("SELECT COUNT(*) FROM roles").fetchone()[0]
         n_rel = conn.execute("SELECT COUNT(*) FROM relations").fetchone()[0]
         n_admins = conn.execute("SELECT COUNT(*) FROM admins").fetchone()[0]
@@ -257,8 +265,6 @@ def _dashboard() -> dict:
         todo.append(("warn", "还没设置公告群", url_for("admins_page"), "管理员在目标群里发「设为公告群」"))
     if not n_admins:
         todo.append(("warn", "还没有 QQ 管理员", url_for("admins_page"), "没有人能在群里用管理指令"))
-    if n_slots:
-        todo.append(("warn", f"有 {n_slots} 个群位等着认群", url_for("dashboard") + "#roles", "登记了群号，但还没人在群里发认群码"))
     if n_undelivered:
         todo.append(("warn", f"最近 24 小时有 {n_undelivered} 条消息没送达", url_for("reviews_page", tab="sms"), "收件人的群可能没授权机器人发言"))
     late = relations_core.overdue()

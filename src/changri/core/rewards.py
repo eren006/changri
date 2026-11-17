@@ -35,6 +35,9 @@ def _row_ok(ref: str) -> str:
         return ""
     if kind == "a" and name:
         return ""
+    if kind == "g":
+        from . import gacha
+        return "" if gacha.find_pool(name)[0] else "抽取池找不到了，重新选一下。"
     return "有一行没选好奖励。"
 
 
@@ -64,9 +67,9 @@ def rows_fixed(refs: list[str], ns: list[str], ps: list[str] | None = None) -> t
         except ValueError:
             return [], "数量要写整数。"
         kind, _, name = ref.partition(":")
-        if n == 0 or (kind == "i" and n < 0):
+        if n == 0 or (kind in ("i", "g") and n < 0):
             return [], "数量要写正整数（属性可以写负数，表示扣）。"
-        out.append({"type": "attr" if kind == "a" else "item", "ref": name, "n": n, "p": p})
+        out.append({"type": {"a": "attr", "g": "gacha"}.get(kind, "item"), "ref": name, "n": n, "p": p})
     return out, ""
 
 
@@ -138,13 +141,20 @@ def describe_conds(conds: dict) -> str:
     return "、".join(parts) or "没有条件（参加就发）"
 
 
+def _pool_name(ref: str) -> str:
+    from . import gacha
+    p = gacha.find_pool(ref)[0]
+    return p["name"] if p else f"池子 {ref}"
+
+
 def describe_rewards(rule: dict) -> str:
     def nm(ref):
         it = rpg.find_item(ref)
         return it["name"] if it else ref
     bits = []
     for f in rule["fixed"]:
-        base = f"{f['ref']} {f['n']:+d}" if f["type"] == "attr" else f"{nm(f['ref'])} ×{f['n']}"
+        base = (f"{f['ref']} {f['n']:+d}" if f["type"] == "attr" else
+                f"抽取机会「{_pool_name(f['ref'])}」×{f['n']}" if f["type"] == "gacha" else f"{nm(f['ref'])} ×{f['n']}")
         p = f.get("p", 100)
         bits.append(base if p >= 100 else f"{base}（{p}%）")
     if rule["pool"]:
@@ -230,6 +240,10 @@ def _grant(role_id: int, rule: dict, room_id: int) -> tuple[bool, list[str], str
             cur = attrs.get_attr(role_id, f["ref"]) or 0
             ok, info = attrs.set_attrs(role_id, [(f["ref"], cur + f["n"])])
             (got if ok else errs).append(f"{f['ref']} {f['n']:+d}" if ok else info)
+        elif f["type"] == "gacha":                                 # 给抽取机会：发到「抽取池」里那个池子的次数上
+            from . import gacha
+            ok, info = gacha.grant(role_id, f["ref"], f["n"])
+            (got if ok else errs).append(f"「{_pool_name(f['ref'])}」抽取机会 ×{f['n']}（发「抽取」使用）" if ok else info)
         else:
             ok, info = rpg.adjust(role_id, f["ref"], f["n"], detail)
             (got if ok else errs).append(f"{f['ref']} ×{f['n']}" if ok else info)

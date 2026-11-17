@@ -26,7 +26,7 @@ class SeasonReportTest(unittest.TestCase):
                                       (self.a, self.c, "gift", "sent"), (self.a, self.c, "sms", "failed")):
                 c.execute("INSERT INTO messages(kind,from_role_id,to_role_id,created_ts,status) VALUES(?,?,?,?,?)", (kind, frm, to, now, st))
             c.execute("INSERT INTO lovemails(from_role_id,to_role_id,content,day,created_ts,status) VALUES(?,?, 'x','D1',?,'sent')", (self.b, self.a, now))
-            c.execute("INSERT INTO rooms(id,kind,status,created_ts) VALUES(1,'私约','ended',?)", (now,))
+            c.execute("INSERT INTO rooms(id,kind,status,created_ts) VALUES(1,'约会','ended',?)", (now,))
             c.executemany("INSERT INTO room_members(room_id,role_id) VALUES(1,?)", [(self.a,), (self.b,)])
 
     def test_build(self):

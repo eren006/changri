@@ -32,7 +32,7 @@ def register(app, login_required):
         tpl = get_config("qqlink_room_name", "auto")
         if tpl == "{kind}·{names}":
             tpl = "auto"
-        sample = {"kind": "私约", "id": 12, "day": 3, "start_hm": "20:00", "end_hm": "21:00", "place": "海边咖啡馆"}
+        sample = {"kind": "约会", "id": 12, "day": 3, "start_hm": "20:00", "end_hm": "21:00", "place": "海边咖啡馆"}
         presets = list(qqpool_core.ROOM_NAME_PRESETS)
         from changri.core import outage
         return render_template("qqlink.html", fallback_missing=outage.ready(), fallback_active=outage.active(),

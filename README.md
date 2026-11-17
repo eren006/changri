@@ -8,9 +8,7 @@
 
 ## 安装
 
-> **0.20 正在准备发布**：安装包上线前（system.changri.work 上能下载之前），暂时不能一键安装。已经装好的不受影响，照常使用。
-
-完整说明（带下载按钮）：**https://system.changri.work/install**
+完整说明（带下载按钮）：**https://system.changri.work/install**（海外也可以到 [GitHub Releases](https://github.com/eren006/changri/releases) 下载）
 
 **Linux**：在服务器上粘贴这一行，回车：
 
@@ -65,3 +63,9 @@ python3.12 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 ```
 
 代码结构、怎么加功能、怎么改数据库、怎么发版：[docs/架构.md](docs/架构.md)。写扩展：[src/changri/extdocs/写扩展.md](src/changri/extdocs/写扩展.md)。
+
+## 仓库与下载
+
+- **安装包**：只从 https://system.changri.work 下载（`get.sh`、`/downloads/`）。服务器上不存安装包，`/downloads/` 会跳转到 GitHub Release 的加速镜像；安装脚本和在线更新都校验 sha256 / 签名，不信任中转站。
+- **公开仓库** https://github.com/eren006/changri ：放源码和每个版本的 Release 安装包，由作者在发新版后从开发仓库同步过来。装好之后升级走后台「更新」，不要在安装目录里 `git pull`。
+- **提问题或建议**：到公开仓库提 Issue。开发过程在作者自己的私有仓库里进行，代码改动不接受直接推到公开仓库。

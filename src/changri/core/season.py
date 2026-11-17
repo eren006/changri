@@ -116,6 +116,69 @@ def day_key() -> str:
     return today()
 
 
+def find_conflict(start: str, end: str, supp: str = "", exclude_id: int | None = None):
+    """档期（含补戏期）和别的预订/进行中的季度撞车就返回那个季度，没撞返回 None。已结束的历史季度不算。"""
+    last = supp or end
+    with get_conn() as conn:
+        for r in conn.execute("SELECT * FROM seasons WHERE status IN ('booked','running') ORDER BY start_date"):
+            if exclude_id is not None and r["id"] == exclude_id:
+                continue
+            if start <= last_end(r) and r["start_date"] <= last:
+                return r
+    return None
+
+
+def month_grid(ym: str = "", now: str | None = None) -> dict:
+    """月历：周一开头的整周格子，每格列出那天占着档期的季度。ym 形如 2026-11，不合法就用本月。
+    items 里 kind=main 是正式档期、supp 是补戏期；first=这一格是它在本月的起点（只在起点写名字）。"""
+    import calendar as _cal
+    t = now or today()
+    try:
+        y, m = int(ym[:4]), int(ym[5:7])
+        if not 1 <= m <= 12:
+            raise ValueError
+    except (ValueError, IndexError):
+        y, m = int(t[:4]), int(t[5:7])
+    seasons = all_seasons()
+    weeks = []
+    for week in _cal.Calendar(0).monthdatescalendar(y, m):
+        row = []
+        for d in week:
+            ds = d.isoformat()
+            items = []
+            for sn in seasons:
+                if not sn["start_date"] <= ds <= last_end(sn):
+                    continue
+                kind = "main" if ds <= sn["end_date"] else "supp"
+                items.append({"id": sn["id"], "name": sn["name"], "status": sn["status"], "kind": kind,
+                              "first": ds == sn["start_date"] or (d.weekday() == 0) or d.day == 1 or (kind == "supp" and ds == _next_day(sn["end_date"]))})
+            row.append({"date": ds, "day": d.day, "in_month": d.month == m, "today": ds == t, "items": items})
+        weeks.append(row)
+    py, pm = (y - 1, 12) if m == 1 else (y, m - 1)
+    ny, nm = (y + 1, 1) if m == 12 else (y, m + 1)
+    return {"year": y, "month": m, "label": f"{y} 年 {m} 月", "weeks": weeks, "prev": f"{py:04d}-{pm:02d}", "next": f"{ny:04d}-{nm:02d}",
+            "this": f"{t[:7]}"}
+
+
+def _next_day(ds: str) -> str:
+    import datetime
+    return (datetime.date.fromisoformat(ds) + datetime.timedelta(days=1)).isoformat()
+
+
+def upcoming_line(now: str | None = None) -> str:
+    """dashboard 日历上方一句话：现在在哪一季 / 下一季几天后开始。"""
+    t = now or today()
+    s = running()
+    if s:
+        return f"「{s['name']}」进行中（{day_label()}），档期到 {last_end(s)}"
+    b = next((r for r in booked() if last_end(r) >= t), None)
+    if not b:
+        return "还没有预订的季度"
+    import datetime
+    n = (datetime.date.fromisoformat(b["start_date"]) - datetime.date.fromisoformat(t)).days
+    return f"下一季「{b['name']}」" + (f"{n} 天后开始（{b['start_date']}）" if n > 0 else f"档期已到（{b['start_date']}），还没点开始")
+
+
 # ---------- 预订 / 开始 / 结束 ----------
 
 def book(name: str, start: str, end: str, supp: str = "", npcs: str = "") -> tuple[bool, str]:
@@ -126,6 +189,9 @@ def book(name: str, start: str, end: str, supp: str = "", npcs: str = "") -> tup
         return False, "档期的开始日要不晚于结束日。"
     if supp and supp < end:
         return False, "补戏截止日不能早于档期结束日。"
+    clash = find_conflict(start, end, supp)
+    if clash:
+        return False, f"档期和「{clash['name']}」（{clash['start_date']} ~ {last_end(clash)}）撞了，换个时间。"
     try:
         with get_conn() as conn:
             conn.execute("INSERT INTO seasons(name, start_date, end_date, supp_end, npcs) VALUES(?,?,?,?,?)",
@@ -138,6 +204,84 @@ def book(name: str, start: str, end: str, supp: str = "", npcs: str = "") -> tup
 def delete_booking(season_id: int) -> bool:
     with get_conn() as conn:
         return conn.execute("DELETE FROM seasons WHERE id=? AND status='booked'", (season_id,)).rowcount > 0
+
+
+def update_booking(season_id: int, name: str, start: str, end: str, supp: str = "") -> tuple[bool, str]:
+    """修改还没开始的预订（名字、档期、补戏期）。"""
+    name = name.strip()
+    if not name or len(name) > 30:
+        return False, "季度名要 1–30 个字。"
+    if not (start and end) or start > end:
+        return False, "档期的开始日要不晚于结束日。"
+    if supp and supp < end:
+        return False, "补戏截止日不能早于档期结束日。"
+    clash = find_conflict(start, end, supp, exclude_id=season_id)
+    if clash:
+        return False, f"档期和「{clash['name']}」（{clash['start_date']} ~ {last_end(clash)}）撞了，换个时间。"
+    try:
+        with get_conn() as conn:
+            n = conn.execute("UPDATE seasons SET name=?, start_date=?, end_date=?, supp_end=? WHERE id=? AND status='booked'",
+                             (name, start, end, supp, season_id)).rowcount
+    except Exception:  # noqa: BLE001
+        return False, f"已经有叫「{name}」的季度了。"
+    return (True, f"已修改「{name}」") if n else (False, "只能修改还没开始的预订。")
+
+
+def get_season(season_id: int):
+    with get_conn() as conn:
+        return conn.execute("SELECT * FROM seasons WHERE id=?", (season_id,)).fetchone()
+
+
+def latest_ended():
+    with get_conn() as conn:
+        return conn.execute("SELECT * FROM seasons WHERE status='ended' ORDER BY COALESCE(ended_ts, 0) DESC, id DESC LIMIT 1").fetchone()
+
+
+def rename_season(season_id: int, name: str) -> tuple[bool, str]:
+    """给历史季度改名（进行中、预订的季度不在这里改）。"""
+    name = name.strip()
+    s = get_season(season_id)
+    if not s or s["status"] != "ended":
+        return False, "只能给已结束的季度改名。"
+    if not name or len(name) > 30:
+        return False, "季度名要 1–30 个字。"
+    try:
+        with get_conn() as conn:
+            conn.execute("UPDATE seasons SET name=? WHERE id=?", (name, season_id))
+    except Exception:  # noqa: BLE001
+        return False, f"已经有叫「{name}」的季度了。"
+    return True, f"已改名为「{name}」"
+
+
+def edit_history(season_id: int, name: str, start: str, end: str, supp: str = "") -> tuple[bool, str]:
+    """编辑历史季度：名字和档期（只是记录，改了不影响别的季度，所以不查撞车）。"""
+    s = get_season(season_id)
+    if not s or s["status"] != "ended":
+        return False, "只能编辑已结束的季度。"
+    if not (start and end) or start > end:
+        return False, "档期的开始日要不晚于结束日。"
+    if supp and supp < end:
+        return False, "补戏截止日不能早于档期结束日。"
+    ok, msg = rename_season(season_id, name) if name.strip() != s["name"] else (True, "")
+    if not ok:
+        return ok, msg
+    with get_conn() as conn:
+        conn.execute("UPDATE seasons SET start_date=?, end_date=?, supp_end=? WHERE id=?", (start, end, supp, season_id))
+    return True, f"已保存「{name.strip()}」"
+
+
+def delete_history(season_id: int) -> tuple[bool, str]:
+    """删除一个已结束的历史季度（连同它的档案）。刚结束、还没收尾的那一季不能删：收尾时还要给它存档案。"""
+    s = get_season(season_id)
+    if not s or s["status"] != "ended":
+        return False, "只能删除已结束的季度。"
+    last = latest_ended()
+    if get_config("season_wiped", "1") == "0" and last and last["id"] == season_id:
+        return False, "这一季刚结束、还没收尾，先收尾再删。"
+    with get_conn() as conn:
+        conn.execute("DELETE FROM season_archives WHERE season_id=?", (season_id,))
+        conn.execute("DELETE FROM seasons WHERE id=?", (season_id,))
+    return True, f"已删除历史季度「{s['name']}」和它的档案"
 
 
 def update_schedule(start: str, end: str, supp: str = "") -> tuple[bool, str]:
@@ -226,6 +370,7 @@ def end() -> tuple[bool, str]:
         conn.execute("UPDATE seasons SET status='ended', ended_ts=? WHERE id=?", (int(time.time()), s["id"]))
     set_config("auto_day", "0")
     set_config("season_wiped", "0")
+    _archive(s["id"])
     return True, f"⏹️ 「{s['name']}」已结束。核对完存档后发「收尾」清空本季的角色和互动记录（先预览，再「收尾 确认」）。"
 
 
@@ -246,11 +391,25 @@ def wipe_preview() -> dict[str, int]:
         return {label: conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] for t, label in names.items()}
 
 
+def _archive(season_id: int) -> None:
+    from . import seasonarchive
+    try:
+        seasonarchive.snapshot(season_id)
+    except Exception:  # noqa: BLE001 存档失败不能拦住结束/收尾
+        import logging
+        logging.getLogger(__name__).exception("季度档案没存下来")
+
+
 def wipe() -> None:
-    """清空本季数据：角色（连带群位、属性、出场、认群码）、短信、拉黑、心动信、关系线。管理员、设置、季度记录都保留。"""
+    """清空本季数据：角色（连带群位、属性、出场、认群码）、短信、拉黑、心动信、关系线。管理员、设置、季度记录都保留。
+    清空之前先给刚结束的那一季存一份档案（房间复盘、统计），之后还能在「季度」页回看。"""
+    last = latest_ended()
+    if last and get_config("season_wiped", "1") == "0":
+        _archive(last["id"])
     with get_conn() as conn:
-        for t in ("votes", "replies", "posts", "wishes", "join_requests", "room_lines", "room_members", "rooms", "lovemails", "rel_details", "relations", "messages", "blocks", "entrance_images", "entrance", "bind_codes", "role_attrs", "role_groups", "roles"):
+        for t in ("tap_outbox", "item_taps", "letter_effects", "letters", "votes", "replies", "posts", "wishes", "join_requests", "room_lines", "room_members", "rooms", "lovemails", "rel_details", "relations", "messages", "blocks", "entrance_images", "entrance", "bind_codes", "role_attrs", "role_groups", "roles"):
             conn.execute(f"DELETE FROM {t}")
+        conn.execute("DELETE FROM sqlite_sequence WHERE name='rooms'")        # 新季度的 R 号从 1 重新开始
         conn.execute("UPDATE pool_groups SET state='free', room_id=NULL")
     set_config("season_wiped", "1")
     set_config("game_day", "")
@@ -274,7 +433,7 @@ def day_summary_line() -> str:
         msg = {r[0]: r[1] for r in c.execute(
             "SELECT kind, COUNT(*) FROM messages WHERE day=? AND error!='已撤回' GROUP BY kind", (key,))}
         wish = c.execute("SELECT COUNT(*) FROM wishes WHERE dkey=?", (key,)).fetchone()[0]
-    parts = [f"{k} {room.pop(k, 0)} 场" for k in ("私约", "电话", "官约")]
+    parts = [f"{k} {room.pop(k, 0)} 场" for k in ("约会", "电话", "官约")]
     parts += [f"{k} {n} 场" for k, n in room.items() if n]             # 微信、踩点、前置电话……有才显示
     parts += [f"短信 {msg.get('sms', 0)} 条", f"礼物 {msg.get('gift', 0)} 份"]
     if wish:

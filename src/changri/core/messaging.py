@@ -1,4 +1,4 @@
-"""短信与礼物：入库、冷却、投递（个人群优先，失败依次试备用群）、重试。
+"""短信与礼物：入库、冷却、投递（发到个人群）、重试。
 
 发送函数 send(bot_id, group_openid, text) 由调用方传入（不同的群可能属于不同的机器人），这里不依赖 QQ。
 """
@@ -75,7 +75,7 @@ def render(kind: str, from_name: str, title: str, content: str) -> str:
 
 
 async def push_to_role_ex(role_id: int, text: str, send: Send, at: bool = True) -> tuple[bool, str, str, str]:
-    """把一段文字发到某角色：主群优先，失败依次试备用群。返回 (是否送达, 群 openid 或错误, 机器人 ID, 消息 id)。"""
+    """把一段文字发到某角色：发到个人群。返回 (是否送达, 群 openid 或错误, 机器人 ID, 消息 id)。"""
     errors = []
     with get_conn() as conn:
         r = conn.execute("SELECT name FROM roles WHERE id=?", (role_id,)).fetchone()
@@ -132,7 +132,7 @@ async def _maybe_broadcast(m, send: Send) -> None:
 
 
 async def deliver(msg_id: int, send: Send) -> bool:
-    """投递一条消息：主群 → 备用群，第一个成功的就算送达。返回是否送达。"""
+    """投递一条消息：发到个人群。返回是否送达。"""
     with get_conn() as conn:
         m = conn.execute(
             "SELECT m.*, f.name AS from_name FROM messages m JOIN roles f ON f.id=m.from_role_id WHERE m.id=?",
