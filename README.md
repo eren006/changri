@@ -69,3 +69,14 @@ python3.12 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 - **安装包**：只从 https://system.changri.work 下载（`get.sh`、`/downloads/`）。服务器上不存安装包，`/downloads/` 会跳转到 GitHub Release 的加速镜像；安装脚本和在线更新都校验 sha256 / 签名，不信任中转站。
 - **公开仓库** https://github.com/eren006/changri ：放源码和每个版本的 Release 安装包，由作者在发新版后从开发仓库同步过来。装好之后升级走后台「更新」，不要在安装目录里 `git pull`。
 - **提问题或建议**：到公开仓库提 Issue。开发过程在作者自己的私有仓库里进行，代码改动不接受直接推到公开仓库。
+
+## 许可证
+
+长日bot 由作者 [eren006](https://github.com/eren006) 独立开发（开发过程中用了 Claude Code 和 Codex 两个 AI 编程助手辅助），源码公开，以 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans)（署名-非商业性使用-相同方式共享 4.0 国际）发布，全文见 [LICENSE](LICENSE)。简单说：
+
+- **可以**：免费查看、下载、使用、修改、二次创作、重新发布，用来学习交流都不需要另外找作者授权。
+- **要署名**：转载或发布改版时注明原作者和出处（长日bot，https://github.com/eren006/changri），并说明改了什么。
+- **不能商用**：不得用于任何商业目的，包括出售代码、收费搭建或代部署、打包卖课等。
+- **相同方式共享**：改版也要用同样的协议（CC BY-NC-SA 4.0）发布。
+
+想商用的话，请先在公开仓库提 Issue 联系作者。

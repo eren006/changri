@@ -43,7 +43,7 @@ _EMOJI = re.compile("[\U0001F000-\U0001FAFF\u2190-\u21FF\u2300-\u27BF\u2B00-\u2B
 
 
 def _label(s: str) -> str:
-    """按钮上不放 emoji（Erin 定的）：写了也在这里去掉。"""
+    """按钮上不放 emoji（作者定的）：写了也在这里去掉。"""
     s = _EMOJI.sub("", str(s)).strip()
     return s if len(s) <= LABEL_MAX else s[:LABEL_MAX - 1] + "…"
 

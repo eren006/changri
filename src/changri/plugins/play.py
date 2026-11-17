@@ -1,6 +1,6 @@
 """核心玩法：约会/电话/官约/微信（约会房间）、时间线、我的待回。（论坛、心愿已拆成可开关的官方扩展 plugins/forum.py、plugins/wishes.py）
 规则和数据在 core/rooms.py、pool.py、wishes.py、pending.py；这里只管解析指令、回话、通知。
-官方机器人建不了群：房间从「群池」里领一个空群，群号由管理员在设置平台填；群池用完就排队。"""
+官方机器人建不了群：房间从「群池」里领一个空群，群号由管理员在设置平台填；群池用完就开不成，告诉玩家，不排队。"""
 import json
 import re
 import time
@@ -892,7 +892,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     await reply_long(see_arc, arclen.report(r["id"]))
 
 
-# ================= 定时：过期结束、给排队的房间补群 =================
+# ================= 定时：过期结束、给还没分到群的房间补群 =================
 
 @scheduler.scheduled_job("interval", seconds=30, id="rooms_tick", max_instances=1, coalesce=True)
 @per_bot

@@ -195,6 +195,13 @@ hr.orn{border:0;height:1px;background:linear-gradient(90deg,transparent,var(--li
 .cmdline code{background:none;border:0;padding:0;color:inherit;white-space:pre;flex:1}
 .copy{flex:none;font:600 12px var(--sans);border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:inherit;border-radius:999px;padding:5px 12px;cursor:pointer}
 .copy:hover{background:rgba(255,255,255,.14)}
+.hb{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:18px 0 4px}
+.hb-btn{font:600 14px var(--sans);color:#fff4dc;background:linear-gradient(135deg,#b8241b,#e04a3c);border:0;border-radius:999px;padding:10px 18px;cursor:pointer;box-shadow:0 12px 24px -14px rgba(150,25,15,.8)}
+.hb-btn:hover{filter:brightness(1.07)}
+.hb-reveal{display:flex;align-items:center;gap:12px;max-width:100%;color:#fff4dc;background:linear-gradient(135deg,#a91f17,#d23b2f);border-radius:16px;padding:8px 8px 8px 16px;box-shadow:0 12px 24px -14px rgba(150,25,15,.8)}
+.hb-reveal[hidden]{display:none}
+.hb-reveal small{font-size:12px;opacity:.8}
+.hb-reveal b{font-size:17px;letter-spacing:.03em;color:#fff4dc;word-break:break-all}
 
 /* steps */
 .steps{counter-reset:s;list-style:none;padding:0;margin:20px 0}
@@ -558,8 +565,8 @@ body::after{content:"";position:fixed;inset:0;z-index:30;pointer-events:none;
     <div class="inner">
       <div class="lavcard">
         <p class="eyebrow">✦ The Remains of the Day</p>
-        <h1>让一整季的心动，<br><em>有条不紊</em>地发生。</h1>
-        <p class="lead">长日bot 是为群恋综而生的 QQ 官方机器人：角色、短信、礼物、约会、心动信、关系线、季度，外加一部玩家用的网页小手机。装好以后全在网页后台管理，不用写一行代码。</p>
+        <h1>让一整季的管理，<br><em>有条不紊</em>发生。</h1>
+        <p class="lead">长日bot 是为恋综而设计的 QQ 官方机器人对接平台：包含角色、短信、礼物、约会、心动信、关系线等，外加网页和 UI 端。</p>
         <div class="cta">
           <a class="btn pri" href="#/install">开始安装 <span aria-hidden="true">→</span></a>
           <a class="btn sec" href="#/season">读恋综指南</a>
@@ -582,8 +589,8 @@ body::after{content:"";position:fixed;inset:0;z-index:30;pointer-events:none;
   <div class="band">
     <div class="wrap">
       <div class="shead">
-        <div><span class="num">Features · 能做什么</span><h2>一场恋综需要的，<br>它都替你做。</h2></div>
-        <p>主持人不再对着表格手动转发短信、核对时间线。玩家在自己的群里发一句话，剩下的交给机器人。</p>
+        <div><span class="num">Features · 能做什么</span><h2>一场恋综需要的功能，<br>它都替你做。</h2></div>
+        <p>不再手动转发短信、核对时间线，剩下的交给机器人。</p>
       </div>
       <img class="deco float b" src="assets/snowflake.svg" alt="" aria-hidden="true" style="width:58px;right:-6px;top:-30px">
       <div class="grid3" id="feats"></div>
@@ -593,13 +600,13 @@ body::after{content:"";position:fixed;inset:0;z-index:30;pointer-events:none;
   <div class="band">
     <div class="wrap">
       <div class="shead">
-        <div><span class="num">How it works · 工作原理</span><h2>一个负责说，<br>一个负责听。</h2></div>
-        <p>官方机器人稳定、不怕封号，收发消息、指令、通知都靠它。可选的 QQ 小号本来就在各个群里，帮你旁听房间、记下戏文，还能自动改群名。<a href="#/how">看它们怎么配合 →</a></p>
+        <div><span class="num">How it works · 工作原理</span><h2>一个说，<br>一个听。</h2></div>
+        <p>官方机器人稳定不怕封号，可以收发消息、指令、通知。搭配可选的 QQ 小号旁听房间，无需新拉群。<a href="#/how">看它们怎么配合 →</a></p>
       </div>
       <div class="duo">
-        <a class="feat" href="#/how"><div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16v10H8l-4 4z"/></svg></div><h3>官方机器人</h3><p>收指令、发短信、送邀请、派心动信。玩家看到的所有回复都来自它。</p></a>
+        <a class="feat" href="#/how"><div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16v10H8l-4 4z"/></svg></div><h3>官方机器人</h3><p>收指令、发短信、送邀请、派心动信，接收玩家个人群的所有回复。</p></a>
         <div class="duo-mid"><span class="orbic big"></span><b>长日bot</b><small>你的服务器</small></div>
-        <a class="feat" href="#/how"><div class="ic silver"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="12" cy="12" r="2.5"/></svg></div><h3>QQ 小号 <span class="tag x">可选</span></h3><p>旁听备用群、记下每一句戏、自动改群名，复盘和字数统计靠它。</p></a>
+        <a class="feat" href="#/how"><div class="ic silver"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="12" cy="12" r="2.5"/></svg></div><h3>QQ 小号 <span class="tag x">可选</span></h3><p>旁听房间群，记下戏，自动改群名，统计房间状态。</p></a>
       </div>
     </div>
   </div>
@@ -613,7 +620,7 @@ body::after{content:"";position:fixed;inset:0;z-index:30;pointer-events:none;
       <img class="deco float" src="assets/orb-red.webp" alt="" aria-hidden="true" style="width:56px;left:-18px;bottom:-24px;z-index:3">
       <img class="deco" src="assets/holly.svg" alt="" aria-hidden="true" style="width:110px;right:-14px;bottom:-40px">
       <div class="season">
-        <div><span class="d">01</span><h4>开季之前</h4><p>预订季度、设公告群和备用群池；玩家建群、创建角色。</p></div>
+        <div><span class="d">01</span><h4>开季之前</h4><p>预订季度、设公告群和群池；玩家建群、创建角色。</p></div>
         <div><span class="d">02</span><h4>出场</h4><p>抽取出场顺序，轮到谁，戏群里就出现谁。</p></div>
         <div><span class="d">03</span><h4>日常</h4><p>短信、送礼、约会、电话，时间线自动记。</p></div>
         <div><span class="d">04</span><h4>夜里</h4><p>心动信统一派送，关系线一根根拉起来。</p></div>
@@ -629,14 +636,18 @@ body::after{content:"";position:fixed;inset:0;z-index:30;pointer-events:none;
     <aside class="toc"></aside>
     <article>
       <h1 class="ptitle">安装</h1>
-      <p class="psub">安装包自带运行环境，不用装 Python，也不用联网装依赖。Linux 一条命令，Windows 解压即用。当前版本 <code>@VERSION@</code>。</p>
+      <p class="psub">安装包自带运行环境，不用装 Python，也不用联网装依赖。Linux 只需一条命令，Windows 解压即用。当前版本 <code>@VERSION@</code>。</p>
+      <div class="hb">
+        <button type="button" class="hb-btn" id="hbBtn" aria-controls="hbReveal" aria-expanded="false">🧧 点我领红包口令</button>
+        <div class="hb-reveal" id="hbReveal" hidden><small>红包口令</small><b>我爱加百列66！</b><button type="button" class="copy" data-copy="我爱加百列66！">复制</button></div>
+      </div>
 
       <h2 id="i-prep"><span class="n">01</span>准备</h2>
       <div class="gloss">
-        <div><dt>一台服务器</dt><dd>Linux（Ubuntu 20.04+ / Debian 10+ / CentOS 8+）或 Windows，有公网 IP。2 核 2G 够用。</dd></div>
-        <div><dt>一个 QQ 官方机器人</dt><dd>在 <a href="https://q.qq.com" rel="noopener" target="_blank">QQ 开放平台</a> 创建，记下 AppID 和 AppSecret。</dd></div>
-        <div><dt>不需要域名</dt><dd>也不需要备案。想要 HTTPS，后台一键开通。</dd></div>
-        <div><dt>两个端口</dt><dd><code>5091</code> 设置平台；<code>5092</code> 玩家小手机（用到再开）。</dd></div>
+        <div><dt>一台服务器</dt><dd>Linux（Ubuntu 20.04+ / Debian 10+ / CentOS 8+）或 Windows，有公网 IP。目前 2 核 2G 够用。</dd></div>
+        <div><dt>一个 QQ 官方机器人</dt><dd>需要在 <a href="https://q.qq.com" rel="noopener" target="_blank">QQ 开放平台</a> 创建，记下 AppID 和 AppSecret，后续连接用。</dd></div>
+        <div><dt>不需要域名</dt><dd>无需备案。如果想要 HTTPS 安全域名，可以后台一键开通。</dd></div>
+        <div><dt>开放两个端口</dt><dd><code>5091</code> 设置 UI；<code>5092</code> 对接小手机功能。</dd></div>
       </div>
 
       <h2 id="i-setup"><span class="n">02</span>安装</h2>
@@ -660,7 +671,7 @@ body::after{content:"";position:fixed;inset:0;z-index:30;pointer-events:none;
 
       <h2 id="i-first"><span class="n">03</span>第一次使用</h2>
       <ol class="steps">
-        <li><b>放行端口</b>云服务商控制台的「安全组 / 防火墙」放行 TCP <code>5091</code>；以后开小手机再放行 <code>5092</code>。</li>
+        <li><b>放行端口</b>需要云服务商控制台的「安全组 / 防火墙」放行 TCP <code>5091</code>；然后开小手机再放行 <code>5092</code> 端口。</li>
         <li><b>打开设置平台</b>浏览器访问 <code>http://服务器公网IP:5091</code>，输入安装时显示的验证码，建管理账号。</li>
         <li><b>跟着向导走</b>填 AppID / AppSecret → 把服务器 IP 加进 QQ 开放平台的 IP 白名单 → 设 QQ 管理员 → 建第一个角色 →（可选）开小手机。</li>
         <li><b>测一下</b>在群里对机器人发 <code>/ping</code>，回「收到」就通了。</li>
@@ -712,12 +723,12 @@ body::after{content:"";position:fixed;inset:0;z-index:30;pointer-events:none;
 
       <h2 id="s-words"><span class="n">00</span>先认识几个词</h2>
       <dl class="gloss">
-        <div><dt>个人群</dt><dd>每个玩家自己建的小群，拉机器人进去。短信、礼物、邀请都送到这里。</dd></div>
-        <div><dt>公告群</dt><dd>全员大群。论坛、播报、点歌等公开内容发在这里。</dd></div>
-        <div><dt>戏群</dt><dd>出场时用的群，轮到谁，机器人就把谁的出场戏发进来。</dd></div>
-        <div><dt>备用群池</dt><dd>预先建好的一批空群（备用群）。约会、电话开房间时，从这里领一个；没有空群时新的房间开不成，不排队。</dd></div>
-        <div><dt>房间 R12</dt><dd>一次约会 / 电话 / 官约就是一个房间，带编号，复盘、结束都靠它。</dd></div>
-        <div><dt>D几 · 时间</dt><dd>游戏内第几天，时间写成 <code>1400-1500</code>。不写 D 就是今天。</dd></div>
+        <div><dt>个人群</dt><dd>玩家的个人小群，需要拉官方机器人进去。短信、礼物、邀请的回复和发起都从这里开始。</dd></div>
+        <div><dt>公告群</dt><dd>全员用的大群。论坛、播报、点歌等公开内容会发在这里。</dd></div>
+        <div><dt>戏群</dt><dd>出场、群戏时用的群。</dd></div>
+        <div><dt>群池</dt><dd>预先建好的一批空群。约会、电话开房间时，可以从这里领一个分配。</dd></div>
+        <div><dt>房间 R12</dt><dd>每一次约会 / 电话 / 官约形成一个独特的房间号，可以在复盘使用。</dd></div>
+        <div><dt>D几 · 时间</dt><dd>游戏内第几天，时间写成 <code>1400-1500</code>，无需冒号。</dd></div>
       </dl>
 
       <h2 id="s-buttons"><span class="n">✦</span>点按钮就行</h2>
@@ -745,20 +756,20 @@ body::after{content:"";position:fixed;inset:0;z-index:30;pointer-events:none;
       <div class="only-admin">
         <h3>主持人：搭好舞台 <span class="tag a">管理员</span></h3>
         <ol class="steps">
-          <li><b>认管理员</b>在设置平台「管理员」页生成 6 位码，到群里发 <code>认管理员 码</code>。</li>
+          <li><b>认管理员</b>先在设置平台「管理员」页生成 6 位码，到群里发 <code>认管理员 码</code>。</li>
           <li><b>划分群</b>在全员群发 <code>设为公告群</code>；主持人内部群发 <code>设为后台群</code>；闲聊群发 <code>设为水群</code>；出场用的群发 <code>设为戏群</code>。</li>
-          <li><b>准备备用群池</b>把机器人拉进一批空群，在每个群里发 <code>设为备用群池</code>。<code>查看备用群池</code> 看还剩几个。</li>
-          <li><b>预订季度</b><code>预订季度 长日将尽 1115-1120 补戏1123</code>，也可以在设置平台「季度」页填。</li>
-          <li><b>NPC（可选）</b><code>创建NPC 名字</code> 建一个没有个人群的角色；或 <code>设为NPC 角色名</code>。NPC 不参与出场。</li>
+          <li><b>准备群池</b>把 QQ 官方机器人拉进备用群，在每个群里发 <code>设为群池</code>。或者使用 QQ 小号，然后在后台批量添加。可以 <code>查看群池</code> 看还剩几个。</li>
+          <li><b>预订季度</b><code>预订季度 长日将尽 1115-1120 补戏1123</code>，也可以在设置平台「季度」页填写。</li>
+          <li><b>NPC（可选）</b><code>创建NPC 名字</code> 建一个没有个人群的角色；或将已经创建的角色 <code>设为NPC 角色名</code>。</li>
         </ol>
       </div>
       <div class="only-player">
         <h3>玩家：建好自己的个人群 <span class="tag p">玩家</span></h3>
         <ol class="steps">
-          <li><b>建群并拉机器人</b>自己建一个 QQ 群，把机器人拉进去，它会发一段欢迎语。</li>
-          <li><b>创建角色</b>在这个群里发 <code>创建新角色 名字</code>，这个群就成了你的个人群。</li>
-          <li><b>小手机（可选）</b>发 <code>手机码</code>，拿网页链接和激活码，在手机浏览器里打开。</li>
-          <li><b>拿模板</b>发 <code>格式短信</code> <code>格式送礼</code>，拿到能直接复制的写法。</li>
+          <li><b>建群并拉机器人</b>建立或确定个人群，管理员把官方机器人拉入。</li>
+          <li><b>创建角色</b>在这个群里发 <code>创建新角色 名字</code>，绑定角色。</li>
+          <li><b>小手机（可选）</b>如果已经激活小手机，发 <code>手机码</code>，拿网页链接和激活码，在手机浏览器里打开。</li>
+          <li><b>查看格式</b>发 <code>格式短信</code> <code>格式送礼</code>，拿到能直接复制的写法。</li>
         </ol>
         <div class="ex">
           <div class="chat static">
@@ -778,7 +789,7 @@ body::after{content:"";position:fixed;inset:0;z-index:30;pointer-events:none;
       </ul>
 
       <h2 id="s-daily"><span class="n">03</span>日常：短信、送礼</h2>
-      <p>在<b>自己的个人群</b>里发，机器人会转到对方的个人群。每天的次数和冷却由主持人在后台设定。</p>
+      <p>在<b>自己的个人群</b>里发送指令，机器人会转到对方的个人群。</p>
       <div class="ex">
         <div class="chat static">
           <div class="msg me">短信 小满 今晚的月色很好</div>
@@ -802,7 +813,7 @@ body::after{content:"";position:fixed;inset:0;z-index:30;pointer-events:none;
       </ul>
 
       <h2 id="s-date"><span class="n">04</span>约会、电话、踩点</h2>
-      <p>发起后机器人从备用群池领一个空群当「房间」，通知对方进群。人到齐就开始，聊完在房间里发「结束约会」。</p>
+      <p>发起后机器人从群池领一个空群分配，通知对方进群，在个人群发送对应的 QQ 群号。等人到齐就可以开始写戏，聊完在房间里发「结束约会」。</p>
       <div class="tblwrap"><table class="tbl">
         <tr><th>类型</th><th>写法</th><th>说明</th></tr>
         <tr><td>约会</td><td><code>约会 1400-1500 咖啡厅 小满</code></td><td>多人用 <code>/</code> 隔开：<code>小满/阿川</code></td></tr>
@@ -815,17 +826,17 @@ body::after{content:"";position:fixed;inset:0;z-index:30;pointer-events:none;
       <ul>
         <li><code>结束约会</code>（电话、官约也用这一条）：聊完结束，写进双方时间线。</li>
         <li><code>申请加入 小满 14:00</code>：想加入别人正在进行的约会；对方用 <code>同意加入 编号</code> / <code>拒绝加入 编号</code>。</li>
-        <li><code>复盘 R12</code>：把一场房间的戏文画成长图，只有参与者和管理员能看。</li>
-        <li><code>补录 R12</code>：监听的 QQ 号掉线漏记了？把聊天记录合并转发到备用群，回复它发这一句。</li>
+        <li><code>复盘 R12</code>：查看某一场的复盘。</li>
+        <li><code>补录 R12</code>：监听的 QQ 号掉线漏记了？把聊天记录合并转发到个人群，回复这段合并记录发「补录 + 房间号」。</li>
         <li><code>时间线</code> / <code>时间线 角色名</code>：看排期。要改：在房间群里发 <code>修改时间线 D1 1400-1500</code>；在<b>个人群</b>里也能改，带上房间号：<code>修改时间线 R12 D1 1400-1500</code>，其他参与者会在自己的个人群收到申请，点「同意」或「拒绝」。所有参与者同意后生效。</li>
       </ul>
 
       <h2 id="s-official"><span class="n">05</span>官约与官电</h2>
-      <p>由主持人安排的「节目组约会」。</p>
+      <p>由主持人安排的官约。</p>
       <div class="only-admin">
         <ul>
           <li><span class="tag a">管理员</span> <code>发起官约 D3 1400-1500 后山 小满/阿林</code>：立即发起（地点可省）。</li>
-          <li><code>发起官电 D2 2000-2100 小满/阿林</code>：节目组安排的电话。</li>
+          <li><code>发起官电 D2 2000-2100 小满/阿林</code>：管理组安排的电话。</li>
           <li><b>批量排：</b>先多次 <code>计划官约 …</code> 攒着，再发一次 <code>执行官约</code> 一起发出；<code>计划官约 清空</code> 重来。</li>
           <li><code>取消官约 R12</code> 当作没发生过；<code>强结约会 R12</code> 结束卡住的房间；<code>删除时间线 角色名 R12</code> 彻底删掉一场。</li>
         </ul>
@@ -833,7 +844,7 @@ body::after{content:"";position:fixed;inset:0;z-index:30;pointer-events:none;
       <p class="only-player"><span class="tag p">玩家</span> 收到官约邀请后，和约会一样进房间、按格式写戏、结束时发 <code>结束约会</code>。</p>
 
       <h2 id="s-lovemail"><span class="n">06</span>心动信</h2>
-      <p>每晚的重头戏：白天悄悄投递，到点统一派送。收信人不知道是谁写的，除非你署名。</p>
+      <p>到点统一派送，可以选择匿名或者署名。</p>
       <div class="ex">
         <div class="chat static">
           <div class="msg me">发送心动信
@@ -850,15 +861,15 @@ body::after{content:"";position:fixed;inset:0;z-index:30;pointer-events:none;
 
       <h2 id="s-relations"><span class="n">07</span>关系线、公知与二表</h2>
       <ul>
-        <li><code>拉线 小满 第一次见面是在雨里</code>：给你和对方的关系线添一条细节，会同步到对方的群。</li>
-        <li><code>查看关系线 小满</code> 看你们之间的所有细节；<code>撤回关系 小满 要撤回的内容</code>；双方都认可时 <code>确认关系线 小满</code>。</li>
-        <li><code>提交公知 内容</code>：大家都能看到的公开设定，可带图，重复提交会覆盖。<code>查看公知</code> 生成长图。</li>
-        <li><code>提交二表 内容</code>：只有本人和管理员能看的私密设定。</li>
-        <li class="only-admin"><span class="tag a">管理员</span> <code>关系线统计</code>：每个人拉了几根线。</li>
+        <li><code>拉线 小满 第一次见面是在雨里</code>：给你和对方的关系线添一条细节，会同步到对方的群并且通知。</li>
+        <li><code>查看关系线 小满</code> 看你们之间已经写了的所有细节；<code>撤回关系 小满 要撤回的内容</code>；双方都认可关系线，决定结束时 <code>确认关系线 小满</code>。</li>
+        <li><code>提交公知 内容</code>：大家都能看到的公知，可带图，重复提交会覆盖。<code>查看公知</code> 生成长图查看所有人。</li>
+        <li><code>提交二表 内容</code>：向管理员上传你的二表。</li>
+        <li class="only-admin"><span class="tag a">管理员</span> <code>关系线统计</code>：每个人拉了几条关系线。</li>
       </ul>
 
       <h2 id="s-extras"><span class="n">08</span>可选玩法</h2>
-      <p>这些在后台「功能与设置」「扩展」里按需打开，没开的指令不会响应。</p>
+      <p>这些在后台「功能与设置」「扩展」里按需打开，没开的指令不会响应，无需设置。</p>
       <div class="grid3" style="grid-template-columns:repeat(2,1fr)">
         <div class="feat"><h3>论坛</h3><p><code>发帖 署名 内容</code> 匿名发帖；<code>回复帖子 001 内容</code>，<code>点赞 001</code>，<code>查看帖子</code>。</p></div>
         <div class="feat"><h3>心愿</h3><p><code>挂心愿 1400-1500 花园 一起散步</code>，别人 <code>摘心愿 编号</code> 就开一场约会。悬赏心愿可以带奖励。</p></div>
@@ -998,8 +1009,8 @@ body::after{content:"";position:fixed;inset:0;z-index:30;pointer-events:none;
       <details class="qa"><summary>发了指令机器人没反应</summary><div>① 对应的扩展可能没开（后台「功能与设置」）；② 后台开了「指令必须带前缀」，需要在前面加 <code>/</code>；③ 这个群是跑团模式，恋综指令会静音；④ 你还没在个人群「创建新角色」。</div></details>
       <details class="qa"><summary>回复下面没有按钮</summary><div>按钮要机器人在 QQ 开放平台有群 Markdown 和按钮权限，没有的话会自动发纯文字，照文字提示手打指令就行。也可能是主持人在后台「功能与设置 → 基础」关掉了「列表下面挂按钮」。</div></details>
       <details class="qa"><summary>短信发错人了</summary><div>2 分钟内在自己群里发 <code>撤回</code>，对方群里那条一起删，次数返还。超过 2 分钟请联系管理员。</div></details>
-      <details class="qa"><summary>复盘说「没有记到戏文」</summary><div>备用群里要有监听的 QQ 号，说话的人要用 <code>绑定qq 你的QQ号</code> 绑过，戏文要按「角色名：正文」写。漏记的可以用 <code>补录 R房间号</code> 补。</div></details>
-      <details class="qa"><summary>备用群池用完了怎么办</summary><div>新的约会、电话会开不成，机器人会告知玩家，不会排队。管理员可以多准备几个备用群，在里面发 <code>设为备用群池</code>。</div></details>
+      <details class="qa"><summary>复盘说「没有记到戏文」</summary><div>房间群里要有监听的 QQ 号，说话的人要用 <code>绑定qq 你的QQ号</code> 绑过，戏文要按「角色名：正文」写。漏记的可以用 <code>补录 R房间号</code> 补。</div></details>
+      <details class="qa"><summary>群池用完了怎么办</summary><div>新的约会、电话会无法开启，机器人会告知玩家，不会排队。主持人可以多准备几个群，在里面发 <code>设为群池</code>。</div></details>
     </article>
   </div>
 </section>
@@ -1042,7 +1053,7 @@ body::after{content:"";position:fixed;inset:0;z-index:30;pointer-events:none;
     <aside class="toc"></aside>
     <article>
       <h1 class="ptitle">工作原理</h1>
-      <p class="psub">长日bot 的主力是<b>官方机器人</b>：收指令、发消息、发通知、补录都靠它。<b>QQ 小号</b>是可选的帮手，本来就在各个群里，等着旁听房间、记下戏文，还能顺手改群名。中间由装在你服务器上的长日bot 指挥。</p>
+      <p class="psub">长日bot 的主力是<b>官方机器人</b>：收指令、发消息、发通知、补录都靠它。<b>QQ 小号</b>是可选的帮手，省去重新拉群的麻烦，旁听房间、记下戏录，提供改群名服务。中间由装在你服务器上的长日bot 程序指挥。</p>
 
       <div class="arch">
         <div class="node">
@@ -1056,26 +1067,26 @@ body::after{content:"";position:fixed;inset:0;z-index:30;pointer-events:none;
           <span class="orbic big"></span>
           <h4>长日bot</h4>
           <p>装在你自己的服务器上</p>
-          <ul><li>角色、时间线、季度、数据库</li><li>设置平台 :5091 · 小手机 :5092</li><li>决定谁来说、谁来听</li></ul>
+          <ul><li>角色、时间线、季度、数据库</li><li>设置平台 :5091 · 小手机 :5092</li><li>整套系统的大脑</li></ul>
         </div>
         <div class="wire"><span>OneBot 11 · WebSocket + 口令</span><i></i></div>
         <div class="node">
           <span class="orbic silver"></span>
           <h4>QQ 小号 <span class="tag x">可选</span></h4>
           <p>登录在 NapCat / LLBot / SnowLuma 这类客户端里</p>
-          <ul><li>旁听备用群里的每一句</li><li>给备用群改群名</li><li>官方机器人不在的备用群里代为回话</li></ul>
+          <ul><li>旁听备用群</li><li>给房间群改群名</li><li>官方机器人不在的房间群里代为回话</li></ul>
         </div>
       </div>
 
       <h2 id="h-why"><span class="n">01</span>为什么还要一个小号</h2>
-      <p>说话、指令、通知、补录，官方机器人都能做。小号的好处是<b>省事</b>：它本来就在群里，不用一个个拉机器人、开设置；而且它能改群名，这是官方机器人做不到的。</p>
+      <p>省去重新拉群的麻烦，而且可以接入多个小号，补充备用群。</p>
       <div class="tblwrap"><table class="tbl">
         <tr><th>事情</th><th>官方机器人</th><th>QQ 小号</th></tr>
-        <tr><td>收指令、发通知</td><td>✓ 主力</td><td>只在官方机器人不在的备用群里，回结束约会、修改时间线这几句</td></tr>
-        <tr><td>进备用群</td><td>要把它拉进每一个备用群，并打开相应设置</td><td>✓ 本来在群里就行，比如以前给海豹骰用过的号</td></tr>
+        <tr><td>收指令、发通知</td><td>✓ 主力</td><td>备用群里，回结束约会、修改时间线这几句</td></tr>
+        <tr><td>进房间群</td><td>要把它拉进每一个备用群，并打开相应设置</td><td>✓ 本来在群里就行，比如以前给海豹骰用过的号</td></tr>
         <tr><td>改群名</td><td>✗</td><td>✓ 要是群管理员或群主</td></tr>
         <tr><td>认出真实群号</td><td>✗ 只有加密的群 ID，靠「认群码」绑定</td><td>✓ 后台直接勾选群，加进群号组</td></tr>
-        <tr><td>补录漏记的戏</td><td>✓ 在个人群回复那条合并转发，发 <code>补录 R12</code></td><td>✓ 在备用群里也能补</td></tr>
+        <tr><td>补录漏记的戏</td><td>✓ 在个人群回复那条合并转发，发 <code>补录 R12</code></td><td>✗ 无法补录</td></tr>
         <tr><td>踢人、禁言、加好友</td><td>—</td><td>✗ 代码里直接禁止</td></tr>
       </table></div>
       <div class="callout"><p><b>小号是可选的。</b>不接小号，短信、心动信、关系线、季度都不受影响；约会房间就得把官方机器人拉进每个备用群并打开设置，群名也不会自动改。目前房间戏文的复盘由小号来记；让官方机器人在备用群里也能记，是接下来要做的。</p></div>
@@ -1083,21 +1094,21 @@ body::after{content:"";position:fixed;inset:0;z-index:30;pointer-events:none;
       <h2 id="h-date"><span class="n">02</span>一场约会里，两个账号怎么配合</h2>
       <ol class="steps relay">
         <li><b>玩家发起 <span class="who k">官方机器人</span></b>阿林在自己的个人群发 <code>约会 1400-1500 咖啡厅 小满</code>，官方机器人收到，交给长日bot。</li>
-        <li><b>领一个房间 <span class="who c">长日bot</span></b>从备用群池里领一个空闲的备用群，记成 R12，写进两个人的时间线。备用群池用完了就无法开启，并告知玩家。</li>
-        <li><b>改群名 <span class="who q">小号</span></b>小号把群名改成「约会 D2 1400-1500 咖啡厅 阿林/小满」，谁进错群一眼就看得出来。</li>
+        <li><b>领一个房间 <span class="who c">长日bot</span></b>从群池里领一个空闲的备用群，记成 R12，写进两个人的时间线。群池用完了就无法开启，并告知玩家。</li>
+        <li><b>改群名 <span class="who q">小号</span></b>小号把群名改成「约会 D2 1400-1500 咖啡厅 阿林/小满」。</li>
         <li><b>发邀请 <span class="who k">官方机器人</span></b>官方机器人在阿林和小满的个人群里各发一条邀请，告诉他们进哪个群。</li>
-        <li><b>旁听写戏 <span class="who q">小号</span></b>两个人在备用群里按「角色名：正文」写戏，小号听到每一句，记进 R12 的复盘，并统计字数。玩家要先发过 <code>绑定qq 自己的QQ号</code>，小号才认得出谁是谁。</li>
-        <li><b>结束 <span class="who q">小号</span></b>有人在备用群发 <code>结束约会</code>，小号听到后照常处理，并在群里回话。</li>
-        <li><b>归还 <span class="who q">小号</span></b>群名改回空闲时的名字，房间回到备用群池等下一场。<code>复盘 R12</code> 可以把这场戏画成长图。</li>
+        <li><b>旁听写戏 <span class="who q">小号</span></b>两个人在房间群里按「角色名：正文」写戏，小号听到每一句，记进 R12 的复盘，并统计字数。玩家要先发过 <code>绑定qq 自己的QQ号</code>，小号才认得出谁是谁。</li>
+        <li><b>结束 <span class="who q">小号</span></b>有人在房间群发 <code>结束约会</code>，小号听到后照常处理，并在群里回话。</li>
+        <li><b>归还 <span class="who q">小号</span></b>群名改回空闲时的名字，房间回到群池等下一场。<code>复盘 R12</code> 可以把这场戏画成长图。</li>
         <li><b>补录 <span class="who k">官方机器人</span></b>小号掉线漏记了几句？把那段聊天记录合并转发到自己的个人群，回复它发 <code>补录 R12</code>，官方机器人会把缺的按顺序补进复盘。</li>
       </ol>
 
       <h2 id="h-safe"><span class="n">03</span>小号只做这些事</h2>
       <ul>
-        <li><b>只看群号组里的群。</b>不在群号组里的群，消息在内存里就丢掉，不写进数据库；也不允许给它们改名。</li>
-        <li><b>只放行几种操作：</b>改群名、读群列表和群成员、读合并转发，以及在备用群里发提示。踢人、禁言这些在代码里就调不了。</li>
+        <li><b>只看群号组里的群。</b>不在群号组里的群，消息在内存里就丢掉，不写进数据库。</li>
+        <li><b>只放行几种操作：</b>改群名、读群列表和群成员、读合并转发，以及在房间群里发提示。踢人、禁言这些在代码里就不予放行。</li>
         <li><b>只在本机连接：</b>默认连 <code>ws://127.0.0.1:3001</code>，带口令。客户端和长日bot 放在同一台服务器最省心。</li>
-        <li><b>不用它聊天：</b>平时收发消息、回指令的始终是官方机器人。小号只在官方机器人不在的备用群里，回几句房间指令。</li>
+        <li><b>不用它聊天：</b>平时收发消息、回指令的始终是官方机器人。小号只在官方机器人不在的备用群里，保护小号。</li>
       </ul>
 
       <h2 id="h-down"><span class="n">04</span>小号掉线了怎么办</h2>
@@ -1109,10 +1120,10 @@ body::after{content:"";position:fixed;inset:0;z-index:30;pointer-events:none;
 
       <h2 id="h-setup"><span class="n">05</span>接一个小号</h2>
       <ol class="steps">
-        <li><b>准备小号</b>用一个不常用的 QQ 号，拉进所有备用群，并设成管理员（改群名需要）。</li>
+        <li><b>准备小号</b>用一个不常用的 QQ 号，拉进所有房间群，并设成管理员（改群名需要）。</li>
         <li><b>装客户端</b>在服务器上装 NapCat、LLBot 或 SnowLuma 这类 OneBot 11 客户端，用小号扫码登录，打开「正向 WebSocket」，设一个口令。</li>
         <li><b>在后台连上</b>设置平台「连接群号组」页，添加 QQ 号连接：填地址（例如 <code>ws://127.0.0.1:3001</code>）和口令。可以连多个号。</li>
-        <li><b>把群放进群号组</b>连上后，小号在的群会列在页面上，勾选要用的备用群，放进一个群号组。</li>
+        <li><b>把群放进群号组</b>连上后，小号在的群会列在页面上，勾选要用的房间群，放进一个群号组。</li>
         <li><b>让玩家绑 QQ</b>每个玩家在自己的个人群发一次 <code>绑定qq 自己的QQ号</code>。</li>
       </ol>
       <div class="callout warn"><p><b>风险提醒：</b>个人 QQ 号用第三方客户端登录，有被 QQ 检测、警告甚至冻结的可能，所以请用小号，别用主号。这个号不能同时登录电脑版 QQ，否则会互相挤下线；客户端有时需要重新扫码。</p></div>
@@ -1148,7 +1159,7 @@ body::after{content:"";position:fixed;inset:0;z-index:30;pointer-events:none;
 
 <footer>
   <div class="wrap">
-    <div><a class="brand" href="#/"><span class="mark"></span>长日<small>bot</small></a><p style="margin:10px 0 0">为群恋综而生的 QQ 官方机器人 · v@VERSION@</p></div>
+    <div><a class="brand" href="#/"><span class="mark"></span>长日<small>bot</small></a><p style="margin:10px 0 0">对接恋综的 QQ 官方机器人 · v@VERSION@</p></div>
     <div style="text-align:right"><a href="@BASE@/install">下载安装包</a> · <a href="https://github.com/eren006/changri" target="_blank" rel="noopener">GitHub</a> · <a href="#/app">申请专属 App</a><p style="margin:10px 0 0">投诉举报 QQ：3052553938 · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener" style="color:inherit">浙ICP备2026078867号-1</a></p><p style="margin:2px 0 0">部分规则改编自「长日将尽」CC BY-NC-SA 作品</p></div>
   </div>
 </footer>
@@ -1169,7 +1180,7 @@ body::after{content:"";position:fixed;inset:0;z-index:30;pointer-events:none;
 var G = [
  ["start","入门与群","在任意群里","绑定角色、绑定群、认管理员和设置群用途。"],
  ["social","短信与礼物","在自己的个人群里发","每天的次数、冷却在后台「功能与设置」调。"],
- ["date","约会与时间线","约会 / 电话 / 踩点 / 官约","发起后从备用群池领房间，聊完结束，自动写进时间线。"],
+ ["date","约会与时间线","约会 / 电话 / 踩点 / 官约","发起后从群池领房间，聊完结束，自动写进时间线。"],
  ["love","心动信与关系线","夜间派送 · 关系细节",""],
  ["season","季度与出场","主持人主导","季度推进、游戏天数、出场顺序、NPC。"],
  ["ext","扩展玩法","在后台按需开启","论坛、心愿、前置电话、物品商城、晚餐、抽取池等。"],
@@ -1305,7 +1316,7 @@ var DICE = {coc:["ra","rah","rb / rp","sc","en","ti / li","coc","rav"],dnd:["dnd
 
 var FEATS = [
  ["短信与礼物","在个人群里发一句，自动送达对方，可带图，2 分钟内可撤回。",["短信","送礼","撤回"],'<path d="M4 6h16v10H8l-4 4z"/>'],
- ["约会房间","约会、电话、踩点，从备用群池自动领房间，人到齐就开始。",["约会","电话","结束约会"],'<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>'],
+ ["约会房间","约会、电话、踩点，从群池自动领房间，人到齐就开始。",["约会","电话","结束约会"],'<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>'],
  ["心动信","白天投递，夜里统一派送，署名与否由你决定。",["发送心动信","撤回心动信"],'<path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/>'],
  ["关系线","每一段关系的细节都有据可查，可同步给对方。",["拉线","查看关系线"],'<circle cx="6" cy="12" r="3"/><circle cx="18" cy="12" r="3"/><path d="M9 12h6"/>'],
  ["季度与出场","预订档期、自动推进天数、抽出场顺序、一键收尾。",["季度状态","抽取出场顺序"],'<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>'],
@@ -1541,6 +1552,9 @@ document.addEventListener("keydown",function(e){
   });
   $("#appcopy").addEventListener("click",function(){copy($("#appmsg").textContent)});
 })();
+
+// ---------- 安装页红包口令：点一下才显示 ----------
+$("#hbBtn").addEventListener("click",function(){var r=$("#hbReveal");r.hidden=false;this.hidden=true;this.setAttribute("aria-expanded","true")});
 
 setRole(store("cr-role")||"all");
 route();

@@ -284,7 +284,8 @@ def end(room_id: int, status: str = "ended") -> dict | None:
 
 
 def assign_waiting() -> list[int]:
-    """有空群了：给排队的房间按先后补群。返回拿到群的房间 id。"""
+    """有空群了：给还没分到群的房间（比如开着小手机聊天室时发起的）按先后补群。返回拿到群的房间 id。
+    新发起的房间领不到群会直接撤掉、告诉玩家，不会排到这里。"""
     got = []
     with get_conn() as c:
         wait = [r["id"] for r in c.execute("SELECT id FROM rooms WHERE status='open' AND pool_id IS NULL ORDER BY id")]

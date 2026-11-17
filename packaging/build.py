@@ -530,11 +530,12 @@ def main() -> None:
         log("  ⚠ 这是测试包（临时密钥），不要上传。")
     else:
         log("\n上传到主页（在 system.changri.work 的服务器上，先备份旧的 latest.json）：")
-        log("  ssh jarvis 'mkdir -p /var/www/system/downloads && cp /var/www/system/latest.json /var/www/system/latest.json.bak 2>/dev/null; true'")
-        log(f"  rsync -av {site}/downloads/ jarvis:/var/www/system/downloads/")
-        log(f"  rsync -av {site}/media/ jarvis:/var/www/system/media/")
-        log(f"  rsync -av {site}/get.sh {site}/install {site}/index.html {site}/guide {site}/assets jarvis:/var/www/system/")
-        log(f"  rsync -av {site}/latest.json jarvis:/var/www/system/latest.json      # 最后传：传上去以后各处才会看到新版本")
+        deploy_host = os.environ.get("CHANGRI_DEPLOY_HOST", "<服务器>")   # ssh 主机名（~/.ssh/config 里的别名）
+        log(f"  ssh {deploy_host} 'mkdir -p /var/www/system/downloads && cp /var/www/system/latest.json /var/www/system/latest.json.bak 2>/dev/null; true'")
+        log(f"  rsync -av {site}/downloads/ {deploy_host}:/var/www/system/downloads/")
+        log(f"  rsync -av {site}/media/ {deploy_host}:/var/www/system/media/")
+        log(f"  rsync -av {site}/get.sh {site}/install {site}/index.html {site}/guide {site}/assets {deploy_host}:/var/www/system/")
+        log(f"  rsync -av {site}/latest.json {deploy_host}:/var/www/system/latest.json      # 最后传：传上去以后各处才会看到新版本")
 
 
 if __name__ == "__main__":

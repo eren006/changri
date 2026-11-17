@@ -3,7 +3,7 @@
 两种点法：
 1. 回复一张网易云 / QQ 音乐的分享卡片，发「点歌 [给 某人|给大家] [寄语]」（也认旧格式「点歌人：… 留言：… 送给：…」）。
    官方机器人收到回复时，被引用的卡片会以文字形式出现在 msg_elements[].content 里（tag/title/desc/jump_url 各一行），
-   2026-11-15 在贾维斯上实测过，网易云和 QQ 音乐都有。
+   2026-11-15 在线上服务器实测过，网易云和 QQ 音乐都有。
 2. 「点歌 [QQ/网易] 歌名 [歌手] [给 某人|给大家] [寄语]」：机器人自己去搜，取最像的一首。
 
 公告群收到一张图文卡片（msg_type 8，点开跳到歌曲页）；卡片发不出去时退成带链接的文字。
@@ -343,7 +343,7 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 def _resolve_short(url: str) -> str:
-    """b23.tv 短链接 → 跳转地址。只读 Location、不真的打开视频页（贾维斯打开 www.bilibili.com 会被 412 拦）。"""
+    """b23.tv 短链接 → 跳转地址。只读 Location、不真的打开视频页（线上服务器打开 www.bilibili.com 会被 412 拦）。"""
     req = urllib.request.Request(url, headers={"User-Agent": _UA})
     try:
         with urllib.request.build_opener(_NoRedirect).open(req, timeout=_TIMEOUT) as r:

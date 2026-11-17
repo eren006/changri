@@ -59,7 +59,7 @@ INK, MUTED, ACCENT, SUBTLE = P.INK, P.MUTED, P.PURPLE, P.SUBTLE
 BRAND = "长日将尽"               # 机器人自己发言时用的名字（认这个名字就不标发言人）
 BRAND_LABEL = "长日将尽系统"      # 图上左上角的标识
 
-# (路径, ttc 里的序号)：贾维斯用思源黑体（序号 2 = 简体中文）；本机测试用 macOS 自带的冬青黑体
+# (路径, ttc 里的序号)：线上服务器（Ubuntu）用思源黑体（序号 2 = 简体中文）；本机测试用 macOS 自带的冬青黑体
 from ...platform.layout import fonts_dir
 
 _FONT_DIR = fonts_dir()           # 开发时在包里；安装后在运行环境里（字体很大，不随每次更新重复下载）

@@ -126,7 +126,7 @@ def link_ready(g) -> bool:
 
 
 def allocate(room_id: int):
-    """领一个空群给房间。池里没有空群返回 None（房间排队）。
+    """领一个空群给房间。池里没有空群返回 None（调用方会撤掉这个房间，不排队）。
     QQ 号没登录（没连上）的群不分：登记在哪个 QQ 号名下，就跟着那个号走。"""
     with get_conn() as c:
         g = next((x for x in c.execute("SELECT * FROM pool_groups WHERE in_pool=1 AND state='free' ORDER BY RANDOM()") if link_ready(x)), None)
@@ -167,7 +167,7 @@ def room_qqs(room_id: int) -> set[str]:
 
 
 def reject(pool_id: int, room_id: int, to: str = "cleaning") -> None:
-    """分到的群里还有别的玩家：群先放一边（等人退群），房间退回排队，再领一个。"""
+    """分到的群里还有别的玩家：群先放一边（等人退群），房间退回未分群的状态，再领一个；领不到由调用方撤掉房间。"""
     with get_conn() as c:
         c.execute("UPDATE pool_groups SET state=?, room_id=NULL WHERE id=?", (to, pool_id))
         c.execute("UPDATE rooms SET pool_id=NULL WHERE id=?", (room_id,))

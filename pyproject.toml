@@ -5,6 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "changri-bot"
 description = "长日bot：QQ 官方机器人 + 设置平台 + 网页小手机"
+license = {text = "CC-BY-NC-SA-4.0"}
 requires-python = ">=3.11"
 dynamic = ["version"]
 dependencies = [
