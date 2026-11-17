@@ -400,6 +400,21 @@ class PlayE2E(unittest.TestCase):
         self.assertTrue(any("已拒绝" in o for o in self.say("拒绝时间线", member="M1", group="POOL0")))
         self.assertEqual(rooms.get(rid)["start_hm"], "16:00")
 
+    def test_change_timeline_from_personal_group(self):
+        """在个人群带房间号也能改：申请推到对方的个人群，对方在自己的个人群带房间号同意就生效。"""
+        self.add_pool(1)
+        self.say("约会 1400-1500 咖啡厅 乙")
+        rid = rooms.timeline(roles.get_role_by_name("甲")["id"])[0]["id"]
+        self.assertIn("房间号", self.say("修改时间线 D1 1600-1700")[0])                 # 个人群不带房间号：提示带上
+        self.assertIn("不是这个房间", self.say(f"修改时间线 R{rid} D1 1600-1700", member="M2", group="P2")[0])
+        out = self.say(f"修改时间线 R{rid} D1 1600-1700")
+        self.assertTrue(any("已通知乙" in o for o in out), out)
+        self.assertTrue(any(o.startswith("[P1]") and f"同意时间线 R{rid}" in o for o in out), out)    # 乙的个人群收到申请
+        self.assertIn(f"同意时间线 R{rid}", self.say("我的待回", member="M1", group="P1")[0])
+        out = self.say(f"同意时间线 R{rid}", member="M1", group="P1")
+        self.assertTrue(any("时间线已改为 D1 16:00-17:00" in o for o in out), out)
+        self.assertEqual(rooms.get(rid)["start_hm"], "16:00")
+
     def test_not_playing_blocked(self):
         self.say("结束季度", member="ADMIN", group="ADM")
         self.assertIn("不是进行中", self.say("约会 1400-1500 咖啡厅 乙")[0])

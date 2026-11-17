@@ -89,7 +89,7 @@ async def _():
     # 购买按钮只填进输入框（后面可以补数量），玩家自己按发送
     await reply_buttons(shop, "🏪 商城\n" + "\n".join(
         f"[{x['item_code']}] {x['name']} — {x['price']}{x['currency_name']}\n  {x['description']}" for x in rows) + "\n买东西发「购买 名字 [数量]」",
-        [Btn(f"🛒 {x['name']}", f"购买 {x['name']} ", enter=False) for x in rows], per_row=3)
+        [Btn(f"{x['name']}", f"购买 {x['name']} ", enter=False) for x in rows], per_row=3)
     await shop.finish()
 
 

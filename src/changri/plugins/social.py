@@ -74,6 +74,23 @@ async def _(event: GroupMessageCreateEvent):
     await my_role.finish("\n".join(lines))
 
 
+mine = _cmd("我的")
+
+
+@mine.handle()
+async def _(event: GroupMessageCreateEvent, args=CommandArg()):
+    """「我的」：角色卡、时间线、待回、数量……集中成一排按钮。「我的xxx」里没有单独注册的（打错的）不理，免得刷屏。"""
+    if args.extract_plain_text().strip():
+        await mine.finish()
+    role = _sender_role(event)
+    if not role:
+        await mine.finish("你还没有角色。在你的个人群里发「创建新角色 名字」。")
+    items = formats.mine()
+    await reply_buttons(mine, f"「{role['name']}」\n点下面的按钮查看（也可以直接发：" + "、".join(c for _l, c in items) + "）",
+                        [Btn(label, cmd) for label, cmd in items], per_row=4)
+    await mine.finish()
+
+
 change_code = _cmd("换绑码")
 
 
@@ -177,7 +194,7 @@ async def _(args=CommandArg()):
             await fmt.finish(text)
         if st == "ok":
             f = formats.fill(t)             # 「✏️ 填入输入框」：只把指令开头填进输入框，不直接发出
-            await reply_buttons(fmt, text, [Btn("✏️ 填入输入框", f, enter=False)] if f else [], per_row=1)
+            await reply_buttons(fmt, text, [Btn("填入输入框", f, enter=False)] if f else [], per_row=1)
             await fmt.finish()
     names = formats.available()
     await reply_buttons(fmt, formats.menu_text(names),

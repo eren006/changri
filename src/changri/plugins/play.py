@@ -47,8 +47,8 @@ def _resolve(names: list[str]) -> tuple[list, str]:
     return found, ("、".join(missing) if missing else "")
 
 
-async def _push(role_id: int, text: str, at: bool = True) -> bool:
-    ok, _ = await messaging.push_to_role(role_id, text, make_send(), at)     # 发到角色群时默认自动 @ 本人（见 messaging.push_to_role_ex）
+async def _push(role_id: int, text: str, at: bool = True, buttons=None) -> bool:
+    ok, _ = await messaging.push_to_role(role_id, text, make_send(), at, buttons)     # 发到角色群时默认自动 @ 本人（见 messaging.push_to_role_ex）
     return ok
 
 
@@ -84,7 +84,7 @@ def _room_text(room, who_from: str = "") -> str:
     head = f"💌 {who_from} 向你发起了{room['kind']}" if who_from else f"💌 {room['kind']}"
     tips = [RP_FORMAT_TIP]
     if room["kind"] not in rooms.NO_TIMELINE:
-        tips += [f"修改时间 ➜ 修改时间线 D{room['day']} 新时间", f"不想参加 ➜ 拒绝时间线 R{room['id']}"]
+        tips += [f"修改时间 ➜ 修改时间线 R{room['id']} D{room['day']} 新时间（个人群里也能发）", f"不想参加 ➜ 拒绝时间线 R{room['id']}"]
     tips.append(f"结束互动 ➜ 在约会群里直接发「结束{room['kind']}」")
     return f"{head}\n{_slot(room)}\n参与者：{mem}\n房间号 R{room['id']}\n\n" + "\n".join(tips)
 
@@ -666,7 +666,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent):
     if not qs:
         await join_list.finish("没有待处理的加入申请。")
     text = "🙋 收到的加入申请\n" + "\n".join(f"#{q['id']} {q['applicant']} 想加入 R{q['room_id']} {q['kind']}（D{q['day']} {q['start_hm']}-{q['end_hm']}）" for q in qs)
-    btns = [b for q in qs for b in (Btn(f"✅ 同意 #{q['id']} {q['applicant']}", f"同意加入 {q['id']}"), Btn(f"❌ 拒绝 #{q['id']}", f"拒绝加入 {q['id']}", style="danger"))]
+    btns = [b for q in qs for b in (Btn(f"同意 #{q['id']} {q['applicant']}", f"同意加入 {q['id']}"), Btn(f"拒绝 #{q['id']}", f"拒绝加入 {q['id']}", style="danger"))]
     await reply_buttons(join_list, text + "\n同意发「同意加入 编号」，拒绝发「拒绝加入 编号」", btns, per_row=2)
     await join_list.finish()
 
@@ -765,27 +765,42 @@ async def _(bot: Bot, event: GroupMessageCreateEvent):
 chg = _cmd("修改时间线")
 
 
+CHG_USAGE = "用法：修改时间线 [R房间号] [D几] 时间（在房间群里发可以不写房间号；在个人群发要带上）\n例：修改时间线 R12 D1 {t}"
+
+
 @chg.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
-    room = rooms.room_of_group(bot.self_id, event.group_openid)
+    """在房间群里发：改这个房间。在别的群（个人群）发：带上 R房间号。申请会推到其他参与者的个人群，下面挂同意/拒绝。"""
+    p = args.extract_plain_text().split()
+    rid = next((int(x[1:]) for x in p if re.fullmatch(r"[Rr]\d+", x)), None)
+    p = [x for x in p if not re.fullmatch(r"[Rr]\d+", x)]
+    here = rooms.room_of_group(bot.self_id, event.group_openid)
+    room = rooms.get(rid) if rid else here
     if not room:
-        await chg.finish("请在约会房间的群里发。")
+        await chg.finish(("❌ 没有房间 R%d。" % rid if rid else "请在约会房间的群里发，或带上房间号。\n") + CHG_USAGE.format(t=storycal.example_time()))
     me = _me(bot, event)
     if not me or not any(m["role_id"] == me["id"] for m in rooms.members(room["id"])):
         await chg.finish("你不是这个房间的参与者。")
-    p = args.extract_plain_text().split()
     day = room["day"]
     if p and re.fullmatch(r"[Dd]\d+", p[0]):
         day = int(p.pop(0)[1:])
     hm = rooms.parse_hm(p[0], day) if p else None
     if not hm:
-        await chg.finish(f"用法：修改时间线 [D几] 时间\n例：修改时间线 D1 {storycal.example_time()}")
+        await chg.finish(CHG_USAGE.format(t=storycal.example_time()))
     ok, why = rooms.propose_change(room["id"], me["id"], day, *hm)
     if not ok:
         await chg.finish(f"❌ {why}")
-    await reply_buttons(chg, f"📝 {me['name']} 申请把时间线改成 D{day} {hm[0]}-{hm[1]}。其他人发「同意时间线」，全部同意后生效；不同意发「拒绝时间线」。",
-                        [Btn("✅ 同意时间线", "同意时间线"), Btn("❌ 拒绝时间线", "拒绝时间线", style="danger")], per_row=2)
-    await chg.finish()
+    r = room["id"]
+    vote_btns = [Btn("同意", f"同意时间线 R{r}"), Btn("拒绝", f"拒绝时间线 R{r}", style="danger")]
+    if here and here["id"] == r:            # 在房间群里：大家都看得到，直接在群里挂按钮
+        await reply_buttons(chg, f"📝 {me['name']} 申请把时间线改成 D{day} {hm[0]}-{hm[1]}。其他人发「同意时间线」，全部同意后生效；不同意发「拒绝时间线」。",
+                            [Btn("同意时间线", "同意时间线"), Btn("拒绝时间线", "拒绝时间线", style="danger")], per_row=2)
+        await chg.finish()
+    others = [m for m in rooms.members(r) if m["role_id"] != me["id"]]   # 在个人群发的：房间里的人看不到，推到他们各自的个人群
+    for m in others:
+        await _push(m["role_id"], f"📝 {me['name']} 申请把 R{r} {room['kind']}的时间线改成 D{day} {hm[0]}-{hm[1]}。\n"
+                                  f"同意发「同意时间线 R{r}」，不同意发「拒绝时间线 R{r}」。全部同意后生效。", buttons=vote_btns)
+    await chg.finish(f"📝 已申请把 R{r} 的时间线改成 D{day} {hm[0]}-{hm[1]}，已通知" + "、".join(m["name"] for m in others) + "，全部同意后生效。")
 
 
 async def _vote(matcher, bot: Bot, event: GroupMessageCreateEvent, args, agree: bool):

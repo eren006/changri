@@ -78,7 +78,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent):
         out.append(f"#{it['no']}{'（你）' if it['role_id'] == me['id'] else ''}  {_short(it['text'])}")
     out.append(f"\n{precall.usage(me['id'])}")
     # 拨打会马上开电话房间：按钮只把指令填进输入框，玩家自己按发送
-    await reply_buttons(view, "\n".join(out), [Btn(f"📞 拨 #{it['no']}", f"拨打前置电话 {it['no']}", enter=False)
+    await reply_buttons(view, "\n".join(out), [Btn(f"拨打 #{it['no']}", f"拨打前置电话 {it['no']}", enter=False)
                                                for it in items if it["role_id"] != me["id"]], per_row=4)
     await view.finish()
 

@@ -286,6 +286,19 @@ body[data-role="player"] .only-admin,body[data-role="admin"] .only-player{displa
 mark{background:rgba(201,160,67,.35);color:inherit;border-radius:3px;padding:0 1px}
 
 /* faq */
+.chat .qbtns{display:flex;gap:6px;margin-top:8px}
+.chat .qbtns span{font-size:12.5px;padding:3px 12px;border-radius:8px;border:1px solid var(--line);color:var(--ink);background:var(--glass2)}
+.chat .caret{color:var(--faint)}
+.wl{list-style:none;padding:0;margin:14px 0 0;display:grid;gap:12px}
+.wl li.w{display:flex;gap:14px;align-items:flex-start;border-radius:18px;padding:14px 16px;background:var(--glass);border:1px solid var(--line);box-shadow:var(--shadow)}
+.wl .wt{flex:1;min-width:0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:15px}
+.wl .wm{display:block;margin-top:6px;font-size:12.5px;color:var(--faint)}
+.wl .up{flex:none;font:inherit;font-size:13px;border-radius:12px;padding:7px 12px;border:1px solid var(--line);background:var(--glass2);color:var(--ink);cursor:pointer;min-width:84px}
+.wl .up b{display:block;font-size:17px}
+.wl .up[disabled]{opacity:.65;cursor:default}
+.wl li.done .wt{color:var(--faint)}
+.wl .wempty{color:var(--faint);padding:8px 2px}
+.wmsg{margin:12px 0 0;font-size:14px;min-height:1.4em}
 details.qa{border-radius:18px;padding:2px 20px;margin:10px 0;background:var(--glass);border:1px solid var(--line);box-shadow:var(--shadow);}
 details.qa summary{cursor:pointer;list-style:none;padding:15px 36px 15px 0;font-weight:600;font-size:15.5px;position:relative}
 details.qa summary::-webkit-details-marker{display:none}
@@ -512,6 +525,7 @@ body::after{content:"";position:fixed;inset:0;z-index:30;pointer-events:none;
       <a href="#/commands" data-r="commands">指令大全</a>
       <a href="#/dice" data-r="dice">跑团骰子</a>
       <a href="#/faq" data-r="faq">常见问题</a>
+      <a href="#/wishes" data-r="wishes">许愿池</a>
       <a href="#/app" data-r="app">申请 App</a>
     </nav>
     <span class="sp"></span>
@@ -522,7 +536,7 @@ body::after{content:"";position:fixed;inset:0;z-index:30;pointer-events:none;
   </div>
 </header>
 <div class="drawer" id="drawer">
-  <a href="#/">首页</a><a href="#/install">安装</a><a href="#/how">工作原理</a><a href="#/season">恋综指南</a><a href="#/commands">指令大全</a><a href="#/dice">跑团骰子</a><a href="#/faq">常见问题</a><a href="#/app">申请专属 App</a>
+  <a href="#/">首页</a><a href="#/install">安装</a><a href="#/how">工作原理</a><a href="#/season">恋综指南</a><a href="#/commands">指令大全</a><a href="#/dice">跑团骰子</a><a href="#/faq">常见问题</a><a href="#/wishes">许愿池</a><a href="#/app">申请专属 App</a>
 </div>
 
 <main>
@@ -655,7 +669,7 @@ body::after{content:"";position:fixed;inset:0;z-index:30;pointer-events:none;
       <h2 id="i-daily"><span class="n">04</span>日常维护</h2>
       <div class="tblwrap"><table class="tbl">
         <tr><th>想做的事</th><th>怎么做</th></tr>
-        <tr><td>升级</td><td>后台「更新」一键升级，或 <code>sudo /opt/changri-bot/changri update</code>。会先备份所有数据库；新版本起不来会自动退回。</td></tr>
+        <tr><td>升级</td><td>后台「更新」页点「立即更新」，一键完成，见下面的<a href="#/install#i-update">更新到新版本</a>。</td></tr>
         <tr><td>开 HTTPS</td><td>后台「HTTPS」页：先装 Caddy（Linux 粘贴页面上的命令；Windows 右键 <code>Install-HTTPS.bat</code> 以管理员运行），再点「开通」。不用域名。</td></tr>
         <tr><td>自检</td><td>Linux <code>sudo /opt/changri-bot/changri doctor</code>；Windows 双击 <code>Doctor.bat</code>。</td></tr>
         <tr><td>备份</td><td>所有数据都在安装目录的 <code>data/</code>，复制它就是备份；也可以 <code>changri backup</code>。</td></tr>
@@ -663,7 +677,17 @@ body::after{content:"";position:fixed;inset:0;z-index:30;pointer-events:none;
         <tr><td>重启</td><td>Linux <code>sudo systemctl restart changri-bot</code>；Windows 关窗口再双击 <code>Start-Changri.bat</code>。</td></tr>
       </table></div>
 
-      <h2 id="i-safe"><span class="n">05</span>安全</h2>
+      <h2 id="i-update"><span class="n">05</span>更新到新版本</h2>
+      <p>出了新版本，<b>不用重新安装，也不用传文件</b>，在设置平台里点一下就行。</p>
+      <ol class="steps">
+        <li><b>打开「更新」页</b>设置平台左侧菜单里的「更新」，点「检查更新」。</li>
+        <li><b>点「立即更新」</b>有新版本时会显示版本号和这次更新了什么。点一下，大约一分钟。</li>
+        <li><b>等它自己重启</b>更新完机器人会重启一次（约 20 秒），页面自动刷新，显示「已更新到 新版本号」。这期间群里的消息可能晚几秒回复。</li>
+      </ol>
+      <div class="callout"><p><b>不会丢数据。</b>更新前会自动备份所有数据库；新版本起不来，会自动退回旧版本、恢复备份。角色、季度、聊天记录都在 <code>data/</code> 里，更新不碰它。</p></div>
+      <p>喜欢用命令的话，Linux 也可以在服务器上运行 <code>sudo /opt/changri-bot/changri update</code>，效果一样。</p>
+
+      <h2 id="i-safe"><span class="n">06</span>安全</h2>
       <ul>
         <li>后台默认是 http 明文。到「HTTPS」页一键加密；或在「远程访问」页只放行自己的 IP；或把 <code>data/config.toml</code> 的 <code>host</code> 改成 <code>127.0.0.1</code>。</li>
         <li><b>扩展是 Python 代码</b>，装上就有和主程序一样的权限，只装信得过的人写的。</li>
@@ -695,6 +719,27 @@ body::after{content:"";position:fixed;inset:0;z-index:30;pointer-events:none;
         <div><dt>房间 R12</dt><dd>一次约会 / 电话 / 官约就是一个房间，带编号，复盘、结束都靠它。</dd></div>
         <div><dt>D几 · 时间</dt><dd>游戏内第几天，时间写成 <code>1400-1500</code>。不写 D 就是今天。</dd></div>
       </dl>
+
+      <h2 id="s-buttons"><span class="n">✦</span>点按钮就行</h2>
+      <p>很多回复下面带一排按钮，<b>点一下就是发了一条指令</b>，不用记格式、不用手打名字。</p>
+      <div class="ex">
+        <div class="chat static">
+          <div class="msg bot"><span class="who">机器人</span>📩 阿林 给你发来一条短信<br>今晚的月色很好<div class="qbtns"><span>回短信</span></div></div>
+          <div class="msg me">@机器人 短信 阿林 <span class="caret">｜</span></div>
+        </div>
+        <div class="note">
+          <p>点「回短信」，输入框里自动出现 <code>短信 阿林 </code>，名字已经填好，接着写内容就能发。</p>
+        </div>
+      </div>
+      <ul>
+        <li><b>发 <code>格式</code></b>：一排按钮，只列出本季开着的功能。点一下，空白格式就填进输入框（比如「【短信】／对象：／内容：」），填好直接发。</li>
+        <li><b>发 <code>我的</code></b>：角色卡、时间线、待回、数量、统计、关系线、心动信、背包……集中在一处，随时点。</li>
+        <li><b>收到短信、礼物、关系线新细节</b>：下面有「回短信」「回礼」「回一段」。匿名或自定义署名发来的没有这个按钮，不会暴露对方是谁。</li>
+        <li><b>列表点名字</b>：查看关系线、查看公知（点谁看谁，带他自己的图）、加入请求、看心愿、查看帖子、前置电话、商城。</li>
+        <li>点按钮时，输入框前面会自动带上「@机器人」，<b>不用删，直接发</b>。</li>
+        <li>会开房间或花钱的（摘心愿、拨打前置电话、购买）只填进输入框、不直接发出，确认没问题再自己按发送。</li>
+      </ul>
+      <div class="only-admin"><div class="callout"><p><b>主持人：</b>按钮要机器人有 QQ 的群 Markdown 和按钮权限；没有的话会自动改发纯文字，玩家照文字提示手打指令，功能不受影响。不想要按钮：后台「功能与设置 → 基础」关掉「列表下面挂按钮」。</p></div></div>
 
       <h2 id="s-before"><span class="n">01</span>开季之前</h2>
       <div class="only-admin">
@@ -749,6 +794,7 @@ body::after{content:"";position:fixed;inset:0;z-index:30;pointer-events:none;
           <p style="margin-top:10px">发错了？<b>2 分钟内</b>发 <code>撤回</code>，对方群里那条一起删，次数返还。</p>
         </div>
       </div>
+      <p>收到短信、礼物时，下面有「回短信」「回礼」按钮，点一下名字就填好了。</p>
       <ul>
         <li>开了「混乱短信」扩展时，短信可能错字、丢半截、被误投、被撕成两半……</li>
         <li><code>我的图鉴</code>：看看收到过哪些礼物。<code>礼品店</code>：送礼时可以直接写编号。</li>
@@ -771,7 +817,7 @@ body::after{content:"";position:fixed;inset:0;z-index:30;pointer-events:none;
         <li><code>申请加入 小满 14:00</code>：想加入别人正在进行的约会；对方用 <code>同意加入 编号</code> / <code>拒绝加入 编号</code>。</li>
         <li><code>复盘 R12</code>：把一场房间的戏文画成长图，只有参与者和管理员能看。</li>
         <li><code>补录 R12</code>：监听的 QQ 号掉线漏记了？把聊天记录合并转发到备用群，回复它发这一句。</li>
-        <li><code>时间线</code> / <code>时间线 角色名</code>：看排期。要改：<code>修改时间线 D1 1400-1500</code>，所有参与者 <code>同意时间线</code> 后生效。</li>
+        <li><code>时间线</code> / <code>时间线 角色名</code>：看排期。要改：在房间群里发 <code>修改时间线 D1 1400-1500</code>；在<b>个人群</b>里也能改，带上房间号：<code>修改时间线 R12 D1 1400-1500</code>，其他参与者会在自己的个人群收到申请，点「同意」或「拒绝」。所有参与者同意后生效。</li>
       </ul>
 
       <h2 id="s-official"><span class="n">05</span>官约与官电</h2>
@@ -946,12 +992,47 @@ body::after{content:"";position:fixed;inset:0;z-index:30;pointer-events:none;
       <details class="qa"><summary>打不开设置平台</summary><div>检查云服务商安全组是否放行了 TCP 5091；Linux 用 <code>systemctl status changri-bot</code> 看服务是否在跑。</div></details>
       <details class="qa"><summary>玩家打不开小手机</summary><div>后台「小手机」页点「检查玩家能不能打开」。没通就是安全组没放行 5092。所有机器人共用这一个端口，玩家用激活码登录会自动进到自己的机器人。</div></details>
       <details class="qa"><summary>一台服务器能跑几个机器人？</summary><div>可以同时接好几个，每个机器人是一套独立的系统，各管各的数据，在设置平台里增删即可，不用重启。</div></details>
+      <details class="qa"><summary>怎么升级到新版本？</summary><div>设置平台「更新」页，点「检查更新」，再点「立即更新」，一键完成，大约一分钟。不用重新安装、不用传文件。见<a href="#/install#i-update">更新到新版本</a>。</div></details>
       <details class="qa"><summary>升级失败会不会丢数据？</summary><div>升级前会先备份所有数据库；新版本起不来会自动退回旧版本。</div></details>
       <h2 id="f-play"><span class="n">02</span>玩法</h2>
       <details class="qa"><summary>发了指令机器人没反应</summary><div>① 对应的扩展可能没开（后台「功能与设置」）；② 后台开了「指令必须带前缀」，需要在前面加 <code>/</code>；③ 这个群是跑团模式，恋综指令会静音；④ 你还没在个人群「创建新角色」。</div></details>
+      <details class="qa"><summary>回复下面没有按钮</summary><div>按钮要机器人在 QQ 开放平台有群 Markdown 和按钮权限，没有的话会自动发纯文字，照文字提示手打指令就行。也可能是主持人在后台「功能与设置 → 基础」关掉了「列表下面挂按钮」。</div></details>
       <details class="qa"><summary>短信发错人了</summary><div>2 分钟内在自己群里发 <code>撤回</code>，对方群里那条一起删，次数返还。超过 2 分钟请联系管理员。</div></details>
       <details class="qa"><summary>复盘说「没有记到戏文」</summary><div>备用群里要有监听的 QQ 号，说话的人要用 <code>绑定qq 你的QQ号</code> 绑过，戏文要按「角色名：正文」写。漏记的可以用 <code>补录 R房间号</code> 补。</div></details>
       <details class="qa"><summary>备用群池用完了怎么办</summary><div>新的约会、电话会开不成，机器人会告知玩家，不会排队。管理员可以多准备几个备用群，在里面发 <code>设为备用群池</code>。</div></details>
+    </article>
+  </div>
+</section>
+<!-- ================= WISHES ================= -->
+<section class="page" data-page="wishes">
+  <div class="wrap doc">
+    <aside class="toc"></aside>
+    <article>
+      <h1 class="ptitle">许愿池</h1>
+      <p class="psub">想要什么功能？许个愿。审核通过后会出现在下面的墙上；看到别人许的愿你也想要，点「我也想要」，想要的人越多越靠前。</p>
+      <h2 id="w-make"><span class="n">01</span>许个愿</h2>
+      <form id="wishf" class="form glass" autocomplete="off">
+        <div class="row"><label for="wtext">想要的功能 <small>一两句话就行，最多 200 字</small></label><textarea id="wtext" rows="3" maxlength="200" required placeholder="例如：心动信能定时在第二天早上送达"></textarea></div>
+        <div class="row"><label for="wname">怎么称呼你 <small>选填，会显示在墙上</small></label><input id="wname" type="text" maxlength="12" placeholder="例如：某团主持人"></div>
+        <button class="btn pri" type="submit">许愿 <span aria-hidden="true">→</span></button>
+        <p class="wmsg" id="wmsg" role="status"></p>
+      </form>
+      <h2 id="w-wall"><span class="n">02</span>大家的愿望</h2>
+      <ul class="wl" id="wl"><li class="wempty">正在加载……</li></ul>
+    </article>
+  </div>
+</section>
+<!-- 许愿池审核（不在导航里，要口令；口令只存在本标签页） -->
+<section class="page" data-page="wishes-admin">
+  <div class="wrap doc">
+    <aside class="toc"></aside>
+    <article>
+      <h1 class="ptitle">许愿池审核</h1>
+      <form id="wadmf" class="form glass" autocomplete="off" style="margin-bottom:18px">
+        <div class="row"><label for="wtok">口令</label><input id="wtok" type="password" required></div>
+        <button class="btn pri" type="submit">载入</button> <span class="wmsg" id="wadmmsg" role="status"></span>
+      </form>
+      <ul class="wl" id="wadm"></ul>
     </article>
   </div>
 </section>
@@ -1113,7 +1194,8 @@ var C = [
  ["短信","【短信】","短信 收信人 内容","发一条短信到对方的个人群，可带一张图。","p","social"],
  ["送礼","【送礼】","送礼 对象 礼物 [留言]","送一份礼物；礼品店里的可以直接写编号。","p","social"],
  ["撤回","","撤回","撤回 2 分钟内最近一条短信 / 礼物，次数返还。","p","social"],
- ["格式","格式短信、格式送礼、格式撤回","格式短信","拿可复制的写法模板。","p","social"],
+ ["格式","格式短信、格式送礼、格式心动信……","格式","一排按钮，只列开着的功能；点一下把空白格式填进输入框。发「格式短信」看带例子的完整写法。","p","social"],
+ ["我的","","我的","角色卡、时间线、待回、数量、统计……一排按钮，随时点。","p","social"],
  ["我的图鉴","图鉴、我的礼物","我的图鉴","收到过的所有礼物。","p","social"],
  ["礼品店","","礼品店","看礼物编号。","p","social"],
  ["我的数量","","我的数量","今天还能发几条。","p","social"],
@@ -1128,7 +1210,7 @@ var C = [
  ["复盘","","复盘 R12","把房间戏文画成长图。","p","date"],
  ["补录","","（回复合并转发）补录 R12","补记监听号掉线期间漏掉的戏。","p","date"],
  ["时间线","","时间线 [角色名]","看排期。","p","date"],
- ["修改时间线","同意时间线、拒绝时间线","修改时间线 D1 1400-1500","全员同意后生效。","p","date"],
+ ["修改时间线","同意时间线、拒绝时间线","修改时间线 R12 D1 1400-1500","在房间群里可以不写 R 号；在个人群里要写。全员同意后生效。","p","date"],
  ["本场统计","我的统计","本场统计","这一季的数据。","p","date"],
  ["发起官约","","发起官约 [D3] 1400-1500 [后山] 小满/阿林","节目组安排的约会。","a","date"],
  ["发起官电","","发起官电 D2 2000-2100 小满/阿林","节目组安排的电话。","a","date"],
@@ -1344,6 +1426,49 @@ function buildToc(){
   spy=new IntersectionObserver(function(es){es.forEach(function(en){if(en.isIntersecting){$$("a",toc).forEach(function(a){a.classList.toggle("on",a.dataset.id===en.target.id)})}})},{rootMargin:"-80px 0px -70% 0px"});
   hs.forEach(function(h){spy.observe(h)});
 }
+// ---------- 许愿池 ----------
+var WISH_API="/api/wishes",wishLoaded=false;
+function wishVoted(){try{return JSON.parse(localStorage.getItem("wish_up")||"[]")}catch(e){return []}}
+function wishRender(ws){
+  var l=$("#wl"),voted=wishVoted();
+  if(!ws.length){l.innerHTML='<li class="wempty">墙上还空着，来许第一个愿吧。</li>';return}
+  l.innerHTML=ws.map(function(w){var me=voted.indexOf(w.id)>=0,done=w.status==="done";
+    return '<li class="w'+(done?" done":"")+'"><div class="wt">'+esc(w.text)+'<span class="wm">'+(w.name?esc(w.name)+" · ":"")+(done?'<span class="tag p">已实现</span>':"")+'</span></div>'+
+      (done?'':'<button class="up" data-id="'+w.id+'"'+(me?" disabled":"")+'><b>'+w.votes+'</b>'+(me?"已想要":"我也想要")+'</button>')+'</li>'}).join("");
+}
+function wishLoad(){
+  fetch(WISH_API,{cache:"no-store"}).then(function(r){return r.json()}).then(function(d){wishLoaded=true;wishRender(d.wishes||[])})
+  .catch(function(){$("#wl").innerHTML='<li class="wempty">墙暂时打不开，过一会儿再来看。</li>'});
+}
+$("#wishf").addEventListener("submit",function(e){
+  e.preventDefault();var b=$("#wishf button"),m=$("#wmsg");b.disabled=true;m.textContent="正在许愿……";
+  fetch(WISH_API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:$("#wtext").value,name:$("#wname").value})})
+  .then(function(r){return r.json().then(function(d){return [r.ok,d]})})
+  .then(function(x){m.textContent=x[0]?(x[1].message||"收到了。"):(x[1].error||"没许成，过一会儿再试。");if(x[0]){$("#wtext").value=""}})
+  .catch(function(){m.textContent="没许成，网络好像断了，过一会儿再试。"}).then(function(){b.disabled=false});
+});
+$("#wl").addEventListener("click",function(e){
+  var b=e.target.closest(".up");if(!b||b.disabled)return;var id=+b.dataset.id;b.disabled=true;
+  fetch(WISH_API+"/"+id+"/up",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}).then(function(r){return r.json()}).then(function(d){
+    if(d.votes){b.innerHTML="<b>"+d.votes+"</b>已想要";var v=wishVoted();v.push(id);try{localStorage.setItem("wish_up",JSON.stringify(v))}catch(err){}}else{b.disabled=false}
+  }).catch(function(){b.disabled=false});
+});
+var WST={pending:"待审核",open:"墙上",done:"已实现",rejected:"没通过"},WACT={pending:[["approve","通过"],["reject","不通过"]],open:[["done","已实现"],["reject","撤下"]],done:[["reopen","改回墙上"]],rejected:[["approve","通过"]]};
+function wadmTok(){try{return sessionStorage.getItem("wish_tok")||""}catch(e){return ""}}
+function wadmLoad(){
+  var t=wadmTok(),m=$("#wadmmsg");if(!t)return;m.textContent="载入中……";
+  fetch(WISH_API+"/admin",{headers:{Authorization:"Bearer "+t},cache:"no-store"}).then(function(r){return r.json().then(function(d){return [r.ok,d]})}).then(function(x){
+    if(!x[0]){m.textContent=x[1].error||"载入失败";return}
+    var ws=x[1].wishes||[];m.textContent="共 "+ws.length+" 条，待审核 "+ws.filter(function(w){return w.status==="pending"}).length+" 条";
+    $("#wadm").innerHTML=ws.map(function(w){return '<li class="w"><div class="wt">'+esc(w.text)+'<span class="wm">#'+w.id+' · '+WST[w.status]+' · '+(w.name?esc(w.name)+" · ":"")+w.votes+' 人想要 · '+new Date(w.ts*1000).toLocaleString()+'</span></div><div style="display:flex;flex-direction:column;gap:6px">'+
+      (WACT[w.status]||[]).concat([["delete","删除"]]).map(function(a){return '<button class="up" data-id="'+w.id+'" data-a="'+a[0]+'">'+a[1]+'</button>'}).join("")+'</div></li>'}).join("")||'<li class="wempty">还没有愿望。</li>';
+  }).catch(function(){m.textContent="连不上"});
+}
+$("#wadmf").addEventListener("submit",function(e){e.preventDefault();try{sessionStorage.setItem("wish_tok",$("#wtok").value.trim())}catch(err){}wadmLoad()});
+$("#wadm").addEventListener("click",function(e){
+  var b=e.target.closest("button[data-a]");if(!b)return;if(b.dataset.a==="delete"&&!confirm("删除这个愿望？删了找不回来。"))return;b.disabled=true;
+  fetch(WISH_API+"/admin/"+b.dataset.id,{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+wadmTok()},body:JSON.stringify({action:b.dataset.a})}).then(wadmLoad,wadmLoad);
+});
 function route(){
   var h=location.hash||"#/";
   if(h.indexOf("#/")!==0){ // in-page anchor
@@ -1357,7 +1482,9 @@ function route(){
     $$("#nav a").forEach(function(a){a.classList.toggle("on",a.dataset.r===r)});
     current=r;window.scrollTo(0,0);buildToc();
     if(r==="")runDemo();else clearTimeout(demoTimer);
-    document.title=(r?{install:"安装",season:"恋综指南",commands:"指令大全",dice:"跑团骰子",faq:"常见问题",app:"申请专属 App",how:"工作原理"}[r]+" · 长日系统":"长日系统 · 把恋综装进自己的 QQ 群");
+    if(r==="wishes")wishLoad();
+    if(r==="wishes-admin")wadmLoad();
+    document.title=(r?{install:"安装",season:"恋综指南",commands:"指令大全",dice:"跑团骰子",faq:"常见问题",app:"申请专属 App",how:"工作原理",wishes:"许愿池","wishes-admin":"许愿池审核"}[r]+" · 长日系统":"长日系统 · 把恋综装进自己的 QQ 群");
   }
   if(parts[1]){var el=document.getElementById(parts[1]);el&&setTimeout(function(){el.scrollIntoView()},30)}
   $("#drawer").classList.remove("on");
@@ -1373,8 +1500,8 @@ $("#menu").onclick=function(){$("#drawer").classList.toggle("on")};
 
 // ---------- command palette ----------
 var PI=[];
-[["#/install","安装","Linux / Windows / 第一次使用"],["#/how","工作原理","官方机器人和 QQ 小号怎么配合"],["#/season","恋综指南","一季从头到尾"],["#/commands","指令大全","全部群指令"],["#/dice","跑团骰子","COC7 / DND5e / 绿色三角洲"],["#/faq","常见问题","不在线、打不开小手机…"],["#/app","申请专属 App","专属安卓 App 打包"]].forEach(function(p){PI.push({k:"页面",t:p[1],s:p[2],go:p[0]})});
-$$("[data-page] article h2[id]").forEach(function(h){var pg=h.closest("[data-page]").dataset.page;PI.push({k:"章节",t:h.textContent.replace(/^\d+/,""),s:{install:"安装",season:"恋综指南",dice:"跑团骰子",faq:"常见问题",app:"申请 App",how:"工作原理"}[pg],go:"#/"+pg+"#"+h.id})});
+[["#/install","安装","Linux / Windows / 第一次使用"],["#/how","工作原理","官方机器人和 QQ 小号怎么配合"],["#/season","恋综指南","一季从头到尾"],["#/commands","指令大全","全部群指令"],["#/dice","跑团骰子","COC7 / DND5e / 绿色三角洲"],["#/wishes","许愿池","想要什么功能，许个愿"],["#/faq","常见问题","不在线、打不开小手机…"],["#/app","申请专属 App","专属安卓 App 打包"]].forEach(function(p){PI.push({k:"页面",t:p[1],s:p[2],go:p[0]})});
+$$("[data-page] article h2[id]").forEach(function(h){var pg=h.closest("[data-page]").dataset.page;PI.push({k:"章节",t:h.textContent.replace(/^\d+/,""),s:{install:"安装",season:"恋综指南",dice:"跑团骰子",faq:"常见问题",app:"申请 App",how:"工作原理",wishes:"许愿池"}[pg],go:"#/"+pg+"#"+h.id})});
 C.forEach(function(c){PI.push({k:c[4]==="a"?"管理":"指令",t:c[0],s:c[2].split("\n")[0]+(c[1]?" · "+c[1]:""),cp:c[2],f:c[0]+c[1]+c[3]})});
 var sel=0,res=[];
 function palRender(){

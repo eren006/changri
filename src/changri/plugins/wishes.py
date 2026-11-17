@@ -74,7 +74,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent):
         await wish_list.finish("现在没有开放的心愿。")
     # 摘心愿会马上开房间、通知对方：按钮只把指令填进输入框，玩家自己按发送
     await reply_buttons(wish_list, "🌠 开放的心愿\n" + "\n".join(_wish_line(w) for w in ws) + "\n摘一个发「摘心愿 编号」",
-                        [Btn(f"🌠 摘 #{w['id']}", f"摘心愿 {w['id']}", enter=False) for w in ws], per_row=4)
+                        [Btn(f"摘 #{w['id']}", f"摘心愿 {w['id']}", enter=False) for w in ws], per_row=4)
     await wish_list.finish()
 
 

@@ -94,3 +94,23 @@ def template(name: str) -> tuple[str, str]:
 def menu_text(names: list[str]) -> str:
     return ("📋 格式指令\n点下面的按钮，格式会填进输入框，填好再发送\n"
             "想看带例子的完整写法：发「格式短信」「格式心动信」这样\n现在可用：" + "、".join(names))
+
+
+# 「我的」：自己的东西集中在一处，一排按钮随时点。(按钮上的字, 点了发的指令, 开没开)。只列开着的功能。
+MINE: list[tuple[str, str, Callable[[], bool]]] = [
+    ("角色卡", "名片", _ext("rpg")),          # 用「名片」：「角色卡」在跑团模块里也是指令
+    ("时间线", "时间线", _always),
+    ("待回", "我的待回", _always),
+    ("数量", "我的数量", _always),
+    ("统计", "本场统计", _always),
+    ("关系线", "查看关系线", _relations),
+    ("心动信", "我的心动信", _lovemail),
+    ("背包", "背包", _ext("rpg")),
+    ("图鉴", "我的图鉴", _always),
+    ("小手机", "手机码", _ext("phone")),
+    ("我的群", "我的群", _always),
+]
+
+
+def mine() -> list[tuple[str, str]]:
+    return [(label, cmd) for label, cmd, on in MINE if on()]

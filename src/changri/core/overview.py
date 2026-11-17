@@ -50,7 +50,7 @@ def todo_items(role) -> list[str]:
         else:
             items.append(f"R{r['id']} {r['kind']}（{slot_text(r)}）：进行中，聊完记得「结束{r['kind']}」")
         if r["pending_change"] and not r["agree"]:
-            items.append(f"R{r['id']} 有人想改时间线，在那个群里发「同意时间线」或「拒绝时间线」")
+            items.append(f"R{r['id']} 有人想改时间线，发「同意时间线 R{r['id']}」或「拒绝时间线 R{r['id']}」（在那个房间群里可以不带房间号）")
     for q in rooms.pending_requests(role["id"]):
         items.append(f"{q['applicant']} 想加入 R{q['room_id']}，发「同意加入 {q['id']}」或「拒绝加入 {q['id']}」")
     return items + pending.collect(role)

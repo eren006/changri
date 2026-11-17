@@ -108,6 +108,10 @@ class LayoutTest(unittest.TestCase):
         self.assertNotIn("*粗*", md)
         self.assertNotIn("<b>", md)
 
+    def test_label_has_no_emoji(self):
+        kb = buttons.keyboard([[Btn("↩️ 回短信", "x"), Btn("🎁回礼", "y")]])
+        self.assertEqual([b["render_data"]["label"] for b in kb["content"]["rows"][0]["buttons"]], ["回短信", "回礼"])
+
     def test_long_label_cut(self):
         kb = buttons.keyboard([[Btn("一二三四五六七八九十一二三四", "x")]])
         self.assertLessEqual(len(kb["content"]["rows"][0]["buttons"][0]["render_data"]["label"]), buttons.LABEL_MAX)
@@ -173,7 +177,7 @@ class ButtonsE2E(unittest.TestCase):
     def test_template_has_fill_button(self):
         text, btns = self.say("格式私约")[0]
         self.assertIn("私约 时间 地点", text)
-        self.assertEqual(btns, [("✏️ 填入输入框", "私约 ", False)])
+        self.assertEqual(btns, [("填入输入框", "私约 ", False)])
         text, btns = self.say("格式撤回")[0]
         self.assertIn("撤回", text)
         self.assertEqual(btns, [])                       # 撤回没有可以填的开头，不出按钮
@@ -219,7 +223,7 @@ class ButtonsE2E(unittest.TestCase):
         text, btns = self.pushed_to("G2")[-1]
         self.assertIn("今晚有空吗", text)
         self.assertIn('qqbot-at-user id="M2"', text)                          # 开头照样 @ 收件人
-        self.assertEqual(btns, [("↩️ 回短信", "短信 甲 ", False)])           # 名字填好、内容空着，只填进输入框
+        self.assertEqual(btns, [("回短信", "短信 甲 ", False)])           # 名字填好、内容空着，只填进输入框
 
     def test_anonymous_sms_has_no_reply_button(self):
         """自定义署名 / 匿名的短信不挂回复按钮：按钮里是真名，挂了就暴露发件人。"""
@@ -233,7 +237,7 @@ class ButtonsE2E(unittest.TestCase):
     def test_gift_reply_buttons(self):
         from changri.core import messaging
         m = {"kind": "gift", "from_name": "甲", "sign": ""}
-        self.assertEqual([(b.label, b.cmd) for b in messaging.reply_buttons(m)], [("🎁 回礼", "送礼 甲 "), ("↩️ 回短信", "短信 甲 ")])
+        self.assertEqual([(b.label, b.cmd) for b in messaging.reply_buttons(m)], [("回礼", "送礼 甲 "), ("回短信", "短信 甲 ")])
         self.assertEqual(messaging.reply_buttons({"kind": "gift", "from_name": "甲", "sign": "匿名"}), [])
         self.assertEqual(len(messaging.reply_buttons({"kind": "sms", "from_name": "甲", "sign": "甲"})), 1)     # 署名就是本人名字：照常挂
 
@@ -241,7 +245,7 @@ class ButtonsE2E(unittest.TestCase):
         self.say("拉线 乙 那天雨很大")
         text, btns = self.pushed_to("G2")[-1]
         self.assertIn("那天雨很大", text)
-        self.assertEqual([(b[0], b[1], b[2]) for b in btns], [("✍️ 回一段", "拉线 甲 ", False), ("📖 看全部", "查看关系线 甲", True)])
+        self.assertEqual([(b[0], b[1], b[2]) for b in btns], [("回一段", "拉线 甲 ", False), ("看全部", "查看关系线 甲", True)])
 
     def test_push_falls_back_to_text_when_rejected(self):
         set_config("sms_cooldown_sec", "0")
@@ -249,6 +253,18 @@ class ButtonsE2E(unittest.TestCase):
         self.say("短信 乙 你好")
         got = self.pushed_to("G2")
         self.assertTrue(any("你好" in t and not b for t, b in got), got)    # 没按钮权限：照常收到文字
+
+    def test_mine_menu(self):
+        text, btns = self.say("我的")[0]
+        self.assertIn("「甲」", text)
+        labels = [b[0] for b in btns]
+        for x in ("时间线", "待回", "数量", "统计", "图鉴"):
+            self.assertIn(x, labels)
+        self.assertIn(("时间线", "时间线", True), btns)
+        set_config("ext:rpg", "0")
+        self.assertNotIn("角色卡", [b[0] for b in self.say("我的")[0][1]])     # 关掉的功能不出现
+        self.assertEqual(self.say("我的角色")[0][0][:3], "角色：")              # 原来的「我的角色」不受影响
+        self.assertEqual(self.say("我的不存在的东西"), [])                       # 打错的不理
 
     def test_relation_list_has_name_buttons(self):
         a, b, c = (roles.get_role_by_name(n) for n in ("甲", "乙", "丙"))

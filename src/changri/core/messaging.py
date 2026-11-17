@@ -82,8 +82,8 @@ def reply_buttons(m) -> list:
     if (m["sign"] and m["sign"] != name) or not name:
         return []
     if m["kind"] == "sms":
-        return [Btn("↩️ 回短信", f"短信 {name} ", enter=False)]
-    return [Btn("🎁 回礼", f"送礼 {name} ", enter=False), Btn("↩️ 回短信", f"短信 {name} ", enter=False, style="secondary")]
+        return [Btn("回短信", f"短信 {name} ", enter=False)]
+    return [Btn("回礼", f"送礼 {name} ", enter=False), Btn("回短信", f"短信 {name} ", enter=False, style="secondary")]
 
 
 async def push_to_role_ex(role_id: int, text: str, send: Send, at: bool = True, buttons=None) -> tuple[bool, str, str, str]:

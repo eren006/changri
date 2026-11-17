@@ -7,6 +7,7 @@
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from .db import get_config
@@ -38,8 +39,12 @@ def _cmd_text(cmd: str) -> str:
     return ("/" + cmd) if get_config("require_prefix", "0") == "1" and not cmd[:1] in "/.。" else cmd
 
 
+_EMOJI = re.compile("[\U0001F000-\U0001FAFF\u2190-\u21FF\u2300-\u27BF\u2B00-\u2BFF\uFE0F\u200D]+")
+
+
 def _label(s: str) -> str:
-    s = str(s).strip()
+    """按钮上不放 emoji（Erin 定的）：写了也在这里去掉。"""
+    s = _EMOJI.sub("", str(s)).strip()
     return s if len(s) <= LABEL_MAX else s[:LABEL_MAX - 1] + "…"
 
 

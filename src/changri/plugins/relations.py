@@ -68,8 +68,8 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
         await add_rel.finish(hint)
     new_line, _, stat = hint.partition("\n") if hint.startswith("✨") else ("", "", hint)
     delivered = await _notify(bot, target["id"], f"📝 来自「{me['name']}」的新关系细节：\n{parts[1].strip()}\n\n（使用「查看关系线 {me['name']}」查看完整记录）",
-                              buttons=[Btn("✍️ 回一段", f"拉线 {me['name']} ", enter=False),          # 填进输入框，接着写
-                                       Btn("📖 看全部", f"查看关系线 {me['name']}", style="secondary")])
+                              buttons=[Btn("回一段", f"拉线 {me['name']} ", enter=False),          # 填进输入框，接着写
+                                       Btn("看全部", f"查看关系线 {me['name']}", style="secondary")])
     head = (new_line + "\n") if new_line else ""
     if delivered:
         await add_rel.finish(f"{head}✅ 细节已同步至「{target['name']}」的绑定群\n{stat}")
