@@ -147,19 +147,52 @@ async def send_at(bot, group_openid: str, member_openid: str, name: str, text: s
     return getattr(r, "id", "") or ""
 
 
+async def _send_with_buttons(bot, group_openid: str, text: str, btns) -> str | None:
+    """主动发到群、下面挂按钮（短信、礼物、关系线通知的「回复」）。文本开头的 {{AT:…}} 变成 Markdown 里的真 @。
+    发不了（没开按钮、QQ 拒绝过、内容太长）返回 None，调用方照原来的方式发；QQ 明确拒绝时一小时内不再试（和 reply_buttons 共用）。"""
+    global _btn_off_until
+    from nonebot.adapters.qq import Message
+    from nonebot.adapters.qq.exception import ActionFailed
+    from nonebot.adapters.qq.models import MessageKeyboard
+
+    from changri.core import buttons
+
+    m = AT_RE.match(text)
+    body = text[m.end():] if m else text
+    if not btns or not buttons.enabled() or time.time() < _btn_off_until or _image_wanted(body) or len(body) > BTN_MD_MAX:
+        return None
+    md, kb = buttons.build(body, btns, per_row=3)
+    if m:
+        md = f'<qqbot-at-user id="{m.group(1)}" />  \n' + md
+    try:
+        r = await bot.send_to_group(group_openid=group_openid,
+                                    message=Message([MessageSegment.markdown(md), MessageSegment.keyboard(MessageKeyboard.model_validate(kb))]))
+    except ActionFailed as e:
+        _btn_off_until = time.time() + 3600
+        logger.warning("[按钮] 主动消息带按钮被 QQ 拒绝，一小时内改发纯文字：" + ascii(str(e))[:200])
+        return None
+    return getattr(r, "id", "") or ""
+
+
 def make_send():
-    """按群所属的机器人选发送者（定时任务、出场用）。文本开头写 {{AT:成员openid:名字}} 就会在开头 @ 这个人。"""
+    """按群所属的机器人选发送者（定时任务、出场用）。文本开头写 {{AT:成员openid:名字}} 就会在开头 @ 这个人。
+    buttons=[Btn…] 时在消息下面挂按钮，发不了就照常发文字（见 _send_with_buttons）。"""
     import nonebot
 
-    async def send(bot_id: str, group_openid: str, text: str) -> str:
+    async def send(bot_id: str, group_openid: str, text: str, buttons=None) -> str:
         bot = nonebot.get_bots().get(bot_id)
         if bot is None:
             raise RuntimeError(f"机器人 {bot_id} 当前不在线")
+        if buttons:
+            mid = await _send_with_buttons(bot, group_openid, text, buttons)
+            if mid is not None:
+                return mid
         m = AT_RE.match(text)
         if m:
             return await send_at(bot, group_openid, m.group(1), m.group(2), text[m.end():])
         return await send_to_group(bot, group_openid, text)
 
+    send.buttons_ok = True          # messaging.push_to_role_ex 看这个决定传不传按钮（测试里的假 send 没有）
     return send
 
 

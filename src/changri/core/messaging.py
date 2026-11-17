@@ -74,8 +74,21 @@ def render(kind: str, from_name: str, title: str, content: str) -> str:
     return text + (f"\n留言：{content}" if content else "")
 
 
-async def push_to_role_ex(role_id: int, text: str, send: Send, at: bool = True) -> tuple[bool, str, str, str]:
-    """把一段文字发到某角色：发到个人群。返回 (是否送达, 群 openid 或错误, 机器人 ID, 消息 id)。"""
+def reply_buttons(m) -> list:
+    """短信、礼物送到时下面的「回复」按钮：把「短信 对方名 」「送礼 对方名 」填进输入框，内容让收件人自己写。
+    匿名或自定义署名（署名不是本人名字）的不挂：按钮里写的是真名，挂了就把匿名的人暴露了。"""
+    from .buttons import Btn
+    name = m["from_name"]
+    if (m["sign"] and m["sign"] != name) or not name:
+        return []
+    if m["kind"] == "sms":
+        return [Btn("↩️ 回短信", f"短信 {name} ", enter=False)]
+    return [Btn("🎁 回礼", f"送礼 {name} ", enter=False), Btn("↩️ 回短信", f"短信 {name} ", enter=False, style="secondary")]
+
+
+async def push_to_role_ex(role_id: int, text: str, send: Send, at: bool = True, buttons=None) -> tuple[bool, str, str, str]:
+    """把一段文字发到某角色：发到个人群。返回 (是否送达, 群 openid 或错误, 机器人 ID, 消息 id)。
+    buttons：消息下面挂的按钮（core/buttons.Btn），只有支持按钮的 send（qqsend.make_send）才会带上，发不了自动退回纯文字。"""
     errors = []
     with get_conn() as conn:
         r = conn.execute("SELECT name FROM roles WHERE id=?", (role_id,)).fetchone()
@@ -86,7 +99,10 @@ async def push_to_role_ex(role_id: int, text: str, send: Send, at: bool = True) 
         # 发给本人的通知（短信、礼物、邀请……）开头 @ 本人；认过群成员才能 @，文本已经带了 @ 的不重复加
         body = "{{AT:%s:%s}}%s" % (g["member_openid"], name, text) if at and g["member_openid"] and name and not text.startswith("{{AT:") else text
         try:
-            mid = await send(g["bot_id"], g["group_openid"], body)
+            if buttons and getattr(send, "buttons_ok", False):
+                mid = await send(g["bot_id"], g["group_openid"], body, buttons=buttons)
+            else:
+                mid = await send(g["bot_id"], g["group_openid"], body)
         except Exception as e:  # noqa: BLE001 官方接口失败原因很杂，原样记下
             errors.append(f"{g['kind']}:{str(e)[:80]}")
             continue
@@ -94,8 +110,8 @@ async def push_to_role_ex(role_id: int, text: str, send: Send, at: bool = True) 
     return False, "; ".join(errors) or "收件人没有可用的群", "", ""
 
 
-async def push_to_role(role_id: int, text: str, send: Send, at: bool = True) -> tuple[bool, str]:
-    ok, info, _bot, _mid = await push_to_role_ex(role_id, text, send, at)
+async def push_to_role(role_id: int, text: str, send: Send, at: bool = True, buttons=None) -> tuple[bool, str]:
+    ok, info, _bot, _mid = await push_to_role_ex(role_id, text, send, at, buttons)
     return ok, info
 
 
@@ -143,7 +159,7 @@ async def deliver(msg_id: int, send: Send) -> bool:
     from . import msgimages
     imgs = msgimages.blobs(msg_id)
     text = render(m["kind"], m["sign"] or m["from_name"], m["title"], m["content"] or ("（图片）" if imgs else ""))
-    ok, info, bot_id, mid = await push_to_role_ex(m["to_role_id"], text, send)
+    ok, info, bot_id, mid = await push_to_role_ex(m["to_role_id"], text, send, buttons=reply_buttons(m))
     if ok:
         for data in imgs:                                  # 图片紧跟文字发到同一个群；发不出去不影响短信算送达
             try:

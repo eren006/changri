@@ -83,7 +83,7 @@
       </form></details></span></div>
   <div class="rowlist">
     {% for b in booked %}
-    <div class="row">
+    <div class="row" style="flex-wrap:wrap">{# 展开「修改」时那块占满一行，要能换行；以前固定占满又不能换行，名字和日期被挤成竖排 #}
       <div class="nm"><b>{{ b.name }}</b>
         <div class="muted tabular">{{ b.start_date }} ~ {{ b.end_date }}{% if b.supp_end %} · 补戏到 {{ b.supp_end }}{% endif %}</div></div>
       <div class="acts">
@@ -92,7 +92,7 @@
           <button class="btn sm">开始</button></form>{% endif %}
         <form method="post" action="{{ url_for('season_delete', season_id=b.id) }}" onsubmit="return confirm('删除这个预订？')">{{ csrf() }}<button class="linkbtn">删除</button></form>
       </div>
-      <details class="panel" style="flex:1 1 100%"><summary class="linkbtn">修改</summary>
+      <details class="panel"><summary class="linkbtn">修改</summary>
         <form class="form" method="post" action="{{ url_for('season_edit', season_id=b.id) }}">{{ csrf() }}
           <div class="fields">
             <div><label>名字</label><input name="name" required maxlength="30" value="{{ b.name }}"></div>
