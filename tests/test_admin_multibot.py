@@ -242,6 +242,29 @@ class AdminMultiBot(unittest.TestCase):
         with db.use_bot("111111"):
             self.assertEqual(dice.custom_lines(), {})
 
+    def test_dice_marks_and_new_pools(self):
+        """个性化骰子：等级表情可换（空着 = 默认），/sc /en 的台词也走后台；表情恢复默认只清表情。"""
+        from changri.core import dice, dicecard
+        base = "/b/111111"
+        page = self.c.get(f"{base}/dice/lines").get_data(as_text=True)
+        self.assertIn("个性化骰子", page)
+        self.assertIn("还撑得住。", page)
+        self.assertIn("经验急不得。", page)
+        tok = self._csrf(f"{base}/dice/lines")
+        form = {"_csrf": tok, "mark.大成功": "🌟", "mark.失败": "  ", "en.none": "下次一定"}
+        self.c.post(f"{base}/dice/lines", data=form)
+        with db.use_bot("111111"):
+            self.assertEqual(dicecard.custom_marks(), {"大成功": "🌟"})
+            self.assertEqual(dicecard.mark_for("大成功"), "🌟")
+            self.assertEqual(dicecard.mark_for("失败"), "❌")
+            self.assertIn("🌟", dicecard.check_card("侦查", 1, 60, "大成功", "x"))
+            self.assertEqual(dice._pick(dice.GROWTH_REMARKS, "none"), "下次一定")
+            self.assertEqual(dice._pick(dice.SAN_REMARKS, "pass"), "还撑得住。")
+        self.c.post(f"{base}/dice/lines/reset", data={"k": "marks", "_csrf": tok})
+        with db.use_bot("111111"):
+            self.assertEqual(dicecard.custom_marks(), {})
+            self.assertEqual(dice.custom_lines(), {"en.none": ["下次一定"]})
+
     def test_god_erase_role(self):
         """上帝模式里彻底删除角色：要输对角色名才删。"""
         base = "/b/111111"

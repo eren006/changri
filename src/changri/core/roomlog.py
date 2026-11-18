@@ -7,6 +7,7 @@ import time
 
 from . import pool, rooms, storycal
 from .db import get_conn, get_int
+from .textutil import hm_text
 
 _RP = re.compile(r"^\s*(\S{1,12}?)\s*[：:\s]\s*(.+)$", re.S)
 _ROOM_CMD = re.compile(r"(?:@\S+\s*)*[/.。]?(结束(?:约会|私约|电话|官约|微信|心愿|前置电话)|修改时间线|同意时间线|拒绝时间线|绑定qq|绑定QQ|补录)\s*.*", re.S)
@@ -348,7 +349,7 @@ def events(role: str = "", kind: str = "", q: str = "") -> list[dict]:
                     num, label = r["day"], f"D{r['day']}"
                 out.append({"type": "room", "ts": r["created_ts"], "day": num, "day_label": label, "id": r["id"], "kind": r["kind"],
                             "story": ("" if r["kind"] in rooms.NO_TIMELINE else storycal.label_for_slot(num, r["start_hm"])),
-                            "who": who, "slot": ("" if r["kind"] in rooms.NO_TIMELINE else f"{r['start_hm']}-{r['end_hm']}" + (f" @{r['place']}" if r["place"] else "")),
+                            "who": who, "slot": ("" if r["kind"] in rooms.NO_TIMELINE else f"{hm_text(r['start_hm'], r['end_hm'])}" + (f" @{r['place']}" if r["place"] else "")),
                             "status": r["status"], "lines": ls, "n": len(ls), "chars": sum(x["chars"] for x in ls)})
         if kind in ("", "sms", "gift", "msg"):
             sql = ("SELECT m.*, f.name AS fn, t.name AS tn FROM messages m JOIN roles f ON f.id=m.from_role_id JOIN roles t ON t.id=m.to_role_id "

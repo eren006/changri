@@ -2,6 +2,10 @@
 {% block title %}总览{% endblock %}
 {% block head %}
 <style>
+/* 通知群卡片：二维码 + 说明，窄屏上下排 */
+.ios .ng{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+.ios .ng img{border-radius:10px;flex:none}
+.ios .ng p{margin:0 0 8px}
 /* 总览：iOS 风——大标题、圆角卡片、分组列表、行尾箭头。颜色全部走 base.html 的变量，深色模式自动跟着变 */
 
 /* 现在 / 下一项：大块渐变卡片 */
@@ -174,6 +178,19 @@ a.tile:active{transform:scale(.97)}
     {% if errors %}<form method="post" action="{{ url_for('errors_clear') }}" style="margin-top:14px">{{ csrf() }}<button class="btn sm ghost">清空</button></form>{% endif %}
   </div>
 </details>
+
+<details class="card dcard" id="notice">
+  <summary><span class="ico c-blue" aria-hidden="true">{{ icon('users') }}</span>
+    <div class="tx"><b>长日bot 通知群</b><span>QQ 群 {{ NOTICE_GROUP }} · 新版本、维护通知都发在这里</span></div>
+    <i class="chev" aria-hidden="true"></i></summary>
+  <div class="body ng">
+    <img src="{{ url_for('static', filename='notice-group-qr.png') }}" width="160" height="160" alt="长日bot 通知群的 QQ 群二维码">
+    <div>
+      <p>用手机 QQ 扫码加群，或者在 QQ 里搜群号 <b class="tabular">{{ NOTICE_GROUP }}</b>。</p>
+      <p class="note">出新版本、要维护的时候会在群里说；用的时候遇到问题，也可以在群里问。</p>
+    </div>
+  </div>
+</details>
 </div>
 {% if ask_contact %}
 <dialog class="cq" id="cq" aria-labelledby="cq-t">
@@ -181,6 +198,7 @@ a.tile:active{transform:scale(.97)}
     <h2 id="cq-t">留一个联系 QQ？</h2>
     <p>机器人出错时，报错会自动发给作者。留了 QQ，作者看到报错后可以加你，帮你一起看问题。</p>
     <p class="cq-note">选填。只在发报错时附带，不会用在别处。以后可以在「基础」设置里改或删。</p>
+    <p class="cq-note">也欢迎加长日bot 通知群 {{ NOTICE_GROUP }}，新版本和维护通知都发在群里（总览最下面有二维码）。</p>
     <label for="cq-qq">QQ 号</label>
     <input id="cq-qq" name="qq" inputmode="numeric" pattern="[0-9]{5,12}" maxlength="12" autocomplete="off" placeholder="例如 12345678">
     <div class="cq-act">

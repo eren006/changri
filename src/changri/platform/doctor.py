@@ -1,4 +1,4 @@
-"""自检（changri doctor）：装好以后不知道哪里不对，先跑这个。只读，不改任何东西。"""
+"""自检（changri doctor）：装好以后不知道哪里不对，先跑这个。只读，不改任何东西（要修用官网的修复工具，见 portcheck.fix_hint）。"""
 from __future__ import annotations
 
 import os
@@ -34,8 +34,14 @@ def checks() -> list[tuple[bool | None, str, str]]:
     writable = os.access(DATA_DIR if DATA_DIR.exists() else DATA_DIR.parent, os.W_OK)
     out.append((writable, "数据目录可写", str(DATA_DIR) if writable else f"{DATA_DIR} 写不进去：看看是不是用别的用户装的"))
     ap = config.admin_port()
-    up = _listening(ap)
-    out.append((up, f"设置平台（{ap} 端口）", "在运行" if up else "没在运行：先启动程序，或者端口被别的程序占了"))
+    if not _listening(ap):
+        out.append((False, f"设置平台（{ap} 端口）", "没在运行：先启动程序"))
+    else:
+        from .portcheck import busy_message, changri_on, who_listens
+        if changri_on(ap):
+            out.append((True, f"设置平台（{ap} 端口）", "在运行"))
+        else:
+            out.append((False, f"设置平台（{ap} 端口）", busy_message(ap, who_listens(ap))))
     try:
         from ..core import phoneserver
         if phoneserver.phone_bots(fresh=True):
@@ -73,3 +79,4 @@ def report() -> tuple[str, bool]:
     lines.append("")
     lines.append("全部正常。" if all_ok else "有打 ✗ 的项目，按说明处理；还是不行就把上面这些发给维护的人。")
     return "\n".join(lines), all_ok
+

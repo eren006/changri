@@ -38,8 +38,12 @@ def segments_to_text(message) -> str:
     if isinstance(message, str):
         return message
     out = []
-    for seg in message or []:
-        kind, data = seg.get("type"), seg.get("data") or {}
+    if not isinstance(message, list):
+        return ""
+    for seg in message:
+        if not isinstance(seg, dict):
+            continue
+        kind, data = seg.get("type"), seg.get("data") if isinstance(seg.get("data"), dict) else {}
         if kind == "text":
             out.append(str(data.get("text", "")))
         elif kind == "at":
@@ -59,15 +63,24 @@ def parse_group_message(ev: dict) -> GroupMsg | None:
     """不是群消息返回 None。"""
     if ev.get("post_type") != "message" or ev.get("message_type") != "group":
         return None
-    sender = ev.get("sender") or {}
-    nick = sender.get("card") or sender.get("nickname") or str(ev.get("user_id", ""))
-    text = segments_to_text(ev.get("message")) or str(ev.get("raw_message", "")).strip()
-    segs = ev.get("message") if isinstance(ev.get("message"), list) else []
-    reply = next((str((s.get("data") or {}).get("id", "")) for s in segs if s.get("type") == "reply"), "")
-    fwd = [str((s.get("data") or {}).get("id", "")) for s in segs if s.get("type") == "forward" and (s.get("data") or {}).get("id")]
+    # 各家实现偶尔给出奇怪的字段（sender 不是对象、消息段里混着字符串、time 不是数字）：能认的认，认不出的当没有，不抛错
+    sender = ev.get("sender") if isinstance(ev.get("sender"), dict) else {}
+    nick = str(sender.get("card") or sender.get("nickname") or ev.get("user_id", ""))
+    message = ev.get("message")
+    segs = [s for s in message if isinstance(s, dict)] if isinstance(message, list) else []
+    text = segments_to_text(message if isinstance(message, str) else segs) or str(ev.get("raw_message", "")).strip()
+
+    def seg_data(s) -> dict:
+        return s.get("data") if isinstance(s.get("data"), dict) else {}
+    reply = next((str(seg_data(s).get("id", "")) for s in segs if s.get("type") == "reply"), "")
+    fwd = [str(seg_data(s)["id"]) for s in segs if s.get("type") == "forward" and seg_data(s).get("id")]
+    try:
+        ts = int(float(ev.get("time") or 0)) or int(time.time())
+    except (TypeError, ValueError):
+        ts = int(time.time())
     return GroupMsg(self_id=str(ev.get("self_id", "")), group_id=str(ev.get("group_id", "")),
                     user_id=str(ev.get("user_id", "")), nickname=nick, text=text,
-                    time=int(ev.get("time") or time.time()), message_id=str(ev.get("message_id", "")),
+                    time=ts, message_id=str(ev.get("message_id", "")),
                     reply_id=reply, forward_ids=fwd)
 
 
@@ -113,26 +126,45 @@ class QQLink:
     # ---------- 连接 ----------
 
     async def run(self) -> None:
+        """收消息的循环只做两件事：API 的返回当场交给等它的 call()，事件排进队列交给 _work 按顺序处理。
+        不能在这里直接 await 回调：回调里常常要再调这个号的接口（房间群里回话、改群名、查群成员），
+        那个返回也要靠这个循环来收，循环被回调占着就收不到，每次都白等到超时（「QQ 号没有回应」）。"""
         import websockets
+        events: asyncio.Queue = asyncio.Queue()
+        worker = asyncio.get_running_loop().create_task(self._work(events))
         delay = 1.0
-        while not self._stop:
+        try:
+            while not self._stop:
+                try:
+                    headers = {"Authorization": f"Bearer {self.token}"} if self.token else None
+                    async with websockets.connect(self.url, additional_headers=headers, open_timeout=10, max_size=8 * 1024 * 1024) as ws:
+                        self._ws, self.connected, self.last_error, delay = ws, True, "", 1.0
+                        async for raw in ws:
+                            data = self._parse(raw)
+                            if data is not None and not self._take_reply(data):
+                                events.put_nowait(data)
+                except asyncio.CancelledError:
+                    raise
+                except Exception as e:                      # 断线、连不上、口令错：记下原因，退避后重连
+                    self.last_error = f"{type(e).__name__}: {e}"[:200]
+                finally:
+                    self.connected, self._ws = False, None
+                    self._fail_pending()
+                if self._stop:
+                    break
+                await asyncio.sleep(delay)
+                delay = min(delay * 2, 30.0)
+        finally:
+            worker.cancel()
+
+    async def _work(self, events: asyncio.Queue) -> None:
+        """按收到的顺序一条一条处理事件（同一个群里发言、到场的先后不会乱）。一条出错（包括格式不对）不影响后面的，也不会断线。"""
+        while True:
+            data = await events.get()
             try:
-                headers = {"Authorization": f"Bearer {self.token}"} if self.token else None
-                async with websockets.connect(self.url, additional_headers=headers, open_timeout=10, max_size=8 * 1024 * 1024) as ws:
-                    self._ws, self.connected, self.last_error, delay = ws, True, "", 1.0
-                    async for raw in ws:
-                        await self._handle(raw)
-            except asyncio.CancelledError:
-                raise
-            except Exception as e:                      # 断线、连不上、口令错：记下原因，退避后重连
-                self.last_error = f"{type(e).__name__}: {e}"[:200]
-            finally:
-                self.connected, self._ws = False, None
-                self._fail_pending()
-            if self._stop:
-                break
-            await asyncio.sleep(delay)
-            delay = min(delay * 2, 30.0)
+                await self._dispatch(data)
+            except Exception:
+                log.exception("处理 QQ 号事件出错")
 
     def stop(self) -> None:
         self._stop = True
@@ -145,20 +177,35 @@ class QQLink:
                 fut.set_exception(QQLinkError("连接断开了"))
         self._pending.clear()
 
-    async def _handle(self, raw) -> None:
+    @staticmethod
+    def _parse(raw) -> dict | None:
+        """不是 JSON 对象（坏数据、数组、数字）返回 None，直接丢掉。"""
         try:
             data = json.loads(raw)
         except ValueError:
-            return
+            return None
+        return data if isinstance(data, dict) else None
+
+    def _take_reply(self, data: dict) -> bool:
+        """是 API 的返回：交给等它的 call()，返回 True。"""
         echo = data.get("echo")
-        if echo is not None and str(echo) in self._pending:          # API 的返回
-            fut = self._pending.pop(str(echo))
-            if not fut.done():
-                fut.set_result(data)
-            return
+        if echo is None or str(echo) not in self._pending:
+            return False
+        fut = self._pending.pop(str(echo))
+        if not fut.done():
+            fut.set_result(data)
+        return True
+
+    async def _handle(self, raw) -> None:
+        """一条消息当场处理完（测试直接调）。run() 里事件走队列，原因见 run 的说明。"""
+        data = self._parse(raw)
+        if data is not None and not self._take_reply(data):
+            await self._dispatch(data)
+
+    async def _dispatch(self, data: dict) -> None:
         self.last_event = time.time()
         if data.get("post_type") == "meta_event":
-            status = data.get("status") or {}
+            status = data.get("status") if isinstance(data.get("status"), dict) else {}
             if "online" in status:
                 self.online = bool(status["online"])
         if data.get("self_id"):

@@ -223,5 +223,68 @@ class GroupMembersTests(unittest.IsolatedAsyncioTestCase):
                 qqmanager._links.pop(k, None)
 
 
+class CallbackCallsBackTests(unittest.IsolatedAsyncioTestCase):
+    """回调里再调这个号的接口（进群后查群成员、群里回话）：收消息的循环不能被回调占着，否则返回收不到、白等 10 秒超时。"""
+
+    async def test_join_hook_can_query_members(self):
+        async def handler(ws):
+            await ws.send(json.dumps({"post_type": "notice", "notice_type": "group_increase", "group_id": 123, "user_id": 456, "self_id": 1}))
+            async for raw in ws:
+                req = json.loads(raw)
+                await ws.send(json.dumps({"status": "ok", "retcode": 0, "echo": req["echo"], "data": [{"user_id": 456, "role": "member"}]}))
+
+        server = await websockets.serve(handler, "127.0.0.1", 0)
+        port = server.sockets[0].getsockname()[1]
+        done: asyncio.Future = asyncio.get_running_loop().create_future()
+
+        async def on_join(gid, uid):
+            try:
+                done.set_result(await link.member_rows(gid))
+            except Exception as e:  # noqa: BLE001
+                done.set_exception(e)
+
+        link = QQLink(f"ws://127.0.0.1:{port}", on_group_join=on_join)
+        task = asyncio.get_running_loop().create_task(link.run())
+        try:
+            rows = await asyncio.wait_for(done, 3)          # 修之前要等满 10 秒然后「QQ 号没有回应」
+        finally:
+            link.stop()
+            task.cancel()
+            server.close()
+            await server.wait_closed()
+        self.assertEqual(rows, [{"qq": "456", "role": "member"}])
+
+    async def test_bad_events_do_not_drop_connection_and_order_kept(self):
+        """格式不对的事件（不是对象、time 不是数字、sender 不是对象、消息段里混着字符串）不断线；正常的消息照顺序到。"""
+        connects = []
+
+        async def handler(ws):
+            connects.append(1)
+            for raw in ("[1, 2]", "42", json.dumps(gev(text="一", time="昨天", sender="??")),
+                        json.dumps(gev(text="二", message=["坏段", {"type": "text", "data": {"text": "二"}}, {"type": "reply", "data": "x"}])),
+                        json.dumps(gev(text="三"))):
+                await ws.send(raw)
+            await ws.wait_closed()                           # 一直开着，直到测试关掉
+
+        server = await websockets.serve(handler, "127.0.0.1", 0)
+        port = server.sockets[0].getsockname()[1]
+        got = []
+        link = QQLink(f"ws://127.0.0.1:{port}", on_group_message=lambda m: got.append(m.text))
+        task = asyncio.get_running_loop().create_task(link.run())
+        try:
+            for _ in range(150):
+                if len(got) >= 3:
+                    break
+                await asyncio.sleep(0.02)
+        finally:
+            link.stop()
+            task.cancel()
+            server.close()
+            await server.wait_closed()
+        self.assertEqual(got, ["一", "二", "三"])
+        self.assertEqual(len(connects), 1)
+        self.assertEqual(link.last_error, "")
+
+
 if __name__ == "__main__":
     unittest.main()

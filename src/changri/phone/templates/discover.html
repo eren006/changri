@@ -4,6 +4,7 @@
 {% block body %}
   <header class="bar tab-bar"><div class="tab-head"><h1>发现</h1></div></header>
   <div class="scroll list" id="discoverList">
+    {% if on.dailyquote %}<div class="daily-card" id="dailyQuote" role="button" tabindex="0" aria-label="每日一句，点一下换一句" hidden><div class="q"></div><div class="src"></div></div>{% endif %}
     <div class="disc-label">我的</div>
     <div class="disc-group">
       <a class="row" href="{{ url_for('search_page') }}">{{ admin_app_icon('guide') }}<span class="name">搜索与收藏</span><span class="chev" aria-hidden="true">›</span></a>
@@ -31,4 +32,22 @@
       <a class="row" href="{{ url_for('guide') }}">{{ admin_app_icon('guide') }}<span class="name">使用指南</span><span class="chev" aria-hidden="true">›</span></a>
     </div>
   </div>
+  {% if on.dailyquote %}<script>
+  (function () {
+    var box = document.getElementById('dailyQuote'), qs = [], i = 0;
+    if (!box) return;
+    function show() {
+      if (!qs.length) return;
+      var q = qs[i % qs.length];
+      box.querySelector('.q').textContent = '「' + q.text + '」';
+      box.querySelector('.src').textContent = q.source || '';
+      box.hidden = false;
+    }
+    function next() { if (qs.length > 1) { i++; show(); } }
+    box.addEventListener('click', next);
+    box.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); next(); } });
+    fetch({{ url_for('daily_quote')|tojson }}, { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { qs = (d && d.quotes) || []; i = Math.floor(Math.random() * Math.max(qs.length, 1)); show(); }).catch(function () {});
+  })();
+  </script>{% endif %}
 {% endblock %}

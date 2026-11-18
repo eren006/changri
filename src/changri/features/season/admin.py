@@ -1,7 +1,25 @@
 """设置平台 · 季度、出场与 NPC。由 changri.admin.create_app 调用 register(app, login_required) 挂上路由（路由名不变，模板里的 url_for 照常用）。"""
 from flask import Response, abort, flash, redirect, render_template, request, url_for
 from changri.core import loopbridge, npc as npc_core, season as season_core, seasonarchive
-from changri.core.db import get_config, get_conn, set_config
+from changri.core.db import current_bot, get_config, get_conn, set_config
+
+ENDING_TEXT = "季度已经结束，季末报告还在往玩家那里发（每人一张海报，人多要几分钟）。过一会儿刷新这一页，就能看到发了多少。"
+_ending: dict = {}          # 机器人 → 还在发季末报告的那件事（concurrent.futures.Future）；页面先返回，不占着后台线程干等
+
+
+def _ending_note() -> None:
+    """上次「结束季度」页面先返回了、季末报告在后台发：发完了就把结果显示一次，没发完提示还在发。"""
+    fut = _ending.get(current_bot())
+    if fut is None:
+        return
+    if not fut.done():
+        flash(ENDING_TEXT)
+        return
+    _ending.pop(current_bot(), None)
+    try:
+        flash(fut.result()[1])
+    except Exception as e:  # noqa: BLE001
+        flash(f"季度已经结束，但季末报告没发完：{str(e)[:60]}")
 
 
 def register(app, login_required):
@@ -20,6 +38,7 @@ def register(app, login_required):
     @login_required
     def season_page():
         from changri.core import entrance as entrance_core
+        _ending_note()
         return render_template("season.html", running=season_core.running(), phase=season_core.phase(), day=season_core.day_label(),
                                auto=get_config("auto_day") == "1", booked=season_core.booked(), past=[x for x in season_core.all_seasons() if x["status"] == "ended"], archived=seasonarchive.archived_ids(), cal=season_core.month_grid(request.args.get("cal", "")), cal_line=season_core.upcoming_line(), report=_report_ctx(),
                                preview=season_core.wipe_preview(), stage=entrance_core.get_stage(), queue=entrance_core.queue(),
@@ -185,7 +204,13 @@ def register(app, login_required):
     @login_required
     def season_end():
         from changri.core.qqsend import make_send, make_send_image
-        flash(loopbridge.run(season_core.end_and_report(make_send(), make_send_image()), timeout=600)[1])     # 每人一张海报，人多要一会儿
+        fut = _ending.get(current_bot())
+        if fut is not None and not fut.done():         # 上一次的还在发：季度页会提示，不再结束一次
+            return redirect(url_for("season_page"))
+        try:
+            flash(loopbridge.run(season_core.end_and_report(make_send(), make_send_image()), timeout=20)[1])
+        except loopbridge.StillRunning as e:          # 每人一张海报，人多要几分钟：页面先返回（季度页提示还在发），发完的结果下次打开季度页时显示
+            _ending[current_bot()] = e.future
         return redirect(url_for("season_page"))
 
     # ---------- 季末报告：开关、样式、下载 ----------

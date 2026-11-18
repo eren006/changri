@@ -1,5 +1,6 @@
 """QQ 号断线提醒：掉线超过 2 分钟，用卡拉往后台群（没设就公告群）发一条；恢复了再发一条。不发就记日志。
 掉线备案（core/outage.py，默认开）：掉线时通知所有玩家暂停 QQ 群回戏、自动打开小手机并发激活码；恢复后关回去、@ 大家回 QQ 群。"""
+import asyncio
 import time
 
 import nonebot
@@ -44,16 +45,20 @@ async def _tick():
         if not ln["enabled"]:
             continue
         res = qqmanager.watch(current_bot(), time.time(), secs, ln["id"])
-        if not res:
-            continue
-        kind, reason = res
-        st = qqmanager.link_status(current_bot(), ln["id"])
-        who = f"QQ {st['self_id']}（{ln['name']}）" if st["self_id"] else f"监听用的 QQ 号「{ln['name']}」"
-        await _notify(f"⚠️ {who} 掉线了：{reason}。听群消息、改群名暂时不能用，管理员请处理。" if kind == "alert" else f"✅ {who} 已恢复连接。")
-        if kind == "alert" and outage.enabled():
-            await _fallback_on(ln["id"])
-        elif kind != "alert" and ln["id"] in outage.down_links():
-            await _fallback_off(ln["id"])
+        if res:
+            kind, reason = res
+            st = qqmanager.link_status(current_bot(), ln["id"])
+            who = f"QQ {st['self_id']}（{ln['name']}）" if st["self_id"] else f"监听用的 QQ 号「{ln['name']}」"
+            await _notify(f"⚠️ {who} 掉线了：{reason}。听群消息、改群名暂时不能用，管理员请处理。" if kind == "alert" else f"✅ {who} 已恢复连接。")
+        # 掉线备案按「现在的状态」做，不只在提醒的那一下做：这一轮没做成（出错、机器人刚好不在线），下一轮（30 秒后）接着做。
+        # 做成了 outage 里就记着这个号，不会重复通知。
+        try:
+            if qqmanager.alerted(current_bot(), ln["id"]) and outage.enabled() and ln["id"] not in outage.down_links():
+                await _fallback_on(ln["id"])
+            elif not qqmanager.down_reason(current_bot(), ln["id"]) and ln["id"] in outage.down_links():
+                await _fallback_off(ln["id"])
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[掉线备案] QQ 号 {ln['id']} 这一轮没做成，30 秒后再试：{e}")
 
 
 async def _tell_players(text_for) -> int:
@@ -69,7 +74,7 @@ async def _tell_players(text_for) -> int:
 
 
 async def _fallback_on(link_id: int) -> None:
-    res = outage.start(link_id)
+    res = await asyncio.to_thread(outage.start, link_id)      # 里面会启动小手机（要等几秒）：放到线程里，不卡住机器人
     if not res["first"]:
         return                                                          # 已经有号掉线、大家已经切到小手机了
     n = await _tell_players(outage.down_text)
@@ -79,7 +84,7 @@ async def _fallback_on(link_id: int) -> None:
 
 
 async def _fallback_off(link_id: int) -> None:
-    res = outage.end(link_id)
+    res = await asyncio.to_thread(outage.end, link_id)        # 里面会关小手机（要等它收尾）：同上
     if not res["all_clear"]:
         return
     n = await _tell_players(lambda rid: outage.UP_TEXT)

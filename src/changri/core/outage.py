@@ -76,6 +76,16 @@ def rooms_down_for(role_id: int) -> list:
     return [r for r in rows if room_down(r)]
 
 
+def _restart_phone() -> None:
+    """按新的开关启停小手机。启停出错只记日志：掉线已经记下了，玩家照样要收到通知。"""
+    from . import phoneserver
+    try:
+        phoneserver.start()
+    except Exception:  # noqa: BLE001
+        import logging
+        logging.getLogger(__name__).exception("掉线备案：小手机启停出错")
+
+
 def start(link_id: int) -> dict:
     """记下掉线。返回 {"first": 是不是这次掉线的第一个号, "phone_opened": 小手机是不是刚被自动打开}。"""
     links = down_links()
@@ -88,8 +98,7 @@ def start(link_id: int) -> dict:
         set_config("phone_enabled", "1")
         set_config(AUTO_KEY, "1")
         opened = True
-    from . import phoneserver
-    phoneserver.start()
+    _restart_phone()
     return {"first": first, "phone_opened": opened}
 
 
@@ -104,8 +113,7 @@ def end(link_id: int) -> dict:
         set_config("phone_enabled", "0")
         closed = True
     set_config(AUTO_KEY, "0")
-    from . import phoneserver
-    phoneserver.start()
+    _restart_phone()
     return {"all_clear": True, "phone_closed": closed}
 
 

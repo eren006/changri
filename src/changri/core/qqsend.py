@@ -1,6 +1,9 @@
 """往 QQ 群里发消息的工具（原 plugins/_long.py）：长内容画成图片发（官方机器人没有合并转发），画不出来或发不出去就退回文字；
 @人、撤回、下载消息里的图片。群指令、设置平台、小手机都从这里发。"""
+import asyncio
+import collections
 import re
+import threading
 import time
 
 from nonebot import logger
@@ -25,11 +28,31 @@ def _strip_img(text: str) -> str:
     return text[len(IMG):] if text.startswith(IMG) else text
 
 
+_render_lock = threading.Lock()          # 署名是模块里的全局变量，几个线程同时画会串：一次只画一张
+_render_cache: collections.OrderedDict = collections.OrderedDict()     # (署名, 文字) → 图；自动复盘给每个参与者发同一份，只画一次
+_RENDER_CACHE_N = 4
+
+
 def _render(text: str) -> list[bytes]:
+    """画图很慢（2 万字要 4 秒左右），只能在线程里调（见 _render_async），别在事件循环里直接调。"""
     from changri.core.render import forward_image as F
-    F._apply_brand()
-    pngs, _cut = F.render_forward([{"name": F.BRAND, "text": text}])
-    return pngs[:5]       # 被动回复同一条消息最多 5 次
+    with _render_lock:
+        F._apply_brand()
+        key = (F.BRAND_LABEL, text)
+        if key in _render_cache:
+            _render_cache.move_to_end(key)
+            return _render_cache[key]
+        pngs, _cut = F.render_forward([{"name": F.BRAND, "text": text}])
+        pngs = pngs[:5]       # 被动回复同一条消息最多 5 次
+        _render_cache[key] = pngs
+        while len(_render_cache) > _RENDER_CACHE_N:
+            _render_cache.popitem(last=False)
+        return pngs
+
+
+async def _render_async(text: str) -> list[bytes]:
+    """放到线程里画：画的时候机器人照样收消息、回指令。"""
+    return await asyncio.to_thread(_render, text)
 
 
 async def send_to_group(bot, group_openid: str, text: str) -> str:
@@ -40,7 +63,7 @@ async def send_to_group(bot, group_openid: str, text: str) -> str:
     if wanted:
         sent = 0
         try:
-            for png in _render(text):
+            for png in await _render_async(text):
                 r = await bot.send_to_group(group_openid=group_openid, message=MessageSegment.file_image(png))
                 first = first or (getattr(r, "id", "") or "")
                 sent += 1
@@ -65,7 +88,7 @@ async def reply_long(matcher, text: str, as_image: bool = True) -> None:
     if wanted:
         sent = 0
         try:
-            for png in _render(text):
+            for png in await _render_async(text):
                 await matcher.send(MessageSegment.file_image(png))
                 sent += 1
             return

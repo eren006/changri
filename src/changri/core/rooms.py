@@ -6,6 +6,7 @@ import time
 
 from . import blocks, pool, rpg, season, windows
 from .db import get_conn, get_config, get_int
+from .textutil import hm_text
 
 ROOM_KINDS_GATED = ("约会", "电话", "微信")
 KINDS = {"约会": True, "电话": False, "官约": True, "微信": False, "心愿": True, "前置电话": False, "踩点": True}   # 值：是否需要地点
@@ -36,7 +37,7 @@ def joinable_kinds() -> tuple[str, ...]:
 
 
 def parse_hm(text: str, day: int | None = None) -> tuple[str, str] | None:
-    """「1400-1500」「14:00-15:00」→ ('14:00', '15:00')；结束必须晚于开始。"""
+    """「1400-1500」「14:00-15:00」→ ('14:00', '15:00')。结束早于开始 = 跨午夜（2300-0100 是当天 23 点到第二天 1 点），一样也不行。"""
     from . import storycal                  # 故事历打开（且这个 D 填了日期）时，约时间只认「3月5日」这种某一天，不认钟点
     if storycal.exclusive(day):
         return storycal.parse_when(text, day)[0]
@@ -44,7 +45,7 @@ def parse_hm(text: str, day: int | None = None) -> tuple[str, str] | None:
     if not m:
         return None
     a, b = f"{int(m[1]):02d}:{m[2]}", f"{int(m[3]):02d}:{m[4]}"
-    if not ("00:00" <= a <= "23:59" and "00:00" <= b <= "23:59") or int(m[2]) > 59 or int(m[4]) > 59 or a >= b:
+    if not ("00:00" <= a <= "23:59" and "00:00" <= b <= "23:59") or int(m[2]) > 59 or int(m[4]) > 59 or a == b:
         return None
     return a, b
 
@@ -57,10 +58,35 @@ def _minutes(hm: str) -> int | None:
     return int(m[1]) * 60 + int(m[2]) if m else None
 
 
+def crosses_midnight(a: str, b: str) -> bool:
+    """结束钟点早于开始 = 跨到第二天（2300-0100）。"""
+    x, y = _minutes(a), _minutes(b)
+    return x is not None and y is not None and y <= x
+
+
+def span(day: int | None, a: str, b: str) -> tuple[int, int] | None:
+    """把「第几天 + 开始/结束钟点」换成连续的分钟数（第 day 天 0 点 = day*1440），跨午夜的结束时间算进第二天。
+    day 是 None（没有游戏天数）就按第 0 天算。写错返回 None。"""
+    x, y = _minutes(a), _minutes(b)
+    if x is None or y is None:
+        return None
+    if y <= x:
+        y += 1440
+    base = (day or 0) * 1440
+    return base + x, base + y
+
+
+def spans_overlap(d1: int | None, a1: str, b1: str, d2: int | None, a2: str, b2: str) -> bool:
+    s, t = span(d1, a1, b1), span(d2, a2, b2)
+    return bool(s and t and s[0] < t[1] and t[0] < s[1])
+
+
 def too_short(kind: str, a: str, b: str) -> str:
     """约的时间够不够长（电话默认至少 29 分钟，约会和踩点 59 分钟）。够了、或这种房间不限，返回空串。"""
     need = get_int(f"min_minutes_{kind}", MIN_MINUTES[kind]) if kind in MIN_MINUTES else 0
     x, y = _minutes(a), _minutes(b)
+    if x is not None and y is not None and y <= x:      # 跨午夜
+        y += 1440
     if need <= 0 or x is None or y is None or y - x >= need:
         return ""
     eg = f"{a.replace(':', '')}-{(x + need) // 60 % 24:02d}{(x + need) % 60:02d}"
@@ -82,15 +108,23 @@ def save_blocked_hours(data: dict[int, list[int]]) -> None:
 
 
 def blocked_hit(day: int | None, a: str, b: str) -> str:
-    """这段时间有没有碰到禁约的钟点：约会盖到的每一个小时都查，不只看开始那个小时。没碰到返回空串。"""
-    x, y = _minutes(a), _minutes(b)
-    hours = blocked_hours().get(day) if day is not None else None
-    if not hours or x is None or y is None:
+    """这段时间有没有碰到禁约的钟点：约会盖到的每一个小时都查，不只看开始那个小时。
+    跨午夜的，过了 0 点的那部分按第二天（D+1）的禁约时段查。没碰到返回空串。"""
+    sp = span(0, a, b)
+    allb = blocked_hours() if day is not None else {}
+    if not allb or not sp:
         return ""
-    hit = [h for h in hours if x < (h + 1) * 60 and h * 60 < y]
+    x, y = sp
+    hit: list[tuple[int, int]] = []
+    for h in range(x // 60, (y + 59) // 60):
+        d, hh = day + h // 24, h % 24
+        if hh in allb.get(d, ()) and x < (h + 1) * 60 and h * 60 < y:
+            hit.append((d, hh))
     if not hit:
         return ""
-    return f"D{day} 的 {'、'.join(f'{h}点' for h in hit)} 不开放约会，请换个时间。"
+    days = sorted({d for d, _ in hit})
+    parts = [f"D{d} 的 {'、'.join(f'{hh}点' for dd, hh in hit if dd == d)}" for d in days]
+    return f"{'，'.join(parts)} 不开放约会，请换个时间。"
 
 
 _missed: dict[int, dict] = {}
@@ -142,16 +176,28 @@ def is_member(room_id: int, role_id: int) -> bool:
         return c.execute("SELECT 1 FROM room_members WHERE room_id=? AND role_id=?", (room_id, role_id)).fetchone() is not None
 
 
+def _near_days(day: int | None) -> tuple:
+    """查撞时要看的天：跨午夜的约会会伸进第二天，所以前一天、当天、后一天都看。"""
+    return (day,) if day is None else (day - 1, day, day + 1)
+
+
 def conflict(role_id: int, day: int, a: str, b: str, ignore_room: int = 0, locks: bool = True, ignore_wish: int = 0):
-    """一个时间段只能有一件事：进行中和已结束的房间都占时间线（只有取消的不占），自己挂着还没被摘、没过期的心愿也占。"""
-    for r in timeline(role_id, day):
-        if r["id"] != ignore_room and _overlap(a, b, r["start_hm"], r["end_hm"]):
-            return r
+    """一个时间段只能有一件事：进行中和已结束的房间都占时间线（只有取消的不占），自己挂着还没被摘、没过期的心愿也占。
+    跨午夜的（2300-0100）后半段算进第二天：D3 2300-0100 和 D4 0030-0130 算撞。"""
+    for d in _near_days(day):
+        for r in timeline(role_id, d):
+            if r["id"] != ignore_room and spans_overlap(day, a, b, r["day"], r["start_hm"], r["end_hm"]):
+                return r
+    days = _near_days(day)
     with get_conn() as c:
-        ws = c.execute("SELECT id, start_hm, end_hm FROM wishes WHERE poster_id=? AND day=? AND status='open' AND id!=? AND created_ts>=?",
-                       (role_id, day, ignore_wish, int(time.time()) - 24 * 3600)).fetchall()     # 心愿 24 小时过期，过期的不占
+        if day is None:
+            ws = c.execute("SELECT id, day, start_hm, end_hm FROM wishes WHERE poster_id=? AND day IS NULL AND status='open' AND id!=? AND created_ts>=?",
+                           (role_id, ignore_wish, int(time.time()) - 24 * 3600)).fetchall()
+        else:
+            ws = c.execute("SELECT id, day, start_hm, end_hm FROM wishes WHERE poster_id=? AND day BETWEEN ? AND ? AND status='open' AND id!=? AND created_ts>=?",
+                           (role_id, days[0], days[-1], ignore_wish, int(time.time()) - 24 * 3600)).fetchall()     # 心愿 24 小时过期，过期的不占
     for w in ws:
-        if _overlap(a, b, w["start_hm"], w["end_hm"]):
+        if spans_overlap(day, a, b, w["day"], w["start_hm"], w["end_hm"]):
             return {"id": 0, "kind": f"心愿 #{w['id']}，还没被摘", "start_hm": w["start_hm"], "end_hm": w["end_hm"], "status": "open"}
     if locks:                                              # 上帝模式的时间锁定
         from . import godmode
@@ -266,7 +312,7 @@ def create(kind: str, creator_id: int, target_ids: list[int], time_text: str, pl
                     _missed[creator_id] = {"role_id": rid, "kind": kind, "day": day, "start_hm": hm[0], "end_hm": hm[1]}
                 # 官约由管理员发起，creator 只是名单上的第一个人：写「你」管理员会以为是自己撞了
                 who = "你" if rid == creator_id and not official else f"「{names.get(rid, '对方')}」"
-                return False, f"{who}在 D{day} {hit['start_hm']}-{hit['end_hm']} 已经有安排（{hit['kind']}），时间撞了。", 0
+                return False, f"{who}在 D{day} {hm_text(hit['start_hm'], hit['end_hm'])} 已经有安排（{hit['kind']}），时间撞了。", 0
     with get_conn() as c:
         cur = c.execute("INSERT INTO rooms(kind, creator_id, day, start_hm, end_hm, place, note, dkey, created_ts) VALUES(?,?,?,?,?,?,?,?,?)",
                         (kind, creator_id, day, hm[0], hm[1], place, note, season.day_key(), int(time.time())))
@@ -373,13 +419,19 @@ def end(room_id: int, status: str = "ended") -> dict | None:
     r = get(room_id)
     if not r or r["status"] != "open":
         return None
-    with get_conn() as c:
-        c.execute("UPDATE rooms SET status=?, ended_ts=?, pending_change='' WHERE id=?", (status, int(time.time()), room_id))
+    with get_conn() as c:                              # 只结束还开着的：两边同时结束（小手机 + 群里），只有一边真的结束、放群
+        n = c.execute("UPDATE rooms SET status=?, ended_ts=?, pending_change='' WHERE id=? AND status='open'",
+                      (status, int(time.time()), room_id)).rowcount
+    if not n:
+        return None
     if r["pool_id"]:
         g = pool.get(r["pool_id"])
-        auto = g is not None and pool.is_qq_only(g) and get_config("pool_auto_free", "1") == "1"
+        if g is None:                                  # 群已经从池里删掉了
+            return None
+        auto = pool.is_qq_only(g) and get_config("pool_auto_free", "1") == "1"
         pool.release(r["pool_id"], "free" if auto else "cleaning")
-        return dict(pool.get(r["pool_id"]))
+        g = pool.get(r["pool_id"])
+        return dict(g) if g else None
     return None
 
 
@@ -449,7 +501,7 @@ def propose_change(room_id: int, by_id: int, day: int, a: str, b: str) -> tuple[
     for m in members(room_id):
         hit = conflict(m["role_id"], day, a, b, ignore_room=room_id)
         if hit:
-            return False, f"「{m['name']}」在 D{day} {hit['start_hm']}-{hit['end_hm']} 已有安排，改不了。"
+            return False, f"「{m['name']}」在 D{day} {hm_text(hit['start_hm'], hit['end_hm'])} 已有安排，改不了。"
     with get_conn() as c:
         c.execute("UPDATE rooms SET pending_change=? WHERE id=?", (json.dumps({"day": day, "a": a, "b": b, "by": by_id}), room_id))
         c.execute("UPDATE room_members SET agree=CASE WHEN role_id=? THEN 1 ELSE 0 END WHERE room_id=?", (by_id, room_id))
@@ -505,7 +557,7 @@ def request_join(room_id: int, role_id: int) -> tuple[bool, str, int]:
             return False, ("申请失败，请稍后再试。" if b["silent"] else f"「{m['name']}」已拒绝你的联系。"), 0
     hit = conflict(role_id, r["day"], r["start_hm"], r["end_hm"])
     if hit:
-        return False, f"你在 D{r['day']} {hit['start_hm']}-{hit['end_hm']} 已经有安排了。", 0
+        return False, f"你在 D{r['day']} {hm_text(hit['start_hm'], hit['end_hm'])} 已经有安排了。", 0
     with get_conn() as c:
         old = c.execute("SELECT id FROM join_requests WHERE room_id=? AND role_id=? AND status='pending'", (room_id, role_id)).fetchone()
         if old:

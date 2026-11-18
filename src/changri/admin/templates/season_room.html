@@ -7,7 +7,7 @@
 </style>
 <p><a href="{{ url_for('season_view', season_id=s.id) }}">← {{ s.name }}</a></p>
 <h1>R{{ room.id }} {{ room.kind }}</h1>
-<p class="lede">{% if room.day is not none %}D{{ room.day }}　{% endif %}{{ room.start_hm }}{% if room.end_hm %}–{{ room.end_hm }}{% endif %}{% if room.place %}　{{ room.place }}{% endif %}　·　参与者：{{ room.members|join('、') }}　
+<p class="lede">{% if room.day is not none %}D{{ room.day }}　{% endif %}{{ room.start_hm }}{% if room.end_hm %}–{{ next_day(room.start_hm, room.end_hm) }}{{ room.end_hm }}{% endif %}{% if room.place %}　{{ room.place }}{% endif %}　·　参与者：{{ room.members|join('、') }}　
   <a class="btn sm ghost" href="{{ url_for('season_room_export', season_id=s.id, rid=room.id) }}">导出文本</a></p>
 <section>
   {% for l in room.lines %}<div class="ln {{ '' if l.rp else 'chat' }}"><span class="t">{{ l.ts|ts }}</span><span class="w">{{ l.name }}</span><span class="x">{{ l.text }}</span></div>

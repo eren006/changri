@@ -1,0 +1,55 @@
+# 长日bot 修复工具的启动器（Fix-Changri.bat 调用）。
+# 1. 要管理员权限（关掉开机自启跑的长日bot 需要），没有就弹窗请求一次。
+# 2. 从官网拉最新的修复脚本 fix.ps1 和它的签名，用下面写死的公钥验过才用；拉不到、验不过，就用压缩包里自带的那份。
+#    这样作者改了修复逻辑，大家下次打开修复工具就用上了，不用重新下载；官网被人改了也骗不过签名。
+$ErrorActionPreference = 'Continue'
+$Base = '@BASE@'
+$PublicKeyXml = '@FIX_PUBKEY_XML@'
+$here = $PSScriptRoot
+try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch {}
+
+$admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if (-not $admin) {
+    Write-Host '  需要管理员权限才能修：等一下弹出的窗口里点「是」。'
+    try {
+        Start-Process powershell.exe -Verb RunAs -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`"")
+        exit 0
+    } catch {
+        Write-Host '  没有拿到管理员权限，先按普通权限试试（开机自启的长日bot 可能关不掉）。' -ForegroundColor Yellow
+    }
+}
+
+function Test-Signed([byte[]]$data, [string]$sigB64) {
+    try {
+        $rsa = [Security.Cryptography.RSA]::Create()
+        $rsa.FromXmlString($PublicKeyXml)
+        $sig = [Convert]::FromBase64String($sigB64.Trim())
+        return $rsa.VerifyData($data, $sig, [Security.Cryptography.HashAlgorithmName]::SHA256, [Security.Cryptography.RSASignaturePadding]::Pkcs1)
+    } catch { return $false }
+}
+
+function Get-LatestFix {
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+        $wc = New-Object Net.WebClient
+        $data = $wc.DownloadData("$Base/fix/fix.ps1")
+        $sig = $wc.DownloadString("$Base/fix/fix.ps1.sig")
+        if (Test-Signed $data $sig) { return [Text.Encoding]::UTF8.GetString($data) }
+        Write-Host '  官网上的修复脚本签名不对，不用它，用自带的。' -ForegroundColor Yellow
+    } catch {
+        Write-Host '  连不上官网，用自带的修复脚本。' -ForegroundColor DarkGray
+    }
+    return $null
+}
+
+$text = Get-LatestFix
+if (-not $text) { $text = [IO.File]::ReadAllText((Join-Path $here 'fix.ps1'), [Text.Encoding]::UTF8) }
+$text = $text.TrimStart([char]0xFEFF)
+try {
+    & ([scriptblock]::Create($text)) -ToolDir $here
+} catch {
+    Write-Host "  修复工具出错了：$($_.Exception.Message)" -ForegroundColor Red
+    Write-Host '  请把这个窗口截图发给维护的人。' -ForegroundColor Yellow
+}
+Write-Host ''
+Read-Host '按回车键关闭这个窗口' | Out-Null

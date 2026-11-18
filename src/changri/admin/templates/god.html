@@ -35,7 +35,7 @@
         <div class="actions"><button class="btn" type="submit">封禁</button><button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
       </form></details></span></div>
   <div class="rowlist">{% for l in g_locks %}
-    <div class="row"><div class="nm"><b class="tabular">{{ ('D' ~ l.day) if l.day is not none else '每天' }} {{ l.start_hm }}–{{ l.end_hm }}</b>{% if l.note %}<div class="muted">{{ l.note }}</div>{% endif %}</div>
+    <div class="row"><div class="nm"><b class="tabular">{{ ('D' ~ l.day) if l.day is not none else '每天' }} {{ l.start_hm }}–{{ next_day(l.start_hm, l.end_hm) }}{{ l.end_hm }}</b>{% if l.note %}<div class="muted">{{ l.note }}</div>{% endif %}</div>
       <form method="post" action="{{ url_for('god_all_unlock', lock_id=l.id) }}">{{ csrf() }}<button class="linkbtn">解封</button></form></div>
   {% else %}<p class="empty">没有封禁。</p>{% endfor %}</div>
 </section>
@@ -221,7 +221,7 @@
 <section>
   <div class="sec-head keep"><h2>已有的安排<span class="n">{{ timeline|length }}</span></h2></div>
   <div class="rowlist">{% for r in timeline %}
-    <div class="row"><div class="nm"><b class="tabular">D{{ r.day }} {{ r.start_hm }}–{{ r.end_hm }}</b>
+    <div class="row"><div class="nm"><b class="tabular">D{{ r.day }} {{ r.start_hm }}–{{ next_day(r.start_hm, r.end_hm) }}{{ r.end_hm }}</b>
       <div class="muted">{{ r.kind }}{{ ' · ' ~ r.place if r.place }} · R{{ r.id }}{{ ' · 已结束' if r.status == 'ended' }}</div></div>
       <div class="acts"><form method="post" action="{{ url_for('god_slot_delete', role_id=role.id, room_id=r.id) }}" onsubmit="return confirm('删除这个时段？这场房间里所有人的时间线和复盘记录都会一起删掉，不能撤销。')">{{ csrf() }}<input type="hidden" name="tab" value="time"><button class="linkbtn">删除</button></form></div></div>
   {% else %}<p class="empty">还没有约会安排。</p>{% endfor %}</div>
@@ -239,7 +239,7 @@
         <div class="actions"><button class="btn" type="submit">锁定</button><button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
       </form></details></span></div>
   <div class="rowlist">{% for l in locks %}
-    <div class="row"><div class="nm"><b class="tabular">{{ ('D' ~ l.day) if l.day is not none else '每天' }} {{ l.start_hm }}–{{ l.end_hm }}</b>{% if l.note %}<div class="muted">{{ l.note }}</div>{% endif %}</div>
+    <div class="row"><div class="nm"><b class="tabular">{{ ('D' ~ l.day) if l.day is not none else '每天' }} {{ l.start_hm }}–{{ next_day(l.start_hm, l.end_hm) }}{{ l.end_hm }}</b>{% if l.note %}<div class="muted">{{ l.note }}</div>{% endif %}</div>
       <form method="post" action="{{ url_for('god_unlock', role_id=role.id, lock_id=l.id) }}">{{ csrf() }}<input type="hidden" name="tab" value="time"><button class="linkbtn">解锁</button></form></div>
   {% else %}<p class="empty">没有锁定。</p>{% endfor %}</div>
 </section>

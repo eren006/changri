@@ -7,6 +7,7 @@ import time
 
 from . import blocks, rooms, season, storycal, windows
 from .db import get_conn, get_int
+from .textutil import hm_text
 
 
 EXPIRE = 24 * 3600
@@ -32,7 +33,7 @@ def label(w) -> str:
 
 def line(w, now: int | None = None) -> str:
     """看心愿 / 撤心愿 列表里的一行（照老系统）。"""
-    return f"编号：{w['id']}｜{label(w)}｜D{w['day']} {w['start_hm']}-{w['end_hm']}｜{w['place']}｜剩{left_hours(w, now)}h｜内容：{w['content']}"
+    return f"编号：{w['id']}｜{label(w)}｜D{w['day']} {hm_text(w['start_hm'], w['end_hm'])}｜{w['place']}｜剩{left_hours(w, now)}h｜内容：{w['content']}"
 
 
 def broadcast_text(w) -> str:
@@ -88,7 +89,7 @@ def post(poster_id: int, time_text: str, place: str, content: str, sign: str = "
         return False, closed_h
     hit = rooms.conflict(poster_id, day, hm[0], hm[1])          # 已有的约会（含已结束的）和自己别的心愿都算
     if hit:
-        return False, f"你在 D{day} {hit['start_hm']}-{hit['end_hm']} 已经有安排了（{hit['kind']}）。"
+        return False, f"你在 D{day} {hm_text(hit['start_hm'], hit['end_hm'])} 已经有安排了（{hit['kind']}）。"
     from . import letters                       # 写信综开着、设了「挂心愿要几个写信币」时先看够不够
     why = letters.check_cost(poster_id, "wish")
     if why:
@@ -138,11 +139,11 @@ def take(wish_id: int, taker_id: int) -> tuple[bool, str, int]:
         return False, f"今天摘心愿的次数用完了（每天 {lim} 次）。", 0
     hit = rooms.conflict(taker_id, w["day"], w["start_hm"], w["end_hm"], ignore_wish=wish_id)
     if hit:
-        return False, f"你在 D{w['day']} {hit['start_hm']}-{hit['end_hm']} 已经有安排了（{hit['kind']}），摘不了这条心愿。", 0
+        return False, f"你在 D{w['day']} {hm_text(hit['start_hm'], hit['end_hm'])} 已经有安排了（{hit['kind']}），摘不了这条心愿。", 0
     hit = rooms.conflict(w["poster_id"], w["day"], w["start_hm"], w["end_hm"], locks=False, ignore_wish=wish_id)
     if hit:
-        return False, f"挂这条心愿的人在 D{w['day']} {hit['start_hm']}-{hit['end_hm']} 已经有别的安排了，这条心愿暂时摘不了。", 0
-    ok, info, room_id = rooms.create("心愿", w["poster_id"], [taker_id], f"{w['start_hm']}-{w['end_hm']}", w["place"], w["content"],
+        return False, f"挂这条心愿的人在 D{w['day']} {hm_text(hit['start_hm'], hit['end_hm'])} 已经有别的安排了，这条心愿暂时摘不了。", 0
+    ok, info, room_id = rooms.create("心愿", w["poster_id"], [taker_id], f"{hm_text(w['start_hm'], w['end_hm'])}", w["place"], w["content"],
                                      official=True, day=w["day"], wish_id=wish_id)
     if not ok:
         return False, info, 0

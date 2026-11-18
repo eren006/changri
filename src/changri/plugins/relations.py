@@ -197,18 +197,9 @@ from changri.core.qqsend import download_images  # noqa: E402
 from changri.core import sheets  # noqa: E402
 
 
-def _slices(png: bytes, step: int = 4200) -> list[bytes]:
-    """很长的图切成几张发（被动回复同一条消息最多 5 次）。"""
-    from PIL import Image
-    im = Image.open(io.BytesIO(png))
-    if im.height <= step + 600:
-        return [png]
-    out = []
-    for top in range(0, im.height, step):
-        buf = io.BytesIO()
-        im.crop((0, top, im.width, min(im.height, top + step))).save(buf, "PNG")
-        out.append(buf.getvalue())
-    return out[:5]
+PAGE_STEP = 4200          # 一张图最高多少（再高 QQ 里看不清）
+PAGE_SLACK = 600          # 最后一段只多出这么点就不再单切一张
+MAX_SENDS = 5             # 被动回复同一条消息最多 5 次
 
 
 def _render_one(sh: dict, kind: str) -> bytes:
@@ -220,30 +211,77 @@ def _render_one(sh: dict, kind: str) -> bytes:
                               sh["text"], [b[0] for b in imgs])
 
 
-def _stack(pngs: list[bytes]) -> bytes:
-    """把几张长图上下拼成一张。"""
-    import io
+PER_PAGE = MAX_SENDS - 1   # 一页发 4 张图，第 5 次留给「发『查看公知 第2页』看下一页」
+
+
+def _pages(many: list[dict], kind: str, skip: int = 0, count: int = PER_PAGE) -> tuple[list[bytes], bool]:
+    """把一串人的表排成一张张图（每张不超过一屏高）：人短就几个人拼一张，一个人太长就切成几张。
+    只返回第 skip+1 到 skip+count 张，和「后面还有没有」。前面的照样要画一遍才知道怎么排，但画完就丢，不留在内存里；
+    要的这几张凑齐、确认后面还有，就停，不再往后画。
+    以前是全员先拼成一整张再切、只发前几段：20 个人填满时内存涨 1.5 GB，后面的人画了也发不出去。
+    很慢（每人约 0.2 秒），要在线程里调。"""
     from PIL import Image
-    ims = [Image.open(io.BytesIO(b)).convert("RGB") for b in pngs]
-    w = max(i.width for i in ims)
-    out = Image.new("RGB", (w, sum(i.height for i in ims)), "white")
-    y = 0
-    for i in ims:
-        out.paste(i, ((w - i.width) // 2, y))
-        y += i.height
-    buf = io.BytesIO()
-    out.save(buf, "PNG")
-    return buf.getvalue()
+    out: list[bytes] = []
+    n = 0                                     # 已经排好的张数
+    cur: list = []
+
+    def emit(parts: list) -> None:
+        nonlocal n
+        if skip <= n < skip + count:          # 只有要发的这几张才真的拼、编码
+            w = max(i.width for i in parts)
+            img = Image.new("RGB", (w, sum(i.height for i in parts)), "white")
+            y = 0
+            for i in parts:
+                img.paste(i, ((w - i.width) // 2, y))
+                y += i.height
+            buf = io.BytesIO()
+            img.save(buf, "PNG")
+            out.append(buf.getvalue())
+        n += 1
+
+    for x in many:
+        if n >= skip + count:                 # 要的都齐了，后面还有人
+            return out, True
+        im = Image.open(io.BytesIO(_render_one(x, kind))).convert("RGB")
+        if im.height > PAGE_STEP + PAGE_SLACK:                 # 一个人就超过一屏：当前这张先出，他单独切几张
+            if cur:
+                emit(cur)
+                cur = []
+            tops = list(range(0, im.height, PAGE_STEP))
+            for k, top in enumerate(tops):
+                if n >= skip + count:
+                    return out, True
+                emit([im.crop((0, top, im.width, min(im.height, top + PAGE_STEP)))])
+            continue
+        if cur and sum(i.height for i in cur) + im.height > PAGE_STEP + PAGE_SLACK:
+            emit(cur)
+            cur = []
+            if n >= skip + count:
+                return out, True
+        cur.append(im)
+    if cur:
+        if n >= skip + count:
+            return out, True
+        emit(cur)
+    return out, False
 
 
-async def _show(matcher, sh: dict | list, kind: str) -> None:
-    """sh 是一个人的一份，或者一串（全员，拼成一张长图）。"""
+async def _show(matcher, sh: dict | list, kind: str, page: int = 1, again: str = "") -> None:
+    """sh 是一个人的一份，或者一串（全员）。按页发：一页 4 张图，后面还有就提示发「{again} 第N页」，谁都不省略。
+    画图放到线程里，不卡住机器人。"""
+    import asyncio
     label = sheets.KINDS[kind]
     many = sh if isinstance(sh, list) else [sh]
+    page = max(1, page)
     try:
-        png = _render_one(many[0], kind) if len(many) == 1 else _stack([_render_one(x, kind) for x in many])
-        for part in _slices(png):
+        parts, more = await asyncio.to_thread(_pages, many, kind, (page - 1) * PER_PAGE, PER_PAGE)
+        if not parts:
+            await matcher.send(f"没有第 {page} 页了。" + (f"发「{again}」从头看。" if again else ""))
+            return
+        for part in parts:
             await matcher.send(MessageSegment.file_image(part))
+        if more:
+            await matcher.send(f"第 {page} 页。还有，发「{again} 第{page + 1}页」接着看。")
     except Exception as e:  # noqa: BLE001
         logger.warning(f"[{label}] 画图或发图失败，改发文字：{e}")
         await matcher.send("\n\n".join(f"【{x['name']} 的{label}】\n{x['text'] or '（只有图片，图片没发出来）'}" for x in many))
@@ -296,18 +334,23 @@ def _make_view(kind: str):
 
     @cmd.handle()
     async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
+        import re
         me = _me(event)
         name = args.extract_plain_text().strip()
+        page = 1
+        if m := re.fullmatch(r"(.*?)\s*第\s*(\d{1,3})\s*页", name):     # 「查看公知 第2页」「查看公知 名字 第2页」：翻页
+            name, page = m.group(1).strip(), int(m.group(2))
+        again = f"查看{label}" + (f" {name}" if name else "")
         is_admin = admins.is_admin(_bid(), _sender(event)) if hasattr(admins, "is_admin") else False
         if kind == "gongzhi" and not name and (is_admin or sheets.public()):
             everyone = sheets.all_of(kind)       # 不带名字：看所有人的；带名字：只看这一个人
             if not everyone:
                 await cmd.finish("还没有人提交公知。发「提交公知 内容」就能提交。")
-            if len(everyone) > 1 and await reply_buttons(    # 能发按钮：列名字，点谁看谁（带他自己的图），不再拼一整张长图
+            if len(everyone) > 1 and page == 1 and await reply_buttons(    # 能发按钮：列名字，点谁看谁（带他自己的图），不再拼一整张长图
                     cmd, f"📜 公知\n{len(everyone)} 位，点下面的名字查看（或发「查看公知 名字」）",
                     [Btn(x["name"], f"查看公知 {x['name']}") for x in everyone], per_row=3, fallback=False):
                 await cmd.finish()
-            await _show(cmd, everyone, kind)
+            await _show(cmd, everyone, kind, page, again)
             await cmd.finish()
         target = roles.get_role_by_name(name) if name else me
         if name and not target:
@@ -321,7 +364,7 @@ def _make_view(kind: str):
         sh = sheets.get(target["id"], kind)
         if not sh:
             await cmd.finish(f"「{target['name']}」还没有提交{label}。" + (f"发「提交{label} 内容」就能提交。" if mine else ""))
-        await _show(cmd, sh, kind)
+        await _show(cmd, sh, kind, page, again)
         await cmd.finish()
     return cmd
 

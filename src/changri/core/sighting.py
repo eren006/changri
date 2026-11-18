@@ -9,6 +9,7 @@ import time
 
 from . import rooms
 from .db import get_config, get_conn, get_int
+from .textutil import hm_text
 
 MODES = ("匿名", "点名", "随机")
 
@@ -22,11 +23,15 @@ def _mins(hm: str) -> int:
     return int(h) * 60 + int(m)
 
 
-def overlap_ratio(a1: str, a2: str, b1: str, b2: str) -> float:
-    lo, hi = max(_mins(a1), _mins(b1)), min(_mins(a2), _mins(b2))
+def overlap_ratio(a1: str, a2: str, b1: str, b2: str, d1: int = 0, d2: int = 0) -> float:
+    """两段时间的重叠占较短那段的几成。跨午夜的（2300-0100）后半段算进第二天，所以要带上各自是第几天。"""
+    s, t = rooms.span(d1, a1, a2), rooms.span(d2, b1, b2)
+    if not s or not t:
+        return 0.0
+    lo, hi = max(s[0], t[0]), min(s[1], t[1])
     if lo >= hi:
         return 0.0
-    return (hi - lo) / min(_mins(a2) - _mins(a1), _mins(b2) - _mins(b1))
+    return (hi - lo) / min(s[1] - s[0], t[1] - t[0])
 
 
 def _today_start() -> int:
@@ -69,8 +74,8 @@ def _look(viewers: list[int], vroom, target) -> None:
     for v in viewers:
         if _already(v, target["id"]) or (cap and saw_today(v) >= cap) or random.random() * 100 >= chance:
             continue
-        _add(v, "saw", vroom["id"], target["id"], target["place"], target["day"], f"{target['start_hm']}-{target['end_hm']}",
-             f"👀 不会吧，你居然在「{target['place']}」看见 {'、'.join(tnames)} 在一起了！（时间：{target['start_hm']}-{target['end_hm']}）")
+        _add(v, "saw", vroom["id"], target["id"], target["place"], target["day"], f"{hm_text(target['start_hm'], target['end_hm'])}",
+             f"👀 不会吧，你居然在「{target['place']}」看见 {'、'.join(tnames)} 在一起了！（时间：{hm_text(target['start_hm'], target['end_hm'])}）")
         won.append(v)
     if not won or get_config("sighting_notify_seen", "1") != "1":
         return
@@ -80,8 +85,8 @@ def _look(viewers: list[int], vroom, target) -> None:
     for rid in _ids(target["id"]):
         anon = 1 if mode == "匿名" or (mode != "点名" and random.random() < 0.5) else 0
         who = "有人" if anon else "、".join(vnames)
-        _add(rid, "seen", target["id"], vroom["id"], target["place"], target["day"], f"{target['start_hm']}-{target['end_hm']}",
-             f"👀 哎呀，你们在「{target['place']}」的约会被{who}看见了！（时间：{target['start_hm']}-{target['end_hm']}）", anon)
+        _add(rid, "seen", target["id"], vroom["id"], target["place"], target["day"], f"{hm_text(target['start_hm'], target['end_hm'])}",
+             f"👀 哎呀，你们在「{target['place']}」的约会被{who}看见了！（时间：{hm_text(target['start_hm'], target['end_hm'])}）", anon)
 
 
 def detect(room_id: int) -> int:
@@ -94,12 +99,12 @@ def detect(room_id: int) -> int:
     thr = get_int("sighting_overlap_pct", 30) / 100
     states = ("open", "ended") if get_config("sighting_include_ended", "0") == "1" else ("open",)
     with get_conn() as c:
-        others = c.execute(f"SELECT * FROM rooms WHERE id!=? AND day=? AND status IN ({','.join('?' * len(states))}) AND place!='' AND LOWER(place)=LOWER(?) AND start_hm!=''",
-                           (room_id, room["day"], *states, room["place"])).fetchall()
+        others = c.execute(f"SELECT * FROM rooms WHERE id!=? AND day BETWEEN ? AND ? AND status IN ({','.join('?' * len(states))}) AND place!='' AND LOWER(place)=LOWER(?) AND start_hm!=''",
+                           (room_id, room["day"] - 1, room["day"] + 1, *states, room["place"])).fetchall()
         before = c.execute("SELECT COUNT(*) FROM sightings").fetchone()[0]
     mine = set(_ids(room_id))
     for o in others:
-        if overlap_ratio(room["start_hm"], room["end_hm"], o["start_hm"], o["end_hm"]) < thr:
+        if overlap_ratio(room["start_hm"], room["end_hm"], o["start_hm"], o["end_hm"], room["day"], o["day"]) < thr:
             continue
         theirs = set(_ids(o["id"]))
         if mine & theirs:

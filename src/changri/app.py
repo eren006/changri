@@ -56,9 +56,11 @@ from changri.admin.remote import AdminGate, LocalProxyFix  # noqa: E402
 nonebot.get_app().mount("/", WSGIMiddleware(LocalProxyFix(AdminGate(admin_app))))
 
 # 小手机（玩家用的网页）：另开一个公网端口，和设置平台分开监听；开关和端口在设置平台改完立刻生效（core/phoneserver.py）。
-def _start_phone_server() -> None:
+async def _start_phone_server() -> None:
+    import asyncio
+
     from changri.core import phoneserver
-    phoneserver.start_all()
+    await asyncio.to_thread(phoneserver.start_all)       # 启动要等它真的起来（最多几秒）：放到线程里，不卡住机器人的事件循环
 
 
 async def _remember_loop() -> None:

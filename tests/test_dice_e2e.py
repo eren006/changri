@@ -72,6 +72,18 @@ class DiceE2E(unittest.TestCase):
         for p in ("/", ".", "。"):
             self.assertTrue(self.say(f"{p}rd d20")[0].startswith("D20 ="))
 
+    def test_usage_counts_by_command_word(self):
+        """匿名上报按指令词计数：只记指令词（别名照实记），不记后面写的内容；不是指令的话不算。"""
+        from changri.core import usage
+        usage._take_count()
+        self.say("/rd d20")
+        self.say("r d6 打怪")
+        self.say("rd 3d6")
+        self.say("hello")
+        n, by = usage._take_count()
+        self.assertEqual((n, by), (3, {"rd": 2, "r": 1}))
+        self.assertNotIn("打怪", str(by))
+
     def test_attrs_flow_and_rule_switch(self):
         self.assertIn("已记下", self.say("/录属性 力量60 SAN55")[0])
         self.assertIn("力量　60", self.say("/属性")[0])

@@ -224,6 +224,12 @@ def down_reason(app_id: str, link_id: int = 0) -> str:
     return ""
 
 
+def alerted(app_id: str, link_id: int = 0) -> bool:
+    """这个号掉线、而且已经提醒过了（掉线超过提醒时间，还没恢复）。"""
+    d = _down.get((app_id, link_id))
+    return bool(d and d["alerted"])
+
+
 def watch(app_id: str, now: float, alert_after: int = 120, link_id: int = 0) -> tuple[str, str] | None:
     """每隔几十秒调用一次（每个 QQ 号连接各自调）。掉线超过 alert_after 秒返回 ("alert", 原因)（只提醒一次）；恢复后返回 ("recover", "")。其余返回 None。"""
     key = (app_id, link_id)

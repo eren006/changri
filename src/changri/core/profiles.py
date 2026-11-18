@@ -86,12 +86,8 @@ def set_remark(owner_id: int, target_id: int, raw: str) -> tuple[bool, str]:
 def process_avatar(raw: bytes) -> bytes:
     """裁成正方形、缩到 256，转 JPEG（顺便去掉 EXIF）。打不开抛 ValueError。"""
     from PIL import Image, ImageOps
-    Image.MAX_IMAGE_PIXELS = 40_000_000
-    try:
-        img = Image.open(io.BytesIO(raw))
-        img.load()
-    except Exception:
-        raise ValueError("不是能识别的图片")
+    from .imgload import open_upload
+    img = open_upload(raw, (256, 256))            # 先看像素数再解码（见 imgload）
     img = ImageOps.exif_transpose(img)
     if img.mode in ("RGBA", "LA", "P"):
         img = img.convert("RGBA")

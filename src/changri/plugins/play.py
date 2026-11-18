@@ -76,6 +76,7 @@ async def _to_group(bot_id: str, group_openid: str, text: str) -> bool:
 
 
 from changri.core.overview import group_line as _group_line, slot_text as _slot  # noqa: E402
+from changri.core.textutil import hm_text
 
 
 RP_FORMAT_TIP = "✍️ 戏文格式：首行「角色名」+ 换行/空格/冒号（：或:）+ 正文，其余视为闲聊，不计入存档与字数"
@@ -290,7 +291,7 @@ async def start_room(kind: str, me, targets: list, time_text: str, place: str = 
     if not ok:
         miss = rooms.pop_missed(me["id"])              # 对方那个时间已经有安排：在对方个人群留一句，谁想约、什么时候、没约成
         if miss:
-            await _push(miss["role_id"], f"📅 {me['name']} 想在 D{miss['day']} {miss['start_hm']}-{miss['end_hm']} 约你（{miss['kind']}），"
+            await _push(miss["role_id"], f"📅 {me['name']} 想在 D{miss['day']} {hm_text(miss['start_hm'], miss['end_hm'])} 约你（{miss['kind']}），"
                                          "但这个时间你已经有安排了，没约成。")
         return False, info, 0
     room = rooms.get(room_id)
@@ -515,11 +516,14 @@ async def _(bot: Bot, event: GroupMessageCreateEvent):
 
 
 async def _finish_room(room_id: int, status: str, why: str, timeout: bool = False) -> None:
-    """timeout=True：「到时间强制结群」到点了（文案不一样：结戏限时已到）。"""
+    """timeout=True：「到时间强制结群」到点了（文案不一样：结戏限时已到）。
+    房间已经不在了或者已经结束（小手机和群里同时点结束、定时任务刚好到点）：什么也不做，不重复通知、不重复发奖励。"""
     room = rooms.get(room_id)
+    if not room or room["status"] != "open":
+        return
     mem = rooms.members(room_id)
-    gi = rooms.group_info(room) if room else None
-    g = rooms.end(room_id, status)
+    gi = rooms.group_info(room)
+    rooms.end(room_id, status)
     verb = "已经结束" if status == "ended" else "已经取消"
     if status != "ended":                                                # 正常结束不再往个人群发通知；取消、超时这类参与者不一定在场，才通知
         for m in mem:
@@ -544,8 +548,9 @@ async def _finish_room(room_id: int, status: str, why: str, timeout: bool = Fals
                     await _push(rid, rewards.message(room_id, items))
             except Exception as e:  # noqa: BLE001
                 logger.warning(f"[结戏奖励] R{room_id} 结算失败：{e}")
-    if gi and gi[1].startswith(pool.QQ_PREFIX):                          # 房间群：群名改回「长日备用」（可在「QQ 小号与群号组（双骰）」页改）
-        await qqmanager.room_rename(gi[0], pool.get(room["pool_id"]), qqpool.free_name(pool.get(room["pool_id"])["set_name"]))
+    pg = pool.get(room["pool_id"]) if room["pool_id"] else None
+    if gi and gi[1].startswith(pool.QQ_PREFIX) and pg:                   # 房间群：群名改回「长日备用」（可在「QQ 小号与群号组（双骰）」页改）
+        await qqmanager.room_rename(gi[0], pg, qqpool.free_name(pg["set_name"]))
     if gi and gi[1].startswith(pool.QQ_PREFIX):                          # 小号的群：小号会自己查人，直接放回池
         if timeout:
             await _to_group(gi[0], gi[1], "结戏限时已到~请及时离开！")
@@ -626,7 +631,7 @@ REVIEW_LIST = 15
 def _review_line(r, my_id: int) -> str:
     """复盘名单的一行：R12 约会 · D2 14:00-15:00 · 咖啡厅 · 和 小满、阿川"""
     others = "、".join(m["name"] for m in rooms.members(r["id"]) if m["role_id"] != my_id) or "自己"
-    return f"R{r['id']} {r['kind']} · D{r['day']} {r['start_hm']}-{r['end_hm']}" + (f" · {r['place']}" if r["place"] else "") + f" · 和 {others}"
+    return f"R{r['id']} {r['kind']} · D{r['day']} {hm_text(r['start_hm'], r['end_hm'])}" + (f" · {r['place']}" if r["place"] else "") + f" · 和 {others}"
 
 
 @review_cmd.handle()
@@ -793,7 +798,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent):
     qs = rooms.pending_requests(me["id"])
     if not qs:
         await join_list.finish("没有待处理的加入申请。")
-    text = "🙋 收到的加入申请\n" + "\n".join(f"#{q['id']} {q['applicant']} 想加入 R{q['room_id']} {q['kind']}（D{q['day']} {q['start_hm']}-{q['end_hm']}）" for q in qs)
+    text = "🙋 收到的加入申请\n" + "\n".join(f"#{q['id']} {q['applicant']} 想加入 R{q['room_id']} {q['kind']}（D{q['day']} {hm_text(q['start_hm'], q['end_hm'])}）" for q in qs)
     btns = [b for q in qs for b in (Btn(f"同意 #{q['id']} {q['applicant']}", f"同意加入 {q['id']}"), Btn(f"拒绝 #{q['id']}", f"拒绝加入 {q['id']}", style="danger"))]
     await reply_buttons(join_list, text + "\n同意发「同意加入 编号」，拒绝发「拒绝加入 编号」", btns, per_row=2)
     await join_list.finish()
@@ -840,7 +845,7 @@ def _timeline_text(role) -> str:
             day = r["day"]; lines.append(f"\nD{day}")
         others = "、".join(m["name"] for m in rooms.members(r["id"]) if m["role_id"] != role["id"])
         st = {"open": "进行中", "ended": "已结束"}.get(r["status"], r["status"])
-        lines.append(f"  {r['start_hm']}-{r['end_hm']} {r['kind']}{' @' + r['place'] if r['place'] else ''} 与 {others}（R{r['id']} {st}）")
+        lines.append(f"  {hm_text(r['start_hm'], r['end_hm'])} {r['kind']}{' @' + r['place'] if r['place'] else ''} 与 {others}（R{r['id']} {st}）")
     return "\n".join(lines)
 
 
@@ -896,7 +901,7 @@ chg = _cmd("修改时间线")
 
 
 def _when(room) -> str:
-    return f"D{room['day']} {room['start_hm']}-{room['end_hm']}"
+    return f"D{room['day']} {hm_text(room['start_hm'], room['end_hm'])}"
 
 
 CHG_USAGE = "用法：修改时间线 [R房间号] [D几] 时间（在房间群里发可以不写房间号；在个人群发要带上）\n例：修改时间线 R12 D1 {t}"

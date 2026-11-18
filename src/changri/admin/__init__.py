@@ -11,6 +11,7 @@ from changri import config as _config
 from changri.core import botconf, extensions as ext_core, loopbridge, netcheck, pool as pool_core, qqmanager as qqmanager_core, roles as roles_core, roomnotify as roomnotify_core, rooms as rooms_core, season as season_core, setupcode, updater, webusers
 from changri.core.db import DB_PATH, current_bot, enter_bot, get_config, get_conn, init_db, leave_bot, list_bot_ids, set_config, use_bot
 from changri.admin.common import GLOBAL_ENDPOINTS, HIDDEN_FIELDS, LOCK_AFTER, LOCK_SECONDS, SECTIONS, SETTINGS, _bot_cards, _bot_label, _bot_status, _csrf_token, _dashboard, _fails, _secret_key, field_view, log
+from changri.core.textutil import hm_text, next_day_mark
 
 THEME_COOKIE = "admin_theme"
 THEMES = {"lily", "ballet", "xmas"}          # 样式在 templates/_themes.html；空 = 默认
@@ -33,9 +34,13 @@ def create_app() -> Flask:
     app.config.update(SESSION_COOKIE_NAME="changri_admin", SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax")
     app.jinja_env.filters["datetimefmt"] = lambda ts: time.strftime("%m-%d %H:%M", time.localtime(ts))
     app.jinja_env.globals["csrf"] = lambda: Markup(f'<input type="hidden" name="_csrf" value="{_csrf_token()}">')
+    app.jinja_env.globals["next_day"] = next_day_mark            # 跨午夜的约会在结束时间前显示「次日」
+    app.jinja_env.globals["NOTICE_GROUP"] = "120287262"       # 长日bot 通知群（作者的 QQ 群）；二维码在 static/notice-group-qr.png，换群要两个一起换
 
     from .botprefix import BotPrefix
     app.wsgi_app = BotPrefix(app.wsgi_app)
+
+    loopbridge.install_flask_handler(app)            # 等机器人超时：提示「还在处理」，不出 500
 
     @app.before_request
     def bot_context():
@@ -215,7 +220,7 @@ def create_app() -> Flask:
         from changri.core import errlog
         with get_conn() as conn:
             live = conn.execute("SELECT * FROM rooms WHERE status='open' ORDER BY id").fetchall()
-        live_rooms = [{**dict(r), "slot": ("不占时间线" if r["kind"] == "微信" else f"D{r['day']} {r['start_hm']}-{r['end_hm']}"),
+        live_rooms = [{**dict(r), "slot": ("不占时间线" if r["kind"] == "微信" else f"D{r['day']} {hm_text(r['start_hm'], r['end_hm'])}"),
                        "who": "、".join(m["name"] for m in rooms_core.members(r["id"])),
                        "grp": (pool_core.get(r["pool_id"]) if r["pool_id"] else None)} for r in live]
         return render_template("dashboard.html", d=_dashboard(), errors=errlog.recent(30), err_url=errlog.report_url(),

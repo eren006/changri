@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>长日bot 修复工具</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+@STYLE@
+</head>
+<body>
+<header class="bar"><div><a class="brand" href="@BASE@/"><i></i>长日</a><nav><a href="@BASE@/install/">安装</a><a href="@BASE@/#/commands">指令大全</a></nav></div></header>
+<main>
+<h1>长日bot 修复工具</h1>
+<p class="sub">长日bot 打不开、设置平台进不去、报错说端口被占用时用它。不管装的是哪个版本都能用。</p>
+
+<section>
+<h2>Windows：下载，双击</h2>
+<p><a class="btn" href="@BASE@/fix/@WIN_ZIP@">下载修复工具（@WIN_SIZE@ KB）</a></p>
+<ol>
+<li>解压下载的压缩包，放哪里都行。</li>
+<li>双击 <code>Fix-Changri.bat</code>。弹出「是否允许此应用对你的设备进行更改」时点「是」。<br>
+如果弹出「Windows 已保护你的电脑」，点「更多信息」→「仍要运行」。</li>
+<li>照窗口里的提示做。修好后会自动在浏览器里打开设置平台。</li>
+</ol>
+</section>
+
+<section>
+<h2>Linux：一行命令</h2>
+<p>登录服务器，粘贴这一行，回车：</p>
+<pre>curl -fsSL @BASE@/fix.sh | sudo bash</pre>
+<p class="note">长日bot 装在别的目录的话：<code>curl -fsSL @BASE@/fix.sh | sudo CHANGRI_DIR=/你的/安装目录 bash</code></p>
+</section>
+
+<section>
+<h2>它会做什么</h2>
+<table>
+<tr><td>正常运行</td><td>告诉你没问题，帮你打开设置平台，什么都不改。</td></tr>
+<tr><td>卡住了</td><td>把卡住的长日bot 全部关掉，重新打开。</td></tr>
+<tr><td>位置被占了</td><td>长日bot 要用的端口被别的软件占着：告诉你是哪个软件，问过你才关。</td></tr>
+<tr><td>没在运行</td><td>帮你打开（装了开机自启的用开机自启的方式；Linux 没装的会问你要不要顺便装上）。</td></tr>
+<tr><td>还是不行</td><td>把最近一次报错显示出来。把窗口截图发给维护的人。</td></tr>
+</table>
+<p class="note">修复办法会随时更新：Windows 每次打开先从官网取最新的（带签名，验过才用），Linux 每次运行的就是官网上最新的。当前 @FIX_VERSION@。</p>
+</section>
+</main>
+<footer>投诉举报 QQ：3052553938 · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">浙ICP备2026078867号-1</a></footer>
+</body>
+</html>

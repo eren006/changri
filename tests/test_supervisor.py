@@ -78,11 +78,20 @@ class SupervisorTests(unittest.TestCase):
             self.assertEqual(supervisor.run(), 0)
         self.assertEqual(self.runs(), 9)
 
-    def test_already_running_does_not_launch(self):
-        """端口上已经有一个长日bot：一次都不拉起，退出码 0。"""
-        with self.child("raise SystemExit(1)"), mock.patch.object(supervisor, "_already_running", lambda: 5091):
+    def test_port_busy_stops_at_once(self):
+        """子进程说端口被别的程序占了（PORT_BUSY）：不再拉起，退出码 0。"""
+        with self.child(f"raise SystemExit({supervisor.PORT_BUSY})"):
             self.assertEqual(supervisor.run(), 0)
-        self.assertEqual(self.runs(), 0)
+        self.assertEqual(self.runs(), 1)
+
+    def test_already_running_does_not_launch(self):
+        """端口上已经有一个长日bot：一次都不拉起、帮他打开设置平台、不停住等回车，退出码 0。"""
+        opened = []
+        with self.child("raise SystemExit(1)"), mock.patch.object(supervisor, "_already_running", lambda: 5091), \
+                mock.patch.object(supervisor, "_open_running", opened.append), \
+                mock.patch.object(supervisor, "_wait_for_user", lambda: self.fail("不该停住等回车")):
+            self.assertEqual(supervisor.run(), 0)
+        self.assertEqual((self.runs(), opened), (0, [5091]))
 
     def test_failing_new_version_rolls_back(self):
         calls = []

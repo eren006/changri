@@ -35,9 +35,8 @@ def public() -> bool:
 def normalize_image(data: bytes) -> tuple[bytes, str] | None:
     """验证并压缩一张图片。不是图片、太大、打不开都返回 None。返回 (字节, 扩展名)。"""
     try:
-        from PIL import Image
-        im = Image.open(io.BytesIO(data))
-        im.load()
+        from .imgload import open_upload
+        im = open_upload(data, (SIDE_MAX, SIDE_MAX))      # 先看像素数再解码（见 imgload）；太大、打不开都抛错，下面当 None
         if max(im.size) > SIDE_MAX:
             im.thumbnail((SIDE_MAX, SIDE_MAX))
         out = io.BytesIO()

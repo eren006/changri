@@ -14,8 +14,9 @@ import random
 import re
 import time
 
-from . import roles, rpg, season
+from . import roles, rooms, rpg, season
 from .db import get_config, get_conn, get_int, set_config
+from .textutil import hm_text
 
 SPECIALS = [
     ("SPEC_001", "追踪器", "一枚微型追踪器：使用 追踪器 角色名 [钟点]，看 TA 那时在哪场约会、在哪、和谁。"),
@@ -121,15 +122,17 @@ def _track(me, t, when: str) -> tuple[bool, str]:
     if why:
         return False, why
     with get_conn() as c:
-        room = c.execute("SELECT r.* FROM rooms r JOIN room_members m ON m.room_id=r.id WHERE m.role_id=? AND r.day=? AND r.status!='cancelled' "
-                         "AND r.start_hm<? AND ? < r.end_hm ORDER BY r.start_hm LIMIT 1", (t["id"], day, b, a)).fetchone()
+        # 前一天跨午夜伸过来的约会（D2 2300-0100 在 D3 的 0 点）也算
+        cand = c.execute("SELECT r.* FROM rooms r JOIN room_members m ON m.room_id=r.id WHERE m.role_id=? AND r.day BETWEEN ? AND ? AND r.status!='cancelled' "
+                         "AND r.start_hm!='' ORDER BY r.day, r.start_hm", (t["id"], day - 1, day)).fetchall()
+        room = next((r for r in cand if rooms.spans_overlap(day, a, b, r["day"], r["start_hm"], r["end_hm"])), None)
         mates = [x["name"] for x in c.execute("SELECT ro.name FROM room_members m JOIN roles ro ON ro.id=m.role_id WHERE m.room_id=? AND m.role_id!=?",
                                               (room["id"], t["id"]))] if room else []
     if not room:
         return True, f"🔍 没发现「{t['name']}」在 D{day} {a}-{b} 的行踪。（追踪器已用掉）"
     if rng.random() * 100 >= get_int("item_tracker_success_rate", 70):
         return True, "🔍 信号干扰，定位失败。（追踪器已用掉）"
-    text = f"🔍 追踪到「{t['name']}」在 D{day} {room['start_hm']}-{room['end_hm']} 出现在「{room['place'] or '某处'}」"
+    text = f"🔍 追踪到「{t['name']}」在 D{day} {hm_text(room['start_hm'], room['end_hm'])} 出现在「{room['place'] or '某处'}」"
     if mates and get_config("item_tracker_show_partner", "1") == "1":
         text += f"，和 {'、'.join(mates)} 在一起"
     return True, text + "。（追踪器已用掉）"

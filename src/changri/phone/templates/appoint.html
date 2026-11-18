@@ -10,7 +10,7 @@
     <div class="disc-label">想加入你的约会</div>
     {% for q in reqs %}
     <div style="padding:12px 20px;border-bottom:1px solid var(--line)">
-      <div><b>{{ q.applicant }}</b> 想加入 R{{ q.room_id }} {{ q.kind }}（D{{ q.day }} {{ q.start_hm }}-{{ q.end_hm }}）</div>
+      <div><b>{{ q.applicant }}</b> 想加入 R{{ q.room_id }} {{ q.kind }}（D{{ q.day }} {{ q.start_hm }}-{{ next_day(q.start_hm, q.end_hm) }}{{ q.end_hm }}）</div>
       <form method="post" action="{{ url_for('appoint_answer') }}" style="display:flex;gap:10px;margin-top:8px">
         <input type="hidden" name="_csrf" value="{{ csrf() }}"><input type="hidden" name="qid" value="{{ q.id }}">
         <button class="send" name="accept" value="1" type="submit">同意</button><button class="send" name="accept" value="0" type="submit" style="background:var(--field,#999)">拒绝</button>

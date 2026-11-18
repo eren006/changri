@@ -216,7 +216,7 @@ def format_error(day: int | None = None) -> str:
             from . import season
             day = season.current_day()
         return f"时间要写故事里的某一天，比如 {_fmt_md(day_list(day)[0])}（D{day} 是 {span_text(day)}）。"
-    return "时间格式不对，写成 1400-1500（结束要晚于开始）。"
+    return "时间格式不对，写成 1400-1500（跨午夜写 2300-0100，0 点以后算第二天）。"
 
 
 def example_time(day: int | None = None) -> str:

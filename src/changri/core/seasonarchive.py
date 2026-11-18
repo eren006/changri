@@ -8,6 +8,7 @@ import json
 import time
 
 from .db import get_conn
+from .textutil import hm_text
 
 
 def _stats_for(rid: int) -> dict:
@@ -95,7 +96,7 @@ def archived_ids() -> set[int]:
 
 
 def room_text(season_name: str, room: dict) -> str:
-    head = [f"{season_name} · R{room['id']} {room['kind']}　" + (f"D{room['day']} " if room["day"] is not None else "") + f"{room['start_hm']}-{room['end_hm']} {room['place']}".strip(),
+    head = [f"{season_name} · R{room['id']} {room['kind']}　" + (f"D{room['day']} " if room["day"] is not None else "") + f"{hm_text(room['start_hm'], room['end_hm'])} {room['place']}".strip(),
             "参与者：" + "、".join(room["members"]), ""]
     from .roomlog import body_of
     body = [f"[{time.strftime('%H:%M', time.localtime(ln['ts']))}] {ln['name']}：{body_of(ln['name'], ln['text'])}" + ("" if ln["rp"] else "（闲聊）") for ln in room["lines"]]

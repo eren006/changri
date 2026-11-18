@@ -298,16 +298,28 @@ DND_REMARKS = {
     "pass": ["够了，往前走。", "数字站在你这边。"],
     "fail": ["差了一口气。", "没够上，想想别的办法。"],
 }
+SAN_REMARKS = {
+    "pass": ["还撑得住。"],
+    "fail": ["失去的总得想办法找回来。"],
+    "fumble": ["……请先坐下。"],
+}
+GROWTH_REMARKS = {
+    "grow": ["经验积累，终于开窍了。"],
+    "none": ["经验急不得。"],
+}
 
 
-# 后台「跑团 → 台词」可以改上面每一组的句子（一组可以写好几句，掷骰时随机挑一句；清空 = 恢复成这里的默认）。
+# 后台「个性化骰子」可以改上面每一组的句子（一组可以写好几句，掷骰时随机挑一句；清空 = 恢复成这里的默认）。
 # 改过的存在设置 dice_lines（JSON：{"coc.大成功": ["…", "…"], …}），没改过的照旧用上面的默认。
-POOLS = {"coc": LEVEL_REMARKS, "upset": UPSET, "rd": RD_REMARKS, "multi": MULTI_ROLL, "dnd": DND_REMARKS}
+POOLS = {"coc": LEVEL_REMARKS, "upset": UPSET, "rd": RD_REMARKS, "multi": MULTI_ROLL, "dnd": DND_REMARKS,
+         "sc": SAN_REMARKS, "en": GROWTH_REMARKS}
 _POOL_OF = {id(v): k for k, v in POOLS.items()}
 LINE_GROUPS = [
     ("COC / 绿色三角洲 检定（/ra）", "coc", [("大成功", "大成功"), ("极难成功", "极难成功"), ("困难成功", "困难成功"),
                                         ("成功", "成功"), ("失败", "失败"), ("大失败", "大失败")]),
     ("意外结果（COC 检定，有六成机会替换上面那句）", "upset", [("high_fail", "数值 ≥70 却失败"), ("low_success", "数值 ≤30 却成功")]),
+    ("理智检定（/sc）", "sc", [("pass", "通过"), ("fail", "没通过"), ("fumble", "大失败")]),
+    ("成长检定（/en）", "en", [("grow", "成长了"), ("none", "没有成长")]),
     ("通用掷骰（/rd）", "rd", [("max", "掷出最大值"), ("high", "偏高"), ("mid", "中间"), ("low", "偏低"), ("min", "掷出最小值")]),
     ("连掷几轮（/rd 3#…）", "multi", [("all_same", "每轮一样"), ("spread_big", "起伏大"), ("spread_small", "很接近")]),
     ("DND 检定 / 攻击", "dnd", [("nat20", "自然 20"), ("nat1", "自然 1"), ("pass", "通过 DC"), ("fail", "没通过 / 没命中")]),
@@ -656,7 +668,7 @@ def coc_sanity(raw: str, lookup: Lookup, house: str = DEFAULT_HOUSE) -> str:
     else:
         loss, process, verdict = bad_loss[0], bad_loss[2], "失败"
     left = max(san - loss, 0)
-    tail = "……请先坐下。" if verdict == "大失败" else ("还撑得住。" if passed else "失去的总得想办法找回来。")
+    tail = _pick(SAN_REMARKS, "fumble" if verdict == "大失败" else "pass" if passed else "fail")
     hints = []
     if left == 0:
         hints.append("理智归零，角色陷入永久疯狂。")
@@ -689,10 +701,10 @@ def coc_growth(raw: str, lookup: Lookup | None = None) -> str:
     prefix = f"{label} " if label else ""
     if roll > value or roll > 95:
         gain = random.randint(1, 10)
-        remark = "经验积累，终于开窍了。"
+        remark = _pick(GROWTH_REMARKS, "grow")
         plain = f"{prefix}成长检定：D100={roll}/{value} —— 成长！+{gain}（1D10），{value} → {value + gain}。"
     else:
-        gain, remark = 0, "经验急不得。"
+        gain, remark = 0, _pick(GROWTH_REMARKS, "none")
         plain = f"{prefix}成长检定：D100={roll}/{value} —— 没有成长。{remark}"
     return Rolled(plain, dicecard.en_card(label, roll, value, gain, remark), gain=gain, value=value,
                   label=label, from_lookup=from_card, who=who)
@@ -841,7 +853,8 @@ def dg_sanity(raw: str, lookup: Lookup) -> str:
         hints.append("理智归零：Agent 永久疯狂，交给 Handler。")
     elif loss >= 5:
         hints.append(f"一次失去 {loss} 点（≥5）：临时疯狂，由 Handler 决定反应（战斗、逃跑或崩溃）。")
-    plain = f"理智检定：D100={roll}/{san} —— {level}\n损失 {loss}（{process}），理智 {san} → {left}。{note}"
+    tail = _pick(SAN_REMARKS, "fumble" if level == "大失败" else "pass" if level.endswith("成功") else "fail")
+    plain = f"理智检定：D100={roll}/{san} —— {level}\n损失 {loss}（{process}），理智 {san} → {left}。{tail}{note}"
     if hints:
         plain += "\n" + "\n".join(hints)
     return Rolled(plain, None, san_left=left, san_before=san, loss=loss, from_lookup=from_card, who=who, level=level)

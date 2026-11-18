@@ -5,8 +5,10 @@
 - 子进程异常退出：5 秒后重新拉起。刚更新完的新版本 90 秒内就退出，算一次失败，连续 3 次就回滚（core/updater.py）。
 - 连续 MAX_QUICK_CRASHES 次都是一启动就崩（端口被占、配置写错这类重来多少次都不会好的）：不再拉起，退出码 0。
   用 0 是为了让老版本的 Start-Changri.bat 也停下来（它见到非 0 会自己再循环）；有窗口的话先停住让人看清原因。
-- 每次拉起前先看设置平台端口上是不是已经有一个长日bot 在跑（/healthz 回 ok）：是的话这次不启动，退出码 0。
+- 每次拉起前先看设置平台端口上是不是已经有一个长日bot 在跑（/healthz 回 ok）：是的话这次不启动、帮他打开设置平台，退出码 0。
   常见于装了开机自启又双击了启动；不查的话新的那个抢不到端口，一直崩一直重启，报错刷屏。
+  端口被卡死的旧长日bot / 别的程序占着：不在这里修，提示用官网的修复工具（portcheck.fix_hint）。
+- 子进程退出码 PORT_BUSY（设置平台端口被别的程序占了，platform/portcheck.py）：不再拉起，退出码 0。
 - 收到 Ctrl+C / 服务停止：把子进程一起停掉，自己退出码 0（启动脚本看到 0 就不再循环）。
 Windows 和 Linux 用同一套，取代以前 start.bat / start.sh 里的循环。
 """
@@ -19,6 +21,7 @@ import sys
 import time
 
 from . import layout
+from .portcheck import PORT_BUSY
 
 RELAUNCH = 10            # 给启动脚本：按 current 重新起我
 RESTART_CODE = 3
@@ -74,18 +77,26 @@ def _wait_for_user() -> None:
 
 
 def _already_running() -> int | None:
-    """设置平台端口上已经有一个长日bot 在跑：返回端口号；没有（连不上、不是长日bot）返回 None。"""
-    import urllib.request
-
+    """设置平台端口上已经有一个正常的长日bot：返回端口号；没有（连不上、不是长日bot）返回 None。
+    卡死的旧长日bot、别的程序占着端口：不在这里修，子进程会把原因和修复工具的地址打出来（portcheck.fix_hint）。"""
     from .. import config
+    from .portcheck import changri_on
     try:
         port = config.admin_port()
-        with urllib.request.urlopen(f"http://127.0.0.1:{port}/healthz", timeout=2) as r:
-            if r.status == 200 and r.read(16).strip() == b"ok":
-                return port
-    except Exception:  # noqa: BLE001  连不上、超时、别的程序回了别的东西：都当没有
+    except Exception:  # noqa: BLE001
+        return None
+    return port if changri_on(port) else None
+
+
+def _open_running(port: int) -> None:
+    """已经有一个长日bot 在跑：双击启动的就直接帮他打开设置平台（不用懂「已经在运行」是什么意思）。"""
+    if not sys.platform.startswith("win") or os.environ.get("CHANGRI_SERVICE") == "1":
+        return
+    try:
+        import webbrowser
+        webbrowser.open(f"http://127.0.0.1:{port}/")
+    except Exception:  # noqa: BLE001
         pass
-    return None
 
 
 def run() -> int:
@@ -112,9 +123,9 @@ def run() -> int:
     quick_crashes = 0
     while not stopping["flag"]:
         if (port := _already_running()) is not None:
-            _log(f"已经有一个长日bot 在运行（设置平台 http://127.0.0.1:{port} 能打开），这次不再启动。")
-            _log("想重新开：先关掉原来那个。装了开机自启的，用 Remove-Autostart.bat 取消，或重启电脑后只留一种启动方式。")
-            _wait_for_user()
+            _log(f"长日bot 已经在运行了，不用再开一个。设置平台：http://127.0.0.1:{port}/" +
+                 ("（已经帮你在浏览器里打开）" if sys.platform.startswith("win") and os.environ.get("CHANGRI_SERVICE") != "1" else ""))
+            _open_running(port)
             return 0
         t0 = time.monotonic()
         child["p"] = subprocess.Popen(_child_cmd())
@@ -139,6 +150,10 @@ def run() -> int:
             continue
         if code == 0:
             _log("程序正常退出。")
+            return 0
+        if code == PORT_BUSY:                          # 端口被别的程序占了：子进程已经把原因和办法打出来了，重来多少次都一样
+            _log("端口被占用，不再自动重启。照上面的办法处理好之后再重新打开。")
+            _wait_for_user()
             return 0
         if ran < HEALTHY_AFTER and (msg := updater.rollback_if_failing()):
             _log(msg)

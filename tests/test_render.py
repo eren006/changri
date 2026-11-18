@@ -63,6 +63,22 @@ class LongReplyTests(unittest.TestCase):
             self.run_(self.long.reply_long(m, "很长的内容。" * 150))
         self.assertTrue(m.sent and all(isinstance(x, str) for x in m.sent))
 
+    def test_render_off_loop_and_cached(self):
+        """画长图放到线程里（不卡住机器人），同一段文字（自动复盘发给每个参与者）只画一次。"""
+        import threading
+        seen = []
+        real = F.render_forward
+
+        def spy(nodes, owners=None):
+            seen.append(threading.current_thread() is threading.main_thread())
+            return real(nodes, owners)
+        self.long._render_cache.clear()
+        with mock.patch.object(F, "render_forward", side_effect=spy):
+            for _ in range(3):
+                m = self.Matcher(); self.run_(self.long.reply_long(m, "同一段复盘。" * 150))
+                self.assertTrue(m.sent and all(not isinstance(x, str) for x in m.sent))
+        self.assertEqual(seen, [False])                   # 只画了一次，而且不在主线程（事件循环）里
+
     def test_switch_off_means_text(self):
         set_config("long_as_image", "0")
         m = self.Matcher(); self.run_(self.long.reply_long(m, "很长的内容。" * 30))

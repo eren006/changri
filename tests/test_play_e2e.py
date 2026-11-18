@@ -191,14 +191,24 @@ class PlayE2E(unittest.TestCase):
         from changri.plugins import relations as rel
         seen = []
 
-        async def spy(matcher, sh, kind):
+        pages = []
+
+        async def spy(matcher, sh, kind, page=1, again=""):
             seen.append(sh)
+            pages.append((page, again))
             await matcher.send("<图>")
         with mock.patch.object(rel, "_show", spy):
             self.say("查看公知", member="M1", group="P1")
             self.say("查看公知 甲", member="M1", group="P1")
         self.assertIsInstance(seen[0], list); self.assertEqual({x["name"] for x in seen[0]}, {"甲", "乙"})
         self.assertIsInstance(seen[1], dict); self.assertEqual(seen[1]["name"], "甲")
+        with mock.patch.object(rel, "_show", spy):                    # 翻页：全员第 2 页、一个人的第 3 页
+            self.say("查看公知 第2页", member="M1", group="P1")
+            self.say("查看公知 甲 第3页", member="M1", group="P1")
+        self.assertIsInstance(seen[-2], list)
+        self.assertEqual(pages[-2:], [(2, "查看公知"), (3, "查看公知 甲")])
+        self.assertEqual(seen[-1]["name"], "甲")
+        del seen[-2:]
         set_config("gongzhi_public", "0")
         with mock.patch.object(rel, "_show", spy):
             self.say("查看公知", member="M1", group="P1")                 # 没开放：只看自己的
@@ -592,6 +602,24 @@ class PlayE2E(unittest.TestCase):
         self.assertFalse(any(o.startswith("[ANN]") for o in out), out)
         self.assertTrue(any(o.startswith("[BACK]") and "在等人退群" in o for o in out), out)
 
+    def test_finish_room_twice_or_missing_is_noop(self):
+        """小手机和群里同时结束同一个房间、或房间已被删掉：第二次什么都不做（不重复通知、不报错）。"""
+        import asyncio
+
+        from changri.plugins import play
+        self.add_pool(1)
+        self.say("约会 1400-1500 咖啡厅 乙")
+        rid = rooms.timeline(roles.get_role_by_name("甲")["id"])[0]["id"]
+        asyncio.run(play._finish_room(rid, "cancelled", ""))
+        self.assertEqual(rooms.get(rid)["status"], "cancelled")
+        SENT.clear()
+        asyncio.run(play._finish_room(rid, "cancelled", ""))              # 第二次：已经不是 open 了
+        asyncio.run(play._finish_room(rid, "ended", ""))
+        self.assertEqual(SENT, [])
+        self.assertEqual(rooms.get(rid)["status"], "cancelled")
+        self.assertIsNone(rooms.end(rid))
+        asyncio.run(play._finish_room(99999, "ended", ""))                # 房间不存在：不抛 TypeError
+
     def test_end_command_every_kind(self):
         """结束约会 / 结束电话 / 结束官约 / 结束心愿：四种叫法都能结束房间；在房间群里不用带房间号，在自己的群里带房间号；结束后还占着时间线。"""
         self.add_pool(5)                                                   # 官方机器人的群结束后要等清场，不会马上空出来
@@ -832,6 +860,46 @@ class PlayE2E(unittest.TestCase):
             self.assertFalse(any(str(o).startswith("[ANN]") for o in SENT))      # 结束房间不往公告群发任何东西
         finally:
             qqmanager.room_say = old_say
+
+    def test_outage_fallback_retried_after_error(self):
+        """掉线备案这一轮出错（小手机起不来之类）：下一轮接着做；做成以后不重复；恢复后关回去。"""
+        import asyncio
+
+        from changri.core import outage, phoneserver, qqmanager, qqpool
+        from changri.plugins import qqwatch
+        set_config("qqdown_phone_fallback", "1")
+        notes, calls = [], []
+        real_start = outage.start
+
+        def flaky_start(link_id):
+            calls.append(link_id)
+            if len(calls) == 1:
+                raise RuntimeError("数据库正忙")
+            return real_start(link_id)
+
+        async def fake_notify(text):
+            notes.append(text)
+        state = {"down": "连不上"}
+        saved = (qqwatch._notify, phoneserver.start, outage.start, qqpool.links, qqmanager.watch, qqmanager.alerted, qqmanager.down_reason)
+        qqwatch._notify, phoneserver.start, outage.start = fake_notify, lambda *a: "", flaky_start
+        qqpool.links = lambda: [{"id": 1, "enabled": 1, "name": "A"}]
+        qqmanager.watch = lambda *a, **k: None
+        qqmanager.alerted = lambda app, link: bool(state["down"])
+        qqmanager.down_reason = lambda app, link=0: state["down"]
+        try:
+            asyncio.run(qqwatch._tick())                                          # 第一轮出错
+            self.assertNotIn(1, outage.down_links())
+            asyncio.run(qqwatch._tick())                                          # 第二轮做成
+            self.assertIn(1, outage.down_links())
+            self.assertEqual(sum("📱" in n for n in notes), 1)
+            asyncio.run(qqwatch._tick())                                          # 第三轮：已经做过，不重复
+            self.assertEqual((len(calls), sum("📱" in n for n in notes)), (2, 1))
+            state["down"] = ""
+            asyncio.run(qqwatch._tick())                                          # 恢复：关回去
+            self.assertNotIn(1, outage.down_links())
+            self.assertTrue(any("回 QQ 群" in n for n in notes), notes)
+        finally:
+            (qqwatch._notify, phoneserver.start, outage.start, qqpool.links, qqmanager.watch, qqmanager.alerted, qqmanager.down_reason) = saved
 
     def test_qq_outage_moves_rooms_to_phone(self):
         """拉群 QQ 号掉线：通知所有玩家暂停 QQ 群、自动打开小手机并发激活码；掉线的房间在小手机上能写、记进同一份复盘；

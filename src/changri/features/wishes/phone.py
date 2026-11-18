@@ -2,6 +2,7 @@
 from changri.core import loopbridge, publicfeed, rooms as rooms_core, rpg, season, wishes
 from changri.core.db import get_config
 from flask import flash, redirect, request, url_for
+from changri.core.textutil import hm_text
 
 
 def register(app, ctx):
@@ -15,7 +16,7 @@ def register(app, ctx):
             return bad
         from changri.core import godmode, windows
         why = ("现在不是进行中的季度，不能挂心愿。" if season.phase() != "playing" else "") or windows.check("wish") or godmode.check(role["id"], "wish")
-        wall = [{"id": w["id"], "who": wishes.label(w), "mine": w["poster_id"] == role["id"], "day": f"D{w['day']}", "time": f"{w['start_hm']}-{w['end_hm']}",
+        wall = [{"id": w["id"], "who": wishes.label(w), "mine": w["poster_id"] == role["id"], "day": f"D{w['day']}", "time": f"{hm_text(w['start_hm'], w['end_hm'])}",
                  "place": w["place"], "content": w["content"], "left": wishes.left_hours(w)} for w in wishes.list_open()]
         return page("wishes.html", role=role, mode="wishes", why=why, wall=wall, places=[p["name"] for p in rpg.places()], max_content=200, rewards=[], room_on=True)
 
@@ -83,5 +84,5 @@ def register(app, ctx):
         try:
             flash(loopbridge.run(go()))
         except Exception as e:  # noqa: BLE001
-            flash(f"没摘成：{str(e)[:60]}")
+            flash(loopbridge.friendly_error(e, "没摘成"))
         return redirect(url_for("wishes_page"))

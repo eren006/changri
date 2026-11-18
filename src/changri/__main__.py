@@ -25,6 +25,31 @@ def _utf8_console() -> None:
             pass
 
 
+def _port_busy() -> int | None:
+    """启动前看设置平台的端口：被占了就说清楚是谁、怎么办，记一条「配置」报错，退出码 PORT_BUSY（看门进程不再重启）。
+    不自动换端口，原因见 platform/portcheck.py。能用返回 None。"""
+    from changri import config
+    from changri.platform import portcheck
+    try:
+        config.ensure()
+        host, port = str(config.get("host")), config.admin_port()
+    except Exception:  # noqa: BLE001  配置读不了：让后面正常启动的流程去报
+        return None
+    if portcheck.can_bind(host, port):
+        return None
+    mine = portcheck.changri_on(port)
+    msg = portcheck.busy_message(port, "" if mine else portcheck.who_listens(port), changri=mine)
+    print(msg, flush=True)
+    if mine:
+        return 0
+    try:
+        from changri.core import errlog
+        errlog.record("config", "启动:端口", msg)
+    except Exception:  # noqa: BLE001
+        pass
+    return portcheck.PORT_BUSY
+
+
 def main(argv: list[str] | None = None) -> int:
     _utf8_console()
     ap = argparse.ArgumentParser(prog="changri", description="长日bot")
@@ -42,6 +67,8 @@ def main(argv: list[str] | None = None) -> int:
     a = ap.parse_args(argv)
 
     if a.cmd in (None, "run"):
+        if (code := _port_busy()) is not None:
+            return code
         from changri import app
         app.run()
         return 0

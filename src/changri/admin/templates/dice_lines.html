@@ -1,9 +1,21 @@
-{% extends "base.html" %}{% block title %}跑团台词{% endblock %}
+{% extends "base.html" %}{% block title %}个性化骰子{% endblock %}
 {% block body %}
-<h1>跑团台词</h1>
-<p class="lede">掷骰、检定出结果后，机器人跟在后面说的那句话。每一档可以写好几句，<b>一行一句</b>，掷的时候随机挑一句。框里已经填好了默认台词，直接在上面改就行；整档清空保存，会自动填回默认台词。</p>
+<h1>个性化骰子</h1>
+<p class="lede">掷骰、检定出结果时，卡片上的表情和机器人跟在后面说的那句话。<b>跑团群和恋综群通用</b>：恋综群里用 /ra 读角色属性检定，说的也是这里的话。</p>
 
 <form method="post" action="{{ url_for('dice_lines_save') }}" class="form">{{ csrf() }}
+<section>
+  <div class="sec-head keep"><h2>成功等级的表情</h2></div>
+  <p class="note">检定卡片标题前面的那个表情。COC、绿色三角洲的检定和 COC 的理智检定都用这一套；成长检定用「成功」「失败」的。等级的名字不能改。空着保存 = 用默认。</p>
+  <div class="marks">
+  {% for m in mark_rows %}
+    <label class="markslot" for="m-{{ m.level }}"><span>{{ m.level }}{% if m.custom %} <span class="tag">已改</span>{% endif %}</span>
+      <input type="text" id="m-{{ m.level }}" name="mark.{{ m.level }}" value="{{ m.mark }}" maxlength="{{ mark_max }}" placeholder="{{ m.default }}" autocomplete="off"></label>
+  {% endfor %}
+  </div>
+  {% if mark_rows|selectattr('custom')|list %}<button class="linkbtn" type="submit" form="reset-marks">表情恢复默认</button>{% endif %}
+</section>
+<p class="note">下面是台词。每一档可以写好几句，<b>一行一句</b>，掷的时候随机挑一句。框里已经填好了默认台词，直接在上面改就行；整档清空保存，会自动填回默认台词。</p>
 {% for title, rows in line_groups %}
 <section>
   <div class="sec-head keep"><h2>{{ title }}</h2></div>
@@ -25,8 +37,9 @@
 {% for title, rows in line_groups %}{% for r in rows %}{% if r.custom %}
 <form id="reset-{{ r.k }}" method="post" action="{{ url_for('dice_lines_reset') }}" hidden>{{ csrf() }}<input type="hidden" name="k" value="{{ r.k }}"></form>
 {% endif %}{% endfor %}{% endfor %}
+<form id="reset-marks" method="post" action="{{ url_for('dice_lines_reset') }}" hidden>{{ csrf() }}<input type="hidden" name="k" value="marks"></form>
 {% if any_custom %}
-<form method="post" action="{{ url_for('dice_lines_reset') }}" onsubmit="return confirm('把所有台词恢复成默认？改过的都会丢掉。')" style="margin-top:18px">{{ csrf() }}<input type="hidden" name="k" value="*"><button class="linkbtn">全部恢复默认</button></form>
+<form method="post" action="{{ url_for('dice_lines_reset') }}" onsubmit="return confirm('把表情和所有台词恢复成默认？改过的都会丢掉。')" style="margin-top:18px">{{ csrf() }}<input type="hidden" name="k" value="*"><button class="linkbtn">全部恢复默认</button></form>
 {% endif %}
 
 <style>
@@ -36,5 +49,8 @@
 .ui .lineslot label .muted{font-weight:400}
 .ui .lineslot textarea{width:100%;box-sizing:border-box;resize:vertical;line-height:1.6}
 .ui .lineslot .linkbtn{align-self:flex-start}
+.ui .marks{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px 16px;margin:0 0 8px}
+.ui .markslot{display:flex;flex-direction:column;gap:6px;font-weight:600;min-width:0}
+.ui .markslot input{width:100%;box-sizing:border-box;font-size:20px;text-align:center}
 </style>
 {% endblock %}

@@ -61,12 +61,8 @@ def ready(role_id: int) -> bool:
 def process_photo(raw: bytes) -> bytes:
     """资料照片：转成 3:4 竖图（600×800），去掉 EXIF，JPEG 压缩。"""
     from PIL import Image, ImageOps
-    Image.MAX_IMAGE_PIXELS = 40_000_000
-    try:
-        img = Image.open(io.BytesIO(raw))
-        img.load()
-    except Exception:  # noqa: BLE001
-        raise ValueError("不是能识别的图片")
+    from .imgload import open_upload
+    img = open_upload(raw, (800, 800))            # 先看像素数再解码（见 imgload）；后面裁成 600×800
     img = ImageOps.exif_transpose(img)
     if img.mode in ("RGBA", "LA", "P"):
         img = img.convert("RGBA")

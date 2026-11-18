@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 
 
@@ -24,12 +25,32 @@ def md_escape(text: str) -> str:
     return re.sub(r"(?m)^(\s*)([#+\-|])", lambda m: m.group(1) + _MD_LINE_HEAD[m.group(2)], text)
 
 
-# 成功程度一眼看得出来：越好越亮，大失败是爆炸
-_MARKS = {"大成功": "🎉", "极难成功": "💎", "困难成功": "⭐", "成功": "✅", "失败": "❌", "大失败": "💥"}
+# 成功程度一眼看得出来：越好越亮，大失败是爆炸。后台「个性化骰子」可以换（存在设置 dice_marks，JSON {"大成功": "🌟", …}，只存改过的）
+MARKS = {"大成功": "🎉", "极难成功": "💎", "困难成功": "⭐", "成功": "✅", "失败": "❌", "大失败": "💥"}
+MARKS_KEY = "dice_marks"
+MARK_MAX = 8          # 一个表情最多几个字符（组合 emoji 会占好几个）
+
+
+def custom_marks() -> dict[str, str]:
+    """后台改过的表情；读不出来、或者不在库里（单独测排版时）当没改过。"""
+    try:
+        from .db import get_config
+        data = json.loads(get_config(MARKS_KEY, "") or "{}")
+    except Exception:
+        return {}
+    return {k: str(v)[:MARK_MAX] for k, v in data.items() if k in MARKS and str(v).strip()} if isinstance(data, dict) else {}
+
+
+def save_custom_marks(data: dict[str, str]) -> None:
+    """只存和默认不一样的；空的 = 用默认。"""
+    from .db import set_config
+    out = {k: v.strip()[:MARK_MAX] for k, v in data.items() if k in MARKS and v.strip() and v.strip() != MARKS[k]}
+    set_config(MARKS_KEY, json.dumps(out, ensure_ascii=False) if out else "")
 
 
 def mark_for(verdict: str) -> str:
-    return _MARKS.get(verdict) or ("✅" if verdict.endswith("成功") else "❌")
+    marks = {**MARKS, **custom_marks()}
+    return marks.get(verdict) or marks["成功" if verdict.endswith("成功") else "失败"]
 
 
 def check_card(label: str, roll: int, target: int, verdict: str, remark: str, *,
@@ -88,7 +109,7 @@ def en_card(label: str, roll: int, value: int, gain: int, remark: str) -> str:
     rows = [f"**D100**　掷出 **{roll}**　目标 > {value}"]
     if gain:
         rows.append(f"**+{gain}**（1D10）　{value} → **{value + gain}**")
-    return _card(f"{'✅' if gain else '❌'} {title}　{'成长' if gain else '没有成长'}", rows, [], remark)
+    return _card(f"{mark_for('成功' if gain else '失败')} {title}　{'成长' if gain else '没有成长'}", rows, [], remark)
 
 
 def dnd_check_card(label: str, chosen: int, mod: int, total: int, dc: int | None, passed: bool | None,

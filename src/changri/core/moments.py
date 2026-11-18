@@ -41,12 +41,8 @@ def total_bytes() -> int:
 def process_image(raw: bytes) -> tuple[bytes, bytes, int, int]:
     """原图字节 → (大图, 缩略图, 宽, 高)，不是图片抛 ValueError。"""
     from PIL import Image, ImageOps
-    Image.MAX_IMAGE_PIXELS = 40_000_000
-    try:
-        img = Image.open(io.BytesIO(raw))
-        img.load()
-    except Exception:
-        raise ValueError("不是能识别的图片")
+    from .imgload import open_upload
+    img = open_upload(raw, (1600, 1600))          # 先看像素数再解码（见 imgload）
     img = ImageOps.exif_transpose(img)
     if img.mode in ("RGBA", "LA", "P"):
         img = img.convert("RGBA")

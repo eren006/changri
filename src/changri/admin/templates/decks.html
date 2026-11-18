@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}牌堆{% endblock %}
+{% block body %}
+<h1>牌堆</h1>
+<p class="lede">大家把想抽的内容照模板写好交给你，你在这里贴进去或上传文件，保存后全群就能抽：群里发「抽卡 牌堆名 [张数]」，只发「抽卡」列出全部牌堆；内置的塔罗、扑克、随机遭遇也能这样抽。海豹（SealDice）的 json / toml 牌堆可以直接用。</p>
+
+<section>
+  <div class="sec-head keep"><h2>模板和写法</h2>
+    <span class="btns"><a class="btn ghost" href="{{ url_for('decks_template') }}">下载模板</a><button class="btn ghost" type="button" id="dkCopy">复制模板</button></span></div>
+  <div class="card">
+    <ul style="margin:0 0 12px;padding-left:20px;line-height:1.9">
+      <li><b>【牌堆名】</b>开始一个牌堆，下面<b>一行一张牌</b>。空行不算，<code>#</code> 开头的行是说明，机器人不读。</li>
+      <li>行首写 <code>3*</code>：这张被抽中的机会是普通牌的 3 倍（不写就是 1，最大 100）。</li>
+      <li><code>{牌堆名}</code>：先从那个牌堆抽一张填进来，别的文件里的牌堆也能用。</li>
+      <li><code>[1d6]</code>、<code>[2d10+3]</code>：掷骰，换成掷出来的数。</li>
+      <li>名字以 <code>_</code> 开头的牌堆只给别的牌堆用：不能直接抽，也不出现在列表里。</li>
+      <li>一行里想换行写 <code>\n</code>。牌堆名最多 20 个字，全群不能重名。文件要存成 UTF-8 编码的 .txt。</li>
+    </ul>
+    <pre id="dkTpl" style="margin:0;padding:12px;border-radius:8px;background:var(--soft);white-space:pre-wrap;font-size:13px;line-height:1.6">{{ tpl_text }}</pre>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head keep"><h2>{{ '改「' ~ edit.title ~ '」' if edit else '添加牌堆' }}</h2></div>
+  <form class="form" method="post" action="{{ url_for('decks_save') }}" enctype="multipart/form-data">{{ csrf() }}
+    {% if edit %}<input type="hidden" name="file_id" value="{{ edit.id }}">{% endif %}
+    <div class="fields">
+      <div><label for="dkTitle">这份叫什么（可空，空着就用第一个牌堆的名字）</label><input id="dkTitle" name="title" maxlength="30" value="{{ edit.title if edit else '' }}" placeholder="比如：阿林的晚饭牌堆"></div>
+      <div><label for="dkFile">上传文件（.txt / .json / .toml）</label><input id="dkFile" type="file" name="file" accept=".txt,.json,.toml,text/plain,application/json"></div>
+      <div style="grid-column:1/-1"><label for="dkRaw">或者直接贴内容（选了文件就以文件为准）</label>
+        <textarea id="dkRaw" name="raw" rows="14" spellcheck="false" style="font-family:ui-monospace,Menlo,monospace;font-size:13px">{{ edit.raw if edit else '' }}</textarea></div>
+    </div>
+    <div class="actions"><button class="btn" type="submit">{{ '保存修改' if edit else '保存' }}</button>{% if not edit %}<button class="btn ghost" type="button" id="dkUse">把模板填进来</button>{% else %}<a class="btn ghost" href="{{ url_for('decks_page') }}">取消</a>{% endif %}</div>
+  </form>
+</section>
+
+<section>
+  <div class="sec-head keep"><h2>试抽</h2></div>
+  <form class="form" method="get" action="{{ url_for('decks_page') }}">
+    <div class="fields"><div><label for="dkTry">牌堆名（后面可以跟张数）</label><input id="dkTry" name="try" value="{{ try_name }}" placeholder="今晚吃什么 3"></div></div>
+    <div class="actions"><button class="btn" type="submit">抽一下</button></div>
+  </form>
+  {% if try_text %}<div class="card" role="status" style="white-space:pre-wrap;margin-top:10px">{{ try_text }}</div>{% endif %}
+</section>
+
+<section>
+  <div class="sec-head keep"><h2>全部<span class="n">{{ files|length }} 份</span></h2></div>
+  {% for f in files %}
+  <details class="panel" style="margin-bottom:10px">
+    <summary><b>{{ f.title }}</b>　<span class="muted">{{ f.updated_ts|ts }} · {% for d in f.decks %}{{ d.name }}（{{ d.n }}）{% if not loop.last %}、{% endif %}{% endfor %}</span></summary>
+    <pre style="margin:10px 0;padding:12px;border-radius:8px;background:var(--soft);white-space:pre-wrap;max-height:360px;overflow:auto;font-size:13px">{{ f.raw }}</pre>
+    <div style="display:flex;gap:10px;align-items:center">
+      <a class="btn ghost sm" href="{{ url_for('decks_page', edit=f.id) }}">改</a>
+      <form method="post" action="{{ url_for('decks_delete', fid=f.id) }}" data-q="删掉「{{ f.title }}」？里面的牌堆都会没有。" onsubmit="return confirm(this.dataset.q)" style="margin:0">{{ csrf() }}<button class="btn ghost sm" type="submit">删除</button></form>
+    </div>
+  </details>
+  {% else %}<p class="muted">还没有牌堆。下载模板照着写一份，或者先点「把模板填进来」保存试试。</p>{% endfor %}
+</section>
+
+<script>
+(function () {
+  var tpl = document.getElementById('dkTpl').textContent, ta = document.getElementById('dkRaw');
+  var copy = document.getElementById('dkCopy');
+  copy.addEventListener('click', function () {
+    (navigator.clipboard ? navigator.clipboard.writeText(tpl) : Promise.reject()).then(function () { copy.textContent = '已复制'; },
+      function () { copy.textContent = '复制不了，请手动选中'; });
+  });
+  var use = document.getElementById('dkUse');
+  if (use) use.addEventListener('click', function () {
+    if (ta.value.trim() && !confirm('输入框里已经有内容，换成模板吗？')) return;
+    ta.value = tpl; ta.focus();
+  });
+})();
+</script>
+{% endblock %}

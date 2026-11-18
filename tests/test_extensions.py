@@ -131,7 +131,7 @@ class ExtensionCoreTests(_PatchedDir):
         self.assertFalse(E.delete_user("../x"))
 
     def test_nav_and_groups_follow_switches(self):
-        self.assertEqual(E.disabled_nav(), {"rewards_page", "alarm_page", "phone_page", "giftshop_page", "gacha_page", "sighting_page", "bottles_page", "precall_admin"})      # 结戏奖励、加百列闹钟、小手机默认关
+        self.assertEqual(E.disabled_nav(), {"rewards_page", "alarm_page", "phone_page", "giftshop_page", "gacha_page", "sighting_page", "bottles_page", "precall_admin", "decks_page"})      # 结戏奖励、加百列闹钟、小手机默认关
         E.set_enabled("rewards", True)
         E.set_enabled("alarm", True)
         E.set_enabled("phone", True)
@@ -142,12 +142,13 @@ class ExtensionCoreTests(_PatchedDir):
         E.set_enabled("sighting", True)
         E.set_enabled("precall", True)
         E.set_enabled("bottle", True)
+        E.set_enabled("decks", True)
         self.assertEqual(E.disabled_nav(), set())
-        self.assertEqual(E.disabled_groups(), {"心愿", "混乱短信", "晚餐", "点歌", "写信综", "踩点", "申请加入"})   # 这些默认关（朋友圈、目击已在上面打开）
+        self.assertEqual(E.disabled_groups(), {"心愿", "混乱短信", "晚餐", "点歌", "写信综", "踩点", "申请加入", "超时提醒"})   # 这些默认关（朋友圈、目击已在上面打开）
         E.set_enabled("lovemail", False)
         E.set_enabled("dice", False)
         self.assertIn("lovemail_page", E.disabled_nav())
-        self.assertEqual(E.disabled_groups(), {"心动信", "跑团骰子", "心愿", "混乱短信", "晚餐", "点歌", "写信综", "踩点", "申请加入"})
+        self.assertEqual(E.disabled_groups(), {"心动信", "跑团骰子", "心愿", "混乱短信", "晚餐", "点歌", "写信综", "踩点", "申请加入", "超时提醒"})
         E.set_enabled("entrance", False)
         self.assertNotIn("season_page", E.disabled_nav())                      # 季度是核心，页面一直在
         self.assertNotIn("season", [e["id"] for e in E.OFFICIAL])

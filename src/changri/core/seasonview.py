@@ -14,6 +14,7 @@ import time
 
 from . import seasonarchive
 from .db import get_config, get_conn, set_config
+from .textutil import hm_text
 
 KIND_TAG = {"约会": "private", "心愿": "private", "踩点": "private", "官约": "official", "电话": "call", "前置电话": "call", "微信": "call"}
 NO_TIME = {"微信", "前置电话"}
@@ -107,7 +108,7 @@ def _room_item(r: dict) -> dict:
     label = r.get("day_label") or (f"D{r['day']}" if r.get("day") is not None else time.strftime("%m-%d", time.localtime(r["created_ts"])))
     num = r.get("day_num", r["day"] if r.get("day") is not None else 10 ** 6)
     return {"type": "room", "id": r["id"], "kind": r["kind"], "tag": KIND_TAG.get(r["kind"], "private"), "place": r.get("place") or "",
-            "who": r["members"], "time": "" if r["kind"] in NO_TIME else f"{r['start_hm']}-{r['end_hm']}", "story": "",
+            "who": r["members"], "time": "" if r["kind"] in NO_TIME else f"{hm_text(r['start_hm'], r['end_hm'])}", "story": "",
             "ts": r["created_ts"], "ended_ts": r.get("ended_ts") or (rp[-1]["ts"] if rp else r["created_ts"]),
             "day_num": num, "day_label": label, "rp_n": len(rp), "rp_chars": sum(_chars(x) for x in rp), "raw": r}
 

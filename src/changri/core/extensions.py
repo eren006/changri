@@ -42,7 +42,7 @@ SETTING_TYPES = {"int", "string", "text", "bool", "choice"}
 
 
 # 小手机自己的功能：开关和设置都在后台「小手机」页里，不算「额外扩展」（没有群里的指令，不用重启）。值 = 默认开不开。
-PHONE_FEATURES = {"moments": False, "masquerade": False, "games": True, "chatroom": False, "groupchat": False}
+PHONE_FEATURES = {"moments": False, "masquerade": False, "games": True, "chatroom": False, "groupchat": False, "dailyquote": False}
 
 
 def is_enabled(ext_id: str) -> bool:
@@ -446,9 +446,11 @@ def confirm_boot() -> None:
 
 
 def list_keys(prefix: str) -> list[str]:
-    from .db import get_conn
+    """设置里以 prefix 开头、值不为空的键。要和 get_config / set_config 查同一个库：
+    ext_ 开头的存在全局库里（db.GLOBAL_CONFIG_PREFIXES），以前查的是当前机器人的库，扩展的旧报错一直清不掉。"""
+    from .db import GLOBAL_CONFIG_PREFIXES, get_conn, get_global_conn
 
-    with get_conn() as conn:
+    with (get_global_conn() if prefix.startswith(GLOBAL_CONFIG_PREFIXES) else get_conn()) as conn:
         return [r[0] for r in conn.execute("SELECT key FROM config WHERE key LIKE ? AND value!=''", (prefix + "%",))]
 
 

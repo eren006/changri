@@ -64,6 +64,8 @@ def create_phone_app(secret_key: str) -> Flask:
     app.secret_key = secret_key
     app.jinja_env.globals["csrf"] = lambda: _csrf()
     app.jinja_env.globals["phone_themes"] = PHONE_THEMES
+    from changri.core.textutil import next_day_mark
+    app.jinja_env.globals["next_day"] = next_day_mark            # 跨午夜的约会在结束时间前显示「次日」
 
     def _csrf() -> str:
         if "csrf" not in session:
@@ -128,6 +130,8 @@ def create_phone_app(secret_key: str) -> Flask:
             ctx["outage_rooms"] = [{"id": r["id"], "kind": r["kind"]} for r in outage.rooms_down_for(role["id"])]
         resp = make_response(render_template(template, **ctx))
         return resp
+
+    loopbridge.install_flask_handler(app, home="/p")  # 等机器人超时：提示「还在处理」，不出 500
 
     @app.after_request
     def headers(resp):
@@ -461,7 +465,7 @@ def create_phone_app(secret_key: str) -> Flask:
         try:
             ok, msg = loopbridge.run(sendmsg.send(role, target, kind, gift, text, sign, _send_fn(), images, gift_by_name_ok=True))
         except Exception as e:  # noqa: BLE001
-            ok, msg = False, f"发送失败：{str(e)[:60]}"
+            ok, msg = False, loopbridge.friendly_error(e, "发送失败")
         flash(msg)
         return back
 
@@ -486,7 +490,7 @@ def create_phone_app(secret_key: str) -> Flask:
         try:
             loopbridge.run(go())
         except Exception as e:  # noqa: BLE001
-            flash(f"撤回失败（可能已超过 2 分钟）：{str(e)[:60]}")
+            flash(loopbridge.friendly_error(e, "撤回失败（可能已超过 2 分钟）"))
             return back
         messaging.mark_recalled(m["id"])
         flash(f"已撤回发给「{m['to_name']}」的{sendmsg.KIND_NAME[m['kind']]}，今天的次数已返还。")
@@ -592,9 +596,32 @@ def create_phone_app(secret_key: str) -> Flask:
         if bad:
             return bad
         return page("discover.html", role=role, mode="discover", collecting=len(collect.open_now()), rel_unread=relations.unread_total(role["id"]) if extensions.is_enabled("relations") else 0,
-                    on={k: extensions.is_enabled(k) for k in ("lovemail", "wishes", "bottle", "relations", "moments", "masquerade", "games", "chatroom", "groupchat", "song", "precall")},
+                    on={k: extensions.is_enabled(k) for k in ("lovemail", "wishes", "bottle", "relations", "moments", "masquerade", "games", "chatroom", "groupchat", "song", "precall", "dailyquote")},
                     moments_latest=moments.latest() if extensions.is_enabled("moments") else None,
                     masq_on=extensions.is_enabled("masquerade") and masquerade.is_on(),
+                    precall_badge=precall.badge(role["id"]) if extensions.is_enabled("precall") else 0)
+
+    @app.route("/p/me/quote")
+    def daily_quote():
+        """发现页「每日一句」：页面先出来，再由页面里的脚本来取（第一次要去外面拉，可能慢几秒）。"""
+        from changri.core import dailyquote
+        if not current():
+            return jsonify(quotes=[]), 401
+        if not dailyquote.enabled():
+            return jsonify(quotes=[])
+        return jsonify(quotes=dailyquote.today())
+
+    @app.route("/p/me/desktop")
+    def desktop():
+        """桌面（照老系统）：底栏「桌面」进来，一格一个应用图标——小手机、关系线、邀约、前置电话、戏录、RPG。"""
+        role, bad = need_login()
+        if bad:
+            return bad
+        rel_on = extensions.is_enabled("relations") and relations.enabled()
+        return page("desktop.html", role=role, mode="desktop", rel_on=rel_on,
+                    rel_unread=relations.unread_total(role["id"]) if rel_on else 0,
+                    appt_on=extensions.is_enabled("chatroom") or extensions.is_enabled("groupchat"),
+                    precall_on=extensions.is_enabled("precall"),
                     precall_badge=precall.badge(role["id"]) if extensions.is_enabled("precall") else 0)
 
     # ---------- 时间线、搜索与收藏 ----------

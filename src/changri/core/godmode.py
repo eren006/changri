@@ -8,6 +8,7 @@ import time
 
 from . import rooms, season, storycal
 from .db import get_config, get_conn, set_config
+from .textutil import hm_text
 
 # 功能 → 给玩家看的名字。官约是管理员发起的，不在里面。
 # 「微信」这种房间现在只有小手机的多人群聊会建（群里的「微信」指令已经改成去小手机），所以对外叫「多人群聊」；键名不改，库里存的还是「微信」。
@@ -113,10 +114,13 @@ def locks() -> list[dict]:
 def lock_hit(role_id: int, day: int, a: str, b: str) -> dict | None:
     """这个时段撞上了管理员锁定的时间就返回一条像房间一样的记录（给 rooms.conflict 用）。"""
     with get_conn() as c:
-        rows = c.execute("SELECT * FROM time_locks WHERE role_id=? AND (day IS NULL OR day=?)", (role_id, day)).fetchall()
-    rows = list(rows) + [x for x in global_locks() if x["day"] is None or x["day"] == day]
+        rows = c.execute("SELECT * FROM time_locks WHERE role_id=? AND (day IS NULL OR ? IS NULL OR day BETWEEN ?-1 AND ?+1)",
+                         (role_id, day, day, day)).fetchall()
+    rows = list(rows) + [x for x in global_locks() if x["day"] is None or day is None or abs(x["day"] - day) <= 1]
     for r in rows:
-        if rooms._overlap(a, b, r["start_hm"], r["end_hm"]):
+        # 锁定也可能跨午夜；只写了钟点、没写天的锁每天都锁，前一天、当天、后一天的都要比
+        lock_days = [r["day"]] if r["day"] is not None else (rooms._near_days(day))
+        if any(rooms.spans_overlap(day, a, b, d, r["start_hm"], r["end_hm"]) for d in lock_days):
             return {"id": 0, "kind": "管理员锁定", "start_hm": r["start_hm"], "end_hm": r["end_hm"], "status": "open"}
     return None
 
@@ -186,4 +190,4 @@ def delete_slot(role_id: int, room_id: int) -> tuple[bool, str]:
         for t in ("room_lines", "room_members"):
             c.execute(f"DELETE FROM {t} WHERE room_id=?", (room_id,))
         c.execute("DELETE FROM rooms WHERE id=?", (room_id,))
-    return True, f"已删除 D{r['day']} {r['start_hm']}-{r['end_hm']} 的{r['kind']}（共 {n} 人的时间线和这场的复盘记录一起没了）"
+    return True, f"已删除 D{r['day']} {hm_text(r['start_hm'], r['end_hm'])} 的{r['kind']}（共 {n} 人的时间线和这场的复盘记录一起没了）"

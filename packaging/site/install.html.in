@@ -106,10 +106,17 @@ footer a{color:inherit}
 </section>
 
 <section>
+<h2>打不开？用修复工具</h2>
+<p>长日bot 打不开、设置平台进不去、报错说端口被占用时，用修复工具：它会自己找到长日bot，看哪里不对，能修的帮你修好。</p>
+<p><a class="btn" href="@BASE@/fix/">打开修复工具页</a></p>
+<p class="note">Linux 直接运行：<code>curl -fsSL @BASE@/fix.sh | sudo bash</code></p>
+</section>
+
+<section>
 <h2>常见问题</h2>
 <table>
 <tr><td>机器人不在线</td><td>多半是 IP 白名单没加对。在设置平台「机器人接入」点「检查连接」，它会告诉你该加哪个 IP。</td></tr>
-<tr><td>打不开设置平台</td><td>先看安全组有没有放行 5091。再在服务器上运行自检：Linux <code>sudo /opt/changri-bot/changri doctor</code>，Windows 双击 <code>Doctor.bat</code>。</td></tr>
+<tr><td>打不开设置平台</td><td>先用上面的<a href="@BASE@/fix/">修复工具</a>。还不行就看安全组有没有放行 5091，再在服务器上运行自检：Linux <code>sudo /opt/changri-bot/changri doctor</code>，Windows 双击 <code>Doctor.bat</code>。</td></tr>
 <tr><td>升级</td><td>设置平台「更新」页一键升级，会先自动备份；新版本起不来会自动退回旧版本。</td></tr>
 <tr><td>备份</td><td>所有数据都在安装目录的 <code>data</code> 文件夹里，复制它就是备份。</td></tr>
 </table>

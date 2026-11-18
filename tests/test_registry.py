@@ -26,7 +26,7 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(g["/sheets"], "relations")
         self.assertEqual(g["/sightings"], "sighting")
         self.assertEqual(g["/moments"], "moments")
-        self.assertEqual(len(g), 17)          # 原来 guard() 里手写的 15 条 + 故事历 + 漂流瓶记录
+        self.assertEqual(len(g), 18)          # 原来 guard() 里手写的 15 条 + 故事历 + 漂流瓶记录 + 牌堆
 
     def test_pages_have_register(self):
         admin, phone = registry.admin_pages(), registry.phone_pages()

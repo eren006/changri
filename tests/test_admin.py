@@ -59,6 +59,18 @@ class AdminTests(unittest.TestCase):
         self.assertNotIn('id="cq"', html)
         self.assertEqual(errlog.contact_qq(), "123456789")
 
+    def test_notice_group_card(self):
+        """总览最下面有长日bot 通知群：群号 + 二维码图片能打开。"""
+        self.login()
+        html = self.c.get("/").get_data(as_text=True)
+        self.assertIn('id="notice"', html)
+        self.assertIn("120287262", html)
+        src = re.search(r'src="([^"]*notice-group-qr\.png)"', html).group(1)
+        r = self.c.get(src)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.mimetype, "image/png")
+        r.close()
+
     def test_contact_qq_prompt_dismiss_and_skip(self):
         """「不用了」：不再弹，也不填。报错不往外发、非主账号：都不弹。"""
         from changri.core.db import get_global_conn, set_config
@@ -314,6 +326,33 @@ class AdminTests(unittest.TestCase):
         self.assertIn("没有清空", r.get_data(as_text=True))
         r = self.c.post("/season/wipe", data={"confirm": "收尾", "_csrf": token(self.c, "/season")}, follow_redirects=True)
         self.assertIn("已收尾", r.get_data(as_text=True))
+
+    def test_season_end_slow_report_returns_page_first(self):
+        """季末报告发得慢（每人一张海报）：页面先返回、说还在发，不占着后台线程干等；发完后打开季度页显示一次结果。"""
+        import concurrent.futures
+
+        from changri.core import loopbridge
+        from changri.features.season import admin as season_admin
+        self.login()
+        fut = concurrent.futures.Future()
+
+        def slow(coro, timeout=25):
+            coro.close()
+            raise loopbridge.StillRunning(future=fut)
+        old = loopbridge.run
+        loopbridge.run = slow
+        try:
+            r = self.c.post("/season/end", data={"_csrf": token(self.c, "/season")}, follow_redirects=True)
+            self.assertIn("季末报告还在往玩家那里发", r.get_data(as_text=True))
+            r = self.c.post("/season/end", data={"_csrf": token(self.c, "/season")}, follow_redirects=True)    # 还在发：不再结束一次
+            self.assertIn("季末报告还在往玩家那里发", r.get_data(as_text=True))
+            fut.set_result((True, "季度「甲季」已结束（测试）"))
+            self.assertIn("已结束（测试）", self.c.get("/season").get_data(as_text=True))
+            self.assertNotIn("已结束（测试）", self.c.get("/season").get_data(as_text=True))   # 只显示一次
+        finally:
+            loopbridge.run = old
+            season_admin._ending.clear()
+
 
 if __name__ == "__main__":
     unittest.main()
