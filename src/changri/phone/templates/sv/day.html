@@ -1,0 +1,47 @@
+{% extends "sv/base.html" %}
+{% block title %}{{ name }} · {{ label }}{% endblock %}
+{% block head %}
+<style>
+.filter-bar{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+.ftab{background:var(--surface);border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:5px 14px;cursor:pointer;font-size:13px;font-family:inherit}
+.ftab:hover{border-color:var(--accent);color:var(--text)}
+.ftab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.ftab small{font-size:11px;opacity:.75;margin-left:3px}
+#q{width:100%;max-width:380px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:7px 14px;font-size:13px;margin-bottom:12px}
+.sec{margin-top:32px;padding-top:24px;border-top:1px solid var(--border)}
+.sec-h{font-size:14px;font-weight:700;color:var(--muted);letter-spacing:1px;margin-bottom:16px}
+#none{display:none;color:var(--muted);text-align:center;padding:40px 0}
+</style>
+{% endblock %}
+{% block body %}
+<div class="page">
+  <div class="back"><a href="{{ root }}">← 返回主页</a></div>
+  <div class="page-title">{{ label }} · 全部场次</div>
+  {% if rooms %}
+  <input id="q" type="search" placeholder="搜索地点或参与者名字…" autocomplete="off">
+  <div class="filter-bar">
+    <button class="ftab active" type="button" data-k="">全部<small>{{ rooms|length }}</small></button>
+    {% for k, n in kinds %}<button class="ftab" type="button" data-k="{{ k }}">{{ k }}<small>{{ n }}</small></button>{% endfor %}
+  </div>
+  {% with list=rooms, show_day=False %}{% include "sv/_rooms.html" %}{% endwith %}
+  <div id="none">没有符合的场次。</div>
+  {% else %}
+  <div class="empty">{{ label }} 没有结束了的场次。</div>
+  {% endif %}
+  {% if evs %}
+  <div class="sec"><div class="sec-h">{{ label }} 互动记录</div>
+    {% for e in evs %}{% with show_day=False %}{% include "sv/_event.html" %}{% endwith %}{% endfor %}
+  </div>
+  {% endif %}
+</div>
+<script>
+(function(){
+  var k="",q=document.getElementById("q");if(!q)return;
+  function apply(){var s=q.value.trim().toLowerCase(),n=0;
+    document.querySelectorAll(".room-card").forEach(function(c){var ok=(!k||c.dataset.kind===k)&&(!s||c.dataset.search.toLowerCase().indexOf(s)>=0);c.style.display=ok?"":"none";if(ok)n++});
+    document.getElementById("none").style.display=n?"none":"block"}
+  q.addEventListener("input",apply);
+  document.querySelectorAll(".ftab").forEach(function(b){b.addEventListener("click",function(){k=b.dataset.k;document.querySelectorAll(".ftab").forEach(function(x){x.classList.toggle("active",x===b)});apply()})});
+})();
+</script>
+{% endblock %}

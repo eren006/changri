@@ -1,0 +1,18 @@
+{# 场次卡片列表：day.html 和 role.html 共用 #}
+{% for s in list %}
+<a href="{{ root }}/room/{{ s.id }}" class="room-card" data-kind="{{ s.kind }}" data-search="{{ s.place }} {{ s.who|join(' ') }}" style="display:block;color:inherit">
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">
+      <span class="card-title">{{ s.place or s.kind }}</span>
+      <span class="tag tag-{{ s.tag }}">{{ s.kind }}</span>
+      <span style="color:var(--muted);font-size:12px">R{{ s.id }}{% if show_day %} · {{ s.day_label }}{% endif %}</span>
+    </div>
+    <div class="card-meta" style="margin-bottom:10px">
+      {% if s.story or s.time %}<span>🕐 {{ s.story or s.time }}</span>{% endif %}
+      <span>📅 {{ fmt(s.ts) }}</span>
+      <span>💬 {{ s.rp_n }} 条 · {{ s.rp_chars }} 字</span>
+    </div>
+    <div>{% for p in s.who %}<span class="pill">{{ p }}</span>{% endfor %}</div>
+  </div>
+</a>
+{% endfor %}

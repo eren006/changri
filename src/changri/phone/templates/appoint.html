@@ -52,7 +52,7 @@
     </form>
     {% endif %}
 
-    {% if chat_on %}<div class="disc-label">申请加入别人的约会</div>
+    {% if chat_on and join_on %}<div class="disc-label">申请加入别人的约会</div>
     <form method="post" action="{{ url_for('appoint_join') }}" style="padding:12px 20px">
       <input type="hidden" name="_csrf" value="{{ csrf() }}">
       <label for="jTo">想加入谁的约会</label>

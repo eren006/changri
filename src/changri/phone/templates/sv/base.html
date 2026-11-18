@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>{% block title %}{{ name }} · 复盘{% endblock %}</title>
+{# 复盘网页：样式照 RP 端（rp_archive）的公开视图 public_base.html，主题切换也一样 #}
+<style>
+:root{--bg:#0f0f13;--surface:#1a1a22;--surface2:#22222e;--border:#2e2e3e;--accent:#8b7cf6;--accent2:#c084fc;--text:#e2e2ec;--muted:#8e8eb6;--red:#f87171;--green:#86efac;--gold:#fcd34d}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:"PingFang SC","Microsoft YaHei",sans-serif;font-size:14px;line-height:1.7;min-height:100vh}
+a{color:var(--accent);text-decoration:none}
+a:hover{color:var(--accent2)}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 20px;display:flex;align-items:center;gap:12px;height:52px;position:sticky;top:0;z-index:100}
+.topbar .logo{font-size:15px;font-weight:600;color:var(--accent2);white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.topbar .show-name{font-size:13px;color:var(--muted);white-space:nowrap}
+.topbar .nav{display:flex;gap:4px;flex-shrink:0;margin-left:auto}
+.topbar .nav a{color:var(--muted);font-size:13px;padding:4px 8px;border-radius:6px;white-space:nowrap}
+.topbar .nav a:hover,.topbar .nav a.on{color:var(--text);background:var(--surface2)}
+.readonly-badge{font-size:11px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:2px 10px;white-space:nowrap}
+.page{max-width:1100px;margin:0 auto;padding:28px 20px 90px}
+@media(max-width:600px){.page{padding:16px 14px 90px}.topbar{padding:0 14px;gap:8px}.topbar .show-name,.readonly-badge{display:none}input{font-size:16px!important}}
+.page-title{font-size:20px;font-weight:600;color:var(--accent2);margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+.back{margin-bottom:14px}.back a{color:var(--muted);font-size:13px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:14px;transition:border-color .2s}
+.card:hover{border-color:var(--accent)}
+.card-title{font-size:15px;font-weight:600}
+.card-meta{color:var(--muted);font-size:12px;display:flex;gap:14px;flex-wrap:wrap}
+.tag{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600}
+.tag-private{background:#2d1f4e;color:#c084fc}.tag-call{background:#1a2d3a;color:#60c8ff}.tag-official{background:#1f2d1a;color:#86efac}
+.pill{display:inline-block;background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:2px 10px;font-size:12px;color:var(--muted);margin:2px}
+.empty{color:var(--muted);text-align:center;padding:48px 0;font-size:14px}
+.ev{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:10px}
+.ev-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ev-b{color:var(--text);font-size:13px;line-height:1.8;white-space:pre-wrap;word-break:break-word;margin-top:8px}
+.ev-t{margin-left:auto;font-size:11px;color:var(--muted)}
+.ev .frm{color:var(--accent);font-weight:700}.ev .to{color:var(--accent2);font-weight:700}.ev .arr{color:var(--muted)}
+.ek{padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700}
+.ek-lovemail{background:#2d1f4e;color:#c084fc}.ek-sms{background:#1a2830;color:#60c8ff}.ek-gift{background:#2a2000;color:#fcd34d}
+[data-theme=spring]{--bg:#0f0a10;--surface:#1a1020;--surface2:#22152a;--border:#3e2040;--accent:#f472b6;--accent2:#e879f9;--text:#fce7f3;--muted:#a07898}
+[data-theme=summer]{--bg:#080f10;--surface:#0d1a1c;--surface2:#122225;--border:#1a3a40;--accent:#06b6d4;--accent2:#22d3ee;--text:#e0f7fa;--muted:#507880}
+[data-theme=autumn]{--bg:#100a04;--surface:#1c1008;--surface2:#261508;--border:#4a2a08;--accent:#f59e0b;--accent2:#f97316;--text:#fef3c7;--muted:#907050}
+[data-theme=winter]{--bg:#080b0f;--surface:#0d1520;--surface2:#111e2c;--border:#1c3048;--accent:#7dd3fc;--accent2:#93c5fd;--text:#e0eeff;--muted:#4a7090}
+[data-theme=monet]{--bg:#0a0c10;--surface:#12181f;--surface2:#19222e;--border:#283848;--accent:#a8d8ea;--accent2:#d4b5d0;--text:#e5eef5;--muted:#608098;--red:#fca5a5}
+[data-theme=spring-day]{--bg:#fef2f8;--surface:#fce7f4;--surface2:#f9d0e8;--border:#f0a8d0;--accent:#db2777;--accent2:#be185d;--text:#1f0610;--muted:#9d5a7a;--red:#dc2626;--green:#15803d;--gold:#b45309}
+[data-theme=summer-day]{--bg:#f0faff;--surface:#e0f5ff;--surface2:#c8ecfc;--border:#7dd3f0;--accent:#0284c7;--accent2:#0ea5e9;--text:#082030;--muted:#3e7a94;--red:#dc2626;--green:#15803d;--gold:#b45309}
+[data-theme=autumn-day]{--bg:#fffbf0;--surface:#fef6e4;--surface2:#feebc8;--border:#fbbf60;--accent:#b45309;--accent2:#c2410c;--text:#1c0d00;--muted:#92632e;--red:#dc2626;--green:#15803d;--gold:#b45309}
+[data-theme=monet-day]{--bg:#f5f7fa;--surface:#eaf1f8;--surface2:#d8e8f5;--border:#a8c8e0;--accent:#4a8fa8;--accent2:#8a6aaa;--text:#18283a;--muted:#5c7d90;--red:#c05050;--green:#2d7a50;--gold:#9a7020}
+:is([data-theme$=-day]) .tag-private,:is([data-theme$=-day]) .ek-lovemail{background:#f3e8ff;color:#7c3aed}
+:is([data-theme$=-day]) .tag-call,:is([data-theme$=-day]) .ek-sms{background:#e0f2fe;color:#0369a1}
+:is([data-theme$=-day]) .tag-official{background:#dcfce7;color:#15803d}
+:is([data-theme$=-day]) .ek-gift{background:#fef3c7;color:#92400e}
+#tp{position:fixed;bottom:20px;right:20px;z-index:9999}
+#tp-btn{background:var(--surface);border:1px solid var(--border);border-radius:50%;width:40px;height:40px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.5)}
+#tp-btn:hover{border-color:var(--accent)}
+#tp-panel{display:none;position:absolute;bottom:48px;right:0;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px;min-width:150px;box-shadow:0 4px 20px rgba(0,0,0,.6)}
+#tp-panel.open{display:block}
+.tp-item{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:6px;cursor:pointer;font-size:13px;color:var(--text)}
+.tp-item:hover{background:var(--surface2)}.tp-item.tp-active{color:var(--accent)}
+.tp-dot{width:14px;height:14px;border-radius:50%;flex-shrink:0}
+.tp-sep{font-size:11px;color:var(--muted);text-align:center;padding:5px 0 3px;margin-top:4px;border-top:1px solid var(--border)}
+</style>
+<script>(function(){try{var t=localStorage.getItem('sv_theme');if(t&&t!=='default')document.documentElement.setAttribute('data-theme',t)}catch(e){}})()</script>
+{% block head %}{% endblock %}
+</head>
+<body>
+<div class="topbar">
+  <span class="logo">📖 {{ name }}</span>
+  <span class="show-name">复盘</span>
+  <nav class="nav">
+    <a href="{{ root }}"{% if nav == 'rooms' %} class="on"{% endif %}>场次</a>
+    <a href="{{ root }}/events"{% if nav == 'events' %} class="on"{% endif %}>互动</a>
+  </nav>
+  <span class="readonly-badge">只读</span>
+</div>
+{% block body %}{% endblock %}
+<div id="tp"><button id="tp-btn" type="button" aria-label="切换主题" onclick="document.getElementById('tp-panel').classList.toggle('open')">🎨</button><div id="tp-panel">
+{% for t, label, color in [('default','默认','#8b7cf6'),('spring','春 · 樱','#f472b6'),('summer','夏 · 海','#06b6d4'),('autumn','秋 · 枫','#f59e0b'),('winter','冬 · 冰','#7dd3fc'),('monet','莫奈','#a8d8ea'),('-','',''),('spring-day','春 · 樱','#db2777'),('summer-day','夏 · 海','#0284c7'),('autumn-day','秋 · 枫','#b45309'),('monet-day','莫奈','#4a8fa8')] %}
+{% if t == '-' %}<div class="tp-sep">日间 ☀</div>{% else %}<div class="tp-item" data-t="{{ t }}"><span class="tp-dot" style="background:{{ color }}"></span>{{ label }}</div>{% endif %}
+{% endfor %}
+</div></div>
+<script>
+(function(){
+  var items=document.querySelectorAll('.tp-item');
+  function mark(t){items.forEach(function(el){el.classList.toggle('tp-active',el.dataset.t===t)})}
+  function cur(){try{return localStorage.getItem('sv_theme')||'default'}catch(e){return 'default'}}
+  items.forEach(function(el){el.addEventListener('click',function(){var t=el.dataset.t;
+    if(t==='default')document.documentElement.removeAttribute('data-theme');else document.documentElement.setAttribute('data-theme',t);
+    try{localStorage.setItem('sv_theme',t)}catch(e){}mark(t);document.getElementById('tp-panel').classList.remove('open')})});
+  mark(cur());
+  document.addEventListener('click',function(e){if(!document.getElementById('tp').contains(e.target))document.getElementById('tp-panel').classList.remove('open')});
+})();
+</script>
+</body>
+</html>

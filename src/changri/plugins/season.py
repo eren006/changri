@@ -95,8 +95,42 @@ end_cmd = _cmd("结束季度")
 async def _(event: GroupMessageCreateEvent):
     if not _is_admin(event):
         await end_cmd.finish(NO)
-    ok, msg = await season.end_and_report(make_send(), make_send_image())
+    ok, msg = await season.end_and_report(make_send(), make_send_image())      # 复盘网页的链接在里面自动发到后台群
     await end_cmd.finish(msg if ok else "❌ " + msg)
+
+
+async def _send_season_view(event, publish: bool = False, new_link: bool = False) -> str:
+    """复盘网页的链接只发后台群（作者定的：不发公告群；没设后台群就不发，在这里直接回）。返回给发指令的人看的一句话。"""
+    from changri.core import announce, seasonview
+    last = seasonview.latest_ended()
+    if not last:
+        return "📖 还没有结束了的季度：复盘网页在「结束季度」以后才有。"
+    if publish or new_link:
+        seasonview.publish(last["id"], new_link=new_link)
+    text = seasonview.message(last["id"])
+    staff = announce.get_backstage()
+    here = (current_bot.get().self_id, event.group_openid)
+    if not seasonview.url(last["id"]) or not staff or staff == here:
+        return text + ("" if staff else "\n（还没设后台群，链接只回在这里。）")
+    await make_send()(staff[0], staff[1], text)
+    return "📖 复盘网页的链接已发到后台群。"
+
+
+sv_cmd = _cmd("复盘网页")
+
+
+@sv_cmd.handle()
+async def _(event: GroupMessageCreateEvent, args=CommandArg()):
+    from changri.core import seasonview
+    if not _is_admin(event):
+        await sv_cmd.finish(NO)
+    arg = args.extract_plain_text().strip()
+    last = seasonview.latest_ended()
+    if arg == "关闭":
+        if last:
+            seasonview.unpublish(last["id"])
+        await sv_cmd.finish("✅ 复盘网页已关闭，原来的链接打不开了。再发「复盘网页」重新打开（还是原来的链接）。")
+    await sv_cmd.finish(await _send_season_view(event, publish=True, new_link=(arg == "换链接")))
 
 
 wipe_cmd = _cmd("收尾")
@@ -112,7 +146,7 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
         pv = "、".join(f"{k}{v}" for k, v in season.wipe_preview().items())
         await wipe_cmd.finish(f"⚠️ 收尾会清空：{pv}。\n管理员、设置、季度记录会保留。确认请发「收尾 确认」。")
     season.wipe()
-    await wipe_cmd.finish("✅ 已收尾，本季的角色和互动记录已清空。")
+    await wipe_cmd.finish("✅ 已收尾，本季的角色和互动记录已清空。\n戏录已经存进往季档案：复盘网页的链接照样能打开，后台「季度与出场」的往季里也能看、能下载 TXT。")
 
 
 status_cmd = _cmd("季度状态")
@@ -186,6 +220,7 @@ npc_set = _cmd("设为NPC", {"设为npc"})
 npc_unset = _cmd("取消NPC", {"取消npc"})
 npc_new = _cmd("创建NPC", {"创建npc"})
 npc_list = _cmd("NPC列表", {"npc列表", "查看NPC", "查看npc"})
+npc_del = _cmd("删除NPC", {"删除npc"})
 
 
 async def _npc_op(matcher, event, args, usage, fn):
@@ -211,6 +246,17 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
 @npc_new.handle()
 async def _(event: GroupMessageCreateEvent, args=CommandArg()):
     await _npc_op(npc_new, event, args, "用法：创建NPC 名字（回执里有认群码，在给 NPC 用的群里发「认群 码」）", npc.create)
+
+
+@npc_del.handle()
+async def _(event: GroupMessageCreateEvent, args=CommandArg()):
+    if not _is_admin(event):
+        await npc_del.finish(NO)
+    parts = args.extract_plain_text().split()
+    if not parts:
+        await npc_del.finish("用法：删除NPC 名字（先告诉你会删掉什么，再发「删除NPC 名字 确认」才真删；删完可以重新创建NPC）")
+    ok, msg = npc.delete(parts[0], len(parts) > 1 and parts[1] == "确认")
+    await npc_del.finish(("✅ " if ok else "") + msg)
 
 
 @npc_list.handle()

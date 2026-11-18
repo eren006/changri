@@ -39,7 +39,7 @@ def register(app, ctx):
             others = c.execute("SELECT id, name FROM roles WHERE id!=? ORDER BY name", (role["id"],)).fetchall()
         return page("appoint.html", role=role, mode="discover", others=others, rooms=[_room_row(r) for r in rooms_core.my_open(role["id"])],
                     reqs=rooms_core.pending_requests(role["id"]), today=season.current_day(),
-                    chat_on=extensions.is_enabled("chatroom"), gc_on=extensions.is_enabled("groupchat"))
+                    chat_on=extensions.is_enabled("chatroom"), gc_on=extensions.is_enabled("groupchat"), join_on=rooms_core.joinreq_enabled())
 
     @app.post("/p/me/appoint/new")
     def appoint_new():
@@ -71,6 +71,8 @@ def register(app, ctx):
     @app.post("/p/me/appoint/join")
     def appoint_join():
         _chat_or_404()
+        if not rooms_core.joinreq_enabled():
+            abort(404)
         role, bad = need_login()
         if bad:
             return bad
@@ -81,7 +83,7 @@ def register(app, ctx):
             return redirect(url_for("appoint_page"))
         cands = rooms_core.find_joinable(target["id"], request.form.get("start", "").strip())
         if not cands:
-            flash(f"「{target['name']}」现在没有可以加入的约会（电话和微信不能加入）")
+            flash(f"「{target['name']}」现在没有可以加入的约会（能加入的：{'、'.join(rooms_core.joinable_kinds()) or '无'}）")
         elif len(cands) > 1:
             flash(f"「{target['name']}」有好几场，请填上开始时间（比如 14:00）：" + "；".join(f"{r['start_hm']} {r['kind']}" for r in cands))
         else:

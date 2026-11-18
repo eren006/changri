@@ -88,8 +88,47 @@ def register(app, login_required):
         arc = seasonarchive.get(season_id)
         players = sorted(arc["summary"].get("players", []), key=lambda p: (p["npc"], -p["chars"], p["name"])) if arc else []
         poster_idx = {p["name"]: i for i, p in enumerate([p for p in (arc["summary"].get("players", []) if arc else []) if p.get("report")])}
+        from changri.core import seasonview
         return render_template("season_view.html", s=s, arc=arc, players=players, poster_idx=poster_idx, counts=arc["summary"].get("counts", {}) if arc else {},
-                               rooms=arc["rooms"] if arc else [])
+                               rooms=arc["rooms"] if arc else [], sv_on=seasonview.is_published(season_id), sv_url=seasonview.url(season_id),
+                               sv_why=seasonview.why_no_url())
+
+    @app.post("/season/<int:season_id>/view")
+    @login_required
+    def season_view_toggle(season_id):
+        """复盘网页：打开 / 关闭 / 换链接 / 发到后台群。"""
+        from changri.core import announce, seasonview
+        _past_or_404(season_id)
+        act = request.form.get("act", "")
+        if act == "off":
+            seasonview.unpublish(season_id)
+            flash("复盘网页已关闭，原来的链接打不开了。")
+        elif act in ("on", "new"):
+            seasonview.publish(season_id, new_link=(act == "new"))
+            flash("已换新链接，旧链接失效。" if act == "new" else "复盘网页已打开。")
+        elif act == "send":
+            staff = announce.get_backstage()
+            if not staff:
+                flash("还没设后台群：在后台群里发「设为后台群」。")
+            elif not seasonview.url(season_id):
+                flash(seasonview.why_no_url() or "先打开复盘网页。")
+            else:
+                from changri.core.qqsend import make_send
+                loopbridge.run(make_send()(staff[0], staff[1], seasonview.message(season_id)), timeout=60)
+                flash("链接已发到后台群。")
+        return redirect(url_for("season_view", season_id=season_id))
+
+    @app.route("/season/<int:season_id>/txt.zip")
+    @login_required
+    def season_txt_zip(season_id):
+        """整季每场一个 TXT，打包下载。"""
+        from urllib.parse import quote
+        from changri.core import seasonview
+        s = _past_or_404(season_id)
+        if not seasonarchive.get(season_id):
+            abort(404)
+        return Response(seasonview.all_text_zip(season_id), mimetype="application/zip",
+                        headers={"Content-Disposition": f"attachment; filename=S{season_id}-txt.zip; filename*=UTF-8''{quote(s['name'] + '_戏录.zip')}"})
 
     @app.route("/season/<int:season_id>/room/<int:rid>")
     @login_required

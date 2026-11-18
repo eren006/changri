@@ -550,7 +550,7 @@ async def _finish_room(room_id: int, status: str, why: str, timeout: bool = Fals
     elif gi:                                                             # 官方机器人的群：查不了人，等管理员确认退光了再放回
         head = "结戏限时已到~" if timeout else f"{room['kind']}{verb}{why}，"
         await _to_group(gi[0], gi[1], head + "请退群！管理员确认人都退了，这个群才会给下一场用。")
-        staff = announce.get_backstage()                                 # 房间结束不往公告群发任何东西（Erin 要求）；清场提醒只发后台群，没设就不发
+        staff = announce.get_backstage()                                 # 房间结束不往公告群发任何东西（作者要求）；清场提醒只发后台群，没设就不发
         if staff:
             await _to_group(staff[0], staff[1], f"🧹 {gi[2]}（R{room_id} 用过）在等人退群：到群里看一眼，人都退光了，"
                                                 f"在那个群里发「放回备用群」（或者在这里发「放回备用群 群号」），也可以到后台「纯官方模式」点「人已退光，放回池」，它才会分给下一场。")
@@ -616,11 +616,18 @@ async def _sweep_cleaning() -> None:
 
 
 review_cmd = _cmd("复盘")
+REVIEW_LIST = 15
+
+
+def _review_line(r, my_id: int) -> str:
+    """复盘名单的一行：R12 约会 · D2 14:00-15:00 · 咖啡厅 · 和 小满、阿川"""
+    others = "、".join(m["name"] for m in rooms.members(r["id"]) if m["role_id"] != my_id) or "自己"
+    return f"R{r['id']} {r['kind']} · D{r['day']} {r['start_hm']}-{r['end_hm']}" + (f" · {r['place']}" if r["place"] else "") + f" · 和 {others}"
 
 
 @review_cmd.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
-    """发「复盘 R12」：把那一场房间的戏文画成图发出来（只有参与者和管理员能看）。不带编号就看我最近一场。"""
+    """发「复盘 R12」：把那一场房间的戏文画成图发出来（只有参与者和管理员能看）。不带编号先列出我结束了的场次（房间号、和谁、几点、在哪），点按钮看。"""
     from changri.core import roomlog
     from changri.core.qqsend import IMG
     me = _me(bot, event)
@@ -629,8 +636,13 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     rid = _room_arg(args.extract_plain_text())
     room = rooms.get(rid) if rid else None
     if not room and not rid and me:
-        mine = [r for r in rooms.timeline(me["id"]) if r["status"] == "ended"]
-        room = mine[-1] if mine else None
+        mine = [r for r in rooms.timeline(me["id"]) if r["status"] == "ended"][-REVIEW_LIST:][::-1]     # 最近的在上面
+        if not mine:
+            await review_cmd.finish("你还没有结束了的场次。约会、电话结束以后才能复盘。")
+        lines = [_review_line(r, me["id"]) for r in mine]
+        await reply_buttons(review_cmd, "📖 你可以复盘的场次（最近的在上面）\n" + "\n".join(lines) + "\n\n发「复盘 房间号」看那一场，例：复盘 R" + str(mine[0]["id"]),
+                            [Btn(f"复盘 R{r['id']}", f"复盘 R{r['id']}") for r in mine[:6]], per_row=3)
+        await review_cmd.finish()
     if not room:
         await review_cmd.finish("用法：复盘 R12（房间号在邀请和回执里）。不带编号看你最近结束的一场。")
     if me and not any(m["role_id"] == me["id"] for m in rooms.members(room["id"])) and not _is_admin(bot, event):
@@ -738,8 +750,13 @@ join_yes = _cmd("同意加入")
 join_no = _cmd("拒绝加入")
 
 
+JOIN_OFF = "❌ 申请加入没有开放。"
+
+
 @join_cmd.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
+    if not rooms.joinreq_enabled():
+        await join_cmd.finish(JOIN_OFF)
     me = _me(bot, event)
     if not me:
         await join_cmd.finish(NEED_ROLE)
@@ -751,7 +768,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
         await join_cmd.finish(f"❌ 找不到角色：{p[0]}。")
     cands = rooms.find_joinable(target["id"], p[1] if len(p) > 1 else "")
     if not cands:
-        await join_cmd.finish(f"「{target['name']}」现在没有可以加入的约会（电话和微信不能加入）。")
+        await join_cmd.finish(f"「{target['name']}」现在没有可以加入的约会（能加入的：{'、'.join(rooms.joinable_kinds()) or '无'}）。")
     if len(cands) > 1:
         await join_cmd.finish(f"「{target['name']}」有好几场，请带上开始时间：\n" + "\n".join(f"· {_slot(r)} {r['kind']}" for r in cands))
     ok, why, qid = rooms.request_join(cands[0]["id"], me["id"])
@@ -764,6 +781,8 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
 
 @join_list.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent):
+    if not rooms.joinreq_enabled():
+        await join_list.finish(JOIN_OFF)
     me = _me(bot, event)
     if not me:
         await join_list.finish(NEED_ROLE)
@@ -777,6 +796,8 @@ async def _(bot: Bot, event: GroupMessageCreateEvent):
 
 
 async def _answer(matcher, bot, event, args, accept: bool):
+    if not rooms.joinreq_enabled():
+        await matcher.finish(JOIN_OFF)
     me = _me(bot, event)
     if not me:
         await matcher.finish(NEED_ROLE)

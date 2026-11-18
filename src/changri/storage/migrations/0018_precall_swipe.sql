@@ -1,4 +1,4 @@
--- 0018：前置电话换成老系统小手机的「滑卡」玩法（Erin 定的，替换原来的编号盲选）：
+-- 0018：前置电话换成老系统小手机的「滑卡」玩法（作者定的，替换原来的编号盲选）：
 -- 玩家在小手机填一份公开资料（照片 / 介绍 / 性别）→ 翻别人的资料卡、选人 → 配对成功在小手机里开一个电话聊天页。纯网页，不建 QQ 群。
 -- 原来的 precall_entries / precall_groups / precall_picks / precall_calls 留着不删（旧数据），新代码不再用。
 CREATE TABLE IF NOT EXISTS precall_profiles (

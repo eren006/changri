@@ -564,7 +564,11 @@ class PhoneExtras(Phone):
             s["csrf"] = "t2"
         other.post("/p", data={"code": phonecodes.code_for_role(c_["id"]), "_csrf": "t2"})
         self.assertEqual(other.get(f"/p/me/room/{rid}").status_code, 404)
-        # 申请加入 → 同意
+        # 申请加入：默认关，表单不显示、提交 404；打开后 → 同意
+        self.assertNotIn("申请加入别人的约会", self.c.get("/p/me/appoint").get_data(True))
+        self.assertEqual(other.post("/p/me/appoint/join", data={"to": str(self.a["id"]), "_csrf": "t2"}).status_code, 404)
+        set_config("ext:joinreq", "1")
+        self.assertIn("申请加入别人的约会", self.c.get("/p/me/appoint").get_data(True))
         other.post("/p/me/appoint/join", data={"to": str(self.a["id"]), "_csrf": "t2"})
         self.assertIn("join", calls)
         q = rooms.pending_requests(self.a["id"])[0]

@@ -1,0 +1,13 @@
+{% extends "sv/base.html" %}
+{% block title %}{{ name }} · {{ who }}{% endblock %}
+{% block body %}
+<div class="page">
+  <div class="back"><a href="{{ root }}">← 返回主页</a></div>
+  <div class="page-title">{{ who }} · 参与的场次 <span style="color:var(--muted);font-size:13px;font-weight:400">{{ rooms|length }} 场 · {{ rooms|sum(attribute='rp_chars') }} 字</span></div>
+  {% if rooms %}
+  {% with list=rooms, show_day=True %}{% include "sv/_rooms.html" %}{% endwith %}
+  {% else %}
+  <div class="empty">{{ who }} 还没有结束了的场次。</div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -14,18 +14,23 @@ from changri.core.qqsend import make_send, reply_buttons
 from changri.plugins.play import NEED_ROLE, _announce_in_room, _cmd, _group_line, _invite, _me, _push, _room_arg, _slot
 
 async def _broadcast(w) -> None:
-    """开了「挂心愿时同步发到公告群」才发；只显示性别符号 + 昵称，不显示真名。"""
-    if get_config("wish_public_send", "0") != "1":
+    """挂出的心愿：默认发到戏群，让大家都知道（「挂心愿时发到戏群」，没设戏群就不发）；开了「同步发到公告群」也发公告群。
+    都只显示性别符号 + 昵称，不显示真名。同一个群只发一次。"""
+    from changri.core import entrance
+    targets = []
+    if get_config("wish_stage_send", "1") == "1" and entrance.get_stage():
+        targets.append(entrance.get_stage())
+    if get_config("wish_public_send", "0") == "1" and announce.get_announce() and announce.get_announce() not in targets:
+        targets.append(announce.get_announce())
+    if not targets:
         return
-    ann = announce.get_announce()
-    if not ann:
-        return
-    try:
-        text = wishes.broadcast_text(w)
-        await make_send()(ann[0], ann[1], text)
-        publicfeed.record("wish", text)
-    except Exception as e:  # noqa: BLE001
-        logger.warning("心愿公开播报失败：{}", e)
+    text = wishes.broadcast_text(w)
+    for bot_id, gid in targets:
+        try:
+            await make_send()(bot_id, gid, text)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("心愿播报失败：{}", e)
+    publicfeed.record("wish", text)
 
 
 USAGE = "用法：挂心愿 时间 地点 内容 [| 昵称]\n例：挂心愿 {t} 花园 一起散步 | 神秘人A\n（昵称最多 10 个字；对外只显示性别和昵称，不显示真名）"

@@ -55,6 +55,22 @@ class Extras(unittest.TestCase):
         ok, text = asyncio.run(sendmsg.send(me, self.r["甲"], "sms", "", "你好", "", fake_send))
         self.assertTrue(ok, text)
 
+    def test_npc_delete_then_recreate(self):
+        """删除NPC：只删 NPC，先问再删；删完同名可以重新创建，拿新码认群。"""
+        import re
+        npc.create("猫猫")
+        self.assertIn("不是 NPC", npc.delete("甲", True)[1])
+        self.assertIn("没有叫", npc.delete("狗狗", True)[1])
+        ok, msg = npc.delete("猫猫", False)
+        self.assertFalse(ok); self.assertIn("删除NPC 猫猫 确认", msg)
+        self.assertIsNotNone(roles.get_role_by_name("猫猫"))                 # 没确认不删
+        self.assertTrue(npc.delete("猫猫", True)[0])
+        self.assertIsNone(roles.get_role_by_name("猫猫"))
+        ok, msg = npc.create("猫猫")
+        self.assertTrue(ok)
+        self.assertTrue(roles.consume_bind_code(re.search(r"认群 (\d{6})", msg).group(1), "B", "GN2", "MNPC2")[0])
+        self.assertEqual(roles.find_role_for_sender("B", "GN2", "MNPC2")["name"], "猫猫")
+
     def test_npc_owner_qq_and_setup_steps(self):
         """后台建的 NPC：认群的人成为主人，之后能绑 QQ；只扮 NPC 的 QQ 不算房间群残留；开了 QQ 小号时先提示绑 QQ，绑好才发回执。"""
         import re

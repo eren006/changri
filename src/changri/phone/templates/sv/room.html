@@ -1,0 +1,49 @@
+{% extends "sv/base.html" %}
+{% block title %}{{ name }} · R{{ s.id }} {{ s.place or s.kind }}{% endblock %}
+{% block head %}
+<style>
+.sess-header{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:20px}
+.sess-header h2{font-size:18px;color:var(--accent2);margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.meta-row{display:flex;flex-wrap:wrap;gap:16px;color:var(--muted);font-size:13px;margin-bottom:10px}
+.meta-row b{color:var(--text)}
+.stat-row{display:flex;flex-wrap:wrap;gap:18px;padding-top:10px;border-top:1px solid var(--border)}
+.stat-item{font-size:12px;color:var(--muted)}.stat-item b{color:var(--text);font-size:14px}
+.dl{display:inline-block;margin-left:auto;font-size:13px;border:1px solid var(--border);border-radius:8px;padding:4px 12px;background:var(--surface2)}
+.rp-feed{display:flex;flex-direction:column;gap:12px;max-width:760px}
+.rp-block{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+.rp-role{font-size:12px;font-weight:700;color:var(--accent2);margin-bottom:6px;letter-spacing:.5px}
+.rp-content{color:var(--text);font-size:14px;line-height:1.85;white-space:pre-wrap;word-break:break-word}
+.rp-time{font-size:11px;color:var(--muted);margin-top:6px}
+</style>
+{% endblock %}
+{% block body %}
+<div class="page">
+  <div class="back"><a href="{{ root }}/day/{{ s.day_label|urlencode }}">← {{ s.day_label }}</a></div>
+  <div class="sess-header">
+    <h2>{{ s.place or s.kind }} <span class="tag tag-{{ s.tag }}">{{ s.kind }}</span><span style="color:var(--muted);font-size:13px;font-weight:400">R{{ s.id }}</span>
+      <a class="dl" href="{{ root }}/room/{{ s.id }}.txt" download>下载 TXT</a></h2>
+    <div class="meta-row">
+      {% if s.story or s.time %}<span>🕐 <b>{{ s.story or s.time }}</b></span>{% endif %}
+      <span>📅 <b>{{ s.day_label }}</b></span>
+      <span>🕰 开始 <b>{{ fmt(s.ts) }}</b></span>
+      <span>🏁 结束 <b>{{ fmt(s.ended_ts) }}</b></span>
+      {% if s.dur %}<span>⏱ <b>{{ s.dur }}</b></span>{% endif %}
+    </div>
+    <div style="margin-bottom:10px">{% for p in s.who %}<a class="pill" href="{{ root }}/role/{{ p|urlencode }}" style="color:var(--accent)">{{ p }}</a>{% endfor %}</div>
+    <div class="stat-row">
+      <div class="stat-item"><b>{{ s.rp_n }}</b><br>戏文</div>
+      <div class="stat-item"><b>{{ s.rp_chars }}</b><br>总字数</div>
+      {% for n, st in s.per.items() %}<div class="stat-item"><b>{{ st.replies }}</b> 条 · <b>{{ st.chars }}</b> 字<br><span style="color:var(--accent2)">{{ n }}</span></div>{% endfor %}
+    </div>
+  </div>
+  {% if s.rp %}
+  <div class="rp-feed">
+    {% for x in s.rp %}
+    <div class="rp-block"><div class="rp-role">{{ x.name }}</div><div class="rp-content">{{ x.text }}</div><div class="rp-time">{{ fmt(x.ts) }}</div></div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">这一场没有记到戏文。</div>
+  {% endif %}
+</div>
+{% endblock %}

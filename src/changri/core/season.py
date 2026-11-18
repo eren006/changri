@@ -382,7 +382,29 @@ async def end_and_report(send, send_image=None) -> tuple[bool, str]:
         if seasonreport.enabled():
             sent, bad = await seasonreport.send_all(send, send_image)
             msg += f"\n📖 季末报告：已发给 {sent} 位玩家" + (f"，{bad} 位没发出去（个人群连不上）" if bad else "") + "。"
+        msg += "\n" + await _season_view_to_staff(send)
     return ok, msg
+
+
+async def _season_view_to_staff(send) -> str:
+    """结束季度时自动打开复盘网页，把链接发到后台群（作者定的：不发公告群；没设后台群就不发）。返回给管理员看的一句。"""
+    from . import announce, seasonview
+    try:
+        last = seasonview.latest_ended()
+        if not last:
+            return ""
+        seasonview.publish(last["id"])
+        if not seasonview.url(last["id"]):
+            return "📖 复盘网页没生成：" + (seasonview.why_no_url() or "看后台「季度与出场 → 往季」。")
+        staff = announce.get_backstage()
+        if not staff:
+            return "📖 复盘网页已打开，但还没设后台群，链接没发出去：在后台「季度与出场 → 往季」里能看到。"
+        await send(staff[0], staff[1], seasonview.message(last["id"]))
+        return "📖 复盘网页的链接已发到后台群。"
+    except Exception:  # noqa: BLE001 发不出去不能拦住结束季度
+        import logging
+        logging.getLogger(__name__).exception("复盘网页链接没发出去")
+        return "📖 复盘网页的链接没发出去，可以在后台「季度与出场 → 往季」里点「发到后台群」。"
 
 
 def wipe_preview() -> dict[str, int]:

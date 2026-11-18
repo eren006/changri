@@ -26,6 +26,11 @@ def _stakeout() -> bool:
     return rooms.stakeout_enabled()
 
 
+def _joinreq() -> bool:
+    from . import rooms
+    return rooms.joinreq_enabled()
+
+
 def _lovemail() -> bool:
     from . import lovemail
     return _ext("lovemail")() and lovemail.enabled()
@@ -55,7 +60,7 @@ ENTRIES: list[tuple[str, Callable[[], bool], str]] = [
     ("点歌", _ext("song"), "点歌 歌名 [歌手] [给 某人] [寄语]\n例：点歌 晴天 周杰伦 给 张三 生日快乐\n\n"
      "也可以先把网易云 / QQ 音乐的歌分享到群里，回复那张卡片发：点歌 [给 某人] [寄语]"),
     ("踩点", _stakeout, "踩点 时间 地点（一个人的群，不带别人）\n例：踩点 1400-1500 大图书馆"),
-    ("申请加入", _always, "申请加入 对方名 [开始时间]\n例：申请加入 张三 14:00\n\n别人申请加入你的约会：发「加入请求」看，点按钮同意或拒绝。"),
+    ("申请加入", _joinreq, "申请加入 对方名 [开始时间]\n例：申请加入 张三 14:00\n\n别人申请加入你的约会：发「加入请求」看，点按钮同意或拒绝。"),
     ("撤回", _always, forms.TEMPLATES["撤回"]),
 ]
 

@@ -908,12 +908,16 @@ class PlayE2E(unittest.TestCase):
         self.assertEqual([ln["role_id"] for ln in ls], [jia, yi, yi, yi])
         self.assertEqual([(ln["is_rp"], ln["chars"]) for ln in ls], [(1, 4), (0, 0), (1, 7), (1, 2)])
         self.assertTrue(ls[0]["qq"].startswith(roomlog.OFFICIAL))
-        self.assertIn("甲：你来了啊", roomlog.review_text(rid))
+        self.assertIn("甲：你来了啊", roomlog.review_text(rid)); self.assertNotIn("甲：甲：", roomlog.review_text(rid))   # 名字只出现一次
         self.say("结束约会", group=grp)
         self.assertEqual(len(roomlog.lines(rid)), 4)                              # 「结束约会」不进复盘
         self.assertEqual({x["name"]: x["chars"] for x in roomlog.stats(rid) if x["rp"]}, {"甲": 4, "乙": 9})
         self.say("甲：结束后再说的", group=grp)                                   # 房间结束了：不记
         self.assertEqual(len(roomlog.lines(rid)), 4)
+        out = "\n".join(self.say("复盘"))                                        # 不带编号：先列名单（房间号、时间、地点、和谁）
+        self.assertIn(f"R{rid} 约会 · D", out); self.assertIn("咖啡厅 · 和 乙", out)
+        self.assertIn("<图>", "\n".join(self.say(f"复盘 R{rid}")))                # 带编号照旧发戏文长图
+        self.assertIn("还没有结束了的场次", self.say("复盘", member="M2", group="P2")[0])
 
     def test_backfill_from_personal_group_for_qq_only_room(self):
         """补录只由卡拉做：小号的房间群卡拉不在，参与者在自己的群里回复合并转发发「补录 R号」就能补。"""
@@ -933,6 +937,9 @@ class PlayE2E(unittest.TestCase):
     def test_join_flow(self):
         self.add_pool(1)
         self.say("约会 1400-1500 咖啡厅 乙")
+        self.assertIn("没有开放", self.say("申请加入 甲", member="M2", group="P2")[0])        # 默认关
+        self.assertIn("没有开放", self.say("加入请求")[0])
+        set_config("ext:joinreq", "1")
         self.assertIn("找不到角色", self.say("申请加入 路人", member="M2", group="P2")[0])
         self.assertIn("没有可以加入", self.say("申请加入 丙", member="M2", group="P2")[0])
         self.assertIn("你已经在这个房间", self.say("申请加入 甲", member="M1", group="P1")[0])
@@ -949,8 +956,25 @@ class PlayE2E(unittest.TestCase):
         self.assertEqual(len(rooms.members(rooms.timeline(roles.get_role_by_name("丙")["id"])[0]["id"])), 3)
         self.assertIn("没有这条", self.say(f"同意加入 {qid}")[0])
 
+    def test_join_settings_and_upgrade(self):
+        self.add_pool(1)
+        set_config("ext:joinreq", "1")
+        self.say("约会 1400-1500 咖啡厅 乙")
+        set_config("join_kinds", "官约、电话")                                               # 电话填了也不算；约会不在里面
+        self.assertEqual(rooms.joinable_kinds(), ("官约",))
+        self.assertIn("没有可以加入", self.say("申请加入 甲", member="M2", group="P2")[0])
+        set_config("join_kinds", "约会")
+        self.assertTrue(any("申请已发出" in o for o in self.say("申请加入 甲", member="M2", group="P2")))
+        set_config("ext:joinreq", "0")
+        self.assertEqual(rooms.pending_requests(roles.get_role_by_name("甲")["id"]), [])      # 关了以后「我的待回」不再提醒
+        self.assertNotIn("想加入", self.say("我的待回")[0])
+        with get_conn() as c:
+            c.execute("DELETE FROM config WHERE key='ext:joinreq'")
+        self.assertTrue(rooms.joinreq_enabled())                                             # 升级前有人申请过：保持开启
+
     def test_join_conflict_and_reject(self):
         self.add_pool(4)
+        set_config("ext:joinreq", "1")
         roles.create_role("丁", "B1", "P3", "M3")
         self.say("约会 1400-1500 咖啡厅 乙")
         self.say("约会 1430-1530 花园 丁", member="M2", group="P2")        # 丙 14:30-15:30 已有安排
@@ -1018,6 +1042,15 @@ class PlayE2E(unittest.TestCase):
         self.assertIn("你发布的心愿", self.say("撤心愿")[0])                                 # 不带编号：列出自己的
         self.assertIn("已撤回", self.say(f"撤心愿 {wishes.list_open()[0]['id']}")[0])
         self.assertIn("昵称最多 10 个字", self.say("挂心愿 1600-1700 图书馆 看书 | 一二三四五六七八九十一")[0])
+
+    def test_wish_goes_to_stage_group(self):
+        """挂出的心愿默认发到戏群（只显示昵称，不显示真名）；关掉「挂心愿时发到戏群」就不发。"""
+        set_config("stage_group", "B1|STAGE")
+        out = self.say("挂心愿 1400-1500 花园 一起散步 | 神秘人A")
+        st = [o for o in out if "[STAGE]" in o]
+        self.assertTrue(st and "神秘人A" in st[0] and "甲" not in st[0], out)
+        set_config("wish_stage_send", "0")
+        self.assertFalse(any("[STAGE]" in o for o in self.say("挂心愿 1600-1700 图书馆 陪我看书")))
 
     def test_wish_expire_and_cap(self):
         for t in ("0800-0900", "0900-1000", "1000-1100"):

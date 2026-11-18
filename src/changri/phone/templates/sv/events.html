@@ -1,0 +1,33 @@
+{% extends "sv/base.html" %}
+{% block title %}{{ name }} · 互动{% endblock %}
+{% block head %}
+<style>
+.filter-bar{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+.ftab{background:var(--surface);border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:5px 14px;cursor:pointer;font-size:13px;font-family:inherit}
+.ftab:hover{border-color:var(--accent);color:var(--text)}
+.ftab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.ftab small{font-size:11px;opacity:.75;margin-left:3px}
+.evs{max-width:760px}
+</style>
+{% endblock %}
+{% block body %}
+<div class="page">
+  <div class="page-title">{{ name }} · 全部互动</div>
+  {% if evs %}
+  <div class="filter-bar">
+    <button class="ftab active" type="button" data-k="">全部<small>{{ evs|length }}</small></button>
+    {% if counts.lovemail %}<button class="ftab" type="button" data-k="lovemail">💌 心动信<small>{{ counts.lovemail }}</small></button>{% endif %}
+    {% if counts.sms %}<button class="ftab" type="button" data-k="sms">📱 短信<small>{{ counts.sms }}</small></button>{% endif %}
+    {% if counts.gift %}<button class="ftab" type="button" data-k="gift">🎁 礼物<small>{{ counts.gift }}</small></button>{% endif %}
+  </div>
+  <div class="evs">{% for e in evs %}{% with show_day=True %}{% include "sv/_event.html" %}{% endwith %}{% endfor %}</div>
+  {% else %}
+  <div class="empty">没有可以公开的互动记录。</div>
+  {% endif %}
+</div>
+<script>
+document.querySelectorAll(".ftab").forEach(function(b){b.addEventListener("click",function(){var k=b.dataset.k;
+  document.querySelectorAll(".ftab").forEach(function(x){x.classList.toggle("active",x===b)});
+  document.querySelectorAll(".ev").forEach(function(e){e.style.display=!k||e.dataset.type===k?"":"none"})})});
+</script>
+{% endblock %}

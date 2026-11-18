@@ -28,6 +28,17 @@
 </section>
 
 <section>
+  <div class="sec-head keep"><h2>复盘网页<span class="n">{{ '已打开' if sv_on else '没打开' }}</span></h2>
+    <span class="btns"><a class="btn sm" href="{{ url_for('season_txt_zip', season_id=s.id) }}">整季戏录 TXT 打包下载</a></span></div>
+  <p class="note">整季的总结页，跟 RP 端的复盘页一样：按天看场次和戏文，每场能下载 TXT，还有短信、礼物、心动信（放哪些在「功能与设置 → 复盘网页」里改）。只读、不用登录，收尾以后照样能看。结束季度时会自动打开，并把链接发到后台群；要给大家看就自己转发。</p>
+  {% if sv_url %}<p><a href="{{ sv_url }}" target="_blank" rel="noopener">{{ sv_url }}</a></p>{% elif sv_on and sv_why %}<div class="callout">{{ sv_why }}</div>{% endif %}
+  <form method="post" action="{{ url_for('season_view_toggle', season_id=s.id) }}" class="actions">{{ csrf() }}
+    {% if sv_on %}<button class="btn sm" name="act" value="send">发到后台群</button><button class="btn sm ghost" name="act" value="new" onclick="return confirm('换新链接？旧链接会打不开。')">换链接</button><button class="btn sm ghost" name="act" value="off">关闭</button>
+    {% else %}<button class="btn sm" name="act" value="on">打开复盘网页</button>{% endif %}
+  </form>
+</section>
+
+<section>
   <div class="sec-head keep"><h2>每个人的数据<span class="n">{{ players|length }} 人</span></h2>
     {% if poster_idx %}<span class="btns"><a class="btn sm" href="{{ url_for('season_posters_archived_zip', season_id=s.id) }}">季末海报全部打包下载</a></span>{% endif %}</div>
   <div class="tblwrap"><table class="pl">

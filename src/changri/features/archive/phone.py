@@ -32,7 +32,7 @@ def register(app, ctx):
         chat = request.args.get("chat") == "1"
         allines = roomlog.lines(rid)
         me_id = role["id"] if role else None
-        shown = [{"name": x["name"], "text": x["text"], "rp": bool(x["is_rp"]), "me": x["role_id"] == me_id,
+        shown = [{"name": x["name"], "text": roomlog.body_of(x["name"], x["text"]), "rp": bool(x["is_rp"]), "me": x["role_id"] == me_id,
                   "time": time.strftime("%H:%M", time.localtime(x["ts"]))} for x in allines if chat or x["is_rp"]]
         view = "archive_view" if role else "admin_room_view"
         return page("archive_view.html", role=role, mode="discover", room={"id": rid, "kind": r["kind"], "slot": slot_text(r), "status": r["status"],

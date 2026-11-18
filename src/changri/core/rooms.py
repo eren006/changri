@@ -19,6 +19,22 @@ def stakeout_enabled() -> bool:
     return extensions.is_enabled("stakeout")
 
 
+def joinreq_enabled() -> bool:
+    """申请加入开关：「扩展」页的「申请加入」卡片（默认关）。"""
+    from . import extensions
+    return extensions.is_enabled("joinreq")
+
+
+JOINABLE_DEFAULT = "约会,官约,心愿"
+
+
+def joinable_kinds() -> tuple[str, ...]:
+    """「申请加入」设置里填的、可以被申请加入的房间类型（电话、微信、踩点这种填了也不算）。"""
+    raw = get_config("join_kinds", JOINABLE_DEFAULT)
+    ks = tuple(k for k in re.split(r"[,，、\s]+", raw) if k in KINDS and k not in SOLO_KINDS and KINDS[k])
+    return ks
+
+
 def parse_hm(text: str, day: int | None = None) -> tuple[str, str] | None:
     """「1400-1500」「14:00-15:00」→ ('14:00', '15:00')；结束必须晚于开始。"""
     from . import storycal                  # 故事历打开（且这个 D 填了日期）时，约时间只认「3月5日」这种某一天，不认钟点
@@ -393,10 +409,13 @@ def vote_change(room_id: int, role_id: int, agree: bool) -> tuple[str, dict | No
 # ---------- 申请加入别人正在进行的约会 ----------
 
 def find_joinable(target_id: int, start_hm: str = "") -> list:
-    """对方现在参与的、可以申请加入的房间（约会/官约/心愿，不含电话和微信）。"""
+    """对方现在参与的、可以申请加入的房间（类型按「申请加入」设置，默认约会/官约/心愿，不含电话和微信）。"""
+    kinds = joinable_kinds()
+    if not kinds:
+        return []
     with get_conn() as c:
         rs = c.execute("SELECT r.* FROM rooms r JOIN room_members m ON m.room_id=r.id WHERE m.role_id=? AND r.status='open' "
-                       "AND r.kind IN ('约会','官约','心愿') ORDER BY r.id", (target_id,)).fetchall()
+                       f"AND r.kind IN ({','.join('?' * len(kinds))}) ORDER BY r.id", (target_id, *kinds)).fetchall()
     if start_hm:
         a = parse_hm(f"{start_hm}-23:59") if re.fullmatch(r"\d{1,2}:?\d{2}", start_hm) else None
         rs = [r for r in rs if a and r["start_hm"] == a[0]]
@@ -404,6 +423,8 @@ def find_joinable(target_id: int, start_hm: str = "") -> list:
 
 
 def request_join(room_id: int, role_id: int) -> tuple[bool, str, int]:
+    if not joinreq_enabled():
+        return False, "申请加入没有开放。", 0
     r = get(room_id)
     if not r or r["status"] != "open":
         return False, "这个房间已经结束了。", 0
@@ -424,7 +445,9 @@ def request_join(room_id: int, role_id: int) -> tuple[bool, str, int]:
 
 
 def pending_requests(role_id: int) -> list:
-    """别人想加入我所在房间的申请。"""
+    """别人想加入我所在房间的申请。申请加入关着时一律当没有（「我的待回」也不再提醒以前剩下的）。"""
+    if not joinreq_enabled():
+        return []
     with get_conn() as c:
         return c.execute("SELECT q.*, a.name AS applicant, r.kind, r.day, r.start_hm, r.end_hm FROM join_requests q "
                          "JOIN rooms r ON r.id=q.room_id JOIN roles a ON a.id=q.role_id "
@@ -433,6 +456,8 @@ def pending_requests(role_id: int) -> list:
 
 
 def answer_request(req_id: int, role_id: int, accept: bool) -> tuple[bool, str, dict | None]:
+    if not joinreq_enabled():
+        return False, "申请加入没有开放。", None
     with get_conn() as c:
         q = c.execute("SELECT * FROM join_requests WHERE id=?", (req_id,)).fetchone()
         if not q or q["status"] != "pending":

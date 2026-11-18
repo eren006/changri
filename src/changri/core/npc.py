@@ -57,3 +57,20 @@ def create(name: str) -> tuple[bool, str]:
     return True, (f"第 1 步完成：已创建 NPC「{name}」。\n"
                   f"第 2 步：把机器人拉进给它用的群，扮它的人在那个群里发「认群 {code}」（24 小时内有效；过期了在后台「角色 → {name} → 换绑群号」再生成）。\n"
                   f"之后机器人会带着绑 QQ、发回执，NPC 在那个群里发指令跟玩家一样。")
+
+
+def delete(name: str, confirmed: bool) -> tuple[bool, str]:
+    """「删除NPC 名字」：只删 NPC（玩家角色在后台删）。不带「确认」先说会删掉什么，带了才真删；删完可以重新「创建NPC」。"""
+    from .roles import delete_role, get_role_by_name
+    r = get_role_by_name((name or "").strip())
+    if not r:
+        return False, f"没有叫「{name}」的角色。"
+    if not r["is_npc"]:
+        return False, f"「{r['name']}」不是 NPC。玩家角色请在后台「角色」页删除。"
+    if not confirmed:
+        return False, (f"要彻底删除 NPC「{r['name']}」吗？会删掉它的个人群绑定、短信、关系线、背包、时间线，"
+                       f"它发起的约会/电话整场删除。不能撤销。\n确认请发：删除NPC {r['name']} 确认")
+    res = delete_role(r["id"])
+    if not res:
+        return False, "这个 NPC 已经不在了。"
+    return True, f"已彻底删除 NPC「{res['name']}」。要重来就再发「创建NPC {res['name']}」，拿新的认群码去认群。"

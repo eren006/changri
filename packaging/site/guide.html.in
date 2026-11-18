@@ -56,7 +56,7 @@ a:hover{text-decoration:underline;text-underline-offset:3px}
 code{font-family:var(--mono);font-size:.86em;background:var(--code);border:1px solid var(--hair);padding:.08em .45em;border-radius:6px}
 ::selection{background:rgba(201,160,67,.3)}
 .wrap{max-width:1180px;margin:0 auto;padding:0 24px}
-.glass,.feat,.cmd,.tbl,.gloss div,.callout,.anat,.phone,.season,.ex .chat,.kbtn,.ibtn,.search{
+.glass,.feat,.cmd,.play,.tbl,.gloss div,.callout,.anat,.phone,.season,.ex .chat,.kbtn,.ibtn,.search{
   background:var(--glass);
   border:1px solid var(--line);box-shadow:var(--shadow)}
 
@@ -301,6 +301,23 @@ body[data-role="player"] .only-admin,body[data-role="admin"] .only-player{displa
 .cmd .cp{position:absolute;top:13px;right:13px;font:600 11.5px var(--sans);border:0;background:var(--btn);color:var(--btn-ink);border-radius:999px;padding:4px 11px;cursor:pointer}
 .cmd .cp:hover{opacity:.85}
 .empty{padding:60px 0;text-align:center;color:var(--faint)}
+.plays{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start;margin-bottom:14px}
+.play{border-radius:24px;padding:18px 20px}
+.play .ph{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.play .ph b{font-size:17px}
+.play .ph small{color:var(--faint);font-size:12.5px}
+.play .pi{color:var(--mute);font-size:14px;margin:4px 0 14px;line-height:1.65}
+.play ol{list-style:none;margin:0;padding:0;counter-reset:s;display:grid;gap:13px}
+.play li{display:grid;grid-template-columns:24px minmax(0,1fr);gap:10px;counter-increment:s;transition:opacity .2s}
+.play li::before{content:counter(s);width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:600;color:var(--ink);background:var(--glass2);border:1px solid var(--line2);margin-top:1px}
+.play li.dim{opacity:.38}
+.play .st{font-size:14px;line-height:1.65}
+.play .st .tag{margin:0 6px 0 0;vertical-align:1px}
+.play .us{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.play .us button{font:12.3px/1.5 var(--mono);background:var(--code);border:1px solid var(--hair);border-radius:10px;padding:5px 10px;color:var(--ink);cursor:pointer;white-space:pre-wrap;word-break:break-all;text-align:left;max-width:100%}
+.play .us button:hover{border-color:var(--line2)}
+.play .more{margin:14px 0 0;padding-top:10px;border-top:1px solid var(--hair);font-size:13px;color:var(--mute);line-height:1.65}
+.loose{margin:6px 0 4px;font-size:13px;color:var(--faint)}
 mark{background:rgba(201,160,67,.35);color:inherit;border-radius:3px;padding:0 1px}
 
 /* faq */
@@ -362,6 +379,7 @@ footer .brand{font-size:15px}
   .doc{grid-template-columns:1fr;gap:0}
   .toc{display:none}
   .clist{grid-template-columns:1fr}
+  .plays{grid-template-columns:1fr}
 }
 @media (max-width:640px){
   .wrap{padding:0 16px}
@@ -478,7 +496,7 @@ nav.main a.glow{animation:navGlow 2.4s ease-in-out infinite}
   --shadow:inset 1.5px 1.5px 0 rgba(255,255,255,.18),inset -1px -1px 0 rgba(255,255,255,.04),inset 0 0 22px rgba(255,255,255,.04),0 34px 60px -30px rgba(0,0,0,.75)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--glass:linear-gradient(140deg,rgba(255,255,255,.1),rgba(255,255,255,.03));--glass2:linear-gradient(140deg,rgba(255,255,255,.14),rgba(255,255,255,.06));
   --shadow:inset 1.5px 1.5px 0 rgba(255,255,255,.18),inset -1px -1px 0 rgba(255,255,255,.04),inset 0 0 22px rgba(255,255,255,.04),0 34px 60px -30px rgba(0,0,0,.75)}}
-.glass,.feat,.cmd,.tbl,.gloss div,.callout,.anat,.phone,.season,.ex .chat,.toc,.arch .node,.rule,details.qa,.dgcard,.top .wrap,.form{background-image:var(--noise),var(--glass)!important;background-color:transparent!important}
+.glass,.feat,.cmd,.play,.tbl,.gloss div,.callout,.anat,.phone,.season,.ex .chat,.toc,.arch .node,.rule,details.qa,.dgcard,.top .wrap,.form{background-image:var(--noise),var(--glass)!important;background-color:transparent!important}
 .top .wrap{background-image:var(--noise),var(--glass2)!important}
 .arch .node.core,.rule.dg,.roleswitch{background-image:var(--noise),var(--lavgrad)!important}
 /* violet cloud inside the hero card, like light trapped in glass */
@@ -552,7 +570,7 @@ body::after{content:"";position:fixed;inset:0;z-index:30;pointer-events:none;
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .snowcap{filter:brightness(.9) drop-shadow(0 3px 4px rgba(0,0,0,.4))}}
 @media (max-width:640px){.snowcap{top:-9px;height:20px;left:12px;right:12px}}
 .feat .ic,.orbic{position:relative}
-.callout,.gloss > div,.anat,.cmd,details.qa,.dgcard,.rule,.arch .node,.form,.ex .chat{position:relative}
+.callout,.gloss > div,.anat,.cmd,.play,details.qa,.dgcard,.rule,.arch .node,.form,.ex .chat{position:relative}
 .snowcap.snoworb{z-index:2;right:auto;animation-delay:calc(var(--sd) + .3s)}
 @media (prefers-reduced-motion:reduce){.snowcap{animation:none!important}.snowdust{display:none}}
 
@@ -1037,7 +1055,6 @@ article h2 .n::after{top:-9px;width:6px;height:7px}
       <div class="callout"><p><b>戏文格式：</b>首行写角色名，再跟换行 / 空格 / 冒号，后面是正文，例如「阿林：你也来了？」。不按格式的算闲聊，不计入存档和字数。</p></div>
       <ul>
         <li><code>结束约会</code>（电话、官约也用这一条）：聊完结束，写进双方时间线。</li>
-        <li><code>申请加入 小满 14:00</code>：想加入别人正在进行的约会；对方用 <code>同意加入 编号</code> / <code>拒绝加入 编号</code>。</li>
         <li><code>复盘 R12</code>：查看某一场的复盘。</li>
         <li><code>补录 R12</code>：监听的 QQ 号掉线漏记了？把聊天记录合并转发到个人群，回复这段合并记录发「补录 + 房间号」。</li>
         <li><code>时间线</code> / <code>时间线 角色名</code>：看排期。要改：在房间群里发 <code>修改时间线 D1 1400-1500</code>；在<b>个人群</b>里也能改，带上房间号：<code>修改时间线 R12 D1 1400-1500</code>，其他参与者会在自己的个人群收到申请，点「同意」或「拒绝」。所有参与者同意后生效。</li>
@@ -1087,6 +1104,7 @@ article h2 .n::after{top:-9px;width:6px;height:7px}
         <div class="feat"><h3>心愿</h3><p><code>挂心愿 1400-1500 花园 一起散步</code>，别人 <code>摘心愿 编号</code> 就开一场约会。<code>| 昵称</code> 结尾可以不露真名。</p></div>
         <div class="feat"><h3>前置电话</h3><p>在小手机「发现 → 前置电话」填资料卡，翻别人的卡、向左滑选 TA，配对了就在小手机里聊。</p></div>
         <div class="feat"><h3>物品与商城</h3><p><code>背包</code> <code>商城</code> <code>购买</code> <code>使用</code> <code>转账 小明 金币 50</code>，还有兑换与合成。</p></div>
+        <div class="feat"><h3>申请加入</h3><p><code>申请加入 小满 14:00</code> 想加入别人正在进行的约会；对方 <code>加入请求</code> 查看，<code>同意加入 编号</code> / <code>拒绝加入 编号</code>。没开时这几条都不响应。</p></div>
         <div class="feat"><h3>晚餐</h3><p>管理员 <code>开始晚餐 8</code>，玩家 <code>入座 3</code>，相邻的人可以 <code>戳你一下 名字</code>。</p></div>
         <div class="feat"><h3>小玩意</h3><p>漂流瓶、抽取池、点歌、提醒、收集……完整列表见 <a href="#/commands">指令大全</a>。</p></div>
       </div>
@@ -1111,10 +1129,11 @@ article h2 .n::after{top:-9px;width:6px;height:7px}
 <section class="page" data-page="commands">
   <div class="wrap" style="padding-top:48px;padding-bottom:96px">
     <h1 class="ptitle">指令大全</h1>
-    <p class="psub" style="margin-bottom:20px">所有群指令，按功能分组。点「复制」直接粘贴到 QQ；搜索支持指令名、别名和说明。</p>
+    <p class="psub" style="margin-bottom:20px">按玩法看：同一个功能的指令放在一块，按先后顺序写清谁来做、做什么。点指令就复制，直接粘贴到 QQ；搜索支持指令名、别名和说明。</p>
     <div class="cbar">
       <div class="row">
         <label class="search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--faint)"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" placeholder="搜「心动信」「rd」「撤回」…" autocomplete="off"></label>
+        <div class="seg" id="viewSeg"><button class="on" data-v="flow">按玩法</button><button data-v="list">按指令</button></div>
         <div class="seg" id="whoSeg"><button class="on" data-w="all">全部</button><button data-w="p">玩家</button><button data-w="a">管理员</button></div>
       </div>
       <div class="cats" id="cats"></div>
@@ -1435,8 +1454,8 @@ var C = [
  ["电话","","电话 2100-2200 小满","发起电话，不能中途加入。","p","date"],
  ["踩点","","踩点 1400-1500 大图书馆","一个人去某个地点。","p","date"],
  ["结束约会","结束电话、结束官约、结束踩点、结束心愿、结束约会","结束约会 [R12]","在房间里发结束；不在房间就带上房间号。","p","date"],
- ["申请加入","","申请加入 小满 14:00","申请加入对方正在进行的约会。","p","date"],
- ["同意加入 / 拒绝加入","加入请求","同意加入 编号","处理别人的加入申请。","p","date"],
+ ["申请加入","","申请加入 小满 14:00","申请加入对方正在进行的约会（扩展，默认关）。","p","date"],
+ ["同意加入 / 拒绝加入","加入请求","同意加入 编号","处理别人的加入申请（扩展，默认关）。","p","date"],
  ["复盘","","复盘 R12","把房间戏文画成长图。","p","date"],
  ["补录","","（回复合并转发）补录 R12","补记监听号掉线期间漏掉的戏。","p","date"],
  ["时间线","","时间线 [角色名]","看排期。","p","date"],
@@ -1474,6 +1493,8 @@ var C = [
  ["收尾","","收尾 → 收尾 确认","预览并清空本季数据。","a","season"],
  ["修改档期","","修改档期 1115-1121 [补戏1123]","","a","season"],
  ["设置天数","开启自动天数、关闭自动天数","设置天数 D3","手动设游戏天数。","a","season"],
+ ["复盘网页","复盘网页 关闭、复盘网页 换链接","复盘网页","整季总结页的链接（跟 RP 端的复盘页一样，每场能下载 TXT）。结束季度时会自动发到后台群，这条是再发一次。","a","season"],
+ ["删除NPC","","删除NPC 名字 → 删除NPC 名字 确认","彻底删掉一个 NPC，删完可以重新创建。","a","season"],
  ["创建NPC","设为NPC、取消NPC、NPC列表","创建NPC 名字","回执里有认群码；扮 NPC 的人到它的群里发「认群 码」，再「绑定QQ」。","a","season"],
  ["设为戏群","取消戏群","设为戏群","出场发到这里。","a","season"],
  ["抽取出场顺序","","抽取出场顺序","随机排出场顺序。","a","season"],
@@ -1499,7 +1520,10 @@ var C = [
  ["发放抽取","","发放抽取 角色名 次数 [池子]","给所有人发：发放抽取 全体 1 新年池","a","ext"],
  ["漂流瓶","","漂流瓶 内容","扔一个；「漂流瓶 编号 内容」回信。","p","ext"],
  ["点歌","","点歌 歌名","发到公告群。","p","ext"],
- ["提醒","我的提醒、删除提醒、再提醒我","提醒 时间 内容","","p","ext"],
+ ["提醒","","提醒 时间 内容","设一个提醒，到点在你的个人群里叫你（30分钟后、21:00、每天08:00……）。","p","ext"],
+ ["我的提醒","","我的提醒","看自己设了哪些提醒。","p","ext"],
+ ["删除提醒","","删除提醒 编号","编号在「我的提醒」里。","p","ext"],
+ ["再提醒我","","再提醒我 [分钟]","提醒响了以后，过一会儿再叫你一次。","p","ext"],
  ["收集","","收集 [内容]","看正在收集什么，或提交。","p","ext"],
  // dinner
  ["开始晚餐","结束晚餐","开始晚餐 5 现代西餐","开一桌晚餐，座位数 + 风格。","a","dinner"],
@@ -1523,7 +1547,6 @@ var C = [
  ["使用望远镜 / 使用羽毛笔","","使用望远镜 小满","望远镜：抄一份对方下一封信；羽毛笔：截下对方下一封信先改再发。","p","letters"],
  ["羽毛笔修改","","羽毛笔修改 1 新内容","改截下来的信。","p","letters"],
  ["写信综指南","","写信综指南","玩法说明。","p","letters"],
- ["注册写信综基础道具","","注册写信综基础道具","在物品库里建好写信币、望远镜、羽毛笔。","a","letters"],
  // dice
  ["rd","r","r 3d6+2 原因","通用掷骰。","p","dice"],
  ["rh","暗骰","rh 1d100","结果私发。","p","dice"],
@@ -1554,6 +1577,145 @@ var C = [
  ["setcoc","房规","setcoc 1","COC 房规。","a","dice"],
  ["骰子帮助","骰子、dicehelp","骰子帮助","机器人内的骰子说明。","p","dice"]
 ];
+// ---------- 玩法块：同一个功能的指令放在一块，按先后顺序写清谁来做、做什么 ----------
+// [分组, 名称, 小字, 一句话说明, 步骤[[谁 p/a, 做什么, [可复制的写法...]]], 底部补充, 覆盖的指令名（C 里的第一列，这些不再单独成卡）]
+var F = [
+ ["start","建角色","第一次进来先做这个","每个玩家一个角色、一个个人群；短信、礼物、提醒都发到个人群。",
+  [["p","在你想当个人群的群里建角色，这个群就成了你的个人群",["创建新角色 名字"]],
+   ["p","绑定自己的 QQ：监听号认出你，房间里的戏文才会记到你名下；绑好会发完整回执",["绑定QQ 你的QQ号"]],
+   ["p","随时看自己的角色和绑了哪些群",["我的角色"]],
+   ["p","拿网页小手机的链接和激活码（开了小手机才有）",["手机码"]]],
+  "",["创建新角色","绑定qq","我的角色","手机码"]],
+ ["start","换个人群","旧群不用了","把个人群换到另一个群，角色和记录都不变。",
+  [["p","在旧的个人群里拿换绑码（10 分钟有效）",["换绑码"]],
+   ["p","到新群里发这个码，新群就成了你的个人群",["认群 6位认群码"]]],
+  "",["换绑码","认群"]],
+ ["start","管理员上手","开季前设一次","先认自己是管理员，再告诉机器人每个群是干什么的。",
+  [["a","在任意群发管理员码（码在设置平台「管理员」页生成）",["认管理员 6位管理员码"]],
+   ["a","在全员大群发：论坛、播报都发这里",["设为公告群"]],
+   ["a","在主持人内部群发：系统提醒发这里",["设为后台群"]],
+   ["a","闲聊群（可选）",["设为水群"]]],
+  "发错了用「取消公告群」「取消后台群」「取消水群」撤掉。",["认管理员","设为公告群","设为后台群","设为水群"]],
+ ["season","NPC","主持人建，扮演的人认领","NPC 和玩家角色一样有自己的群，扮演的人认领后照常发指令。",
+  [["a","建 NPC，回执里有认群码",["创建NPC 名字"]],
+   ["p","扮演 NPC 的人到 NPC 的群里发认群码",["认群 6位认群码"]],
+   ["p","再绑定自己的 QQ",["绑定QQ 你的QQ号"]]],
+  "已有角色转成 NPC 用「设为NPC 角色名」，「NPC列表」看全部。认群、绑定弄乱了：「删除NPC 名字」（再发「删除NPC 名字 确认」才真删），或后台「角色」页删除，然后重新创建。",["创建NPC","删除NPC"]],
+ ["season","出场","在戏群里按顺序登场","抽一个顺序，大家依次在戏群里出场；可以提前交好文字，轮到时自动发。",
+  [["a","在戏群里发，出场都发到这里",["设为戏群"]],
+   ["a","随机排出场顺序",["抽取出场顺序"]],
+   ["p","（可选）提前在个人群交好出场文字，可以带图；轮到你时自动发",["提交出场 角色名 内容"]],
+   ["a","开始出场：轮到谁就在谁的个人群提醒；没提前交的人在戏群直接发「角色名 内容」也算",["开始出场"]],
+   ["a","有人卡住不交，把他挪到队尾",["跳过出场"]]],
+  "随时看进行到谁：「查看出场状态」。",["设为戏群","抽取出场顺序","提交出场","开始出场 / 跳过出场","查看出场状态"]],
+ ["social","礼品店","扩展「礼品店」","每人一个随机货架，逛到的礼物收进图鉴，也能直接拿来送人。",
+  [["p","逛一逛：货架上随机一件你还没有的礼物收进图鉴，24 小时换一次",["礼品店"]],
+   ["p","看自己收过、逛到过的所有礼物",["我的图鉴"]],
+   ["p","送礼时直接写礼品店的编号",["送礼 对象 编号 [留言]"]],
+   ["p","从别人图鉴里偷一件你没有的（管理员在「礼品店」设置里开了才能用）",["偷礼物 对方名"]],
+   ["p","谁偷过你、你偷过谁",["偷盗记录"]]],
+  "",["礼品店","我的图鉴","偷礼物","偷盗记录"]],
+ ["date","约会、电话、踩点","从发起到结束都在这里","发起后从群池领一个房间群，大家进群按「角色名：正文」写戏，写完结束，自动记进时间线。",
+  [["p","发起：多人用 / 隔开；电话不写地点；踩点是一个人去某个地点（扩展，默认关）",["约会 1400-1500 咖啡厅 小满/阿川","电话 2100-2200 小满","踩点 1400-1500 大图书馆"]],
+   ["p","大家收到房间群号，进群写戏：首行写角色名，再跟正文，例如「阿林：你也来了？」",[]],
+   ["p","要改时间：一人提出，房间里所有人同意后生效（在房间群里可以不写 R 号）",["修改时间线 R12 D1 1400-1500","同意时间线","拒绝时间线"]],
+   ["p","写完结束，记进双方时间线；电话、官约、踩点、心愿同理（结束电话、结束官约……）。不在房间群里发就带上房间号",["结束约会","结束约会 R12"]]],
+  "",["约会","电话","踩点","修改时间线","结束约会"]],
+ ["date","申请加入","扩展，默认关","想加入别人正在进行的约会，发申请，房间里的人同意了就把你拉进去。",
+  [["p","申请加入对方现在的约会（对方只有一场时可以不写时间）",["申请加入 小满 14:00"]],
+   ["p","房间里的人看收到的申请",["加入请求"]],
+   ["p","同意或拒绝；同意后申请人收到群号，自动占上时间线",["同意加入 编号","拒绝加入 编号"]]],
+  "电话、微信、踩点不能加入；哪些房间能加入在后台「申请加入」设置里改。",["申请加入","同意加入 / 拒绝加入"]],
+ ["date","回顾","时间线、统计、复盘","戏写完以后回头看：排期、数据、每场的戏文。",
+  [["p","看自己的排期",["时间线"]],
+   ["p","这一季的互动数据",["本场统计"]],
+   ["p","自己每场戏的弧长（多久回一次）",["我的弧长"]],
+   ["p","复盘：不带编号先列出你结束了的场次（房间号、时间、地点、和谁），点按钮或带上房间号看那一场的戏文长图",["复盘","复盘 R12"]],
+   ["p","监听号掉线漏记了：把聊天记录合并转发到个人群，回复这段合并记录发",["补录 R12"]]],
+  "",["时间线","本场统计","我的弧长","复盘","补录"]],
+ ["date","官约与房间管理","主持人","节目组安排的约会、电话，以及处理卡住或录错的房间。",
+  [["a","直接发起官约（不写 D 就是今天，地点可不写）",["发起官约 [D3] 1400-1500 [后山] 小满/阿林"]],
+   ["a","直接发起官电",["发起官电 D2 2000-2100 小满/阿林"]],
+   ["a","先攒一批，到时候一起发起；「计划官约 清空」重来",["计划官约 D2 1400-1500 后山 小满/阿林","执行官约"]],
+   ["a","取消一场，当作没发生过",["取消官约 R12"]],
+   ["a","房间卡住了，强制结束",["强结约会 R12"]],
+   ["a","录错了：连同复盘一起删掉一场",["删除时间线 角色名 R12"]],
+   ["a","看某个人的弧长",["查看弧长 角色名"]]],
+  "",["发起官约","发起官电","计划官约 / 执行官约","取消官约","强结约会","删除时间线","查看弧长"]],
+ ["date","备用群池","主持人","房间用的群从这里领；这三条管一个群归官方机器人还是归 QQ 小号，以及用完放回来。",
+  [["a","在一个空群里发，把它交给官方机器人当备用群（原来在小号群号组里的会移过来）",["设为备用群 123456789"]],
+   ["a","把这个官方备用群交给 QQ 小号管（小号要先在群里、是管理员）",["转为小号群 A组"]],
+   ["a","房间结束后等人退群：确认人都退了，在那个群里发，群就回到可用的备用群（在别的群发要带群号）",["放回备用群","放回备用群 群号"]]],
+  "查看现有的：「查看备用群池」。",["设为备用群","转为小号群","放回备用群"]],
+ ["love","心动信","白天投递，夜里统一派送","写好投进信箱，到点统一派送到对方个人群；署不署名由你决定。",
+  [["p","写好投进信箱",["发送心动信\n【发送对象】小满\n【内容】想说的话\n【署名】选填"]],
+   ["p","派送前看自己投了哪些",["我的心动信"]],
+   ["p","派送前按序号撤回，当天次数退回",["撤回心动信 1"]],
+   ["a","到点自动派送；要提前派送就手动送",["统一送心动信"]],
+   ["a","按天限制每人能收几封，看每人收到几封",["设置信箱上限 D0:3 D1:5","信箱统计"]]],
+  "",["发送心动信","我的心动信","撤回心动信","统一送心动信","设置信箱上限","信箱统计"]],
+ ["love","关系线","两个人一起写","一对角色一条关系线，双方轮流往上加细节，写完一起确认。",
+  [["p","加一条细节，同步到对方的个人群",["拉线 对方名 内容"]],
+   ["p","看你们之间的全部细节",["查看关系线 对方名"]],
+   ["p","写错了撤回自己写的一条",["撤回关系 对方名 内容"]],
+   ["p","写完了确认完成",["确认关系线 对方名"]],
+   ["a","看每人拉了几条",["关系线统计"]]],
+  "",["拉线","查看关系线","撤回关系","确认关系线","关系线统计"]],
+ ["ext","论坛","扩展「论坛」","匿名发帖、回帖、点赞，帖子发在公告群。",
+  [["p","发帖，署名可以随便写",["发帖 署名 内容"]],
+   ["p","看帖子列表，带贴号看一帖的全部楼层",["查看帖子","查看帖子 001"]],
+   ["p","回帖；可以引用某一楼",["回复帖子 001 [引用2|署名] 内容"]],
+   ["p","给帖子点赞、点踩（楼层用「点赞楼层」「点踩楼层」）",["点赞 001","点踩 001"]],
+   ["a","删帖或删某一楼",["删帖 001"]]],
+  "",["发帖","回复帖子","点赞 / 点踩","查看帖子","删帖 / 删楼层"]],
+ ["ext","加百列闹钟","扩展「加百列闹钟」","个人提醒：到点加百列在你的个人群里叫你。管理员的群体闹钟（到点发给每位玩家的个人群，NPC 不收）在后台「加百列闹钟」页里设。",
+  [["p","设一个提醒；时间可以写 30分钟后、2小时后、21:00、明天08:00、每天08:00、每周一20:00、9月14日 20:00",["提醒 30分钟后 喝水","提醒 每天08:00 起床"]],
+   ["p","看自己设了哪些",["我的提醒"]],
+   ["p","不要了就按编号删掉",["删除提醒 编号"]],
+   ["p","提醒响了还没空，过一会儿再叫一次",["再提醒我 [分钟]"]]],
+  "",["提醒","我的提醒","删除提醒","再提醒我"]],
+ ["ext","心愿","扩展「心愿」","挂一个想做的事等人来摘，摘走就自动开一场约会。",
+  [["p","挂出心愿；| 后面写昵称就不显示真名。24 小时没人摘自动消失，每人最多 3 条",["挂心愿 1400-1500 花园 一起散步 | 昵称"]],
+   ["p","看大家挂的心愿",["看心愿"]],
+   ["p","摘走一个，自动开约会房间",["摘心愿 编号"]],
+   ["p","撤回自己的（不带编号会列出自己的）",["撤心愿 编号"]]],
+  "挂出的心愿会自动发到戏群，只显示性别和昵称（后台「心愿」设置里可以关）。",["挂心愿","看心愿 / 摘心愿 / 撤心愿"]],
+ ["dinner","晚餐","先开桌，下面三个小游戏都要开着晚餐","主持人开一桌，大家入座，相邻的人可以互相戳。",
+  [["a","开一桌，写座位数和风格",["开始晚餐 5 现代西餐"]],
+   ["p","选座位入座",["入座 3"]],
+   ["p","戳一下旁边的人（首尾也算相邻），对方个人群会收到提醒",["戳你一下 角色名"]],
+   ["a","散席",["结束晚餐"]]],
+  "",["开始晚餐","入座 / 戳你一下"]],
+ ["dinner","围猎","入座的人一起追猎物","猎物藏在一张方格林地里（列 A、B…，行 1、2…），大家合作在几轮内拿下。",
+  [["a","开局；写「轮流」就按座位一个个来，不写就大家同时出手",["开始狩猎 [轮流] [边长 4-7] [猎物名]"]],
+   ["p","侦查：每人一次，追踪某格看有没有踪迹，或在某格设陷阱",["追踪 C3","设陷阱 C3"]],
+   ["p","开火：每人一次，开枪打某格，或者观望。全员出完或到点统一结算",["开枪 C3","观望"]],
+   ["p","打中先重伤，再中就拿下；拿下后按出力记分。随时看局面和排行",["狩猎状态","狩猎排行"]],
+   ["a","有人一直不动就跳过；提前收局；清空排行榜",["跳过狩猎","结束狩猎","重置狩猎排行"]]],
+  "轮流模式：每人轮到时在追踪、设陷阱、开枪里三选一，全员行动一次算一轮，轮末猎物挪一格。",["开始狩猎","追踪 / 设陷阱 / 开枪 / 观望","狩猎状态 / 狩猎排行","跳过狩猎 / 结束狩猎 / 重置狩猎排行"]],
+ ["dinner","巡逻","捉迷藏淘汰赛","玩家偷偷选地点躲起来，卫兵每轮多一个，被搜到就出局，剩 3 人结束。",
+  [["a","（可选）先定地点，再开局",["巡逻设置地点 花园 厨房 书房","巡逻开局"]],
+   ["p","在自己的个人群报名",["巡逻报名"]],
+   ["p","在自己的个人群选地点躲，别人看不到你藏哪",["巡逻躲藏 书房"]],
+   ["a","结算一轮：藏在卫兵那里或这轮没躲的人被抓。之后回到上一步再躲",["巡逻"]],
+   ["a","剩 3 人以内自动结束，也可以提前收",["巡逻结束"]]],
+  "随时看谁还在、第几轮：「巡逻状态」。",["巡逻开局","巡逻","巡逻报名 / 巡逻躲藏","巡逻状态"]],
+ ["dinner","喝酒游戏","盲选 24 杯，看谁先醉","桌上摆 24 杯酒，每人盲选一杯喝，醉酒值到线就进醉酒名单。每个群一局。",
+  [["p","大家先加入",["加入喝酒游戏"]],
+   ["p","人齐了，任何人开始",["开始喝酒游戏"]],
+   ["p","上酒：摆 24 杯，公布有哪些酒、各加多少醉酒值，但不说哪杯在几号",["上酒"]],
+   ["p","盲选一杯喝；到线就进醉酒名单，不能再喝。「可喝酒」看还剩哪几号",["喝酒 7","可喝酒"]],
+   ["p","24 杯喝完再「上酒」；玩够了结束，公布醉酒名单和幸存者",["结束喝酒游戏"]],
+   ["a","调醉酒的线、把这局清掉重来",["设定醉酒阈值 500","重置喝酒游戏"]]],
+  "随时看：「喝酒状态」「醉酒名单」。",["加入喝酒游戏 / 开始喝酒游戏","上酒 / 喝酒","喝酒状态 / 醉酒名单","结束喝酒游戏","重置喝酒游戏 / 设定醉酒阈值"]],
+ ["letters","写信综","个性化模块，默认关","寄正式信件赚写信币，用望远镜偷看、用羽毛笔截改别人的信。",
+  [["p","寄一封信，够字数有写信币赏金",["发送信件\n【收件人】小满\n【内容】……\n【署名】选填"]],
+   ["p","看今天还能寄几封、写信币多少",["信件状态"]],
+   ["p","望远镜：对方寄出的下一封信抄一份给你；羽毛笔：对方的下一封信先截到你手里",["使用望远镜 小满","使用羽毛笔 小满"]],
+   ["p","改截下来的信，改完照常寄出",["羽毛笔修改 1 新内容"]]],
+  "完整玩法：「写信综指南」。写信币、望远镜、羽毛笔第一次用到时自动建好，不用手动注册。",["发送信件","信件状态","使用望远镜 / 使用羽毛笔","羽毛笔修改","写信综指南"]]
+];
+var FCOVER = {};F.forEach(function(f){f[6].forEach(function(n){FCOVER[n]=1})});
 var DICE = {coc:["ra","rah","rb / rp","sc","en","ti / li","coc","rav"],dnd:["dnd","ri","at","ra"],card:["st","pc / nn","我是谁","team","log","说 / ob"]};
 
 var FEATS = [
@@ -1611,28 +1773,57 @@ function runDemo(){
 }
 
 // ---------- commands page ----------
-var state={q:"",w:"all",cat:"all"};
+var state={q:"",w:"all",cat:"all",v:store("cr-cmdview")==="list"?"list":"flow"};
 $("#cats").innerHTML='<button class="on" data-c="all">全部 <span style="opacity:.6">'+C.length+'</span></button>'+G.map(function(g){
   var n=C.filter(function(c){return c[5]===g[0]}).length;return '<button data-c="'+g[0]+'">'+g[1]+' <span style="opacity:.6">'+n+'</span></button>'}).join("");
+function whoTag(w){return w==="a"?'<span class="tag a">管理员</span>':'<span class="tag p">玩家</span>'}
 function cmdCard(c,q){
-  var tag=c[4]==="a"?'<span class="tag a">管理员</span>':'<span class="tag p">玩家</span>';
-  return '<div class="cmd"><div class="h"><span class="nm">'+hl(c[0],q)+'</span>'+tag+'</div>'+
+  return '<div class="cmd"><div class="h"><span class="nm">'+hl(c[0],q)+'</span>'+whoTag(c[4])+'</div>'+
     (c[1]?'<div class="al">别名：'+hl(c[1],q)+'</div>':'')+
     (c[3]?'<div class="d">'+hl(c[3],q)+'</div>':'<div style="height:8px"></div>')+
     '<div class="u">'+esc(c[2])+'</div><button class="cp" data-copy="'+esc(c[2])+'">复制</button></div>';
 }
+function cmdHit(c,q){return !q||(c[0]+" "+c[1]+" "+c[2]+" "+c[3]).toLowerCase().indexOf(q)>=0}
+// 一个玩法一块：玩家和管理员的步骤都在里面，「玩家 / 管理员」筛选只是把另一方的步骤调淡，顺序不断
+function flowHit(f,q){
+  if(!q)return true;
+  var t=f[1]+" "+f[2]+" "+f[3]+" "+f[5]+" "+f[6].join(" ");
+  f[4].forEach(function(st){t+=" "+st[1]+" "+st[2].join(" ")});
+  C.forEach(function(c){if(f[6].indexOf(c[0])>=0)t+=" "+c[1]});
+  return t.toLowerCase().indexOf(q)>=0;
+}
+function flowCard(f,q){
+  var steps=f[4].map(function(st){
+    var dim=state.w!=="all"&&state.w!==st[0];
+    return '<li'+(dim?' class="dim"':'')+'><div class="st">'+whoTag(st[0])+hl(st[1],q)+
+      '<div class="us">'+st[2].map(function(u){return '<button type="button" data-copy="'+esc(u)+'" title="点一下复制">'+hl(u,q)+'</button>'}).join("")+'</div></div></li>';
+  }).join("");
+  return '<div class="play"><div class="ph"><b>'+hl(f[1],q)+'</b><small>'+esc(f[2])+'</small></div><p class="pi">'+hl(f[3],q)+'</p><ol>'+steps+'</ol>'+
+    (f[5]?'<p class="more">'+hl(f[5],q)+'</p>':'')+'</div>';
+}
+function renderFlows(){
+  var q=state.q.trim().toLowerCase(),qq=state.q.trim(),html="";
+  G.forEach(function(g){
+    if(state.cat!=="all"&&state.cat!==g[0])return;
+    var fs=F.filter(function(f){return f[0]===g[0]&&flowHit(f,q)&&(state.w==="all"||f[4].some(function(st){return st[0]===state.w}))});
+    var rest=C.filter(function(c){return c[5]===g[0]&&!FCOVER[c[0]]&&(state.w==="all"||c[4]===state.w)&&cmdHit(c,q)});
+    if(!fs.length&&!rest.length)return;
+    html+='<div class="cgroup"><h3>'+g[1]+'<small>'+g[2]+'</small></h3>'+(g[3]?'<p>'+g[3]+'</p>':'')+
+      (fs.length?'<div class="plays">'+fs.map(function(f){return flowCard(f,qq)}).join("")+'</div>':'')+
+      (rest.length?(fs.length?'<p class="loose">其他指令</p>':'')+'<div class="clist">'+rest.map(function(c){return cmdCard(c,qq)}).join("")+'</div>':'')+'</div>';
+  });
+  $("#clist").innerHTML=html||'<div class="empty">没有找到「'+esc(state.q)+'」相关的指令。</div>';
+}
 function renderCmds(){
-  // 玩家用的和管理员用的分成两大块，不混在一起；每块里再按分类排
+  if(state.v==="flow")return renderFlows();
+  // 按指令：玩家用的和管理员用的分成两大块，每块里再按分类排
   var q=state.q.trim().toLowerCase(),html="";
   [["p","玩家用的指令","在自己的个人群、房间群里发。"],["a","管理员用的指令","要先「认管理员」；多数在后台群或公告群发。"]].forEach(function(w){
     if(state.w!=="all"&&state.w!==w[0])return;
     var part="";
     G.forEach(function(g){
       if(state.cat!=="all"&&state.cat!==g[0])return;
-      var list=C.filter(function(c){
-        if(c[5]!==g[0]||c[4]!==w[0])return false;
-        return !q||(c[0]+" "+c[1]+" "+c[2]+" "+c[3]).toLowerCase().indexOf(q)>=0;
-      });
+      var list=C.filter(function(c){return c[5]===g[0]&&c[4]===w[0]&&cmdHit(c,q)});
       if(!list.length)return;
       part+='<div class="cgroup"><h3>'+g[1]+'<small>'+g[2]+'</small></h3>'+(g[3]&&w[0]==="p"?'<p>'+g[3]+'</p>':'')+'<div class="clist">'+list.map(function(c){return cmdCard(c,state.q.trim())}).join("")+'</div></div>';
     });
@@ -1640,6 +1831,8 @@ function renderCmds(){
   });
   $("#clist").innerHTML=html||'<div class="empty">没有找到「'+esc(state.q)+'」相关的指令。</div>';
 }
+$$("#viewSeg button").forEach(function(x){x.classList.toggle("on",x.dataset.v===state.v)});
+$("#viewSeg").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;$$("#viewSeg button").forEach(function(x){x.classList.toggle("on",x===b)});state.v=b.dataset.v;store("cr-cmdview",state.v);renderCmds()});
 $("#q").addEventListener("input",function(e){state.q=e.target.value;renderCmds()});
 $("#whoSeg").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;$$("#whoSeg button").forEach(function(x){x.classList.toggle("on",x===b)});state.w=b.dataset.w;renderCmds()});
 $("#cats").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;$$("#cats button").forEach(function(x){x.classList.toggle("on",x===b)});state.cat=b.dataset.c;renderCmds()});
@@ -1808,7 +2001,7 @@ $("#hbBtn").addEventListener("click",function(){var r=$("#hbReveal");r.hidden=fa
   var calm=matchMedia("(prefers-reduced-motion: reduce)").matches,hover=matchMedia("(hover: hover)").matches,uid=0;
   var COLS=["#ffffff","#fff1bf","#cfeeff","#ffd9ec","#e4dbff"];
   var MAIN=".lavcard,.phone,.feat,.season";
-  var BOX=".callout,.gloss > div,.anat,.cmd,details.qa,.dgcard,.rule,.arch .node,.form,.ex .chat";
+  var BOX=".callout,.gloss > div,.anat,.cmd,.play,details.qa,.dgcard,.rule,.arch .node,.form,.ex .chat";
   var ORB=".feat .ic,.orbic,.season .d,article h2 .n";
   var ORNAMENT=".season .d,article h2 .n";
   function rng(s){return function(){s=(s*9301+49297)%233280;return s/233280}}

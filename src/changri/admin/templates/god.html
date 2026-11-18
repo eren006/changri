@@ -241,9 +241,9 @@
 {% endif %}
 
 <section class="erase">
-  <details class="panel"><summary class="btn sm ghost">彻底删除这个角色…</summary>
+  <details class="panel"><summary class="btn sm ghost">彻底删除这个{{ 'NPC' if role.is_npc else '角色' }}…</summary>
     <form class="form" method="post" action="{{ url_for('god_erase', role_id=role.id) }}">{{ csrf() }}
-      <p class="note" style="color:var(--bad)">用于玩家录错了角色。会删掉「{{ role.name }}」的个人群绑定、短信、关系线、背包、属性、朋友圈、公知、时间线；TA 发起的约会/电话整场删除，TA 参加的别人的房间里把 TA 移除。<b>不能撤销</b>。删完玩家可以在个人群里重新「创建新角色」。</p>
+      <p class="note" style="color:var(--bad)">{{ '用于 NPC 认群、绑定出了问题要重来。' if role.is_npc else '用于玩家录错了角色。' }}会删掉「{{ role.name }}」的个人群绑定、短信、关系线、背包、属性、朋友圈、公知、时间线；TA 发起的约会/电话整场删除，TA 参加的别人的房间里把 TA 移除。<b>不能撤销</b>。{{ '删完可以重新「创建NPC 名字」，拿新的认群码去认群。' if role.is_npc else '删完玩家可以在个人群里重新「创建新角色」。' }}</p>
       <div class="fields"><div><label for="erase-name">输入角色名「{{ role.name }}」确认</label><input id="erase-name" type="text" name="confirm" autocomplete="off" required></div></div>
       <div class="actions"><button class="btn" type="submit">彻底删除</button><button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
     </form></details>

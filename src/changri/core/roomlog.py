@@ -13,6 +13,12 @@ _RP = re.compile(r"^\s*(\S{1,12}?)\s*[：:\s]\s*(.+)$", re.S)
 _ROOM_CMD = re.compile(r"(?:@\S+\s*)*[/.。]?(结束(?:约会|私约|电话|官约|微信|心愿|前置电话)|修改时间线|同意时间线|拒绝时间线|绑定qq|绑定QQ|补录)\s*.*", re.S)
 
 
+def body_of(name: str, text: str) -> str:
+    """戏文去掉开头的「名字：」只留正文（发言人已经单独写了，免得出现「小满：小满：……」）。不是这个名字开头的原样返回。"""
+    p = parse_rp(text, {name}) if name else None
+    return p[1] if p else text
+
+
 def parse_rp(text: str, names: set[str]) -> tuple[str, str] | None:
     """是戏文返回 (角色名, 正文)；角色名要是已知的角色（或参与者）名，否则算闲聊。"""
     m = _RP.match(text)
@@ -203,7 +209,7 @@ def export_text(room_id: int) -> str:
     body = []
     for ln in lines(room_id):
         t = time.strftime("%H:%M", time.localtime(ln["ts"]))
-        body.append(f"[{t}] {ln['name']}：{ln['text']}" + ("" if ln["is_rp"] else "（闲聊）"))
+        body.append(f"[{t}] {ln['name']}：{body_of(ln['name'], ln['text'])}" + ("" if ln["is_rp"] else "（闲聊）"))
     return "\n".join(head + body)
 
 
@@ -216,7 +222,7 @@ def review_text(room_id: int) -> str:
     from .overview import slot_text
     st = stats(room_id)
     head = f"📖 R{room['id']} {room['kind']} 复盘\n{slot_text(room)}\n" + "　".join(f"{x['name']} {x['chars'] or 0}字" for x in st if x["rp"])
-    return head + "\n\n" + "\n".join(f"{x['name']}：{x['text']}" for x in rp)
+    return head + "\n\n" + "\n".join(f"{x['name']}：{body_of(x['name'], x['text'])}" for x in rp)
 
 
 def archive_all() -> list[dict]:

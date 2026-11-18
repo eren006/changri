@@ -1,0 +1,55 @@
+{% extends "sv/base.html" %}
+{% block title %}{{ name }} · 复盘{% endblock %}
+{% block head %}
+<style>
+.sum{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px 22px;margin-bottom:22px}
+.sum h1{font-size:22px;color:var(--accent2);margin-bottom:12px}
+.sum .nums{display:flex;flex-wrap:wrap;gap:22px;color:var(--muted);font-size:12px}
+.sum .nums b{display:block;color:var(--text);font-size:18px}
+.sum .roles{margin-top:14px;padding-top:12px;border-top:1px solid var(--border)}
+.day-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.day-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px 22px;transition:border-color .2s,transform .15s;display:block;color:inherit}
+.day-card:hover{border-color:var(--accent);transform:translateY(-2px);color:inherit}
+.day-label{font-size:22px;font-weight:700;color:var(--accent2);margin-bottom:12px}
+.day-stats{display:flex;gap:18px;color:var(--muted);font-size:12px;margin-bottom:10px}
+.day-stats b{color:var(--text);font-size:14px;display:block}
+.day-events{display:flex;gap:10px;flex-wrap:wrap;padding-top:10px;border-top:1px solid var(--border);font-size:11px;color:var(--muted)}
+.day-events b{color:var(--text)}
+.day-date{color:var(--muted);font-size:11px;margin-top:10px}
+</style>
+{% endblock %}
+{% block body %}
+<div class="page">
+  <div class="sum">
+    <h1>{{ name }} · 本季总结</h1>
+    <div class="nums">
+      <div><b>{{ t.rooms }}</b>场次</div><div><b>{{ t.replies }}</b>戏文</div><div><b>{{ t.chars }}</b>字</div>
+      {% if t.lovemail %}<div><b>{{ t.lovemail }}</b>心动信</div>{% endif %}
+      {% if t.sms %}<div><b>{{ t.sms }}</b>短信</div>{% endif %}
+      {% if t.gift %}<div><b>{{ t.gift }}</b>礼物</div>{% endif %}
+    </div>
+    {% if t.roles %}<div class="roles">{% for n in t.roles %}<a class="pill" href="{{ root }}/role/{{ n|urlencode }}" style="color:var(--accent)">{{ n }}</a>{% endfor %}</div>{% endif %}
+  </div>
+  {% if days %}
+  <div class="page-title">所有游戏日</div>
+  <div class="day-grid">
+    {% for d in days %}
+    <a class="day-card" href="{{ root }}/day/{{ d.label|urlencode }}">
+      <div class="day-label">{{ d.label }}</div>
+      <div class="day-stats"><div><b>{{ d.rooms }}</b>场次</div><div><b>{{ d.replies }}</b>戏文</div><div><b>{{ d.chars }}</b>字</div></div>
+      {% if d.sms or d.gift or d.lovemail %}
+      <div class="day-events">
+        {% if d.lovemail %}<span>💌 <b>{{ d.lovemail }}</b></span>{% endif %}
+        {% if d.sms %}<span>📱 <b>{{ d.sms }}</b></span>{% endif %}
+        {% if d.gift %}<span>🎁 <b>{{ d.gift }}</b></span>{% endif %}
+      </div>
+      {% endif %}
+      <div class="day-date">首次记录：{{ fmt(d.first_ts) }}</div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">本季还没有结束了的场次。</div>
+  {% endif %}
+</div>
+{% endblock %}

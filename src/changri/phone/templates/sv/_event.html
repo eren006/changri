@@ -1,0 +1,10 @@
+{# 一条互动（短信 / 礼物 / 心动信）：day.html 和 events.html 共用 #}
+<div class="ev" data-type="{{ e.type }}">
+  <div class="ev-h">
+    {% if e.type == 'lovemail' %}<span class="ek ek-lovemail">💌 心动信</span>{% elif e.type == 'sms' %}<span class="ek ek-sms">📱 短信</span>{% else %}<span class="ek ek-gift">🎁 礼物</span>{% endif %}
+    <span class="frm">{{ e.frm }}</span><span class="arr">→</span><span class="to">{{ e.to }}</span>
+    {% if e.type == 'gift' and e.title %}<span style="color:var(--gold);font-size:12px">{{ e.title }}</span>{% endif %}
+    <span class="ev-t">{% if show_day %}{{ e.day_label }} · {% endif %}{{ fmt(e.ts) }}</span>
+  </div>
+  {% if e.content %}<div class="ev-b">{% if e.type == 'gift' %}寄语：{% endif %}{{ e.content }}</div>{% endif %}
+</div>

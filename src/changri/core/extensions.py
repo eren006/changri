@@ -54,9 +54,20 @@ def is_enabled(ext_id: str) -> bool:
         default = "1"            # 升级前已经上架了礼物的，礼品店保持开启
     if ext_id == "stakeout" and get_config("stakeout_enabled", "0") == "1":
         default = "1"            # 以前在「约会房间」设置里打开过踩点的，变成扩展卡片后保持开启
+    if ext_id == "joinreq" and _joinreq_used():
+        default = "1"            # 升级前已经有人申请加入过的，变成扩展卡片后保持开启
     if ext_id == "phone" and get_config("phone_enabled", "0") == "1":
         default = "1"            # 升级前已经在用小手机的，不能因为它变成可选项就被关掉
     return get_config(f"ext:{ext_id}", default) != "0"
+
+
+def _joinreq_used() -> bool:
+    from .db import get_conn
+    try:
+        with get_conn() as c:
+            return c.execute("SELECT 1 FROM join_requests LIMIT 1").fetchone() is not None
+    except Exception:  # noqa: BLE001  表还没建
+        return False
 
 
 def set_enabled(ext_id: str, on: bool) -> None:
