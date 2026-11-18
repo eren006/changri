@@ -285,6 +285,11 @@ body[data-role="player"] .only-admin,body[data-role="admin"] .only-player{displa
 .cgroup h3{font-size:19px;font-weight:700;margin:0 0 4px;display:flex;align-items:baseline;gap:10px}
 .cgroup h3 small{font-weight:400;font-size:13px;color:var(--faint)}
 .cgroup > p{margin:0 0 14px;color:var(--mute);font-size:14px}
+.flow{margin:22px 0 8px}
+.flow>a{display:block;max-height:440px;overflow:hidden;border-radius:14px;border:1px solid var(--line2);-webkit-mask-image:linear-gradient(#000 72%,transparent);mask-image:linear-gradient(#000 72%,transparent)}
+.flow img{display:block;width:100%;height:auto}
+.flow figcaption{font-size:14px;line-height:1.7;color:var(--mute,inherit);margin-top:8px}
+.cwho{margin:0 0 40px}.cwho+.cwho{padding-top:28px;border-top:1px solid var(--line2)}.cwho-h{display:flex;align-items:center;gap:10px}
 .clist{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .cmd{border-radius:20px;padding:15px 17px;position:relative;transition:transform .2s}
 .cmd:hover{transform:translateY(-2px)}
@@ -668,7 +673,7 @@ article h2 .n::after{top:-9px;width:6px;height:7px}
       <img class="deco float" src="assets/orb-red.webp" alt="" aria-hidden="true" style="width:56px;left:-18px;bottom:-24px;z-index:3">
       <img class="deco" src="assets/holly.svg" alt="" aria-hidden="true" style="width:110px;right:-14px;bottom:-40px">
       <div class="season">
-        <div><span class="d">01</span><h4>开季之前</h4><p>预订季度、设公告群和群池；玩家建群、创建角色。</p></div>
+        <div><span class="d">01</span><h4>开季之前</h4><p>预订季度、设公告群和群池、开始季度进入筹备期；玩家建群、创建角色。</p></div>
         <div><span class="d">02</span><h4>出场</h4><p>抽取出场顺序，轮到谁，戏群里就出现谁。</p></div>
         <div><span class="d">03</span><h4>日常</h4><p>短信、送礼、约会、电话，时间线自动记。</p></div>
         <div><span class="d">04</span><h4>夜里</h4><p>心动信统一派送，关系线一根根拉起来。</p></div>
@@ -748,7 +753,7 @@ article h2 .n::after{top:-9px;width:6px;height:7px}
         <tr><td>查群里还有谁</td><td>不能</td><td>能，分群前自动查</td></tr>
         <tr><td>房间结束后</td><td>群先「等人退群」，管理员确认后再放回</td><td>自动放回</td></tr>
       </table></div>
-      <p>两种可以混着用，但一个群同一时间只归一边。后台左侧「模式」里，两种各有一页。</p>
+      <p>两种可以混着用，但一个群同一时间只归一边。后台菜单「约会房间的群」里，两种各有一页：「备用群池」和「QQ 小号与群号组」。</p>
 
       <h3 id="i-pool">纯官方（单骰）：每个群设一次</h3>
       <ol class="steps">
@@ -765,7 +770,7 @@ article h2 .n::after{top:-9px;width:6px;height:7px}
       <ol class="steps">
         <li><b>装 LLBot</b>按 <a href="https://www.llonebot.com/" target="_blank" rel="noopener">LLBot 官网</a> 的说明在服务器上下载安装，用小号扫码登录。别用自己的大号。</li>
         <li><b>打开连接</b>在 LLBot 的「Bot配置」里打开「WebSocket 服务端(正向)」，勾上启用，记下端口和 Token。</li>
-        <li><b>连上</b>到后台「结合QQ小号模式（双骰）」页，点「连一个 QQ 小号」，地址填 <code>ws://127.0.0.1:端口</code>，口令填 Token（Token 是空的就不填）。</li>
+        <li><b>连上</b>到后台「QQ 小号与群号组（双骰）」页，点「连一个 QQ 小号」，地址填 <code>ws://127.0.0.1:端口</code>，口令填 Token（Token 是空的就不填）。</li>
       </ol>
       <p><b>每个群设一次</b></p>
       <ol class="steps">
@@ -938,9 +943,9 @@ article h2 .n::after{top:-9px;width:6px;height:7px}
         <li><b>发 <code>格式</code></b>：一排按钮，只列出本季开着的功能。点一下，空白格式就填进输入框（比如「【短信】／对象：／内容：」），填好直接发。</li>
         <li><b>发 <code>我的</code></b>：角色卡、时间线、待回、数量、统计、关系线、心动信、背包……集中在一处，随时点。</li>
         <li><b>收到短信、礼物、关系线新细节</b>：下面有「回短信」「回礼」「回一段」。匿名或自定义署名发来的没有这个按钮，不会暴露对方是谁。</li>
-        <li><b>列表点名字</b>：查看关系线、查看公知（点谁看谁，带他自己的图）、加入请求、看心愿、查看帖子、前置电话、商城。</li>
+        <li><b>列表点名字</b>：查看关系线、查看公知（点谁看谁，带他自己的图）、加入请求、看心愿、查看帖子、商城。</li>
         <li>点按钮时，输入框前面会自动带上「@机器人」，<b>不用删，直接发</b>。</li>
-        <li>会开房间或花钱的（摘心愿、拨打前置电话、购买）只填进输入框、不直接发出，确认没问题再自己按发送。</li>
+        <li>会开房间或花钱的（摘心愿、购买）只填进输入框、不直接发出，确认没问题再自己按发送。</li>
       </ul>
       <div class="only-admin"><div class="callout"><p><b>主持人：</b>按钮要机器人有 QQ 的群 Markdown 和按钮权限；没有的话会自动改发纯文字，玩家照文字提示手打指令，功能不受影响。不想要按钮：后台「功能与设置 → 基础」关掉「列表下面挂按钮」。</p></div></div>
 
@@ -952,21 +957,36 @@ article h2 .n::after{top:-9px;width:6px;height:7px}
           <li><b>划分群</b>在全员群发 <code>设为公告群</code>；主持人内部群发 <code>设为后台群</code>；闲聊群发 <code>设为水群</code>；出场用的群发 <code>设为戏群</code>。</li>
           <li><b>准备备用群</b>约会、电话要用的群，先选好模式再设：纯官方（单骰）还是结合 QQ 小号（双骰），照<a href="#/install#i-modes">这一节</a>做。可以 <code>查看群池</code> 看还剩几个空群。</li>
           <li><b>预订季度</b><code>预订季度 长日将尽 1115-1120 补戏1123</code>，也可以在设置平台「季度」页填写。</li>
-          <li><b>NPC（可选）</b><code>创建NPC 名字</code> 建一个没有个人群的角色；或将已经创建的角色 <code>设为NPC 角色名</code>。</li>
+          <li><b>开始季度（进入筹备期）</b>发 <code>开始季度</code>。<b>开了季度玩家才能创建角色</b>；筹备期可以先建角色、改档案，到档期第一天自动进入 D0，打开自动天数和心动信，筹备期里的互动次数在 D0 清零。</li>
+          <li><b>NPC（可选）</b>NPC 除了不收群体闹钟、不抽出场、不算弧长和季末报告、不当漂流瓶 / 混乱短信的随机对象，其他功能跟玩家一样。分三步建：
+            ① 在后台群发 <code>创建NPC 名字</code>，回执里有一个认群码；
+            ② 把机器人拉进给 NPC 用的群，扮它的人在那个群里发 <code>认群 码</code>；
+            ③ 接着发 <code>绑定QQ 扮它的QQ号</code>，绑好机器人发完整回执。已经建好的玩家角色也可以 <code>设为NPC 角色名</code>。</li>
+          <li><b>老角色补 QQ</b>以前建的角色没绑 QQ 的，可以在设置平台「角色 → 点进这个人 → 概况 → 账号」里替他们补绑。</li>
         </ol>
+        <figure class="flow"><a href="assets/flow-admin.webp" target="_blank" rel="noopener" aria-label="打开完整的管理员一季流程图"><img src="assets/flow-admin.webp" loading="lazy" width="1600" alt="管理员一季流程图"></a>
+          <figcaption>一季从搭舞台到收尾，一张图看完：左边是你发的指令，右边是机器人替你做的。 <a href="assets/flow-admin.webp" target="_blank" rel="noopener">看完整长图</a> · <a href="assets/flow-admin.png" download="长日bot-管理员一季流程图.png">下载长图</a></figcaption></figure>
+        <figure class="flow"><a href="assets/flow-npc.webp" target="_blank" rel="noopener" aria-label="打开完整的NPC 流程图"><img src="assets/flow-npc.webp" loading="lazy" width="1600" alt="NPC 流程图"></a>
+          <figcaption>NPC 怎么建、扮的人要做什么、NPC 跟玩家哪里不一样。可以直接转给扮 NPC 的人。 <a href="assets/flow-npc.webp" target="_blank" rel="noopener">看完整长图</a> · <a href="assets/flow-npc.png" download="长日bot-NPC流程图.png">下载长图</a></figcaption></figure>
       </div>
       <div class="only-player">
         <h3>玩家：建好自己的个人群 <span class="tag p">玩家</span></h3>
         <ol class="steps">
-          <li><b>建群并拉机器人</b>建立或确定个人群，管理员把官方机器人拉入。</li>
-          <li><b>创建角色</b>在这个群里发 <code>创建新角色 名字</code>，绑定角色。</li>
+          <li><b>建群并拉机器人</b>建立或确定个人群，管理员把官方机器人拉入。要等管理员「开始季度」以后才能创建角色。</li>
+          <li><b>第 1 步：创建角色</b>在这个群里发 <code>创建新角色 名字</code>，这个群就成了你的个人群。</li>
+          <li><b>第 2 步：绑定 QQ</b>机器人会提示你发 <code>绑定QQ 你的QQ号</code>。填你自己正在用的号：房间群里说话要靠它认出你，填错了说的话不算你到场。</li>
+          <li><b>第 3 步：收好回执</b>绑好 QQ，机器人发完整回执：初始档案、能改什么、接下来能填什么。（没用 QQ 小号的服务器跳过第 2 步，建好直接发回执。）</li>
           <li><b>小手机（可选）</b>如果已经激活小手机，发 <code>手机码</code>，拿网页链接和激活码，在手机浏览器里打开。</li>
           <li><b>查看格式</b>发 <code>格式短信</code> <code>格式送礼</code>，拿到能直接复制的写法。</li>
         </ol>
+        <figure class="flow"><a href="assets/flow-player.webp" target="_blank" rel="noopener" aria-label="打开完整的玩家流程图"><img src="assets/flow-player.webp" loading="lazy" width="1600" alt="玩家流程图"></a>
+          <figcaption>建角色、出场、日常、结季，玩家要做的都在这张图上。 <a href="assets/flow-player.webp" target="_blank" rel="noopener">看完整长图</a> · <a href="assets/flow-player.png" download="长日bot-玩家流程图.png">下载长图</a></figcaption></figure>
         <div class="ex">
           <div class="chat static">
             <div class="msg me">创建新角色 阿林</div>
-            <div class="msg bot"><span class="who">机器人</span>✅ 角色「阿林」创建好了，这个群就是你的个人群。</div>
+            <div class="msg bot"><span class="who">机器人</span>✅ 第 1 步完成：角色「阿林」创建好了，这个群就是你的个人群。第 2 步：发「绑定QQ 你的QQ号」……</div>
+            <div class="msg me">绑定QQ 12345678</div>
+            <div class="msg bot"><span class="who">机器人</span>✅ 第 2 步完成：QQ 12345678 认到「阿林」名下了。第 3 步：这是你的完整回执……</div>
           </div>
           <p class="note">名字就是别人给你发短信、约你时要写的名字，起好再发。想换个人群：在原群发 <code>换绑码</code>，到新群发 <code>认群 码</code>。</p>
         </div>
@@ -1064,8 +1084,8 @@ article h2 .n::after{top:-9px;width:6px;height:7px}
       <p>这些在后台「功能与设置」「扩展」里按需打开，没开的指令不会响应，无需设置。</p>
       <div class="grid3" style="grid-template-columns:repeat(2,1fr)">
         <div class="feat"><h3>论坛</h3><p><code>发帖 署名 内容</code> 匿名发帖；<code>回复帖子 001 内容</code>，<code>点赞 001</code>，<code>查看帖子</code>。</p></div>
-        <div class="feat"><h3>心愿</h3><p><code>挂心愿 1400-1500 花园 一起散步</code>，别人 <code>摘心愿 编号</code> 就开一场约会。悬赏心愿可以带奖励。</p></div>
-        <div class="feat"><h3>前置电话</h3><p><code>提交前置电话 内容</code>，别人 <code>拨打前置电话 编号</code>。管理员可分组、设可选。</p></div>
+        <div class="feat"><h3>心愿</h3><p><code>挂心愿 1400-1500 花园 一起散步</code>，别人 <code>摘心愿 编号</code> 就开一场约会。<code>| 昵称</code> 结尾可以不露真名。</p></div>
+        <div class="feat"><h3>前置电话</h3><p>在小手机「发现 → 前置电话」填资料卡，翻别人的卡、向左滑选 TA，配对了就在小手机里聊。</p></div>
         <div class="feat"><h3>物品与商城</h3><p><code>背包</code> <code>商城</code> <code>购买</code> <code>使用</code> <code>转账 小明 金币 50</code>，还有兑换与合成。</p></div>
         <div class="feat"><h3>晚餐</h3><p>管理员 <code>开始晚餐 8</code>，玩家 <code>入座 3</code>，相邻的人可以 <code>戳你一下 名字</code>。</p></div>
         <div class="feat"><h3>小玩意</h3><p>漂流瓶、抽取池、点歌、提醒、收集……完整列表见 <a href="#/commands">指令大全</a>。</p></div>
@@ -1314,7 +1334,7 @@ article h2 .n::after{top:-9px;width:6px;height:7px}
       <ol class="steps">
         <li><b>准备小号</b>用一个不常用的 QQ 号，拉进所有房间群，并设成管理员（改群名需要）。</li>
         <li><b>装客户端</b>在服务器上装 NapCat、LLBot 或 SnowLuma 这类 OneBot 11 客户端，用小号扫码登录，打开「正向 WebSocket」，设一个口令。</li>
-        <li><b>在后台连上</b>设置平台「结合QQ小号模式（双骰）」页，点「连一个 QQ 小号」：填地址（例如 <code>ws://127.0.0.1:3001</code>）和口令。可以连多个号。</li>
+        <li><b>在后台连上</b>设置平台「QQ 小号与群号组（双骰）」页，点「连一个 QQ 小号」：填地址（例如 <code>ws://127.0.0.1:3001</code>）和口令。可以连多个号。</li>
         <li><b>把群放进群号组</b>连上后，小号在的群会列在页面上，勾选要用的房间群，放进一个群号组。</li>
         <li><b>让玩家绑 QQ</b>每个玩家在自己的个人群发一次 <code>绑定qq 自己的QQ号</code>。</li>
       </ol>
@@ -1370,22 +1390,27 @@ article h2 .n::after{top:-9px;width:6px;height:7px}
 "use strict";
 // ---------- data: [名称, 别名, 用法, 说明, 谁(p 玩家 / a 管理员), 分组] ----------
 var G = [
- ["start","入门与群","在任意群里","绑定角色、绑定群、认管理员和设置群用途。"],
+ ["start","入门与群","在任意群里","建角色三步：创建新角色 → 绑定QQ → 收回执。管理员在这里认管理员、设置群用途。"],
  ["social","短信与礼物","在自己的个人群里发","每天的次数、冷却在后台「功能与设置」调。"],
  ["date","约会与时间线","约会 / 电话 / 踩点 / 官约","发起后从群池领房间，聊完结束，自动写进时间线。"],
  ["love","心动信与关系线","夜间派送 · 关系细节",""],
  ["season","季度与出场","主持人主导","季度推进、游戏天数、出场顺序、NPC。"],
- ["ext","扩展玩法","在后台按需开启","论坛、心愿、前置电话、物品商城、晚餐、抽取池等。"],
+ ["ext","扩展玩法","在后台按需开启","论坛、心愿、物品商城、抽取池、漂流瓶等。前置电话在小手机「发现」里玩。"],
+ ["dinner","晚餐与小游戏","开了晚餐就能玩","晚餐座位、围猎、巡逻、喝酒游戏。"],
+ ["letters","写信综","个性化模块，默认关","正式信件、写信币赏金、望远镜和羽毛笔。"],
  ["dice","跑团骰子","跑团模式的群","COC7 / DND5e / 绿色三角洲 掷骰与角色卡。"]
 ];
 var C = [
  // start
- ["创建新角色","","创建新角色 名字","在当前群创建角色，这个群成为你的个人群。","p","start"],
+ ["创建新角色","","创建新角色 名字","第 1 步：在当前群创建角色，这个群成为你的个人群。","p","start"],
  ["我的角色","我的群","我的角色","看自己的角色和绑了哪些群。","p","start"],
  ["认群","","认群 6位认群码","用认群码把当前群绑给你的角色。","p","start"],
  ["换绑码","","换绑码 → 在新群发 认群 码","把个人群换到一个新群（码 10 分钟有效）。","p","start"],
  ["手机码","","手机码","拿网页小手机的链接和激活码。","p","start"],
- ["绑定qq","绑定QQ、绑QQ","绑定qq 你的QQ号","让监听号认出你，房间戏文才能记到你名下。","p","start"],
+ ["绑定qq","绑定QQ、绑QQ","绑定QQ 你的QQ号","第 2 步：让监听号认出你，房间戏文才能记到你名下；绑好发完整回执。","p","start"],
+ ["修改名字 / 性别 / 年龄 / 皮相 / 签名 / 简称","修改名字、修改性别、修改年龄、修改皮相、修改签名、修改简称","修改皮相 某某","改自己的档案，可以一次发多行。皮相 2 小时、签名 12 小时能改一次。","p","start"],
+ ["玩家名单","角色名单","玩家名单","所有角色，NPC 单独一栏。","p","start"],
+ ["查看皮相墙","皮相墙","查看皮相墙","大家的皮相。","p","start"],
  ["拉黑","","拉黑 角色名 [静默]","不再收到对方的短信。","p","start"],
  ["取消拉黑 / 拉黑列表","","取消拉黑 角色名","","p","start"],
  ["ping","","/ping","连通性测试，回「收到」。","p","start"],
@@ -1400,7 +1425,9 @@ var C = [
  ["格式","格式短信、格式送礼、格式心动信……","格式","一排按钮，只列开着的功能；点一下把空白格式填进输入框。发「格式短信」看带例子的完整写法。","p","social"],
  ["我的","","我的","角色卡、时间线、待回、数量、统计……一排按钮，随时点。","p","social"],
  ["我的图鉴","图鉴、我的礼物","我的图鉴","收到过的所有礼物。","p","social"],
- ["礼品店","","礼品店","看礼物编号。","p","social"],
+ ["礼品店","","礼品店","逛一逛：货架上随机一件你还没有的礼物收进图鉴，24 小时换一次。","p","social"],
+ ["偷礼物","","偷礼物 对方名","从对方图鉴里偷一件你没有的（管理员开了才能用）。","p","social"],
+ ["偷盗记录","","偷盗记录","谁偷过你、你偷过谁。","p","social"],
  ["我的数量","","我的数量","今天还能发几条。","p","social"],
  ["我的待回","","我的待回","还没处理的消息和邀请。","p","social"],
  // date
@@ -1415,6 +1442,8 @@ var C = [
  ["时间线","","时间线 [角色名]","看排期。","p","date"],
  ["修改时间线","同意时间线、拒绝时间线","修改时间线 R12 D1 1400-1500","在房间群里可以不写 R 号；在个人群里要写。全员同意后生效。","p","date"],
  ["本场统计","我的统计","本场统计","这一季的数据。","p","date"],
+ ["我的弧长","","我的弧长","自己每场戏的弧长。","p","date"],
+ ["查看弧长","","查看弧长 角色名","看别人的弧长。","a","date"],
  ["发起官约","","发起官约 [D3] 1400-1500 [后山] 小满/阿林","节目组安排的约会。","a","date"],
  ["发起官电","","发起官电 D2 2000-2100 小满/阿林","节目组安排的电话。","a","date"],
  ["计划官约 / 执行官约","","计划官约 D2 1400-1500 后山 小满/阿林","先攒着，执行时一起发起；「计划官约 清空」重来。","a","date"],
@@ -1445,7 +1474,7 @@ var C = [
  ["收尾","","收尾 → 收尾 确认","预览并清空本季数据。","a","season"],
  ["修改档期","","修改档期 1115-1121 [补戏1123]","","a","season"],
  ["设置天数","开启自动天数、关闭自动天数","设置天数 D3","手动设游戏天数。","a","season"],
- ["创建NPC","设为NPC、取消NPC、NPC列表","创建NPC 名字","没有个人群的角色。","a","season"],
+ ["创建NPC","设为NPC、取消NPC、NPC列表","创建NPC 名字","回执里有认群码；扮 NPC 的人到它的群里发「认群 码」，再「绑定QQ」。","a","season"],
  ["设为戏群","取消戏群","设为戏群","出场发到这里。","a","season"],
  ["抽取出场顺序","","抽取出场顺序","随机排出场顺序。","a","season"],
  ["开始出场 / 跳过出场","","开始出场","","a","season"],
@@ -1457,27 +1486,44 @@ var C = [
  ["点赞 / 点踩","点赞楼层、点踩楼层","点赞 001","","p","ext"],
  ["查看帖子","","查看帖子 [贴号]","","p","ext"],
  ["删帖 / 删楼层","","删帖 001","","a","ext"],
- ["挂心愿","","挂心愿 1400-1500 花园 一起散步","挂出一个心愿等人来摘。","p","ext"],
- ["悬赏心愿","","悬赏心愿 1400-1500 图书馆 陪我看书 | 滋补汤 1","带奖励的心愿。","p","ext"],
- ["看心愿 / 摘心愿 / 撤心愿","","摘心愿 编号","摘走后自动开约会房间。","p","ext"],
- ["提交前置电话","前置电话提交","提交前置电话 内容","","p","ext"],
- ["拨打前置电话","拨打","拨打前置电话 编号","","p","ext"],
- ["查看前置电话","前置电话、我的前置电话、撤回前置电话","查看前置电话","","p","ext"],
- ["前置电话分组","可选、不可选、前置电话一览","前置电话分组 A组 3 5 8","","a","ext"],
+ ["挂心愿","","挂心愿 1400-1500 花园 一起散步 | 昵称","挂出一个心愿等人来摘；| 后面写昵称就不显示真名。24 小时没人摘自动消失，每人最多 3 条。","p","ext"],
+ ["看心愿 / 摘心愿 / 撤心愿","","摘心愿 编号","摘走后自动开约会房间；撤心愿不带编号会列出自己的。","p","ext"],
  ["背包","我的背包","背包","","p","ext"],
  ["商城 / 购买 / 使用","道具商城","商城","看商品，再按提示购买、使用。","p","ext"],
  ["赠送道具","赠送物品、转账、赠送货币","转账 小明 金币 50","","p","ext"],
  ["角色卡","名片、我的名片","角色卡","你的角色名片。","p","ext"],
  ["兑换 / 合成","兑换表、合成表","合成 编号 [次数]","","p","ext"],
  ["地点","","地点","看可约会的地点。","p","ext"],
- ["开始晚餐","结束晚餐","开始晚餐 5 现代西餐","","a","ext"],
- ["入座 / 戳你一下","","入座 3","相邻座位可以戳。","p","ext"],
+
  ["抽取","我的抽取次数、我的保底、查看池子","抽取 [池子] [次数]","","p","ext"],
  ["发放抽取","","发放抽取 角色名 次数 [池子]","给所有人发：发放抽取 全体 1 新年池","a","ext"],
  ["漂流瓶","","漂流瓶 内容","扔一个；「漂流瓶 编号 内容」回信。","p","ext"],
  ["点歌","","点歌 歌名","发到公告群。","p","ext"],
  ["提醒","我的提醒、删除提醒、再提醒我","提醒 时间 内容","","p","ext"],
  ["收集","","收集 [内容]","看正在收集什么，或提交。","p","ext"],
+ // dinner
+ ["开始晚餐","结束晚餐","开始晚餐 5 现代西餐","开一桌晚餐，座位数 + 风格。","a","dinner"],
+ ["入座 / 戳你一下","","入座 3","相邻座位可以戳。","p","dinner"],
+ ["开始狩猎","开始围猎","开始狩猎 [轮流] [边长 4-7] [猎物名]","入座的人一起围猎；不写「轮流」就是大家同时出手。","a","dinner"],
+ ["追踪 / 设陷阱 / 开枪 / 观望","","开枪 C3","围猎里的行动：侦查阶段追踪或设陷阱，开火阶段开枪或观望。","p","dinner"],
+ ["狩猎状态 / 狩猎排行","围猎状态、围猎排行","狩猎状态","","p","dinner"],
+ ["跳过狩猎 / 结束狩猎 / 重置狩猎排行","狩猎跳过、结束围猎","结束狩猎","","a","dinner"],
+ ["巡逻开局","巡逻设置地点、巡逻结束","巡逻设置地点 花园 厨房 书房","开一局巡逻（捉迷藏淘汰赛），可以先设地点。","a","dinner"],
+ ["巡逻","","巡逻","结算一轮：卫兵每轮多一个，藏错的人被捕。","a","dinner"],
+ ["巡逻报名 / 巡逻躲藏","","巡逻躲藏 书房","在自己的个人群发，别人看不到你藏哪。","p","dinner"],
+ ["巡逻状态","","巡逻状态","","p","dinner"],
+ ["加入喝酒游戏 / 开始喝酒游戏","","加入喝酒游戏","大家先加入，有人开始。","p","dinner"],
+ ["上酒 / 喝酒","可喝酒","喝酒 7","上酒摆 24 杯，每人盲选一杯喝。","p","dinner"],
+ ["喝酒状态 / 醉酒名单","喝酒游戏状态","醉酒名单","","p","dinner"],
+ ["结束喝酒游戏","","结束喝酒游戏","公布醉酒名单和幸存者。","p","dinner"],
+ ["重置喝酒游戏 / 设定醉酒阈值","","设定醉酒阈值 500","","a","dinner"],
+ // letters
+ ["发送信件","写信","发送信件\n【收件人】小满\n【内容】……\n【署名】选填","寄一封正式信件，够字数有写信币赏金。","p","letters"],
+ ["信件状态","","信件状态","今天还能寄几封、写信币多少。","p","letters"],
+ ["使用望远镜 / 使用羽毛笔","","使用望远镜 小满","望远镜：抄一份对方下一封信；羽毛笔：截下对方下一封信先改再发。","p","letters"],
+ ["羽毛笔修改","","羽毛笔修改 1 新内容","改截下来的信。","p","letters"],
+ ["写信综指南","","写信综指南","玩法说明。","p","letters"],
+ ["注册写信综基础道具","","注册写信综基础道具","在物品库里建好写信币、望远镜、羽毛笔。","a","letters"],
  // dice
  ["rd","r","r 3d6+2 原因","通用掷骰。","p","dice"],
  ["rh","暗骰","rh 1d100","结果私发。","p","dice"],
@@ -1495,6 +1541,8 @@ var C = [
  ["ri","先攻","ri +2","先攻。","p","dice"],
  ["at","攻击","at 长剑","","p","dice"],
  ["st","录卡、看卡","st 力量60 敏捷70","录入当前角色卡。","p","dice"],
+ ["录属性 / 属性","设置属性、我的属性","录属性 力量60 敏捷70","恋综角色的属性（跑团检定用）；「属性」看。","p","dice"],
+ ["删属性 / 清空属性","删除属性","删属性 力量","","p","dice"],
  ["pc / nn","改名","pc new 名字 [coc|dnd|dg]","建卡、pc list 看卡、切换；nn 改名。","p","dice"],
  ["我是谁","whoami","我是谁","","p","dice"],
  ["team","队伍","team 调查员 ra 聆听","整队一起检定。","p","dice"],
@@ -1574,16 +1622,21 @@ function cmdCard(c,q){
     '<div class="u">'+esc(c[2])+'</div><button class="cp" data-copy="'+esc(c[2])+'">复制</button></div>';
 }
 function renderCmds(){
+  // 玩家用的和管理员用的分成两大块，不混在一起；每块里再按分类排
   var q=state.q.trim().toLowerCase(),html="";
-  G.forEach(function(g){
-    if(state.cat!=="all"&&state.cat!==g[0])return;
-    var list=C.filter(function(c){
-      if(c[5]!==g[0])return false;
-      if(state.w!=="all"&&c[4]!==state.w)return false;
-      return !q||(c[0]+" "+c[1]+" "+c[2]+" "+c[3]).toLowerCase().indexOf(q)>=0;
+  [["p","玩家用的指令","在自己的个人群、房间群里发。"],["a","管理员用的指令","要先「认管理员」；多数在后台群或公告群发。"]].forEach(function(w){
+    if(state.w!=="all"&&state.w!==w[0])return;
+    var part="";
+    G.forEach(function(g){
+      if(state.cat!=="all"&&state.cat!==g[0])return;
+      var list=C.filter(function(c){
+        if(c[5]!==g[0]||c[4]!==w[0])return false;
+        return !q||(c[0]+" "+c[1]+" "+c[2]+" "+c[3]).toLowerCase().indexOf(q)>=0;
+      });
+      if(!list.length)return;
+      part+='<div class="cgroup"><h3>'+g[1]+'<small>'+g[2]+'</small></h3>'+(g[3]&&w[0]==="p"?'<p>'+g[3]+'</p>':'')+'<div class="clist">'+list.map(function(c){return cmdCard(c,state.q.trim())}).join("")+'</div></div>';
     });
-    if(!list.length)return;
-    html+='<div class="cgroup"><h3>'+g[1]+'<small>'+g[2]+'</small></h3>'+(g[3]?'<p>'+g[3]+'</p>':'')+'<div class="clist">'+list.map(function(c){return cmdCard(c,state.q.trim())}).join("")+'</div></div>';
+    if(part)html+='<section class="cwho"><h2 class="cwho-h">'+w[1]+' <span class="tag '+w[0]+'">'+(w[0]==="p"?"玩家":"管理员")+'</span></h2><p class="note">'+w[2]+'</p>'+part+'</section>';
   });
   $("#clist").innerHTML=html||'<div class="empty">没有找到「'+esc(state.q)+'」相关的指令。</div>';
 }

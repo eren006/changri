@@ -163,7 +163,7 @@
     <span class="btns"><details class="panel"><summary class="btn">{{ ic.plus() }}添加 NPC</summary>
       <div class="form">
         <form method="post" action="{{ url_for('season_npc_create') }}">{{ csrf() }}
-          <div class="fields"><div><label for="nn">创建一个新 NPC（没有个人群）</label><input id="nn" name="name" maxlength="20" placeholder="名字，不带空格"></div></div>
+          <div class="fields"><div><label for="nn">创建一个新 NPC（会给一个认群码，在给它用的群里发「认群 码」）</label><input id="nn" name="name" maxlength="20" placeholder="名字，不带空格"></div></div>
           <div class="actions"><button class="btn" type="submit">创建</button></div></form>
         {% if others %}<form method="post" action="{{ url_for('season_npc_flag') }}" style="margin-top:14px">{{ csrf() }}<input type="hidden" name="on" value="1">
           <div class="fields"><div><label for="ns">或者把已有的角色设为 NPC</label><select id="ns" name="name">{% for o in others %}<option>{{ o.name }}</option>{% endfor %}</select></div></div>

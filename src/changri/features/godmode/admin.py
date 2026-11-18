@@ -63,8 +63,16 @@ def register(app, login_required):
                        others=[p for p in people if p["id"] != rid],
                        profile=charprofile.get(rid), my_groups=roles_core.list_groups(rid), qqs=roles_core.qqs_of_role(rid),
                        phone_on=extensions.is_enabled("phone"), phone_code=_phone_code(rid),
-                       bind_code=request.args.get("code", ""))
+                       bind_code=request.args.get("code", ""), pending=roles_core.pending_code(rid))
         return render_template("god.html", people=people, role=role, everyone=False, tab=tab, god=god_core, any_global=any_global, **ctx)
+
+    @app.post("/god/<int:role_id>/bindqq")
+    @login_required
+    def god_bindqq(role_id):
+        """替玩家补绑 QQ（老季度建的角色没绑过的）。"""
+        err = roles_core.bind_qq(role_id, request.form.get("qq", ""))
+        flash(err or "QQ 号已绑好")
+        return _god_back(role_id)
 
     @app.post("/god/<int:role_id>/profile")
     @login_required

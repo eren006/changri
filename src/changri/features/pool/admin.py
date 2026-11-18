@@ -13,7 +13,7 @@ def register(app, login_required):
     @app.route("/backup-pool")
     @login_required
     def backup_pool_page():
-        groups = [g for g in pool_core.all_groups() if not pool_core.is_qq_only(g)]      # 小号群号组的群在「结合QQ小号模式（双骰）」页管
+        groups = [g for g in pool_core.all_groups() if not pool_core.is_qq_only(g)]      # 小号群号组的群在「QQ 小号与群号组（双骰）」页管
         alt = {g["real_gid"]: g for g in pool_core.all_groups() if pool_core.is_qq_only(g)}
         for g in groups:                                   # 同一个群号也在小号的群号组里：可以来回转
             a = alt.get(g["real_gid"]) if g["real_gid"] else None

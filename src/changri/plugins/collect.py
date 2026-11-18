@@ -16,8 +16,6 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     text = args.extract_plain_text().strip()
     if not text:
         await cmd.finish(collect.describe_open())
-    if me["is_npc"]:
-        await cmd.finish("NPC 不参加收集。")
     head, _, rest = text.partition(" ")
     cid = None
     if head.isdigit() and rest.strip() and collect.get(int(head)):       # 第一个词是存在的收集编号才当编号，否则整段都是内容

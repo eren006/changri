@@ -26,9 +26,7 @@ def register(app, ctx):
             return bad
         cid = request.form.get("cid", "")
         why = _gate(role, "收集", request.form.get("text", ""))
-        if role["is_npc"]:
-            flash("NPC 不参加收集。")
-        elif why:
+        if why:
             flash(why)
         else:
             ok, msg = collect.submit(role["id"], request.form.get("text", ""), int(cid) if cid.isdigit() else None)

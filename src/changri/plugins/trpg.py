@@ -92,7 +92,10 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
         await bindqq_cmd.finish("格式：/绑定QQ 你的QQ号。绑定后，QQ 小号在群里听到你的发言，会算在你自己名下（跑团 log 记在你的名字下，房间群里说话算到场）。")
     done = []
     role = roles.find_role_for_sender(current_bot.get().self_id, event.group_openid, event.author.member_openid)
+    first = False
     if role:
+        from changri.core.roles import qqs_of_role
+        first = not qqs_of_role(role["id"])                  # 建角色的第 2 步：绑好就发完整回执（第 3 步）
         err = roles_bind(role["id"], text)
         if err:
             await bindqq_cmd.finish(err)
@@ -102,6 +105,9 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
         if err:
             await bindqq_cmd.finish(err)
         done.append("跑团身份")
+    if first:
+        from changri.core import formats
+        await bindqq_cmd.finish(formats.welcome(role, f"✅ 第 2 步完成：QQ {text} 认到「{role['name']}」名下了。\n\n第 3 步：这是你的完整回执，收好～"))
     await bindqq_cmd.finish(f"好，QQ {text} 认到你的" + "、".join(done) + "名下了。" if done else "这里认不出你是谁：恋综要先有角色，跑团的群要先 /st 或 /pc new 建过卡。")
 
 

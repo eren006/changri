@@ -284,12 +284,16 @@ async def group_members(app_id: str, gid: str) -> set[str] | None:
 
 async def group_others(app_id: str, gid: str) -> set[str] | None:
     """房间群里「不该留着的人」：去掉群主、管理员（工作人员）和我们自己连着的 QQ 号，剩下的都算。
-    不管有没有绑定过 QQ——没绑定的玩家也是人，群里还有他就不能分给下一场。问不到返回 None。"""
+    不管有没有绑定过 QQ——没绑定的玩家也是人，群里还有他就不能分给下一场。
+    只扮 NPC 的号（绑的 QQ 名下全是 NPC）不算，照老系统：NPC 留在群里不耽误下一场。问不到返回 None。"""
     rows = await _member_rows(app_id, gid)
     if rows is None:
         return None
     mine = {l.self_id for l in _links.values() if l.self_id}
-    return {r["qq"] for r in rows if r["role"] not in ("owner", "admin") and r["qq"] not in mine}
+    with use_bot(app_id):
+        from . import roles
+        npc_only = roles.npc_only_qqs()
+    return {r["qq"] for r in rows if r["role"] not in ("owner", "admin") and r["qq"] not in mine and r["qq"] not in npc_only}
 
 
 async def read_forward(app_id: str, gid: str, reply_id: str = "", forward_id: str = "") -> tuple[list[dict] | None, str]:

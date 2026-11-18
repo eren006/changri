@@ -1,11 +1,11 @@
-{% extends "base.html" %}{% block title %}结合QQ小号模式（双骰）{% endblock %}
+{% extends "base.html" %}{% block title %}QQ 小号与群号组（双骰）{% endblock %}
 {% block body %}
 {% import "_rpg_icons.html" as ic %}
 {% macro cancel() %}<button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button>{% endmacro %}
-<h1>结合QQ小号模式（双骰）</h1>
+<h1>QQ 小号与群号组（双骰）</h1>
 <p class="lede">官方机器人加一个 QQ 小号，两个一起干活。约会、电话这些房间用的群交给小号管：<b>小号负责改群名、查谁在群里、听发言记复盘</b>；官方机器人可以不进这些群，除非之后这些群也想转到官方名下。</p>
 <p class="note"><a href="https://system.changri.work/#/install#i-modes" target="_blank" rel="noopener">官网教程：选哪种模式、怎么设 →</a></p>
-<p class="note">不想装别的程序、只用官方机器人？用<a href="{{ url_for('backup_pool_page') }}">纯官方模式（单骰）</a>（腾讯限制，官方机器人改不了群名）。两种可以混着用，一个群同一时间只归一边。</p>
+<p class="note">不想装别的程序、只用官方机器人？用<a href="{{ url_for('backup_pool_page') }}">备用群池（纯官方 · 单骰）</a>（腾讯限制，官方机器人改不了群名）。两种可以混着用，一个群同一时间只归一边。</p>
 
 <details class="callout" {{ 'open' if not link_rows }}>
   <summary><b>第一次用：把小号连上来（三步）</b></summary>
@@ -156,7 +156,7 @@
           <input type="text" name="custom" value="{{ '' if is_preset else tpl }}" placeholder="{kind} {day} {time} {place} {names}" style="flex:1 1 200px"></label>
         <p class="note">默认跟长日系统一样：类型、D几、时间段、地点、人名；超过 30 字会依次缩短地点、人名、时间。自己写时可以用 {kind}、{day}、{time}、{place}、{names}（三人以内用「×」连）、{id}。现在的效果：<b>{{ preview }}</b></p>
         <div class="fields"><div><label>空闲时的群名</label><input name="free_name" value="{{ free_name }}"></div></div>
-        <p class="note">可以用 {set} 代表群号组的名字，比如「{set}·长日备用」。这个空闲群名和「纯官方模式（单骰）」页的是同一个：官方机器人的备用群也一直叫这个名字。</p>
+        <p class="note">可以用 {set} 代表群号组的名字，比如「{set}·长日备用」。这个空闲群名和「备用群池（纯官方 · 单骰）」页的是同一个：官方机器人的备用群也一直叫这个名字。</p>
         <div class="actions"><button class="btn" type="submit">保存</button>{{ cancel() }}</div>
       </form></details>
   </div>

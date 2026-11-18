@@ -88,6 +88,8 @@ def bind_qq(role_id: int, qq: str) -> str:
         row = conn.execute("SELECT member_openid FROM roles WHERE id=?", (role_id,)).fetchone()
         if not row:
             return "没有这个角色"
+        if not row["member_openid"]:
+            return "这个角色还没有认群，先在它的个人群里发「认群 码」再绑 QQ"
         conn.execute("INSERT INTO person_qq(qq, member_openid, created_ts) VALUES(?,?,?) "
                      "ON CONFLICT(qq) DO UPDATE SET member_openid=excluded.member_openid", (qq, row["member_openid"], int(time.time())))
     return ""
@@ -119,6 +121,26 @@ def qqs_of_role(role_id: int) -> list[str]:
     """这个角色的主人绑过的 QQ 号。"""
     with get_conn() as conn:
         return [r["qq"] for r in conn.execute("SELECT q.qq FROM person_qq q JOIN roles r ON r.member_openid=q.member_openid WHERE r.id=?", (role_id,))]
+
+
+def code_role(code: str) -> int | None:
+    """认群码对应的角色（过期、不存在返回 None）。"""
+    with get_conn() as conn:
+        r = conn.execute("SELECT role_id FROM bind_codes WHERE code=? AND expires_ts>=?", (code, int(time.time()))).fetchone()
+    return r["role_id"] if r else None
+
+
+def has_group(role_id: int) -> bool:
+    """这个角色有没有认好的个人群。"""
+    with get_conn() as conn:
+        return bool(conn.execute("SELECT 1 FROM role_groups WHERE role_id=? AND COALESCE(group_openid,'')!=''", (role_id,)).fetchone())
+
+
+def npc_only_qqs() -> set[str]:
+    """绑过 QQ、名下角色全是 NPC 的那些 QQ 号（扮 NPC 的号）。"""
+    with get_conn() as conn:
+        return {r["qq"] for r in conn.execute(
+            "SELECT q.qq FROM person_qq q JOIN roles r ON r.member_openid=q.member_openid GROUP BY q.qq HAVING MIN(r.is_npc)=1")}
 
 
 def get_role(role_id: int):
@@ -170,21 +192,41 @@ def add_slot(role_id: int, real_gid: str) -> tuple[bool, str]:
     """后台登记个人群的群号（群位）并生成认群码；认群时会替换现有的个人群。"""
     if not GID_RE.fullmatch(real_gid):
         return False, "群号要是 5~12 位数字。"
+    return _slot_code(role_id, real_gid)
+
+
+def npc_bind_code(role_id: int) -> str:
+    """给还没有个人群的 NPC 开一个群位并生成认群码（24 小时）：在给它用的群里发「认群 码」，之后跟玩家一样在那个群里发指令。"""
+    return _slot_code(role_id, "")[1]
+
+
+def _slot_code(role_id: int, real_gid: str) -> tuple[bool, str]:
     with get_conn() as conn:
         if not conn.execute("SELECT 1 FROM roles WHERE id=?", (role_id,)).fetchone():
             return False, "没有这个角色。"
-        # 每个角色只有一个个人群，已有的就改它的群号标签，认群时再替换 openid
-        row = conn.execute("SELECT id FROM role_groups WHERE role_id=? AND kind='main'", (role_id,)).fetchone()
+        # 每个角色只有一个个人群。新群号先记在认群码上，认群时才写到个人群上：
+        # 旧群还绑着的时候不能先改群号标签，不然页面上新群号会立刻显示「已认群」。
+        row = conn.execute("SELECT id, group_openid FROM role_groups WHERE role_id=? AND kind='main'", (role_id,)).fetchone()
         if row:
             slot_id = row["id"]
-            conn.execute("UPDATE role_groups SET real_gid=? WHERE id=?", (real_gid, slot_id))
+            if real_gid and not row["group_openid"]:          # 还没认过群的群位：直接改标签（本来就显示「等待认群」）
+                conn.execute("UPDATE role_groups SET real_gid=? WHERE id=?", (real_gid, slot_id))
         else:
             slot_id = conn.execute(
                 "INSERT INTO role_groups(role_id, real_gid, kind, created_ts) VALUES(?,?,'main',?)",
                 (role_id, real_gid, int(time.time())),
             ).lastrowid
+        conn.execute("DELETE FROM bind_codes WHERE role_id=? AND slot_id IS NOT NULL", (role_id,))   # 同一个人只留最新的一个后台认群码
         code = _new_code(conn, role_id, "main", slot_id, ADMIN_CODE_TTL)
+        conn.execute("UPDATE bind_codes SET real_gid=? WHERE code=?", (real_gid, code))
     return True, code
+
+
+def pending_code(role_id: int):
+    """后台生成的、还没用掉的认群码（换绑群号 / 新 NPC）。没有返回 None。"""
+    with get_conn() as conn:
+        return conn.execute("SELECT code, real_gid, expires_ts FROM bind_codes WHERE role_id=? AND slot_id IS NOT NULL AND expires_ts>=? "
+                            "ORDER BY expires_ts DESC LIMIT 1", (role_id, int(time.time()))).fetchone()
 
 
 def consume_bind_code(code: str, bot_id: str, group_openid: str, member_openid: str) -> tuple[bool, str]:
@@ -200,10 +242,12 @@ def consume_bind_code(code: str, bot_id: str, group_openid: str, member_openid: 
         if exist:
             return False, f"这个群已经绑给「{exist['name']}」了。"
         role = conn.execute("SELECT name FROM roles WHERE id=?", (row["role_id"],)).fetchone()
-        if row["slot_id"]:  # 后台登记的群位：补上 openid
+        # 后台建的 NPC 本来没有主人：谁来认群，谁就是它的主人（绑 QQ、认人都按主人走）
+        conn.execute("UPDATE roles SET member_openid=? WHERE id=? AND member_openid=''", (member_openid, row["role_id"]))
+        if row["slot_id"]:  # 后台登记的群位：补上 openid，换上登记的新群号
             conn.execute(
-                "UPDATE role_groups SET bot_id=?, group_openid=?, member_openid=? WHERE id=?",
-                (bot_id, group_openid, member_openid, row["slot_id"]),
+                "UPDATE role_groups SET bot_id=?, group_openid=?, member_openid=?, real_gid=CASE WHEN ?!='' THEN ? ELSE real_gid END WHERE id=?",
+                (bot_id, group_openid, member_openid, row["real_gid"], row["real_gid"], row["slot_id"]),
             )
         else:  # 玩家换绑
             conn.execute(

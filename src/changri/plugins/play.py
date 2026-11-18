@@ -540,7 +540,7 @@ async def _finish_room(room_id: int, status: str, why: str, timeout: bool = Fals
                     await _push(rid, rewards.message(room_id, items))
             except Exception as e:  # noqa: BLE001
                 logger.warning(f"[结戏奖励] R{room_id} 结算失败：{e}")
-    if gi and gi[1].startswith(pool.QQ_PREFIX):                          # 房间群：群名改回「长日备用」（可在「结合QQ小号模式（双骰）」页改）
+    if gi and gi[1].startswith(pool.QQ_PREFIX):                          # 房间群：群名改回「长日备用」（可在「QQ 小号与群号组（双骰）」页改）
         await qqmanager.room_rename(gi[0], pool.get(room["pool_id"]), qqpool.free_name(pool.get(room["pool_id"])["set_name"]))
     if gi and gi[1].startswith(pool.QQ_PREFIX):                          # 小号的群：小号会自己查人，直接放回池
         if timeout:
@@ -673,7 +673,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     QQ 会把被引用的记录作为文字带过来（只有发送者和内容，没有时间），已有的跳过，缺的按顺序插进复盘。"""
     from changri.core import roomlog
     if get_config("qq_backfill_enabled", "1") != "1":
-        await backfill_cmd.finish("补录没有打开（管理员在设置平台「结合QQ小号模式（双骰）」页打开）。")
+        await backfill_cmd.finish("补录没有打开（管理员在设置平台「QQ 小号与群号组（双骰）」页打开）。")
     if not season.running():
         await backfill_cmd.finish("现在没有进行中的季度，补录只能补进进行中的季度。")
     arg = _room_arg(args.extract_plain_text())

@@ -14,7 +14,7 @@ def register(app, ctx):
         if bad:
             return bad
         from changri.core import godmode, windows
-        why = ("NPC 不能挂心愿。" if role["is_npc"] else "" ) or ("现在不是进行中的季度，不能挂心愿。" if season.phase() != "playing" else "") or windows.check("wish") or godmode.check(role["id"], "wish")
+        why = ("现在不是进行中的季度，不能挂心愿。" if season.phase() != "playing" else "") or windows.check("wish") or godmode.check(role["id"], "wish")
         wall = [{"id": w["id"], "who": wishes.label(w), "mine": w["poster_id"] == role["id"], "day": f"D{w['day']}", "time": f"{w['start_hm']}-{w['end_hm']}",
                  "place": w["place"], "content": w["content"], "left": wishes.left_hours(w)} for w in wishes.list_open()]
         return page("wishes.html", role=role, mode="wishes", why=why, wall=wall, places=[p["name"] for p in rpg.places()], max_content=200, rewards=[], room_on=True)
@@ -65,9 +65,6 @@ def register(app, ctx):
         role, bad = need_login()
         if bad:
             return bad
-        if role["is_npc"]:
-            flash("NPC 不能摘心愿。")
-            return redirect(url_for("wishes_page"))
         why = _gate(role, "心愿")
         if why:
             flash(why)

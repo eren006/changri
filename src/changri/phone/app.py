@@ -520,7 +520,7 @@ def create_phone_app(secret_key: str) -> Flask:
         steal = None
         if gifts.steal_enabled():
             with get_conn() as c:
-                targets = [dict(r) for r in c.execute("SELECT id, name FROM roles WHERE id!=? AND is_npc=0 ORDER BY id", (role["id"],))]
+                targets = [dict(r) for r in c.execute("SELECT id, name FROM roles WHERE id!=? ORDER BY id", (role["id"],))]
             steal = {"wait": gifts.steal_wait_min(role["id"]), "targets": targets, "log": gifts.steal_log(role["id"], 20)}
         return page("shop.html", role=role, shop_on=gifts.enabled(), total=len(gifts.items()) if gifts.enabled() else 0, mine=mine,
                     album=gifts.received(role["id"]), only=gifts.only_preset(), mode="shop", steal=steal)

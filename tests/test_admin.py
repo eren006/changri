@@ -84,6 +84,8 @@ class AdminTests(unittest.TestCase):
         with socket.socket() as k:
             k.bind(("127.0.0.1", 0))
             free = k.getsockname()[1]
+        from changri.core import netcheck
+        netcheck._ip_cache.update(ip="", ts=0)                  # 别吃到前面缓存的真实公网 IP
         with mock.patch("changri.core.netcheck.public_ip", return_value="9.9.9.9"):
             r = self.post("/phone/enable", phone_port=str(free))
         from changri.core import phoneserver
@@ -96,8 +98,10 @@ class AdminTests(unittest.TestCase):
         self.assertIn("机器人连上了吗", html)
         r = self.post("/phone/settings", phone_port="80", phone_base_url="x")
         self.assertIn("1024", r.get_data(as_text=True))
-        r = self.post("/phone/settings", phone_port="5092", phone_base_url="http://1.2.3.4:5092/", phone_enabled="1", visual="classic", copy="classic")
-        self.assertEqual(get_config("phone_base_url"), "http://1.2.3.4:5092")
+        # 用刚才挑的空闲端口，不写死 5092：开发机上的 changri-bot-dev 或并行跑的别的测试占着 5092 时，这里会因为「端口被占用」不保存（以前偶发失败的原因）
+        r = self.post("/phone/settings", phone_port=str(free), phone_base_url=f"http://1.2.3.4:{free}/", phone_enabled="1", visual="classic", copy="classic")
+        phoneserver.stop()
+        self.assertEqual(get_config("phone_base_url"), f"http://1.2.3.4:{free}")
         self.assertEqual(get_config("phone_https"), "0")
         self.post("/phone/codes/generate")
         rid = roles.get_role_by_name("甲")["id"]

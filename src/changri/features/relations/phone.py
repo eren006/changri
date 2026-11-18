@@ -10,8 +10,6 @@ def register(app, ctx):
     def _rel_can(role) -> tuple[bool, str]:
         if not relations.enabled():
             return False, "关系线现在没有开放"
-        if role["is_npc"]:
-            return False, "NPC 不参加关系线"
         return (False, phonegate.PAUSE_MSG) if phonegate.comm_paused() else (True, "")
 
     @app.route("/p/me/rel")

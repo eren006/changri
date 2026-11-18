@@ -37,6 +37,44 @@ class Extras(unittest.TestCase):
         self.assertTrue(npc.set_flag("乙", False)[0])
         self.assertEqual(npc.names(), ["阿林"])
 
+    def test_npc_create_gives_bind_code_and_can_send(self):
+        """创建NPC 的回执带认群码；在 NPC 的群里认群后，NPC 在那个群里发短信跟玩家一样。"""
+        import re
+        from changri.core import sendmsg
+        ok, msg = npc.create("猫猫")
+        self.assertTrue(ok)
+        code = re.search(r"认群 (\d{6})", msg).group(1)
+        self.assertEqual([n["groups"] for n in npc.listing() if n["name"] == "猫猫"], [0])   # 还没认群，不算有个人群
+        self.assertTrue(roles.consume_bind_code(code, "B", "GN", "MADMIN")[0])
+        self.assertEqual([n["groups"] for n in npc.listing() if n["name"] == "猫猫"], [1])
+        me = roles.find_role_for_sender("B", "GN", "MADMIN")
+        self.assertEqual(me["name"], "猫猫")
+
+        async def fake_send(*a, **k):
+            return True, "x"
+        ok, text = asyncio.run(sendmsg.send(me, self.r["甲"], "sms", "", "你好", "", fake_send))
+        self.assertTrue(ok, text)
+
+    def test_npc_owner_qq_and_setup_steps(self):
+        """后台建的 NPC：认群的人成为主人，之后能绑 QQ；只扮 NPC 的 QQ 不算房间群残留；开了 QQ 小号时先提示绑 QQ，绑好才发回执。"""
+        import re
+        from changri.core import formats
+        ok, msg = npc.create("猫猫")
+        rid = roles.get_role_by_name("猫猫")["id"]
+        self.assertIn("还没有认群", roles.bind_qq(rid, "123456"))          # 没主人时不能绑，不会挂到空身份上
+        code = re.search(r"认群 (\d{6})", msg).group(1)
+        self.assertEqual(roles.code_role(code), rid)
+        self.assertFalse(roles.has_group(rid))
+        roles.consume_bind_code(code, "B", "GN", "MNPC")
+        self.assertTrue(roles.has_group(rid))
+        set_config("qqlink_on", "1")
+        self.assertIn("第 2 步", formats.setup_step(roles.get_role(rid), "head"))
+        self.assertEqual(roles.bind_qq(rid, "123456"), "")
+        self.assertEqual(roles.npc_only_qqs(), {"123456"})
+        self.assertIn("初始档案", formats.setup_step(roles.get_role(rid), "head"))
+        roles.bind_qq(self.r["甲"]["id"], "654321")
+        self.assertNotIn("654321", roles.npc_only_qqs())
+
     def test_bottle(self):
         me = self.r["甲"]
         npc.set_flag("乙", True)

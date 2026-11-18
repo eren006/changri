@@ -210,7 +210,7 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
 
 @npc_new.handle()
 async def _(event: GroupMessageCreateEvent, args=CommandArg()):
-    await _npc_op(npc_new, event, args, "用法：创建NPC 名字（建出来的 NPC 没有个人群）", npc.create)
+    await _npc_op(npc_new, event, args, "用法：创建NPC 名字（回执里有认群码，在给 NPC 用的群里发「认群 码」）", npc.create)
 
 
 @npc_list.handle()

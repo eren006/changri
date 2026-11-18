@@ -41,8 +41,6 @@ def register(app, ctx):
         to, content, sig = f.get("to", ""), f.get("content", "").strip(), (f.get("signature", "").strip() or "匿名")
         target = roles_core.get_role_by_name(to) if to else None
         msg = _gate(role, "心动信", content, sig)
-        if not msg and role["is_npc"]:
-            msg = "NPC 不能投心动信。"
         if not msg and (not target or target["id"] == role["id"]):
             msg = "请选一个收信人（不能是自己）。"
         if not msg:

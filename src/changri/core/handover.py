@@ -91,7 +91,7 @@ def to_official(bot_id: str, group_openid: str, gid: str, set_name: str = "") ->
 def check_to_qq(bot_id: str, gid: str) -> str:
     a = alt_row(bot_id, gid)
     if not a:
-        return "这个群没进过小号的群号组，不能转回小号。要给小号用，到「结合QQ小号模式（双骰）」页把它加进群号组"
+        return "这个群没进过小号的群号组，不能转回小号。要给小号用，到「QQ 小号与群号组（双骰）」页把它加进群号组"
     if not a["moved"]:
         return "这个群现在就归小号管"
     o = official_row(bot_id, gid)
@@ -127,7 +127,7 @@ async def alt_link_in_group(bot_id: str, gid: str) -> tuple[int, str]:
     with use_bot(bot_id):
         links = [ln for ln in qqpool.links() if ln["enabled"]]
     if not links:
-        return 0, "还没有连 QQ 小号：先在后台「结合QQ小号模式（双骰）」页连一个小号"
+        return 0, "还没有连 QQ 小号：先在后台「QQ 小号与群号组（双骰）」页连一个小号"
     errs = []
     for ln in links:
         if not qqmanager.link_status(bot_id, ln["id"])["connected"]:

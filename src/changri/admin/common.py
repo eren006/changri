@@ -267,9 +267,9 @@ def _dashboard() -> dict:
         found_next = found_next or state != "done"
         sheet.append({"time": fmt(mins), "name": name, "desc": desc, "state": state})
     todo = []
-    for b in _bot_status():
-        if b["id"] == current_bot() and not b["online"]:
-            todo.append(("bad", f"机器人 {b['id']} 不在线", url_for("bots_page"), "看看服务有没有在运行"))
+    offline = [{**b, "seen_txt": _fmt_ts(b["seen"]) if b["seen"] else "从没连上过", "mine": b["id"] == current_bot()}
+               for b in _bot_status() if not b["online"]]
+    offline.sort(key=lambda b: not b["mine"])           # 当前这个机器人排最前；其他机器人掉线也一起提醒
     from changri.core import httpsproxy
     if httpsproxy.active() and not httpsproxy.cert_ok(httpsproxy.subject(), timeout=2):
         todo.append(("bad", "HTTPS 证书失效了", url_for("https_page"), "玩家的小手机网址是 https，现在打不开；多半是 80 端口被关了，证书续不上"))
@@ -298,7 +298,7 @@ def _dashboard() -> dict:
     notes = "，".join(n for n in notes if n)
     facts = [("角色", n_roles), ("空闲的房间群" + (f"（{notes}）" if notes else ""), n_free), ("今天的短信和礼物", n_msg_today),
              ("待派送的心动信", len(pool)), ("关系线", n_rel)]
-    return {"sheet": sheet, "todo": todo, "facts": facts, "now": time.strftime("%H:%M"), "date": time.strftime("%Y年%m月%d日")}
+    return {"sheet": sheet, "todo": todo, "facts": facts, "offline": offline, "now": time.strftime("%H:%M"), "date": time.strftime("%Y年%m月%d日")}
 
 
 # 不属于任何一个机器人的页面（账号、更新、远程访问、机器人清单、登录）；其余页面都在 /b/<AppID>/ 下

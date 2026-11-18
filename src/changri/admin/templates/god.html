@@ -129,12 +129,23 @@
     <div class="row"><div class="nm">{% if g.real_gid %}<b class="tabular">{{ g.real_gid }}</b>{% else %}<b>个人群</b>{% endif %}
       <div class="muted">{% if not g.real_gid %}没登记群号，不影响收发{% if g.bot_id %} · {% endif %}{% endif %}{% if g.bot_id %}机器人 <span class="tabular">{{ g.bot_id }}</span>{% endif %}</div></div>
       <div>{% if g.group_openid %}<span class="dot ok"></span>已认群{% else %}<span class="dot warn"></span>等待认群{% endif %}</div></div>
-  {% else %}<p class="empty">没有个人群。</p>{% endfor %}</div>
+  {% else %}<p class="empty">没有个人群。</p>{% endfor %}
+  {% if pending and (pending.real_gid or not my_groups or not my_groups[0].group_openid) %}
+    <div class="row"><div class="nm">{% if pending.real_gid %}<b class="tabular">{{ pending.real_gid }}</b>{% else %}<b>新群</b>{% endif %}
+      <div class="muted">认群码 <span class="tabular">{{ pending.code }}</span>：在那个群里发「认群 {{ pending.code }}」{% if my_groups and my_groups[0].group_openid %}，发了才换过去，之前照旧用上面的群{% endif %}</div></div>
+      <div><span class="dot warn"></span>等待认群</div></div>
+  {% endif %}</div>
 </section>
 <section>
   <div class="sec-head keep"><h2>账号</h2></div>
   <div class="rowlist">
-    <div class="row"><div class="nm"><b>绑定的 QQ 号</b><div class="muted">{% if qqs %}<span class="tabular">{{ qqs|join('、') }}</span>{% else %}还没绑。玩家在个人群里发「绑定QQ」就行。{% endif %}</div></div></div>
+    <div class="row"><div class="nm"><b>绑定的 QQ 号</b><div class="muted">{% if qqs %}<span class="tabular">{{ qqs|join('、') }}</span>{% else %}还没绑。玩家在个人群里发「绑定QQ」就行，也可以在这里替 TA 补。{% endif %}</div></div>
+      <details class="panel"><summary class="btn sm ghost">补绑 QQ</summary>
+        <form class="form" method="post" action="{{ url_for('god_bindqq', role_id=role.id) }}">{{ csrf() }}<input type="hidden" name="tab" value="info">
+          <div class="fields"><div><label for="bq">QQ 号</label><input id="bq" type="text" name="qq" required pattern="\d{5,12}" inputmode="numeric"></div></div>
+          <p class="note">按人认：这个人名下的其他角色也算这个 QQ。以前建的老角色没绑的，在这里补。</p>
+          <div class="actions"><button class="btn" type="submit">绑定</button><button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
+        </form></details></div>
     {% if phone_on %}
     <div class="row"><div class="nm"><b>小手机激活码</b><div class="muted">{% if phone_code %}<span class="tabular">{{ phone_code }}</span>{% else %}还没有。玩家在个人群里发「手机码」就会生成。{% endif %}</div></div>
       {% if phone_code %}<form method="post" action="{{ url_for('phone_reset', role_id=role.id) }}" onsubmit="return confirm('重置 {{ role.name }} 的激活码？旧码立刻失效，玩家要重新登录。')">{{ csrf() }}<input type="hidden" name="next" value="{{ url_for('god_page', role=role.id) }}"><button class="linkbtn">重置</button></form>{% endif %}</div>

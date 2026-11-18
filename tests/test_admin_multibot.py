@@ -165,6 +165,16 @@ class AdminMultiBot(unittest.TestCase):
         html = self.c.get(path).get_data(as_text=True)
         return re.search(r'name="_csrf" value="([^"]+)"', html).group(1)
 
+    def test_dashboard_offline_banner(self):
+        """机器人没心跳：总览顶上直接红框提示不在线；有心跳就不提示。菜单里备用群池不再藏在「模式」下面。"""
+        import time as _t
+        db.set_config("heartbeat:111111", "0")
+        html = self.c.get("/b/111111/").get_data(as_text=True)
+        self.assertIn("这个机器人（111111）不在线", html)
+        self.assertIn("约会房间的群", html)
+        db.set_config("heartbeat:111111", str(int(_t.time())))
+        self.assertNotIn("（111111）不在线", self.c.get("/b/111111/").get_data(as_text=True))
+
     def test_dashboard_counts_free_room_groups(self):
         """总览的「空闲的房间群」：只算池子里空着的，等人退群的单独注明（不是角色的备用群）。"""
         from changri.core import pool
@@ -179,7 +189,7 @@ class AdminMultiBot(unittest.TestCase):
                 c.execute("UPDATE pool_groups SET state='occupied' WHERE id=?", (a,))
         html = self.c.get("/b/111111/").get_data(as_text=True)
         self.assertIn("空闲的房间群（1 个等人退群）", html)
-        self.assertNotIn(">备用群", html)
+        self.assertNotIn(">备用群<", html)
         i = html.index("空闲的房间群")
         self.assertIn('<span class="v">1</span>', html[i - 200:i])          # 只有 G2 空着
 
@@ -294,6 +304,11 @@ class AdminMultiBot(unittest.TestCase):
         r = self.c.post(f"{base}/roles/{rid}/slot", data={"real_gid": "123456789", "_csrf": tok})
         self.assertIn(f"/god?role={rid}&code=", r.headers["Location"])
         self.assertIn("的认群码", self.c.get(r.headers["Location"]).get_data(as_text=True))
+        page = self.c.get(f"{base}/god?role={rid}").get_data(as_text=True)                     # 换绑还没认群：新群号单列一行「等待认群」，旧群照旧
+        self.assertIn("123456789", page)
+        self.assertIn("等待认群", page)
+        self.c.post(f"{base}/god/{rid}/bindqq", data={"qq": "10001", "tab": "info", "_csrf": tok})   # 老角色在后台补绑 QQ
+        self.assertEqual(roles_c.qqs_of_role(rid), ["10001"])
         extensions.set_enabled("phone", True)
         with db.get_conn() as c:
             c.execute("DELETE FROM phone_codes")

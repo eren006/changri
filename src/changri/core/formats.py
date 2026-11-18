@@ -134,12 +134,28 @@ def mine() -> list[tuple[str, str]]:
     return [(label, cmd) for label, cmd, on in MINE if on()]
 
 
-def welcome(role) -> str:
-    """「创建新角色」成功后的回执：初始档案 + 能改的档案 + 接下来能填什么。只列开着的功能。
-    名字写错了可以自己发「修改名字 新名字」改（HELP 里有）。"""
-    from . import charprofile, extensions
+def qq_needed() -> bool:
+    """用了 QQ 小号（房间群靠绑的 QQ 认人）才要求新角色绑 QQ。"""
     from .db import get_config
-    lines = [f"✅ 角色「{role['name']}」创建好了，这个群就是你的个人群。", "", "你的初始档案：", *charprofile.summary_lines(role),
+    return get_config("qqlink_on", "0") == "1"
+
+
+def setup_step(role, head: str) -> str:
+    """建角色 / NPC 认群之后的下一步：要绑 QQ 又还没绑 → 只提示第 2 步（绑好才发回执，免得玩家看完回执就漏了）；否则直接发完整回执。"""
+    from . import roles
+    if qq_needed() and not roles.qqs_of_role(role["id"]):
+        return (f"{head}\n\n第 2 步：在这个群里发「绑定QQ 你的QQ号」（填你自己正在用的 QQ 号，房间群里说话要靠它认出你，不绑不算到场）。\n"
+                "绑好以后发给你完整的角色回执。")
+    return welcome(role, head)
+
+
+def welcome(role, head: str = "") -> str:
+    """建角色的最后一步：完整回执（个人群、QQ、初始档案 + 接下来能填什么）。只列开着的功能。
+    名字写错了可以自己发「修改名字 新名字」改（HELP 里有）。"""
+    from . import charprofile, extensions, roles
+    from .db import get_config
+    qqs = roles.qqs_of_role(role["id"])
+    lines = [head or f"✅ 角色「{role['name']}」创建好了，这个群就是你的个人群。"] + ([f"🔗 绑定的 QQ：{'、'.join(qqs)}"] if qqs else []) + ["", "你的初始档案：", *charprofile.summary_lines(role),
              "", charprofile.HELP, "", "📎 其他可以填的："]
     lines.append("  提交公知 内容（可以带图，重复提交会覆盖）")
     lines.append("  提交二表 内容（同上）")

@@ -54,7 +54,9 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
     if not season.running():           # 没有进行中的季度（筹备期也算进行中）就不能建角色
         await create_role.finish("现在没有进行中的季度，暂时不能创建新角色。等管理员开了季度（筹备期就可以）再来。")
     ok, msg = roles.create_role(parts[0], _bid(), event.group_openid, _sender(event), parts[1] if len(parts) == 2 else "")
-    await create_role.finish(formats.welcome(roles.get_role_by_name(parts[0])) if ok else msg)
+    if not ok:
+        await create_role.finish(msg)
+    await create_role.finish(formats.setup_step(roles.get_role_by_name(parts[0]), f"✅ 第 1 步完成：角色「{parts[0]}」创建好了，这个群就是你的个人群。"))
 
 
 def _make_profile_cmd(prefix: str):
@@ -144,7 +146,11 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
     code = args.extract_plain_text().strip()
     if not code.isdigit() or len(code) != 6:
         await claim.finish("用法：认群 6位认群码")
-    _, msg = roles.consume_bind_code(code, _bid(), event.group_openid, _sender(event))
+    rid = roles.code_role(code)
+    first = rid is not None and not roles.has_group(rid)          # 第一次有个人群（后台建的 NPC）：接着引导绑 QQ、发回执
+    ok, msg = roles.consume_bind_code(code, _bid(), event.group_openid, _sender(event))
+    if ok and first:
+        await claim.finish(formats.setup_step(roles.get_role(rid), "✅ " + msg))
     await claim.finish(msg)
 
 

@@ -78,6 +78,12 @@ a.tile:active{transform:scale(.97)}
 <div class="ios">
 <h1 class="lt">{{ d.date }}</h1>
 <p class="lt-sub">现在 <b>{{ d.now }}</b></p>
+{% for b in d.offline %}
+<section class="callout bad" role="alert">
+  <b>{{ '这个机器人' if b.mine else '机器人' }}（{{ b.id }}）不在线</b>
+  <p class="note" style="margin:6px 0 0">{% if b.mine %}群里发指令不会有反应，短信、提醒都发不出去（会先记下，连上后补发）。{% endif %}最后一次在线：{{ b.seen_txt }}。看看服务有没有在运行、QQ 开放平台里机器人有没有被停用。<a href="{{ url_for('bots_page') }}">去「机器人」页</a></p>
+</section>
+{% endfor %}
 
 <div class="card hero">
   <div class="k">现在</div>

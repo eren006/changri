@@ -42,7 +42,7 @@ def register(app, login_required):
         pool_id = room["pool_id"] if room else None
         rooms_core.end(rid)
         g = pool_core.get(pool_id) if pool_id else None
-        if g and pool_core.is_qq_only(g):                  # 房间群：群名改回「长日备用」（可在「结合QQ小号模式（双骰）」页改）
+        if g and pool_core.is_qq_only(g):                  # 房间群：群名改回「长日备用」（可在「QQ 小号与群号组（双骰）」页改）
             loopbridge.run(qqmanager_core.room_rename(current_bot(), g, qqpool_core.free_name(g["set_name"])))
         flash(f"R{rid} 已结束（网页上结束不会通知玩家，群放回池里）")
         return redirect(url_for("dashboard") + "#rooms")

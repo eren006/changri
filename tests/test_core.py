@@ -55,7 +55,11 @@ class RoleTests(Base):
         ok, code = roles.add_slot(rid, "987654321")
         self.assertTrue(ok)
         self.assertEqual(len(roles.list_groups(rid)), 1)
+        g = roles.list_groups(rid)[0]                       # 还没认群：旧群照旧，新群号不能先显示成「已认群」
+        self.assertEqual((g["group_openid"], g["real_gid"]), ("G1", ""))
+        self.assertEqual((roles.pending_code(rid)["code"], roles.pending_code(rid)["real_gid"]), (code, "987654321"))
         self.assertTrue(roles.consume_bind_code(code, "B1", "GB", "MX")[0])
+        self.assertIsNone(roles.pending_code(rid))
         g = roles.list_groups(rid)[0]
         self.assertEqual((g["group_openid"], g["real_gid"]), ("GB", "987654321"))
 
