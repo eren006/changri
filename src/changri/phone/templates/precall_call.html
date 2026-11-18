@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+{% block title %}{{ other_name }} · 前置电话 · {{ brand }}{% endblock %}
+{% block body %}
+{# 前置电话的电话聊天页（照老系统 precall_call）：每 3 秒拉一次新消息；谁都能挂断 #}
+<header class="bar">
+  <a class="back" href="{{ url_for('precall_page', view='calls') }}">我的电话</a>
+  <div class="title">{{ other_name }}<small>前置电话{% if ses.ended %} · 已结束{% endif %}</small></div>
+  <div class="right"></div>
+</header>
+<div class="scroll pc-chat" id="pcChat">
+  <div class="pc-top">
+  <details class="pc-peer">
+    <summary><span class="pc-ava">{{ other_name[:1] }}</span><span>{{ other_name }}的资料</span></summary>
+    {% if other_photo %}<img src="{{ other_photo }}" alt="" width="180">{% endif %}
+    {% if other_bio %}<p>{{ other_bio }}</p>{% endif %}
+  </details>
+  <button type="button" class="pc-end" id="pcEnd"{% if ses.ended %} hidden{% endif %}>挂断</button>
+  </div>
+  <div class="pc-thread" id="pcThread">
+    {% for m in msgs %}<div class="pc-msg{{ ' mine' if m.mine else '' }}" data-id="{{ m.id }}"><div class="pc-bubble">{{ m.text }}</div></div>{% endfor %}
+  </div>
+  <div class="pc-sys" id="pcSys">{% if ses.ended %}电话已结束{% elif not msgs %}电话接通了，先打个招呼吧{% endif %}</div>
+</div>
+<form class="pc-bar" id="pcBar"{% if ses.ended %} hidden{% endif %}>
+  <textarea id="pcInput" rows="1" maxlength="300" placeholder="说点什么…"{% if why %} disabled{% endif %}></textarea>
+  <button type="submit" id="pcSend"{% if why %} disabled{% endif %}>发送</button>
+  <p class="pc-left" id="pcLeft2">{% if why %}{{ why }}{% elif cfg.msg_limit %}你还能说 <b id="pcLeftN">{{ [cfg.msg_limit - mine_n, 0]|max }}</b> 句{% endif %}</p>
+</form>
+<style>
+  .pc-page { padding: 0 0 36px; }
+  .pc-seg { display: flex; margin: 12px 16px 0; padding: 3px; border-radius: 12px; background: var(--theirs); }
+  .pc-seg a { flex: 1; text-align: center; padding: 8px 4px; border-radius: 9px; font-size: 14px; font-weight: 600; color: var(--muted); text-decoration: none; position: relative; }
+  .pc-seg a[aria-current] { background: var(--bg); color: var(--text); box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+  .pc-seg b { margin-left: 4px; padding: 1px 6px; border-radius: 9px; background: #d64545; color: #fff; font-size: 11px; }
+  .pc-flash { margin: 12px 16px 0; padding: 11px 14px; border-radius: 14px; background: var(--theirs); font-size: 14px; }
+  .pc-rule { margin: 14px 20px 0; font-size: 13px; color: var(--muted); text-align: center; }
+  .pc-rule b { color: var(--mine); font-size: 15px; }
+  .pc-chips { display: flex; gap: 8px; justify-content: center; margin: 12px 16px 0; }
+  .pc-chips button { border: 0; padding: 6px 14px; border-radius: 999px; background: var(--theirs); color: var(--theirs-text); font: inherit; font-size: 13px; }
+  .pc-chips button.on { background: var(--mine); color: var(--mine-text); }
+  .pc-stage { position: relative; width: min(82vw, 330px); aspect-ratio: 3 / 4; margin: 16px auto 0; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+  .pc-card { position: absolute; inset: 0; border-radius: 24px; overflow: hidden; background: var(--theirs); box-shadow: 0 10px 30px rgba(0,0,0,.18); will-change: transform; cursor: grab; transition: transform .28s cubic-bezier(.2,.8,.3,1), opacity .28s; }
+  .pc-card.drag { transition: none; cursor: grabbing; }
+  .pc-card .ph { position: absolute; inset: 0; background-size: cover; background-position: center; }
+  .pc-card .ph.none { display: flex; align-items: center; justify-content: center; padding: 28px; font-size: 20px; line-height: 1.7; text-align: center;
+    background: linear-gradient(160deg, color-mix(in srgb, var(--mine) 22%, var(--bg)), color-mix(in srgb, var(--mine) 8%, var(--bg))); color: var(--text); }
+  .pc-card .shade { position: absolute; left: 0; right: 0; bottom: 0; padding: 60px 18px 18px; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,.72)); }
+  .pc-card .shade h3 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -.01em; }
+  .pc-card .shade h3 em { margin-left: 8px; font-style: normal; font-size: 12px; font-weight: 500; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,.25); vertical-align: middle; }
+  .pc-card .shade p { margin: 6px 0 0; font-size: 14px; line-height: 1.5; opacity: .95; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .pc-card.open .shade p { -webkit-line-clamp: unset; max-height: 46vh; overflow: auto; }
+  .pc-card.under { transform: scale(.95) translateY(10px); opacity: .9; pointer-events: none; }
+  .pc-card.under2 { transform: scale(.9) translateY(20px); opacity: .7; pointer-events: none; }
+  .pc-stamp { position: absolute; top: 28px; padding: 6px 14px; border: 3px solid; border-radius: 10px; font-size: 24px; font-weight: 800; letter-spacing: .05em; opacity: 0; transform: rotate(-12deg); pointer-events: none; }
+  .pc-stamp.pick { right: 22px; color: #ff4d79; border-color: #ff4d79; transform: rotate(12deg); background: rgba(255,255,255,.85); }
+  .pc-stamp.next { left: 22px; color: #6c7a89; border-color: #6c7a89; background: rgba(255,255,255,.85); }
+  .pc-actions { display: flex; justify-content: center; gap: 36px; margin: 22px 16px 0; }
+  .pc-act { display: flex; flex-direction: column; align-items: center; gap: 6px; border: 0; background: none; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
+  .pc-act i { display: flex; align-items: center; justify-content: center; width: 62px; height: 62px; border-radius: 50%; font-style: normal; font-size: 30px; line-height: 1; background: var(--bg); box-shadow: 0 4px 14px rgba(0,0,0,.16); }
+  .pc-act.pick i { color: #ff4d79; }
+  .pc-act.next i { color: var(--muted); font-size: 38px; padding-bottom: 4px; }
+  .pc-act:active i { transform: scale(.92); }
+  .pc-act[disabled] { opacity: .35; cursor: not-allowed; }
+  .pc-tip { margin: 16px 28px 0; font-size: 12px; line-height: 1.6; color: var(--muted); text-align: center; }
+  .pc-empty { margin: 60px 24px; text-align: center; color: var(--muted); font-size: 16px; line-height: 1.6; }
+  .pc-empty span { display: block; font-size: 40px; margin-bottom: 8px; }
+  .pc-empty small { display: block; font-size: 13px; opacity: .8; }
+  .pc-dialog { margin: auto; max-height: calc(100dvh - 40px); border: 0; border-radius: 22px; padding: 24px 22px 18px; width: min(86vw, 320px); background: var(--bg); color: var(--text); box-shadow: 0 20px 60px rgba(0,0,0,.35); text-align: center; }
+  .pc-dialog::backdrop { background: rgba(0,0,0,.4); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+  .pc-dialog h2 { margin: 0 0 8px; font-size: 18px; }
+  .pc-dialog p { margin: 0 0 18px; font-size: 14px; line-height: 1.6; color: var(--muted); }
+  .pc-dlg-btns { display: flex; gap: 10px; }
+  .pc-dlg-btns button, .pc-dlg-btns a { flex: 1; min-height: 44px; display: flex; align-items: center; justify-content: center; border: 0; border-radius: 999px; font: inherit; font-size: 16px; font-weight: 600; text-decoration: none; background: var(--theirs); color: var(--theirs-text); cursor: pointer; }
+  .pc-dlg-btns .yes { background: var(--mine); color: var(--mine-text); }
+  .pc-list { list-style: none; margin: 14px 16px 0; padding: 0; border-radius: 16px; overflow: hidden; background: var(--bg); box-shadow: 0 0 0 .5px var(--line); }
+  .pc-list li + li { border-top: .5px solid var(--line); }
+  .pc-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; color: var(--text); text-decoration: none; }
+  .pc-ava { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; font-weight: 700; color: var(--mine); background: color-mix(in srgb, var(--mine) 16%, var(--bg)); }
+  .pc-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .pc-main b { font-size: 16px; } .pc-main small { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pc-side { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; font-size: 12px; color: var(--muted); }
+  .pc-side em { font-style: normal; } .pc-dot { min-width: 18px; padding: 0 5px; border-radius: 9px; background: #d64545; color: #fff; font-size: 11px; line-height: 18px; text-align: center; }
+  .pc-form { margin: 14px 16px 0; }
+  .pc-note { margin: 0 0 12px; font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .pc-photo-pick { display: block; }
+  .pc-photo { display: flex; align-items: center; justify-content: center; width: 168px; aspect-ratio: 3 / 4; margin: 0 auto; border-radius: 20px; background: var(--theirs) center / cover; border: 1.5px dashed var(--line); color: var(--muted); font-size: 15px; cursor: pointer; }
+  .pc-photo.has { border-style: solid; } .pc-photo.has i { padding: 4px 12px; border-radius: 999px; background: rgba(0,0,0,.5); color: #fff; font-size: 12px; font-style: normal; margin-top: 150px; }
+  .pc-photo i { font-style: normal; }
+  .pc-check { display: block; text-align: center; margin-top: 8px; font-size: 13px; color: var(--muted); }
+  .pc-form h3 { margin: 18px 4px 8px; font-size: 14px; color: var(--muted); font-weight: 600; }
+  .pc-radios { display: flex; gap: 8px; } .pc-radios label { flex: 1; } .pc-radios input { position: absolute; opacity: 0; }
+  .pc-radios span { display: block; text-align: center; padding: 10px 0; border-radius: 12px; background: var(--theirs); color: var(--theirs-text); font-size: 15px; }
+  .pc-radios input:checked + span { background: var(--mine); color: var(--mine-text); font-weight: 600; }
+  .pc-form textarea { width: 100%; box-sizing: border-box; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); color: var(--text); font: inherit; font-size: 16px; line-height: 1.6; resize: none; }
+  .pc-count { text-align: right; margin: 4px 6px 0; font-size: 12px; color: var(--muted); }
+  .pc-save { width: 100%; min-height: 50px; margin-top: 16px; border: 0; border-radius: 999px; background: var(--mine); color: var(--mine-text); font: inherit; font-size: 17px; font-weight: 600; cursor: pointer; }
+  .pc-chat { padding: 0 0 12px; }
+  .pc-top { display: flex; align-items: flex-start; gap: 8px; margin: 10px 16px 0; }
+  .pc-top .pc-peer { flex: 1; margin: 0; min-width: 0; }
+  .pc-peer { margin: 10px 16px 0; padding: 10px 14px; border-radius: 14px; background: var(--theirs); font-size: 14px; }
+  .pc-peer summary { display: flex; align-items: center; gap: 10px; cursor: pointer; list-style: none; }
+  .pc-peer .pc-ava { width: 28px; height: 28px; font-size: 13px; }
+  .pc-peer img { display: block; margin: 12px auto 0; border-radius: 14px; max-width: 100%; }
+  .pc-peer p { margin: 10px 0 0; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .pc-thread { display: flex; flex-direction: column; padding: 14px 14px 6px; gap: 6px; }
+  .pc-msg { display: flex; } .pc-msg.mine { justify-content: flex-end; }
+  .pc-bubble { max-width: 80%; padding: 9px 14px; border-radius: 19px; background: var(--theirs); color: var(--theirs-text); font-size: 16px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .pc-msg.mine .pc-bubble { background: var(--mine); color: var(--mine-text); }
+  .pc-sys { text-align: center; font-size: 12px; color: var(--muted); padding: 10px 0; }
+  .pc-bar { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 14px calc(8px + env(safe-area-inset-bottom)); background: color-mix(in srgb, var(--bg) 80%, transparent);
+    -webkit-backdrop-filter: saturate(1.8) blur(18px); backdrop-filter: saturate(1.8) blur(18px); border-top: .5px solid var(--line); }
+  .pc-bar textarea { flex: 1; min-height: 40px; max-height: 120px; box-sizing: border-box; padding: 9px 14px; border: 1px solid var(--line); border-radius: 20px; background: var(--bg); color: var(--text); font: inherit; font-size: 16px; resize: none; }
+  .pc-bar button { flex: none; min-width: 64px; border: 0; border-radius: 20px; background: var(--mine); color: var(--mine-text); font: inherit; font-weight: 600; }
+  .pc-bar button[disabled] { opacity: .4; } .pc-left { flex-basis: 100%; margin: 0; text-align: center; font-size: 12px; color: var(--muted); }
+  .pc-end { flex: none; border: 0; padding: 11px 14px; border-radius: 14px; background: color-mix(in srgb, #d64545 12%, var(--bg)); color: #d64545; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+  @media (prefers-reduced-motion: reduce) { .pc-card { transition: none; } }
+</style>
+<script>
+(function () {
+  var csrf = {{ csrf()|tojson }}, SID = {{ ses.id }}, last = {{ last_id }}, ended = {{ 'true' if ses.ended else 'false' }};
+  var thread = document.getElementById('pcThread'), chat = document.getElementById('pcChat'), sys = document.getElementById('pcSys');
+  var input = document.getElementById('pcInput'), sendBtn = document.getElementById('pcSend'), bar = document.getElementById('pcBar'), leftN = document.getElementById('pcLeftN');
+  function bottom() { chat.scrollTop = chat.scrollHeight; } bottom();
+  function add(m) { if (thread.querySelector('[data-id="' + m.id + '"]')) return; var d = document.createElement('div'); d.className = 'pc-msg' + (m.mine ? ' mine' : ''); d.dataset.id = m.id; var b = document.createElement('div'); b.className = 'pc-bubble'; b.textContent = m.text; d.appendChild(b); thread.appendChild(d); sys.textContent = ''; last = Math.max(last, m.id); bottom(); }
+  function poll() {
+    if (document.hidden || ended) return;
+    fetch({{ url_for('precall_poll', session_id=ses.id)|tojson }} + '?after=' + last, { credentials: 'same-origin', cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; }).then(function (d) { if (!d) return; d.msgs.forEach(add); if (d.ended) over(); }).catch(function () {});
+  }
+  function over() { ended = true; bar.hidden = true; sys.textContent = '电话已结束'; var e = document.getElementById('pcEnd'); if (e) e.hidden = true; }
+  setInterval(poll, 3000); document.addEventListener('visibilitychange', poll);
+  bar.addEventListener('submit', function (e) {
+    e.preventDefault(); var t = input.value.trim(); if (!t || sendBtn.disabled) return; sendBtn.disabled = true;
+    var fd = new FormData(); fd.append('_csrf', csrf); fd.append('text', t);
+    fetch({{ url_for('precall_send', session_id=ses.id)|tojson }}, { method: 'POST', credentials: 'same-origin', body: fd })
+      .then(function (r) { return r.json(); }).then(function (d) {
+        sendBtn.disabled = false;
+        if (!d.ok) { sys.textContent = d.msg || '没发出去'; return; }
+        input.value = ''; if (leftN && typeof d.left === 'number') leftN.textContent = d.left; poll();
+      }).catch(function () { sendBtn.disabled = false; sys.textContent = '网络不太好，稍后再试'; });
+  });
+  input.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); bar.requestSubmit(); } });
+  var end = document.getElementById('pcEnd');
+  if (end) end.onclick = function () {
+    if (!confirm('挂断后双方都不能再发消息了，确定吗？')) return;
+    var fd = new FormData(); fd.append('_csrf', csrf);
+    fetch({{ url_for('precall_end', session_id=ses.id)|tojson }}, { method: 'POST', credentials: 'same-origin', body: fd }).then(function () { over(); });
+  };
+})();
+</script>
+{% endblock %}

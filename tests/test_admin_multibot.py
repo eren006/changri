@@ -102,8 +102,10 @@ class AdminMultiBot(unittest.TestCase):
         self.c.post("/b/111111/extensions/toggle", data={"id": "precall", "on": "1", "_csrf": self._csrf("/b/111111/extensions")})
         r = self.c.get("/b/111111/precall")
         self.assertEqual(r.status_code, 200)
-        self.assertIn("还没有人提交", r.get_data(as_text=True))
-        self.assertIn("每人最多主动拨出", self.c.get("/b/111111/extensions?tab=aux").get_data(as_text=True))       # 扩展卡片里有自己的设置
+        self.assertIn("还没有人填资料", r.get_data(as_text=True))
+        self.assertIn("每人每轮最多选几个人", self.c.get("/b/111111/extensions?tab=aux").get_data(as_text=True))       # 扩展卡片里有自己的设置
+        self.c.post("/b/111111/precall/round", data={"_csrf": self._csrf("/b/111111/precall")})
+        self.assertIn("第 <b>2</b> 轮", self.c.get("/b/111111/precall").get_data(as_text=True))
 
     def test_sighting_admin_page(self):
         if type(self) is not AdminMultiBot:
@@ -139,6 +141,15 @@ class AdminMultiBot(unittest.TestCase):
         r = post("/season/npc/create", name="阿林")
         self.assertEqual(r.status_code, 302)
         self.assertIn("阿林", self.c.get(base + "/season").get_data(as_text=True))
+        from changri.core import charprofile, db as _db, roles as _roles
+        with _db.use_bot("111111"):
+            npc_id = _roles.get_role_by_name("阿林")["id"]
+        post(f"/season/npc/{npc_id}/profile", lines="修改皮相 某明星\n修改年龄 30\n修改简称 小林")    # NPC 和玩家一样能改档案
+        post(f"/season/npc/{npc_id}/profile", lines="修改皮相 另一位")                                   # 后台代改不受 2 小时冷却限制
+        with _db.use_bot("111111"):
+            p = charprofile.get(npc_id)
+        self.assertEqual((p["look"], p["age"], p["short"]), ("另一位", 30, "小林"))
+        self.assertIn("另一位", self.c.get(base + "/season").get_data(as_text=True))
         self.assertEqual(self.c.get(base + "/alarm").status_code, 404)           # 加百列闹钟默认关
         post("/extensions/toggle", id="alarm", on="1")
         self.assertEqual(self.c.get(base + "/alarm").status_code, 200)
@@ -237,18 +248,73 @@ class AdminMultiBot(unittest.TestCase):
         self.assertIn("已彻底删除角色「录错」", r.get_data(as_text=True))
         self.assertIsNone(roles.get_role(rid))
 
+    def test_god_hidden_groupchat_switch_survives_save(self):
+        """小手机多人群聊没开时，上帝模式不列「多人群聊」开关。表单只提交勾上的：保存别的开关时，藏着的这个不能被顺手关掉。"""
+        base = "/b/111111"
+        from changri.core import extensions, roles as roles_c
+        roles_c.create_role("甲", "B1", "P0", "M0")
+        with db.get_conn() as c:
+            rid = c.execute("SELECT id FROM roles WHERE name='甲'").fetchone()["id"]
+        extensions.set_enabled("groupchat", False)
+        page = self.c.get(f"{base}/god?role={rid}&tab=perm").get_data(as_text=True)
+        self.assertIn('value="sms"', page)
+        self.assertNotIn('value="微信"', page)
+        self.assertNotIn("多人群聊（小手机）", page)
+        tok = self._csrf(f"{base}/god")
+        keep = [k for k in god_core.shown_features() if k != "sms"]
+        self.c.post(f"{base}/god/{rid}/perm", data={"on": keep, "_csrf": tok})                # 只关短信
+        self.assertNotEqual(god_core.check(rid, "sms"), "")
+        self.assertEqual(god_core.check(rid, "微信"), "")                                       # 藏着的没被动
+        self.c.post(f"{base}/god/all/perm", data={"on": keep, "_csrf": tok})                   # 全体那边也一样
+        self.assertFalse(god_core.global_off("微信"))
+        extensions.set_enabled("groupchat", True)
+        self.assertIn("多人群聊（小手机）", self.c.get(f"{base}/god?role={rid}&tab=perm").get_data(as_text=True))
+
+    def test_role_page_overview(self):
+        """「角色」页：名单带简称和 NPC；每人的「概况」有档案、个人群、QQ 号、激活码；管理员能替玩家改档案、换绑群号（回到这个人页上显示认群码）。"""
+        base = "/b/111111"
+        from changri.core import charprofile, extensions, npc, roles as roles_c
+        roles_c.create_role("甲", "B1", "P0", "M0")
+        roles_c.create_role("乙", "B1", "P1", "M1")
+        rid = roles_c.get_role_by_name("甲")["id"]
+        charprofile.edit(roles_c.get_role(rid), "修改简称 小甲\n修改年龄 21", admin=True)
+        npc.set_flag("乙", True)
+        listing = self.c.get(base + "/god").get_data(as_text=True)
+        self.assertIn("小甲", listing)
+        self.assertIn("NPC", listing)
+        self.assertIn('data-n="甲 小甲"', listing)                                              # 名字和简称都能搜
+        self.assertNotIn('id="roles"', self.c.get(base + "/").get_data(as_text=True))            # 总览不再重复列角色
+        info = self.c.get(f"{base}/god?role={rid}").get_data(as_text=True)                     # 默认就是「概况」
+        for s in ("档案", "21", "小甲", "个人群", "绑定的 QQ 号", "替 TA 改档案"):
+            self.assertIn(s, info)
+        tok = self._csrf(f"{base}/god?role={rid}")
+        self.c.post(f"{base}/god/{rid}/profile", data={"lines": "性别 男\n修改年龄 30", "tab": "info", "_csrf": tok})
+        p = charprofile.get(rid)
+        self.assertEqual((p["gender"], p["age"]), ("男", 30))                                  # 不写「修改」也认
+        r = self.c.post(f"{base}/roles/{rid}/slot", data={"real_gid": "123456789", "_csrf": tok})
+        self.assertIn(f"/god?role={rid}&code=", r.headers["Location"])
+        self.assertIn("的认群码", self.c.get(r.headers["Location"]).get_data(as_text=True))
+        extensions.set_enabled("phone", True)
+        with db.get_conn() as c:
+            c.execute("DELETE FROM phone_codes")
+        self.assertIn("还没有。玩家在个人群里发「手机码」", self.c.get(f"{base}/god?role={rid}").get_data(as_text=True))
+        with db.get_conn() as c:
+            self.assertEqual(c.execute("SELECT COUNT(*) FROM phone_codes").fetchone()[0], 0)    # 看一眼不会顺手生成激活码
+        extensions.set_enabled("phone", False)
+
     def test_god_mode_page(self):
         base = "/b/111111"
         from changri.core import roles as roles_c
         roles_c.create_role("甲", "B1", "P0", "M0")
         page = self.c.get(base + "/god").get_data(as_text=True)
-        self.assertIn("上帝模式", page)
+        self.assertIn("<h1>角色</h1>", page)                                                   # 原「上帝模式」，现在是「角色」入口
+        self.assertIn("全体设置", page)
         self.assertIn("甲", page)
         with db.get_conn() as c:
             rid = c.execute("SELECT id FROM roles WHERE name='甲'").fetchone()["id"]
         tok = self._csrf(f"{base}/god")
         self.c.post(f"{base}/god/{rid}/perm", data={"on": ["sms"], "_csrf": tok})            # 只留短信，其余关掉
-        page = self.c.get(f"{base}/god?role={rid}").get_data(as_text=True)
+        page = self.c.get(f"{base}/god?role={rid}&tab=perm").get_data(as_text=True)
         self.assertIn("关着的功能", page)
         self.assertEqual(god_core.check(rid, "gift") != "", True)
         self.assertEqual(god_core.check(rid, "sms"), "")
@@ -412,7 +478,7 @@ class AdminMultiBot(unittest.TestCase):
         self.assertEqual((r.status_code, r.headers["Location"]), (302, "/b/111111/"))
         r = self.c.get("/roles")
         self.assertEqual(r.headers["Location"], "/b/111111/roles")
-        self.assertEqual(self.c.get("/b/111111/roles").headers["Location"], "/b/111111/#roles")       # 角色与群并进总览
+        self.assertEqual(self.c.get("/b/111111/roles").headers["Location"], "/b/111111/god")          # 角色与群并进「角色」页
         self.assertEqual(self.c.get("/b/999999/").status_code, 404)
 
     def test_picker_with_two_bots_and_isolation(self):
@@ -423,9 +489,9 @@ class AdminMultiBot(unittest.TestCase):
         self.assertIn("乙号", html)
         with db.use_bot("111111"):
             roles.create_role("只在甲号", "111111", "G1", "M1")
-        self.assertIn("只在甲号", self.c.get("/b/111111/").get_data(as_text=True))
-        self.assertNotIn("只在甲号", self.c.get("/b/222222/").get_data(as_text=True))
-        self.assertIn('id="roles"', self.c.get("/b/222222/").get_data(as_text=True))
+        self.assertIn("只在甲号", self.c.get("/b/111111/god").get_data(as_text=True))          # 角色名单在「角色」页
+        self.assertNotIn("只在甲号", self.c.get("/b/222222/god").get_data(as_text=True))
+        self.assertIn('href="/b/222222/god"', self.c.get("/b/222222/").get_data(as_text=True))       # 总览「角色」格子链到角色页
         self.assertIn('id="rooms"', self.c.get("/b/222222/").get_data(as_text=True))                  # 进行中的房间在总览里   # 页面链接自带前缀
         self.assertIn("/b/111111/", self.c.get("/b/222222/").get_data(as_text=True))                # 切换下拉
         self.assertEqual(self.c.get("/accounts").status_code, 200)                                   # 全局页面不带前缀

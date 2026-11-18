@@ -257,16 +257,39 @@ async def group_list(app_id: str, link_id: int, max_age: int = 60) -> list[dict]
     return groups
 
 
-async def group_members(app_id: str, gid: str) -> set[str] | None:
-    """这个群现在有哪些人（QQ 号）。群归属的号先问，问不到换别的号；都问不到返回 None。"""
+async def _member_rows(app_id: str, gid: str) -> list[dict] | None:
+    """群成员名单（qqlink.member_rows 的格式）。群归属的号先问，问不到换别的号；都问不到返回 None。
+    名单是空的也算问不到：QQ 号自己在群里，正常名单至少有它；空名单多半是号被踢了或接口出错，
+    当成「群里没人」会把还有玩家的群放回池、分给下一场。"""
     with use_bot(app_id):
         owner = qqpool.owner_of(gid)
     for k in sorted((k for k in _keys(app_id) if _links[k].connected), key=lambda k: k[1] != owner):
         try:
-            return set(await _links[k].member_list(gid))
+            rows = await _links[k].member_rows(gid)
         except QQLinkError:
             continue
+        except Exception as e:  # noqa: BLE001 连接刚断时 websockets 抛的不是 QQLinkError
+            log.warning("查群 %s 成员出错：%s", gid, e)
+            continue
+        if rows:
+            return rows
     return None
+
+
+async def group_members(app_id: str, gid: str) -> set[str] | None:
+    """这个群现在有哪些人（QQ 号）。问不到返回 None。"""
+    rows = await _member_rows(app_id, gid)
+    return None if rows is None else {r["qq"] for r in rows}
+
+
+async def group_others(app_id: str, gid: str) -> set[str] | None:
+    """房间群里「不该留着的人」：去掉群主、管理员（工作人员）和我们自己连着的 QQ 号，剩下的都算。
+    不管有没有绑定过 QQ——没绑定的玩家也是人，群里还有他就不能分给下一场。问不到返回 None。"""
+    rows = await _member_rows(app_id, gid)
+    if rows is None:
+        return None
+    mine = {l.self_id for l in _links.values() if l.self_id}
+    return {r["qq"] for r in rows if r["role"] not in ("owner", "admin") and r["qq"] not in mine}
 
 
 async def read_forward(app_id: str, gid: str, reply_id: str = "", forward_id: str = "") -> tuple[list[dict] | None, str]:

@@ -37,7 +37,8 @@ def match_social(text: str) -> dict | None:
         kind = KIND_WORD[m.group(1)]
         f = parse_form(t[m.end():])
         ok = bool(f.get("to")) and bool(f.get("content") if kind == "sms" else f.get("gift"))
-        return {"kind": kind, "sign": f.get("sign", ""), "to": f.get("to", ""), "gift": f.get("gift", ""), "content": f.get("content", ""), "bad": not ok}
+        return {"kind": kind, "sign": f.get("sign", ""), "to": f.get("to", ""), "gift": f.get("gift", ""), "content": f.get("content", ""), "bad": not ok,
+                "form": True}                     # 竖着写的：明确是在发指令，不会是聊天里碰巧带了「短信」
     m = _INLINE.match(t)
     if not m:
         return None

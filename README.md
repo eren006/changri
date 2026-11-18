@@ -59,8 +59,9 @@ curl -fsSL https://system.changri.work/get.sh | sudo sh
 ```bash
 python3.12 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 .venv/bin/python -m changri run                     # 前台运行（数据在 ./data）
-.venv/bin/python -m unittest discover -s tests      # 全部测试
-.venv/bin/python packaging/build.py --notes "…"     # 打包发布（要签名私钥），见 packaging/build.py 开头
+.venv/bin/python tests/run.py --changed             # 只跑跟改动有关的测试（平时用这个）
+.venv/bin/python tests/run.py                       # 全部测试，发版前跑（一个文件一个进程；别用 unittest discover，原因见架构.md）
+.venv/bin/python packaging/build.py --notes "…"     # 只打包（要签名私钥）；正式发版用 tools/release.py，见架构.md
 ```
 
 代码结构、怎么加功能、怎么改数据库、怎么发版：[docs/架构.md](docs/架构.md)。写扩展：[src/changri/extdocs/写扩展.md](src/changri/extdocs/写扩展.md)。

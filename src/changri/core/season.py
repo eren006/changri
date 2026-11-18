@@ -336,7 +336,7 @@ def start(name: str = "", clear: bool = False, now: str | None = None) -> tuple[
 
 
 def clear_prep_records() -> dict[str, int]:
-    """筹备期的互动不记录：从筹备期进入 D0 时，把这段时间发的短信/礼物、心动信、关系线、悬赏心愿和已经结束的房间复盘清掉，
+    """筹备期的互动不记录：从筹备期进入 D0 时，把这段时间发的短信/礼物、心动信、关系线、心愿和已经结束的房间复盘清掉，
     正式季第一天从零开始。进行中的房间不动（人正在里面聊）。角色、属性、群位、论坛帖子不动。返回各清了多少条。"""
     out = {}
     with get_conn() as conn:
@@ -344,7 +344,7 @@ def clear_prep_records() -> dict[str, int]:
         out["心动信"] = conn.execute("DELETE FROM lovemails").rowcount
         conn.execute("DELETE FROM rel_details")
         out["关系线"] = conn.execute("DELETE FROM relations").rowcount
-        out["悬赏心愿"] = conn.execute("DELETE FROM wishes").rowcount
+        out["心愿"] = conn.execute("DELETE FROM wishes").rowcount
         out["已结束的房间"] = conn.execute("DELETE FROM rooms WHERE status!='open'").rowcount      # 连带成员、发言、加入申请（外键级联）
     return out
 

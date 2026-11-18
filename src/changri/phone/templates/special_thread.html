@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% block title %}{{ title }} · {{ brand }}{% endblock %}
+{% block body %}
+  {# 署名会话、点歌台、偷盗记录、匿名对话共用（照老系统的系统联系人和化名对话） #}
+  <header class="bar">
+    <a class="back" href="{{ url_for('inbox') }}">{{ skin.words.messages }}</a>
+    <div class="title"><div class="avatar head" data-name="{{ title }}">{{ title[:1] }}</div>{{ title }}</div>
+    <div class="right"></div>
+  </header>
+  <div class="scroll" id="scroll">
+    <div class="chat">
+      {% if note %}<div class="stamp">{{ note }}</div>{% endif %}
+      {% for m in items %}
+      <div class="stamp">{{ m.time }}</div>
+      <div class="msg {{ 'mine' if m.mine else 'theirs' }}">
+        <div class="avatar bav" data-name="{{ role.name if m.mine else title }}">{{ (role.name if m.mine else title)[:1] }}</div>
+        {% if m.kind == 'gift' %}
+        <div class="gift"><div class="gname">{{ m.title }}</div>{% if m.text %}<div class="gnote">{{ m.text }}</div>{% endif %}</div>
+        {% else %}
+        <div class="bubble">{{ m.text }}{% for i in m.imgs %}<a href="{{ url_for('msg_image', img_id=i) }}" target="_blank" rel="noopener"><img class="msg-img" src="{{ url_for('msg_image', img_id=i) }}" alt="图片"></a>{% endfor %}{% if m.url %}<br><a href="{{ m.url }}" target="_blank" rel="noopener">去听</a>{% endif %}</div>
+        {% endif %}
+        {% if admin_viewing and m.id %}<form method="post" action="{{ url_for('admin_msg_delete', mid=m.id) }}" onsubmit="return confirm('删除这条？收发双方的小手机里都不再显示；已经发到 QQ 群里的撤不回来。')" style="align-self:center"><input type="hidden" name="_csrf" value="{{ csrf() }}"><button type="submit" class="linkbtn" style="font-size:12px;color:#c33">删除</button></form>{% endif %}{% if admin_viewing and m.song_id %}<form method="post" action="{{ url_for('admin_song_delete', sid=m.song_id) }}" onsubmit="return confirm('删除这条点歌？')" style="align-self:center"><input type="hidden" name="_csrf" value="{{ csrf() }}"><button type="submit" class="linkbtn" style="font-size:12px;color:#c33">删除</button></form>{% endif %}
+      </div>
+      {% else %}
+      <div class="empty">还没有记录</div>
+      {% endfor %}
+      {% include '_flash.html' %}
+    </div>
+  </div>
+  {% if alias %}
+    {% if alias.blocked_by %}
+      <div class="notice" style="margin:8px 16px">这段匿名对话已经结束了。
+        {% if alias.blocked_by == alias_side %}
+          <form method="post" action="{{ url_for('alias_block', alias_id=alias.id) }}" style="display:inline"><input type="hidden" name="_csrf" value="{{ csrf() }}"><input type="hidden" name="action" value="unblock"><button type="submit" class="pick-tab"{% if alias_wait %} disabled{% endif %}>解除拉黑{% if alias_wait %}（还要等 {{ alias_wait }} 分钟）{% endif %}</button></form>
+        {% endif %}
+      </div>
+    {% else %}
+      <form class="compose" method="post" action="{{ url_for('alias_send', alias_id=alias.id) }}">
+        <input type="hidden" name="_csrf" value="{{ csrf() }}">
+        <div class="input-wrap"><textarea name="text" rows="1" maxlength="500" placeholder="匿名短信" aria-label="内容" required></textarea></div>
+        <button class="icon send" type="submit" aria-label="发送"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5"/></svg></button>
+      </form>
+      <form method="post" action="{{ url_for('alias_block', alias_id=alias.id) }}" style="padding:4px 16px 10px" onsubmit="return confirm('拉黑并结束这段匿名对话？只作用于这个化名，满 2 小时后才能解除。')"><input type="hidden" name="_csrf" value="{{ csrf() }}"><button type="submit" class="pick-tab" style="font-size:13px">拉黑并结束</button></form>
+    {% endif %}
+  {% endif %}
+{% endblock %}

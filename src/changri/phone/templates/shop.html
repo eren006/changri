@@ -4,17 +4,30 @@
 {% block body %}
   <header class="bar">
     <a class="back" href="{{ url_for('inbox') }}">{{ skin.words.messages }}</a>
-    <div class="title">礼品店<small>{{ '只能送这里的礼物' if only else '也可以送别的，随便写' }}</small></div>
+    <div class="title">礼品店<small>{% if shop_on %}图鉴 {{ mine|length }}/{{ total }}{% else %}收到过的礼物{% endif %}</small></div>
   </header>
   <div class="scroll list">
-    {% include '_flash.html' %}
-    <div class="disc-label">可以送的礼物</div>
-    {% if items %}<div class="disc-group">
-      {% for g in items %}<a class="row" href="{{ url_for('new_chat', gift=g) }}">{{ admin_app_icon('shop') }}<span class="name">{{ g }}</span><span class="chev" aria-hidden="true">›</span></a>{% endfor %}
-    </div>{% else %}<div class="empty">礼品店还没有上架礼物，送礼可以随便写礼物名。</div>{% endif %}
-    <div class="disc-label">我的图鉴</div>
+    {% for m in get_flashed_messages() %}<div class="notice inbox-flash" role="status" style="white-space:pre-line">{{ m }}</div>{% endfor %}
+    {% if shop_on %}
+      <form method="post" action="{{ url_for('shop_visit') }}" style="padding:8px 16px"><input type="hidden" name="_csrf" value="{{ csrf() }}"><button class="profile-item" type="submit" style="width:100%;text-align:center;padding:10px">逛一逛礼品店</button></form>
+      <div class="disc-label">我的图鉴（可以无限送）</div>
+      {% if mine %}<div class="disc-group">
+        {% for g in mine %}<a class="row" href="{{ url_for('new_chat', gift=g.name) }}">{{ admin_app_icon('shop') }}<span class="name">{{ g.code }}「{{ g.name }}」{% if g.note %}<small style="display:block;opacity:.7">{{ g.note }}</small>{% endif %}</span><span class="chev" aria-hidden="true">›</span></a>{% endfor %}
+      </div>{% elif total %}<div class="empty">图鉴还是空的，点上面「逛一逛礼品店」开始收集。</div>{% else %}<div class="empty">礼品店还没有上架礼物，送礼可以随便写礼物名。</div>{% endif %}
+    {% endif %}
+    {% if steal %}
+      <div class="disc-label">偷取礼物</div>
+      <form method="post" action="{{ url_for('shop_steal') }}" style="padding:8px 16px;display:flex;gap:8px;align-items:center">
+        <input type="hidden" name="_csrf" value="{{ csrf() }}">
+        <select name="target" aria-label="选一个人下手" style="flex:1;padding:8px">{% for t in steal.targets %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}</select>
+        <button class="profile-item" type="submit" style="padding:8px 14px"{% if steal.wait %} disabled{% endif %} onclick="return confirm('从 TA 的图鉴里偷一件你没有的礼物？可能失手，也可能被发现。')">偷一件</button>
+      </form>
+      {% if steal.wait %}<div class="empty">手还没缓过来，{{ steal.wait }} 分钟后才能再偷。</div>{% endif %}
+      {% if steal.log %}<div class="disc-group">{% for r in steal.log %}<div class="row" style="white-space:normal;line-height:1.5"><span class="name">{{ r.text }}</span></div>{% endfor %}</div>{% endif %}
+    {% endif %}
+    <div class="disc-label">收到过的礼物</div>
     {% if album %}<div class="disc-group">
       {% for a in album %}<div class="row">{{ admin_app_icon('shop') }}<span class="name">{{ a.title }}</span><span class="detail">×{{ a.n }}</span></div>{% endfor %}
-    </div>{% else %}<div class="empty">图鉴还是空的，还没有人送过你礼物。</div>{% endif %}
+    </div>{% else %}<div class="empty">还没有人送过你礼物。</div>{% endif %}
   </div>
 {% endblock %}

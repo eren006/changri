@@ -34,7 +34,7 @@ def precheck(me, target, kind: str, gift: str, content: str, has_image: bool = F
 
 async def send(me, target, kind: str, gift: str, content: str, sign: str, send_fn, images: list[bytes] | None = None, gift_by_name_ok: bool = False) -> tuple[bool, str]:
     if kind == "gift":
-        gift, why = gifts.resolve(gift, gift_by_name_ok)
+        gift, why = gifts.resolve(gift, gift_by_name_ok, role_id=me["id"])       # 礼品店的礼物只能送图鉴里有的
         if why:
             return False, why
     images = list(images or [])[:1]                          # 每条最多 1 张

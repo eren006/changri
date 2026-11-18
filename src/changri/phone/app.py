@@ -111,6 +111,12 @@ def create_phone_app(secret_key: str) -> Flask:
         if ctx.get("role") is not None and "rel_unread" not in ctx and ctx.get("mode") in ("inbox", "discover", "profile"):
             ctx["rel_unread"] = relations.unread_total(ctx["role"]["id"]) if extensions.is_enabled("relations") and relations.enabled() else 0
         role = ctx.get("role")
+        ctx.setdefault("admin_viewing", role is not None and admin_viewing())
+        if role is not None and "phone_unread" not in ctx:
+            try:
+                ctx["phone_unread"] = sum(g["count"] for g in (ctx.get("updates") or _updates(role)))
+            except Exception:  # noqa: BLE001 未读算错不能让页面打不开
+                ctx["phone_unread"] = 0
         if role is not None and "status" not in ctx:
             ctx["status"] = _status(role)
         if role is not None:
@@ -139,6 +145,12 @@ def create_phone_app(secret_key: str) -> Flask:
                             secure=get_config("phone_https", "0") == "1")
         return resp
 
+    AS_COOKIE = "phone_admin_as"
+
+    def admin_viewing() -> bool:
+        """管理员从管理员手机「以角色身份进入」：只读（照老系统管理手机的「以某人视角看」）。设置平台开的 /p/as/<令牌> 不算，那个能正常操作。"""
+        return request.cookies.get(AS_COOKIE) == "1" and is_admin()
+
     @app.before_request
     def guard():
         if get_config("phone_enabled", "0") != "1" and not request.path.startswith("/p/static"):
@@ -149,6 +161,12 @@ def create_phone_app(secret_key: str) -> Flask:
             return redirect(_base_url() + request.full_path.rstrip("?"), 302)
         if request.method == "POST" and not secrets.compare_digest(request.form.get("_csrf", ""), session.get("csrf", "-")):
             abort(400)
+        if request.method == "POST" and request.path.startswith(("/p/me", "/p/push", "/p/r/")) and admin_viewing():
+            # 管理员代看：只能看，不能替玩家发短信、送礼、拉黑、偷礼物……
+            if request.accept_mimetypes.best == "application/json" or request.headers.get("X-Requested-With"):
+                return jsonify(ok=False, msg="管理员只读查看，不能替玩家操作"), 403
+            flash("管理员只读查看，不能替玩家操作。")
+            return redirect(request.referrer or url_for("inbox"))
 
     def need_login():
         role = current()
@@ -181,6 +199,7 @@ def create_phone_app(secret_key: str) -> Flask:
                     resp.set_cookie(_cookie(), f"{role['id']}.{code}.{ts}.{_sign(app.secret_key, role['id'], code, ts)}",
                                     max_age=MAX_AGE, path="/p", httponly=True, samesite="Lax",
                                     secure=get_config("phone_https", "0") == "1")
+                    resp.delete_cookie(AS_COOKIE, path="/p")        # 自己用激活码登录：不再是管理员代看
                     return resp
                 n = (n + 1) if time.time() < until or n < LOCK_AFTER else 1
                 _fails[ip] = (n, time.time() + LOCK_SECONDS)
@@ -205,13 +224,44 @@ def create_phone_app(secret_key: str) -> Flask:
         resp = redirect(url_for("inbox"))
         resp.set_cookie(_cookie(), f"{rid}.{code}.{ts}.{_sign(app.secret_key, rid, code, ts)}", max_age=MAX_AGE, path="/p", httponly=True,
                         samesite="Lax", secure=get_config("phone_https", "0") == "1")
+        resp.delete_cookie(AS_COOKIE, path="/p")              # 设置平台开的：能正常操作（比如替 NPC 发消息），不是只读代看
         return resp
 
     @app.route("/p/logout", methods=["POST"])
     def logout():
         resp = redirect(url_for("entry"))
         resp.delete_cookie(_cookie(), path="/p")
+        resp.delete_cookie(AS_COOKIE, path="/p")
         return resp
+
+    def _updates(role):
+        """未读（照老系统）：会话列表顶上的卡片、每行的未读数、底栏角标、新消息弹窗都用这一份。"""
+        from changri.core import phoneunread
+        rows = phoneunread.updates(role, song_on=extensions.is_enabled("song"), steal_on=gifts.enabled(),
+                                   lovemail_on=extensions.is_enabled("lovemail"), rel_on=extensions.is_enabled("relations") and relations.enabled())
+        for g in rows:
+            g["url"] = {"r": lambda t: url_for("thread", other=t), "s": lambda t: url_for("sign_thread", sign=t),
+                        "alias": lambda t: url_for("alias_thread", alias_id=t), "song": lambda t: url_for("sys_thread", kind="song"),
+                        "steal": lambda t: url_for("sys_thread", kind="steal"), "lovemail": lambda t: url_for("lovemail_page"),
+                        "rel": lambda t: url_for("rel_line", other=t), "precall": lambda t: url_for("precall_call", session_id=t)}[g["kind"]](g["target"])
+        return rows
+
+    def _read(role, key):
+        """打开会话算读过；管理员以玩家视角来看不算（照老系统）。"""
+        from changri.core import phoneunread
+        if not admin_viewing():
+            phoneunread.mark_read(role["id"], key)
+
+    @app.get("/p/me/poll")
+    def poll():
+        """页面开着时每 30 秒问一次：有几条未读、最新一条是什么（新消息弹窗、底栏角标用）。"""
+        role = current()
+        if not role:
+            return jsonify(error="手机登录已失效"), 401
+        rows = _updates(role)
+        top = rows[0] if rows else None
+        return jsonify(total=sum(g["count"] for g in rows), latest=top["ts"] if top else 0,
+                       top={"name": top["name"], "label": top["label"], "url": top["url"]} if top else None)
 
     @app.route("/p/me")
     def inbox():
@@ -219,18 +269,13 @@ def create_phone_app(secret_key: str) -> Flask:
         if bad:
             return bad
         rid = role["id"]
-        with get_conn() as c:
-            rows = c.execute(
-                "SELECT m.*, f.name AS fname, t.name AS tname FROM messages m JOIN roles f ON f.id=m.from_role_id JOIN roles t ON t.id=m.to_role_id "
-                "WHERE (m.from_role_id=? OR m.to_role_id=?) ORDER BY m.id DESC", (rid, rid)).fetchall()
-        threads: dict[int, dict] = {}
-        for m in rows:
-            other = m["to_role_id"] if m["from_role_id"] == rid else m["from_role_id"]
-            if other not in threads:
-                name = m["tname"] if m["from_role_id"] == rid else m["fname"]
-                text = (m["content"] or "［图片］") if m["kind"] == "sms" else f"［礼物］{m['title'] or m['content']}"
-                threads[other] = {"id": other, "name": name, "preview": text[:40], "time": time.strftime("%m-%d %H:%M", time.localtime(m["created_ts"]))}
-        return page("inbox.html", role=role, threads=list(threads.values()), mode="inbox", pub_last=publicfeed.last_line(),
+        from changri.core import phoneview          # 按落款认人；匿名对话、点歌台、偷盗记录各自一个会话（照老系统）
+        threads = phoneview.inbox(role, song_on=extensions.is_enabled("song"), steal_on=gifts.steal_enabled() or bool(gifts.steal_log(rid, 1)))
+        updates = _updates(role)
+        counts = {g["key"]: g["count"] for g in updates}
+        for t in threads:
+            t["unread"] = counts.get({"r": f"r:{t['key']}", "s": f"s:{t['key']}", "alias": f"a:{t['key']}", "precall": f"pc:{t['key']}"}.get(t["url_kind"], t["url_kind"]), 0)
+        return page("inbox.html", role=role, threads=threads, updates=updates, mode="inbox", pub_last=publicfeed.last_line(),
                     ball=masquerade.inbox_row(rid) if extensions.is_enabled("masquerade") and not role["is_npc"] else None)
 
     @app.route("/p/me/<int:other>")
@@ -243,8 +288,9 @@ def create_phone_app(secret_key: str) -> Flask:
             who = c.execute("SELECT name FROM roles WHERE id=?", (other,)).fetchone()
             if not who or other == rid:
                 abort(404)
-            msgs = c.execute("SELECT * FROM messages WHERE (from_role_id=? AND to_role_id=?) OR (from_role_id=? AND to_role_id=?) ORDER BY id",
-                             (rid, other, other, rid)).fetchall()
+        from changri.core import phoneview
+        _read(role, f"r:{other}")
+        msgs = phoneview.thread_messages(rid, other)          # 收到的按落款认人：带别的署名的匿名短信不会出现在真名会话里
         pics = msgimages.ids_by_msg([m["id"] for m in msgs])
         favs = {r[0] for r in get_conn().execute("SELECT message_id FROM phone_favs WHERE role_id=?", (rid,))}
         items = [{"id": m["id"], "fav": m["id"] in favs, "mine": m["from_role_id"] == rid, "kind": m["kind"], "title": m["title"], "text": m["content"], "imgs": pics.get(m["id"], []),
@@ -252,8 +298,114 @@ def create_phone_app(secret_key: str) -> Flask:
         blk = blocks.get_block(role["id"], other)
         return page("thread.html", role=role, me=role["name"], other=who["name"], other_id=other, items=items, mode="thread",
                     blocked=blk, can_recall=bool(messaging.last_recallable(role["id"])),
-                    items_catalog=gifts.catalog(), only_preset=gifts.only_preset(), draft_gift=request.args.get("gift", ""),
+                    items_catalog=gifts.catalog(role["id"]), only_preset=gifts.only_preset(), draft_gift=request.args.get("gift", ""),
                     allow_sign=get_config("allow_custom_sign", "0") == "1", images_ok=msgimages.enabled(), image_mb=msgimages.max_bytes() // 1024 // 1024)
+
+    # ---------- 特别的会话：署名、点歌台、偷盗记录、匿名对话（照老系统） ----------
+
+    def _bubbles(msgs, rid):
+        pics = msgimages.ids_by_msg([m["id"] for m in msgs])
+        return [{"id": m["id"], "mine": m["from_role_id"] == rid, "kind": m["kind"], "title": m["title"], "text": m["content"], "imgs": pics.get(m["id"], []),
+                 "time": time.strftime("%m-%d %H:%M", time.localtime(m["created_ts"]))} for m in msgs]
+
+    @app.route("/p/me/s/<path:sign>")
+    def sign_thread(sign: str):
+        """署名不是任何角色的匿名短信/礼物：单独一个会话，只能看、不能回（回不到真名上，免得穿帮）。"""
+        role, bad = need_login()
+        if bad:
+            return bad
+        from changri.core import phoneview
+        msgs = phoneview.sign_messages(role["id"], sign)
+        if not msgs:
+            abort(404)
+        _read(role, f"s:{sign}")
+        note = "这是带署名的匿名来信，不知道是谁寄的，不能直接回复。"
+        if admin_viewing():                                       # 只有管理员能看到署名背后是谁
+            with get_conn() as c:
+                who = sorted({c.execute("SELECT name FROM roles WHERE id=?", (m["from_role_id"],)).fetchone()["name"] for m in msgs})
+            note += f"（管理员可见：实际是 {'、'.join(who)} 寄的）"
+        return page("special_thread.html", role=role, title=sign, items=_bubbles(msgs, role["id"]), mode="thread", note=note)
+
+    @app.route("/p/me/sys/<kind>")
+    def sys_thread(kind: str):
+        """系统会话：点歌台（点给你的、你点给别人的）、偷盗记录（按身份写的那句话）。"""
+        role, bad = need_login()
+        if bad:
+            return bad
+        from changri.core import phoneview
+        if kind in ("song", "steal"):
+            _read(role, kind)
+        if kind == "song":
+            rows, title = phoneview.song_items(role), phoneview.SONG_THREAD
+        elif kind == "steal":
+            rows, title = phoneview.steal_items(role["id"]), phoneview.STEAL_THREAD
+        else:
+            abort(404)
+        items = [{"id": 0, "song_id": r.get("song_id", 0), "mine": r["mine"], "kind": "sms", "title": "", "text": r["text"], "imgs": [], "url": r.get("url", ""),
+                  "time": time.strftime("%m-%d %H:%M", time.localtime(r["ts"]))} for r in rows]
+        return page("special_thread.html", role=role, title=title, items=items, mode="thread", note="")
+
+    @app.post("/p/me/alias")
+    def alias_create():
+        """「新信息」页勾选匿名：写化名、选收件人，开一段匿名对话（对同一个人最多 3 个化名）。"""
+        role, bad = need_login()
+        if bad:
+            return bad
+        from changri.core import aliases
+        to = request.form.get("to", "")
+        why = _gate(role, "化名", request.form.get("alias", ""))
+        if why:
+            flash(why)
+            return redirect(url_for("new_chat"))
+        ok, msg, aid = aliases.create(role["id"], int(to) if to.isdigit() else 0, request.form.get("alias", ""))
+        if not ok:
+            flash(msg)
+            return redirect(url_for("new_chat"))
+        return redirect(url_for("alias_thread", alias_id=aid))
+
+    @app.route("/p/me/a/<int:alias_id>")
+    def alias_thread(alias_id: int):
+        role, bad = need_login()
+        if bad:
+            return bad
+        from changri.core import aliases
+        a = aliases.get(alias_id)
+        who = aliases.side(a, role["id"])
+        if not who:
+            abort(404)
+        _read(role, f"a:{alias_id}")
+        return page("special_thread.html", role=role, title=aliases.title_for(a, role["id"]), items=_bubbles(aliases.messages(alias_id), role["id"]),
+                    mode="thread", alias=a, alias_side=who, alias_wait=aliases.wait_minutes(a),
+                    note=(("你在用化名「%s」和 %s 聊，对方看不到你的真名。" % (a["alias"], a["target_name"])) if who == "owner"
+                          else "这是一段匿名对话，对方用的是化名。")
+                    + (f"（管理员可见：化名「{a['alias']}」是 {a['owner_name']}）" if admin_viewing() else ""))
+
+    @app.post("/p/me/a/<int:alias_id>/send")
+    def alias_send(alias_id: int):
+        role, bad = need_login()
+        if bad:
+            return bad
+        from changri.core import aliases
+        text = request.form.get("text", "")
+        why = _gate(role, "匿名短信", text)
+        if why:
+            flash(why)
+            return redirect(url_for("alias_thread", alias_id=alias_id))
+        ok, msg = loopbridge.run(aliases.send(role, alias_id, text, _send_fn()))
+        if not ok:
+            flash(msg)
+        return redirect(url_for("alias_thread", alias_id=alias_id))
+
+    @app.post("/p/me/a/<int:alias_id>/block")
+    def alias_block(alias_id: int):
+        """「拉黑并结束 / 解除拉黑」：只作用于这个化名，不牵涉任何真实身份。"""
+        role, bad = need_login()
+        if bad:
+            return bad
+        from changri.core import aliases
+        ok, msg = aliases.block(role, alias_id, unblock=request.form.get("action") == "unblock")
+        flash(msg)
+        return redirect(url_for("alias_thread", alias_id=alias_id))
 
     @app.route("/p/img/<int:img_id>")
     def msg_image(img_id: int):
@@ -362,12 +514,54 @@ def create_phone_app(secret_key: str) -> Flask:
         role, bad = need_login()
         if bad:
             return bad
-        return page("shop.html", role=role, items=gifts.catalog(), album=gifts.received(role["id"]), only=gifts.only_preset(), mode="shop")
+        mine = gifts.unlocked(role["id"]) if gifts.enabled() else []
+        for x in mine:
+            x["code"] = gifts.code(x["id"])
+        steal = None
+        if gifts.steal_enabled():
+            with get_conn() as c:
+                targets = [dict(r) for r in c.execute("SELECT id, name FROM roles WHERE id!=? AND is_npc=0 ORDER BY id", (role["id"],))]
+            steal = {"wait": gifts.steal_wait_min(role["id"]), "targets": targets, "log": gifts.steal_log(role["id"], 20)}
+        return page("shop.html", role=role, shop_on=gifts.enabled(), total=len(gifts.items()) if gifts.enabled() else 0, mine=mine,
+                    album=gifts.received(role["id"]), only=gifts.only_preset(), mode="shop", steal=steal)
+
+    @app.post("/p/me/shop/steal")
+    def shop_steal():
+        """偷取礼物：和群里「偷礼物 对方名」同一套（core/gifts.steal）；被偷的人个人群收到提醒。"""
+        role, bad = need_login()
+        if bad:
+            return bad
+        why = _gate(role, "偷礼物")
+        if why:
+            flash(why)
+            return redirect(url_for("shop"))
+        target = request.form.get("target", "")
+        ok, text, row = gifts.steal(role["id"], int(target)) if target.isdigit() else (False, "选一个要下手的人。", None)
+        flash(text if ok else f"❌ {text}")
+        if ok and row:
+            note = gifts.steal_text(row, row["victim_id"])
+            if note:
+                try:
+                    loopbridge.run(messaging.push_to_role(row["victim_id"], "🕵️ " + note, _send_fn()), timeout=10)
+                except Exception:  # noqa: BLE001 机器人不在线也不影响偷的结果；对方在小手机礼品店的偷盗记录里照样看得到
+                    pass
+        return redirect(url_for("shop"))
+
+    @app.post("/p/me/shop/visit")
+    def shop_visit():
+        """逛一逛：和群里发「礼品店」是同一套（随机收进图鉴、冷却）。"""
+        role, bad = need_login()
+        if bad:
+            return bad
+        if not gifts.enabled():
+            abort(404)
+        flash(gifts.visit(role["id"])["text"])
+        return redirect(url_for("shop"))
 
     # ---------- 各功能页面共用的小工具（功能页面本身在 features/<功能>/phone.py） ----------
 
     def _chat_or_404():
-        if not (extensions.is_enabled("phone") and (extensions.is_enabled("chatroom") or extensions.is_enabled("groupchat") or extensions.is_enabled("precall"))):
+        if not (extensions.is_enabled("phone") and (extensions.is_enabled("chatroom") or extensions.is_enabled("groupchat") or rooms_core.has_kind("前置电话"))):
             abort(404)
 
     def _ext_or_404(ext_id: str):
@@ -401,7 +595,7 @@ def create_phone_app(secret_key: str) -> Flask:
                     on={k: extensions.is_enabled(k) for k in ("lovemail", "wishes", "bottle", "relations", "moments", "masquerade", "games", "chatroom", "groupchat", "song", "precall")},
                     moments_latest=moments.latest() if extensions.is_enabled("moments") else None,
                     masq_on=extensions.is_enabled("masquerade") and masquerade.is_on(),
-                    precall_badge=0)
+                    precall_badge=precall.badge(role["id"]) if extensions.is_enabled("precall") else 0)
 
     # ---------- 时间线、搜索与收藏 ----------
 
@@ -490,7 +684,27 @@ def create_phone_app(secret_key: str) -> Flask:
         if bad:
             return bad
         from changri.core import overview
-        return page("todo.html", role=role, mode="discover", items=overview.todo_items(role))
+        try:
+            linger = loopbridge.run(overview.lingering(role), timeout=8)   # 问 QQ 小号群成员要回到机器人的事件循环里跑；最多等 8 秒
+        except Exception:  # noqa: BLE001 机器人没起来（只开了网页）时就不列「还没退的群」
+            linger = []
+        from changri.core import pending as pending_core
+        off = pending_core.dismissed(role["id"])
+        entries = overview.todo_entries(role, linger)
+        return page("todo.html", role=role, mode="discover", items=[e for e in entries if e[0] not in off],
+                    folded=[e for e in entries if e[0] in off])
+
+    @app.post("/p/me/todo/dismiss")
+    def todo_dismiss():
+        """「暂不提醒 / 恢复提醒」：只影响小手机上的提醒，不算已回复；群里「我的待回」照旧列出（照老系统）。"""
+        role, bad = need_login()
+        if bad:
+            return bad
+        from changri.core import pending as pending_core
+        key = request.form.get("key", "").strip()
+        if key:
+            pending_core.set_dismissed(role["id"], key, request.form.get("action") != "restore")
+        return redirect(url_for("todo_page"))
 
     @app.route("/p/me/profile")
     def profile():
@@ -567,6 +781,7 @@ def create_phone_app(secret_key: str) -> Flask:
         resp = redirect(url_for("inbox"))
         resp.set_cookie(_cookie(), f"{rid}.{code}.{ts}.{_sign(app.secret_key, rid, code, ts)}", max_age=MAX_AGE, path="/p", httponly=True,
                         samesite="Lax", secure=get_config("phone_https", "0") == "1")
+        resp.set_cookie(AS_COOKIE, "1", max_age=MAX_AGE, path="/p", httponly=True, samesite="Lax", secure=get_config("phone_https", "0") == "1")   # 只读代看
         return resp
 
     @app.route("/p/admin/rooms")
@@ -586,6 +801,20 @@ def create_phone_app(secret_key: str) -> Flask:
         if not r:
             abort(404)
         return ctx.archive_render(r, None)          # 戏录页的渲染，在 features/archive/phone.py 里挂到 ctx 上
+
+    @app.post("/p/admin/msg/<int:mid>/delete")
+    def admin_msg_delete(mid):
+        """管理员删短信/礼物（照老系统）：在只读代看的对话里点「删除」。"""
+        _admin_or_404()
+        flash("已删除这条（已经发到 QQ 群里的撤不回来）。" if messaging.admin_delete(mid) else "没有这条。")
+        return redirect(request.referrer or url_for("admin_home"))
+
+    @app.post("/p/admin/song/<int:sid>/delete")
+    def admin_song_delete(sid):
+        _admin_or_404()
+        song_core.delete(sid)
+        flash("已删除这条点歌。")
+        return redirect(request.referrer or url_for("admin_home"))
 
     @app.route("/p/admin/logout", methods=["POST"])
     def admin_logout():
@@ -685,9 +914,89 @@ def create_phone_app(secret_key: str) -> Flask:
     def guide():
         return page("guide.html", mode="guide")
 
+    # ---------- 提醒：网页推送（照老系统；通知里不写发信人和正文）。苹果手机要「添加到主屏幕」后从图标打开才能收；地址全用相对路径，跟着机器人自己的公网地址走 ----------
+
+    SW_JS = """
+self.addEventListener('install', function () { self.skipWaiting(); });
+self.addEventListener('activate', function (e) { e.waitUntil(self.clients.claim()); });
+self.addEventListener('push', function (e) {
+  var d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (_) {}
+  e.waitUntil(self.registration.showNotification(d.title || '小手机', {
+    body: d.body || '你有新消息', tag: d.tag || 'phone-msg', renotify: true,
+    icon: '/p/icon-192.png', badge: '/p/badge-96.png', data: { url: d.url || '/p/me' }
+  }));
+});
+self.addEventListener('notificationclick', function (e) {
+  e.notification.close();
+  var url = (e.notification.data && e.notification.data.url) || '/p/me';
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (list) {
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].url.indexOf('/p/') !== -1 && 'focus' in list[i]) { list[i].navigate(url); return list[i].focus(); }
+    }
+    return self.clients.openWindow(url);
+  }));
+});
+"""
+
+    @app.route("/p/sw.js")
+    def sw_js():
+        resp = make_response(SW_JS)
+        resp.headers["Content-Type"] = "text/javascript; charset=utf-8"
+        resp.headers["Service-Worker-Allowed"] = "/p/"
+        return resp
+
+    @app.route("/p/badge-96.png")
+    def badge_png():
+        from flask import send_from_directory
+        return send_from_directory(HERE / "static" / "themes" / "phone-icons", "badge-96.png")
+
+    @app.get("/p/push/key")
+    def push_key():
+        if not current():
+            return jsonify(ok=False), 401
+        from changri.core import webpush
+        return jsonify(ok=True, key=webpush.public_key())
+
+    @app.post("/p/push/subscribe")
+    def push_subscribe():
+        role = current()
+        if not role:
+            return jsonify(ok=False, msg="手机登录已失效"), 401
+        from changri.core import webpush
+        f = request.form
+        ok, msg = webpush.subscribe(role["id"], f.get("endpoint", ""), f.get("p256dh", ""), f.get("auth", ""))
+        return _mjson(ok, msg)
+
+    @app.post("/p/push/unsubscribe")
+    def push_unsubscribe():
+        role = current()
+        if not role:
+            return jsonify(ok=False, msg="手机登录已失效"), 401
+        from changri.core import webpush
+        webpush.unsubscribe(role["id"], request.form.get("endpoint", ""))
+        return _mjson(True, "已关闭")
+
+    _push_test_last: dict[int, float] = {}
+
+    @app.post("/p/push/test")
+    def push_test():
+        role = current()
+        if not role:
+            return jsonify(ok=False, msg="手机登录已失效"), 401
+        from changri.core import webpush
+        if time.time() - _push_test_last.get(role["id"], 0) < 10:
+            return _mjson(False, "刚试过，等几秒再点")
+        _push_test_last[role["id"]] = time.time()
+        subs = webpush.subs_of(role["id"])
+        if not subs:
+            return _mjson(False, "这台设备还没开启提醒")
+        ok = sum(1 for s in subs if webpush.send(s, {"title": _skin()["words"]["brand"], "body": "测试通知：能看到这条，说明提醒已经通了", "url": "/p/me", "tag": "phone-test"}))
+        return _mjson(bool(ok), "已发出，几秒内应该会弹出" if ok else "发送失败，稍后再试")
+
     @app.route("/p/manifest.json")
     def manifest():
-        return jsonify({"name": _skin()["words"]["brand"], "short_name": "小手机", "start_url": "/p/me", "display": "standalone",
+        return jsonify({"name": _skin()["words"]["brand"], "short_name": "小手机", "start_url": "/p/me", "scope": "/p/", "display": "standalone",
                         "background_color": "#ffffff", "theme_color": "#ffffff",
                         "icons": [{"src": "/p/icon-192.png", "sizes": "192x192", "type": "image/png"}, {"src": "/p/icon-512.png", "sizes": "512x512", "type": "image/png"}]})
 
@@ -727,7 +1036,7 @@ def create_phone_app(secret_key: str) -> Flask:
     def health():
         return "ok"
 
-    ctx = SimpleNamespace(_chat_or_404=_chat_or_404, _csrf=_csrf, _ext_or_404=_ext_or_404, _fmt=_fmt, _gate=_gate, _mjson=_mjson, _push=_push, _room_for=_room_for, _room_row=_room_row, _send_fn=_send_fn, current=current, need_login=need_login, page=page)
+    ctx = SimpleNamespace(_chat_or_404=_chat_or_404, _csrf=_csrf, _ext_or_404=_ext_or_404, _fmt=_fmt, _gate=_gate, _mjson=_mjson, _push=_push, _room_for=_room_for, _room_row=_room_row, _send_fn=_send_fn, current=current, need_login=need_login, page=page, is_admin=admin_viewing)
     from changri.features import registry
     for mod in registry.phone_pages():          # 各功能自己的小手机页面：features/<功能>/phone.py
         importlib.import_module(mod).register(app, ctx)

@@ -136,5 +136,92 @@ class LinkTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.got), 2)               # 断开后自动重连，又收到一条
 
 
+class MemberListTests(unittest.IsolatedAsyncioTestCase):
+    """查群成员：接口说失败、或者没给数据，都要报错，不能当成「群里没人」（会把还有玩家的群放回池）。"""
+
+    async def _ask(self, resp):
+        async def handler(ws):
+            async for raw in ws:
+                req = json.loads(raw)
+                await ws.send(json.dumps({**resp, "echo": req["echo"]}))
+
+        server = await websockets.serve(handler, "127.0.0.1", 0)
+        link = QQLink(f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}")
+        task = asyncio.get_running_loop().create_task(link.run())
+        try:
+            for _ in range(100):
+                if link.connected:
+                    break
+                await asyncio.sleep(0.02)
+            return await (link.member_rows("111") if getattr(self, "_rows", False) else link.member_list("111"))
+        finally:
+            link.stop()
+            task.cancel()
+            server.close()
+            await server.wait_closed()
+
+    async def test_ok(self):
+        self.assertEqual(await self._ask({"status": "ok", "retcode": 0, "data": [{"user_id": 5}, {"user_id": 6}]}), ["5", "6"])
+
+    async def test_rows_keep_role(self):
+        self._rows = True
+        got = await self._ask({"status": "ok", "retcode": 0, "data": [{"user_id": 5, "role": "owner"}, {"user_id": 6}]})
+        self.assertEqual(got, [{"qq": "5", "role": "owner"}, {"qq": "6", "role": "member"}])
+
+    async def test_failed_without_retcode_raises(self):
+        with self.assertRaises(QQLinkError):
+            await self._ask({"status": "failed", "data": None})
+
+    async def test_bad_retcode_raises(self):
+        with self.assertRaises(QQLinkError):
+            await self._ask({"status": "ok", "retcode": 100, "data": []})
+
+    async def test_no_data_raises(self):
+        with self.assertRaises(QQLinkError):
+            await self._ask({"status": "ok", "retcode": 0, "data": None})
+
+
+class GroupMembersTests(unittest.IsolatedAsyncioTestCase):
+    """qqmanager.group_members：空名单、连接异常都返回 None（问不到），有号能问到就用它的。"""
+
+    async def test_empty_and_errors_are_unknown(self):
+        from changri.core import qqmanager
+
+        class L:
+            connected = True
+
+            def __init__(self, result):
+                self.result = result
+
+            self_id = ""
+
+            async def member_rows(self, gid):
+                if isinstance(self.result, Exception):
+                    raise self.result
+                return [r if isinstance(r, dict) else {"qq": r, "role": "member"} for r in self.result]
+
+        keys = [("B", 1), ("B", 2)]
+        old_keys, old_owner = qqmanager._keys, qqmanager.qqpool.owner_of
+        qqmanager._keys = lambda app: keys
+        qqmanager.qqpool.owner_of = lambda gid: 0
+        try:
+            for a, b, want in ((L([]), L(RuntimeError("closed")), None),
+                               (L(ConnectionError("x")), L(["7"]), {"7"}),
+                               (L([]), L(["8"]), {"8"})):
+                qqmanager._links.update({keys[0]: a, keys[1]: b})
+                self.assertEqual(await qqmanager.group_members("B", "111"), want)
+            me = L([{"qq": "1", "role": "member"}, {"qq": "2", "role": "owner"}, {"qq": "3", "role": "admin"}, {"qq": "4", "role": "member"}])
+            me.self_id = "1"                                                 # 我们自己的 QQ 号
+            qqmanager._links.update({keys[0]: me, keys[1]: L([])})
+            self.assertEqual(await qqmanager.group_others("B", "111"), {"4"})   # 群主、管理员、自己的号都不算
+            qqmanager._links.update({keys[0]: L([{"qq": "1", "role": "member"}]), keys[1]: L([])})
+            qqmanager._links[keys[0]].self_id = "1"
+            self.assertEqual(await qqmanager.group_others("B", "111"), set())   # 只剩自己：群是空的（不是问不到）
+        finally:
+            qqmanager._keys, qqmanager.qqpool.owner_of = old_keys, old_owner
+            for k in keys:
+                qqmanager._links.pop(k, None)
+
+
 if __name__ == "__main__":
     unittest.main()

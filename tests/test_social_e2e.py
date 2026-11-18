@@ -46,7 +46,9 @@ class FakeBot(QBot):
 
     async def send_to_group(self, group_openid, message, **kw):
         FakeBot.n += 1
-        SENT.append(f"[{group_openid}] {message}")
+        md = getattr(message, "data", {}).get("markdown") if hasattr(message, "data") else None
+        # markdown 的 @ 消息记原文：str() 出来换行会变成「\n」两个字符，断言对不上（以前要靠别的测试先让 markdown 失败才过）
+        SENT.append(f"[{group_openid}] {md.content if md is not None else message}")
         return SimpleNamespace(id=f"M{FakeBot.n}")
 
     async def _request(self, request):
@@ -59,7 +61,7 @@ class SocialE2E(unittest.TestCase):
     def setUp(self):
         init_db()
         with get_conn() as c:
-            for t in ("gift_shop", "seasons", "entrance", "messages", "blocks", "role_attrs", "role_groups", "roles", "admins", "admin_codes", "config"):
+            for t in ("gift_steals", "gift_unlocks", "gift_shop_visits", "gift_shop", "seasons", "entrance", "messages", "blocks", "role_attrs", "role_groups", "roles", "admins", "admin_codes", "config"):
                 c.execute(f"DELETE FROM {t}")
         SENT.clear(); DELETED.clear()
         FakeBot.fail_delete = False
@@ -102,6 +104,26 @@ class SocialE2E(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("简称已清除", self.say("修改简称 甲")[0])
         self.assertIsNone(roles.get_role_by_name("小甲"))
+
+    def test_look_cooldown_and_rename(self):
+        """皮相 2 小时只能改一次；修改名字：不能撞别人的本名/简称，改完各处按新名字找得到。"""
+        self.assertIn("皮相已改为：某明星", self.say("修改皮相 某明星")[0])
+        self.assertIn("2 小时", self.say("修改皮相 另一位")[0])
+        with get_conn() as c:
+            c.execute("UPDATE role_profiles SET look_ts=look_ts-2*3600")
+        self.assertIn("皮相已改为：另一位", self.say("修改皮相 另一位")[0])
+        self.assertIn("别人的名字", self.say("修改名字 乙")[0])
+        self.assertIn("一样", self.say("修改名字 甲")[0])
+        self.assertIn("「甲」改为「阿甲」", self.say("修改名字 阿甲")[0])
+        self.assertIsNone(roles.get_role_by_name("甲"))
+        self.assertIn("阿甲", self.say("我的角色")[0])
+        out = self.say("短信 阿甲 新名字找得到", member="MB", group="GB")
+        self.assertTrue(any("[GA]" in o for o in out), out)
+
+    def test_mine_quick_reference(self):
+        out = self.say("我的")[0]
+        self.assertIn("我的数量：", out)
+        self.assertIn("全服今天的总数", out)
 
     def test_ping_random_line(self):
         """「/ping 的回复」写好几行：每次随机回一行；空着回「收到。」"""
@@ -152,6 +174,19 @@ class SocialE2E(unittest.TestCase):
         self.assertEqual(self.say("我昨天发短信给你了"), [])                     # 聊天里碰巧带了字，不理
         self.assertEqual(self.say("神秘人短信 乙 你好"), [])                      # 没开放自定义署名，不理
 
+    def test_form_with_sign_when_custom_sign_closed(self):
+        """照模板竖着写、填了署名，但管理员没开自定义署名：照常用角色名发出，回执里说一声（以前整条不理，玩家以为机器人坏了）。"""
+        out = self.say("【短信】\n对象：乙\n内容：照着模板写的\n署名：神秘人")
+        delivered = [o for o in out if "[GB]" in o]
+        self.assertTrue(delivered and "甲 给你发来一条短信" in delivered[0] and "照着模板写的" in delivered[0])
+        self.assertNotIn("神秘人", delivered[0])                                  # 署名没开放：不能借竖着写绕过去
+        self.assertTrue(any("已送达「乙」" in o and "没有开放自定义署名" in o for o in out))
+        out = self.say("【送礼】\n对象：乙\n礼物：一束花\n署名：神秘人")
+        self.assertTrue(any("[GB]" in o and "甲 送了你「一束花」" in o for o in out))
+        self.assertTrue(any("没有开放自定义署名" in o for o in out))
+        out = self.say("【短信】\n对象：乙\n内容：署名是自己\n署名：甲")              # 署名就是自己的名字：不用提示
+        self.assertFalse(any("没有开放自定义署名" in o for o in out))
+
     def test_custom_sign(self):
         set_config("allow_custom_sign", "1")
         out = self.say("神秘人短信 乙 你猜我是谁")
@@ -170,18 +205,68 @@ class SocialE2E(unittest.TestCase):
         self.assertIn("还是空的", self.say("我的图鉴")[0])
 
     def test_catalog_and_only_preset(self):
-        self.assertIn("还没有上架", self.say("礼品店")[0])
+        self.assertIn("货架上什么都没有", self.say("礼品店")[0])
         set_config("gift_catalog", "玫瑰、巧克力")           # 升级前的老格式：第一次用时搬进礼品店表，编号 1、2
-        shop = self.say("礼品店")[0]
-        self.assertIn("1. 玫瑰", shop)
-        self.assertIn("2. 巧克力", shop)
-        self.assertTrue(any("[GB]" in o for o in self.say("送礼 乙 随便什么")))
-        self.assertTrue(any("玫瑰" in o and "[GB]" in o for o in self.say("送礼 乙 1")))      # 写编号 = 送对应的礼物
+        set_config("gift_shop_bonus_pct", "0")
+        self.assertIn("0/2", self.say("我的图鉴")[0])
+        self.assertIn("还不在你的图鉴里", self.say("送礼 乙 1")[0])                    # 没收集到的礼品店礼物不能送
+        self.assertTrue(any("[GB]" in o for o in self.say("送礼 乙 随便什么")))             # 自定义礼物照常
+        first = self.say("礼品店")[0]
+        self.assertIn("收入图鉴", first)
+        got = 1 if "#001" in first else 2
+        self.assertIn("这件已经在你的图鉴里了", self.say("礼品店")[0])                # 冷却中：货架不换
+        self.assertIn("1/2", self.say("我的图鉴")[0])
+        self.assertTrue(any("[GB]" in o for o in self.say(f"送礼 乙 #{got:03d}")))       # 图鉴里有：写编号就能送，送多少次都行
+        self.assertTrue(any("[GB]" in o for o in self.say(f"送礼 乙 {got}")))
+        self.assertIn(f"#{got:03d}", self.say(f"图鉴 #{got}")[0])
+        self.assertIn("不在你的图鉴里", self.say(f"图鉴 #{3 - got}")[0])
+        with get_conn() as c:
+            c.execute("UPDATE gift_shop_visits SET refreshed_ts=refreshed_ts-25*3600")     # 冷却过了
+        self.assertIn("收入图鉴", self.say("礼品店")[0])
+        self.assertIn("所有的 2 件礼物", self.say("礼品店")[0])
+        self.assertTrue(any("随便什么" in o for o in self.say("我的礼物", member="MB", group="GB")))
         set_config("gift_only_preset", "1")
         self.assertIn("只能送礼品店里的礼物", self.say("送礼 乙 随便什么")[0])
         self.assertIn("只能送礼品店里的礼物", self.say("送礼 乙 玫瑰")[0])                    # 开了「只能送礼品店」：名字也不行，只认编号
-        self.assertIn("没有 9 号", self.say("送礼 乙 9")[0])
+        self.assertIn("没有 #009", self.say("送礼 乙 9")[0])
         self.assertTrue(any("巧克力" in o and "[GB]" in o for o in self.say("送礼 乙 2")))
+
+    def test_steal_gift(self):
+        """偷礼物（照老系统）：默认关；开了以后从对方图鉴偷一件自己没有的；默认只抄一份、不被发现；被偷的人个人群收到提醒；冷却。"""
+        from changri.core import gifts
+        set_config("gift_catalog", "玫瑰、巧克力、怀表")
+        self.assertIn("没有开放", self.say("偷礼物 乙")[0])
+        set_config("gift_steal_enabled", "1")
+        self.assertIn("太少", self.say("偷礼物 乙")[0])                                     # 乙图鉴是空的
+        b = roles.get_role_by_name("乙")["id"]; a = roles.get_role_by_name("甲")["id"]
+        i1, i2, i3 = (x["id"] for x in gifts.items())
+        gifts.unlock(b, i1)
+        out = self.say("偷礼物 乙")
+        me = next(o for o in out if "[GB]" not in o)
+        self.assertIn("偷到了「玫瑰」", me); self.assertIn("只是抄了一份", me); self.assertIn("没人发现", me)
+        self.assertTrue(any("[GB]" in o and "有人偷偷抄走了你图鉴里的「玫瑰」" in o for o in out), out)   # 没被发现：不知道是谁
+        self.assertTrue(gifts.owns(a, i1) and gifts.owns(b, i1))
+        self.assertIn("都有了", self.say("偷礼物 乙")[0])
+        gifts.unlock(b, i2)
+        set_config("gift_steal_take_pct", "100"); set_config("gift_steal_find_pct", "100")
+        out = self.say("偷礼物 乙")
+        me = next(o for o in out if "[GB]" not in o)
+        self.assertIn("被你拿走了", me); self.assertIn("被发现了", me)
+        self.assertTrue(any("[GB]" in o and "你发现「甲」偷走了你图鉴里的「巧克力」" in o for o in out), out)
+        self.assertFalse(gifts.owns(b, i2))
+        set_config("gift_steal_cooldown_hours", "2")
+        gifts.unlock(b, i3)
+        self.assertIn("缓过来", self.say("偷礼物 乙")[0])                                   # 冷却
+        self.assertIn("偷走了", self.say("偷盗记录", member="MB", group="GB")[0])
+        set_config("gift_steal_fail_pct", "100"); set_config("gift_steal_cooldown_hours", "0")
+        self.assertTrue(any("失手了" in o for o in self.say("偷礼物 乙")))
+        self.assertFalse(gifts.owns(a, i3))
+
+    def test_shop_bonus(self):
+        set_config("gift_catalog", "玫瑰、巧克力、怀表")
+        set_config("gift_shop_bonus_pct", "100")
+        self.assertIn("两件都收入图鉴", self.say("礼品店")[0])
+        self.assertIn("2/3", self.say("图鉴")[0])
 
     def test_daily_limit_and_recall_refund(self):
         set_config("sms_daily_limit", "2")

@@ -122,7 +122,7 @@ class LayoutTest(unittest.TestCase):
         self.assertNotIn("心动信", formats.available())
         self.assertEqual(formats.template("心动信")[0], "off")
         self.assertNotIn("踩点", formats.available())                       # 踩点默认关
-        set_config("stakeout_enabled", "1")
+        set_config("ext:stakeout", "1")
         self.assertIn("踩点", formats.available())
         self.assertEqual(formats.template("火星")[0], "unknown")
 
@@ -175,9 +175,10 @@ class ButtonsE2E(unittest.TestCase):
         self.assertIn("没有开放", self.say("格式心动信")[0][0])
 
     def test_template_has_fill_button(self):
-        text, btns = self.say("格式私约")[0]
-        self.assertIn("私约 时间 地点", text)
-        self.assertEqual(btns, [("填入输入框", "私约 ", False)])
+        text, btns = self.say("格式私约")[0]                 # 老叫法照样认，给的是新名字的模板
+        self.assertIn("约会 时间 地点", text)
+        self.assertIn("结束约会", text)
+        self.assertEqual(btns, [("填入输入框", "约会 ", False)])
         text, btns = self.say("格式撤回")[0]
         self.assertIn("撤回", text)
         self.assertEqual(btns, [])                       # 撤回没有可以填的开头，不出按钮

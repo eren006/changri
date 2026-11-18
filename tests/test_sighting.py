@@ -3,7 +3,7 @@ import os
 import tempfile
 import unittest
 
-os.environ.setdefault("CHANGRI_DB", os.path.join(tempfile.mkdtemp(), "t.db"))
+os.environ["CHANGRI_DB_PATH"] = os.path.join(tempfile.mkdtemp(), "t.db")
 
 from changri.core import roles, rooms, sighting
 from changri.core.db import get_conn, init_db, set_config

@@ -14,8 +14,9 @@ SOLO_KINDS = {"踩点"}                                                         
 
 
 def stakeout_enabled() -> bool:
-    """踩点开关（「功能与设置 → 约会房间」，默认关）。"""
-    return get_config("stakeout_enabled", "0") == "1"
+    """踩点开关：「扩展」页的「踩点」卡片（默认关）。"""
+    from . import extensions
+    return extensions.is_enabled("stakeout")
 
 
 def parse_hm(text: str, day: int | None = None) -> tuple[str, str] | None:
@@ -73,10 +74,17 @@ def is_member(room_id: int, role_id: int) -> bool:
         return c.execute("SELECT 1 FROM room_members WHERE room_id=? AND role_id=?", (room_id, role_id)).fetchone() is not None
 
 
-def conflict(role_id: int, day: int, a: str, b: str, ignore_room: int = 0, locks: bool = True):
+def conflict(role_id: int, day: int, a: str, b: str, ignore_room: int = 0, locks: bool = True, ignore_wish: int = 0):
+    """一个时间段只能有一件事：进行中和已结束的房间都占时间线（只有取消的不占），自己挂着还没被摘、没过期的心愿也占。"""
     for r in timeline(role_id, day):
-        if r["id"] != ignore_room and r["status"] == "open" and _overlap(a, b, r["start_hm"], r["end_hm"]):
+        if r["id"] != ignore_room and _overlap(a, b, r["start_hm"], r["end_hm"]):
             return r
+    with get_conn() as c:
+        ws = c.execute("SELECT id, start_hm, end_hm FROM wishes WHERE poster_id=? AND day=? AND status='open' AND id!=? AND created_ts>=?",
+                       (role_id, day, ignore_wish, int(time.time()) - 24 * 3600)).fetchall()     # 心愿 24 小时过期，过期的不占
+    for w in ws:
+        if _overlap(a, b, w["start_hm"], w["end_hm"]):
+            return {"id": 0, "kind": f"心愿 #{w['id']}，还没被摘", "start_hm": w["start_hm"], "end_hm": w["end_hm"], "status": "open"}
     if locks:                                              # 上帝模式的时间锁定
         from . import godmode
         return godmode.lock_hit(role_id, day, a, b)
@@ -106,8 +114,9 @@ def web_mode() -> bool:
 
 
 def create(kind: str, creator_id: int, target_ids: list[int], time_text: str, place: str = "", note: str = "",
-           official: bool = False, day: int | None = None) -> tuple[bool, str, int]:
+           official: bool = False, day: int | None = None, wish_id: int = 0) -> tuple[bool, str, int]:
     """发起一个房间。返回 (成功, 提示或房间号, room_id)。
+    wish_id：摘心愿开的房间，传心愿编号——time_text 是挂心愿时已经换算好的「HH:MM-HH:MM」，直接用，不再按故事历重新解析；查时间撞时也不算这条心愿自己。
     成功时提示是「R房间号」；多人邀约里有人拉黑了发起人，会被悄悄剔掉，提示后面多一行「\n…」告诉发起人谁没加进来（对方设了静默的不提）。"""
     if kind not in KINDS:
         return False, "不认识的类型", 0
@@ -124,7 +133,7 @@ def create(kind: str, creator_id: int, target_ids: list[int], time_text: str, pl
     if kind != "微信":
         if season.phase() != "playing":
             return False, "现在不是进行中的季度（筹备期/没有季度时不能约）。", 0
-        hm = parse_hm(time_text, day)
+        hm = tuple(time_text.split("-", 1)) if wish_id else parse_hm(time_text, day)
         if not hm:
             from . import storycal
             return False, (storycal.parse_when(time_text, day)[1] or storycal.format_error(day)), 0
@@ -174,9 +183,10 @@ def create(kind: str, creator_id: int, target_ids: list[int], time_text: str, pl
                 return False, f"你有 {cap} 个电话还没结束，先结束几个再打。", 0
     if kind not in NO_TIMELINE:
         for rid in [creator_id] + ids:
-            hit = conflict(rid, day, hm[0], hm[1], locks=not official)
+            hit = conflict(rid, day, hm[0], hm[1], locks=not official, ignore_wish=wish_id)
             if hit:
-                who = "你" if rid == creator_id else f"「{names.get(rid, '对方')}」"
+                # 官约由管理员发起，creator 只是名单上的第一个人：写「你」管理员会以为是自己撞了
+                who = "你" if rid == creator_id and not official else f"「{names.get(rid, '对方')}」"
                 return False, f"{who}在 D{day} {hit['start_hm']}-{hit['end_hm']} 已经有安排（{hit['kind']}），时间撞了。", 0
     with get_conn() as c:
         cur = c.execute("INSERT INTO rooms(kind, creator_id, day, start_hm, end_hm, place, note, dkey, created_ts) VALUES(?,?,?,?,?,?,?,?,?)",
@@ -189,6 +199,7 @@ def create(kind: str, creator_id: int, target_ids: list[int], time_text: str, pl
         if not pool.allocate(rid_):                                                  # 备用群池没有空群：不排队，直接告诉玩家没开成
             with get_conn() as c:
                 c.execute("DELETE FROM rooms WHERE id=?", (rid_,))                   # 成员、发言连带删除（外键级联）
+            pool.note_exhausted(kind)                                                # 定时任务会提醒后台群
             return False, f"备用群池暂时没有空闲的群，这次{kind}没能开成，请稍后再试，或联系管理员多准备几个备用群。", 0
     try:                                                          # 目击系统（额外扩展）：关着就什么都不做
         from . import sighting
@@ -199,19 +210,10 @@ def create(kind: str, creator_id: int, target_ids: list[int], time_text: str, pl
     return True, f"R{rid_}{note_refused}", rid_
 
 
-def create_call(creator_id: int, target_id: int, note: str = "") -> int:
-    """前置电话拨通：不看季度、不占时间线，直接开房间（网页聊天室开着就不占 QQ 群，否则备用群池有空群就分群，没有就不建（返回 0，不排队））。"""
+def has_kind(kind: str) -> bool:
+    """有没有这种房间（以前的「前置电话」房间：新玩法不再开房间，旧房间照常能进、能结束）。"""
     with get_conn() as c:
-        rid = c.execute("INSERT INTO rooms(kind, creator_id, day, start_hm, end_hm, place, note, dkey, created_ts) VALUES('前置电话',?,NULL,'','','',?,?,?)",
-                        (creator_id, note, season.day_key(), int(time.time()))).lastrowid
-        c.execute("INSERT INTO room_members(room_id, role_id, agree) VALUES(?,?,1)", (rid, creator_id))
-        c.execute("INSERT INTO room_members(room_id, role_id, agree) VALUES(?,?,1)", (rid, target_id))
-    if not web_mode() and not pool.allocate(rid):                  # 备用群池没有空群：不排队，房间不建，返回 0
-        with get_conn() as c:
-            c.execute("DELETE FROM rooms WHERE id=?", (rid,))
-        return 0
-    return rid
-
+        return c.execute("SELECT 1 FROM rooms WHERE kind=? LIMIT 1", (kind,)).fetchone() is not None
 
 def join(room_id: int, role_id: int) -> tuple[bool, str]:
     r = get(room_id)
@@ -301,11 +303,15 @@ def end(room_id: int, status: str = "ended") -> dict | None:
 
 
 def assign_waiting() -> list[int]:
-    """有空群了：给还没分到群的房间（比如开着小手机聊天室时发起的）按先后补群。返回拿到群的房间 id。
-    新发起的房间领不到群会直接撤掉、告诉玩家，不会排到这里。"""
+    """有空群了：给还没分到群的房间按先后补群。返回拿到群的房间 id。
+    新发起的房间领不到群会直接撤掉、告诉玩家，不会排到这里。
+    微信（多人群聊）和聊天室模式开着时的房间只用小手机网页聊天室，不补 QQ 群；
+    聊天室关掉以后，当时在聊天室里建、还没结束的房间才会补到 QQ 群。"""
+    if web_mode():
+        return []
     got = []
     with get_conn() as c:
-        wait = [r["id"] for r in c.execute("SELECT id FROM rooms WHERE status='open' AND pool_id IS NULL ORDER BY id")]
+        wait = [r["id"] for r in c.execute("SELECT id FROM rooms WHERE status='open' AND pool_id IS NULL AND kind != '微信' ORDER BY id")]
     for rid in wait:
         if pool.allocate(rid):
             got.append(rid)

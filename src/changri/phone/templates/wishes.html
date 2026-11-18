@@ -24,11 +24,9 @@
         <div class="wish-label-row"><label for="wishContent">一句想说的话</label><span class="wish-hint" id="wishCount">还可写 {{ max_content }} 字</span></div>
         <textarea id="wishContent" name="content" maxlength="{{ max_content }}" aria-describedby="wishCount" placeholder="比如，想和你一起等一场日落。" required></textarea>
         <label for="wishNick">留个昵称 <span class="wish-hint">选填 · 10 字内</span></label>
-        <input id="wishNick" name="nick" maxlength="10" placeholder="不写就显示真名" aria-describedby="wishPrivacy">
-        <p class="wish-hint" id="wishPrivacy">心愿墙上显示你的昵称；不写昵称就显示角色名。</p>
-        <label for="wishReward">悬赏（选填）</label>
-        <input id="wishReward" name="reward" maxlength="40" placeholder="例如：滋补汤 1（只是登记，兑现靠你们自己）">
-        <div class="wish-submit-row"><span class="wish-hint">时间要写在今天（游戏天数）</span><button type="submit" class="wish-button"{% if why %} disabled{% endif %}>挂出去</button></div>
+        <input id="wishNick" name="nick" maxlength="10" placeholder="比如：神秘人A" aria-describedby="wishPrivacy">
+        <p class="wish-hint" id="wishPrivacy">心愿墙上只显示性别和昵称，不显示角色名；不写昵称就只显示性别。</p>
+        <div class="wish-submit-row"><span class="wish-hint">时间写今天（游戏天数）· 24 小时内没人摘会自动消失</span><button type="submit" class="wish-button"{% if why %} disabled{% endif %}>挂出去</button></div>
       </fieldset>
     </form>
     <section class="wish-section" aria-labelledby="wishWallTitle"><div class="wish-section-heading"><h2 id="wishWallTitle">漂浮的心愿</h2><span class="wish-hint">等一位有缘人</span></div>
@@ -37,7 +35,7 @@
           <div class="wish-card-heading"><h3>{{ w.who or '匿名' }}</h3>{% if w.mine %}<span class="wish-mine">我的</span>{% endif %}</div>
           <div class="wish-where"><span>{{ w.day }} · {{ w.time }}</span><span>{{ w.place }}</span></div>
           <p class="wish-content">{{ w.content }}</p>
-          {% if w.reward %}<span class="wish-reward">悬赏 · {{ w.reward }}</span>{% endif %}
+          <span class="wish-hint">还剩 {{ w.left }} 小时</span>
           <div class="wish-card-foot">
             <button type="button" class="wish-copy" data-wish-copy="{{ w.id }}" aria-label="复制心愿编号 {{ w.id }}">#{{ w.id }} <span>复制</span></button>
             {% if w.mine %}<form method="post" action="{{ url_for('wish_withdraw', wid=w.id) }}"><input type="hidden" name="_csrf" value="{{ csrf() }}"><button type="submit" class="wish-button wish-quiet"{% if why %} disabled aria-describedby="wishWhy"{% endif %}>撤回</button></form>

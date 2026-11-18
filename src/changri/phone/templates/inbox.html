@@ -10,6 +10,19 @@
       <label class="search-pill" for="phoneSearch"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg><input id="phoneSearch" type="search" placeholder="搜索联系人、消息" autocomplete="off" enterkeyhint="search" maxlength="40" aria-label="搜索"></label>
     </div>
     {% include '_flash.html' %}
+    {% if updates %}
+    <section class="updates-card" id="unread-updates" aria-labelledby="updates-title" style="margin:8px 16px;padding:10px 12px;border:1px solid var(--line);border-radius:14px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline"><h2 id="updates-title" style="font-size:15px;margin:0">未读消息</h2><span style="color:var(--muted);font-size:13px">{{ updates|sum(attribute='count') }} 条</span></div>
+      <p style="font-size:12px;color:var(--muted);margin:2px 0 6px">点开查看，读过后自动移出这里</p>
+      {% for u in updates[:8] %}
+      <a href="{{ u.url }}" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line)">
+        <span style="flex:1;min-width:0"><strong>{{ disp(u.name) }}</strong> <small style="color:var(--muted)">{{ u.label }} · {{ u.time }}</small></span>
+        <span class="unread-count" aria-label="{{ u.count }} 条未读" style="min-width:20px;padding:0 6px;border-radius:10px;background:#c62a2f;color:#fff;font-size:12px;text-align:center">{{ u.count }}</span>
+      </a>
+      {% endfor %}
+      {% if updates|length > 8 %}<p style="font-size:12px;color:var(--muted);margin:4px 0 0">还有 {{ updates|length - 8 }} 个来源有未读</p>{% endif %}
+    </section>
+    {% endif %}
     <a class="row public-row" data-find="{{ skin.words.public }} {{ pub_last }}" href="{{ url_for('public_page') }}">
       <div class="avatar public-avatar" aria-hidden="true">📢</div>
       <div class="body">
@@ -25,10 +38,10 @@
       </div>
     </a>{% endif %}
     {% for t in threads %}
-    <a class="row" data-find="{{ disp(t.name) }} {{ t.name }} {{ t.preview }}" href="{{ url_for('thread', other=t.id) }}">
+    <a class="row{% if t.unread %} unread{% endif %}" data-find="{{ disp(t.name) }} {{ t.name }} {{ t.preview }}" href="{% if t.url_kind == 'r' %}{{ url_for('thread', other=t.key) }}{% elif t.url_kind == 's' %}{{ url_for('sign_thread', sign=t.key) }}{% elif t.url_kind == 'alias' %}{{ url_for('alias_thread', alias_id=t.key) }}{% elif t.url_kind == 'precall' %}{{ url_for('precall_call', session_id=t.key) }}{% else %}{{ url_for('sys_thread', kind=t.url_kind) }}{% endif %}">
       <div class="avatar" data-name="{{ t.name }}">{{ t.name[:1] }}</div>
       <div class="body">
-        <div class="top"><span class="name">{{ disp(t.name) }}</span><span class="time">{{ t.time }}</span></div>
+        <div class="top"><span class="name">{{ disp(t.name) }}{% if t.tag %}<small style="margin-left:6px;padding:1px 6px;border-radius:8px;background:var(--theirs);font-size:11px;font-weight:400">{{ t.tag }}</small>{% endif %}</span><span class="time">{% if t.unread %}<span class="unread-count" aria-label="{{ t.unread }} 条未读" style="display:inline-block;min-width:18px;margin-right:6px;padding:0 5px;border-radius:9px;background:#c62a2f;color:#fff;font-size:11px;text-align:center">{{ t.unread }}</span>{% endif %}{{ t.time }}</span></div>
         <div class="preview">{{ t.preview }}</div>
       </div>
     </a>

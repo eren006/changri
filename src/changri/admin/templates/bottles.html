@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}漂流瓶记录{% endblock %}
+{% block body %}
+<h1>漂流瓶记录</h1>
+<p class="lede">玩家那边漂流瓶永远是匿名的，这里能看到每个瓶子真正是谁扔的、谁捡到的，以及来回的每一句（包括被拉黑、对方没收到的）。只有管理员能看。</p>
+<form method="get" class="form" style="max-width:420px;margin-bottom:14px"><input name="q" value="{{ q }}" placeholder="按角色名或内容搜索"><button class="btn sm" type="submit">搜索</button></form>
+{% for b in bottles %}
+<div class="card" style="margin-bottom:10px">
+  <div><b>瓶子 #{{ b.id }}</b> <span class="muted">{{ b.created_ts|ts }}</span></div>
+  <div>抛瓶人：<b>{{ b.thrower }}</b>　→　捡瓶人：<b>{{ b.catcher }}</b></div>
+  {% for m in b.msgs %}<div style="margin-top:6px;white-space:pre-wrap"><span class="muted">{{ m.ts|ts }} · {{ m.side }}（{{ m.who }}）：</span>{{ m.content }}</div>{% endfor %}
+</div>
+{% else %}<p class="muted">{{ '没有搜到。' if q else '还没有漂流瓶。' }}</p>{% endfor %}
+{% endblock %}

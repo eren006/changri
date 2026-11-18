@@ -40,6 +40,19 @@ def register(app, login_required):
         flash(msg)
         return redirect(url_for("season_page") + "#npc")
 
+    @app.post("/season/npc/<int:role_id>/profile")
+    @login_required
+    def season_npc_profile(role_id):
+        """NPC 改档案（和玩家在群里发的「修改名字 / 性别 / 年龄 / 皮相 / 签名 / 简称」同一套规则；管理员代改不受冷却限制）。"""
+        from changri.core import charprofile, roles as roles_core
+        r = roles_core.get_role(role_id)
+        if not r or not r["is_npc"]:
+            flash("没有这个 NPC")
+        else:
+            text = request.form.get("lines", "").strip()
+            flash(charprofile.edit(r, text, admin=True) if text else "写上要改的，比如：修改皮相 某某")
+        return redirect(url_for("season_page") + "#npc")
+
     @app.post("/season/npc/flag")
     @login_required
     def season_npc_flag():

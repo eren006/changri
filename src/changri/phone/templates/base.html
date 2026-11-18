@@ -23,6 +23,7 @@
 <body>
 {% include '_phone_symbol_runtime.html' %}
 <div class="phone" data-mode="{{ mode }}" data-visual="{{ skin.visual }}">
+{% if admin_viewing %}<div class="pause-banner" role="status">👀 管理员只读查看「{{ role.name }}」的手机：只能看，不能替 TA 操作；看过的消息也不算 TA 已读。<a href="{{ url_for('admin_home') }}">回管理员手机</a></div>{% endif %}
 {% if comm_paused %}<div class="pause-banner" role="status">通讯暂时关闭了，稍后开放。已有的内容还能看。</div>{% endif %}
 {% if outage_rooms %}<div class="pause-banner" role="status">拉群用的 QQ 号掉线了，进行中的戏先在这里接着写：{% for r in outage_rooms %}<a href="{{ url_for('room_page', rid=r.id) }}">R{{ r.id }} {{ r.kind }}</a>{% if not loop.last %}、{% endif %}{% endfor %}</div>{% endif %}
 {% block body %}{% endblock %}
@@ -30,7 +31,7 @@
 <div class="bottom-dock">
   {% if mode == 'inbox' %}<a class="shop-fab" href="{{ url_for('shop') }}" aria-label="礼品店" title="礼品店">{{ phone_symbol('gift') }}{% if skin.visual == 'medici' %}<span class="md-cherub" aria-hidden="true"><i class="md-angel-body"></i><i class="md-wing-left"></i><i class="md-wing-right"></i></span>{% endif %}</a>{% endif %}
   <nav class="phone-nav" aria-label="手机导航">
-    <a href="{{ url_for('inbox') }}"{% if mode == 'inbox' %} aria-current="page"{% endif %}><span aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" focusable="false"><path d="M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-5 3v-3a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/><path d="M7 9h10M7 13h7"/></svg></span>{{ skin.words.messages }}</a>
+    <a href="{{ url_for('inbox') }}" id="navInbox"{% if phone_unread %} class="unread"{% endif %}{% if mode == 'inbox' %} aria-current="page"{% endif %}><span aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" focusable="false"><path d="M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-5 3v-3a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/><path d="M7 9h10M7 13h7"/></svg></span>{{ skin.words.messages }}</a>
     <a href="{{ url_for('discover') }}"{% if rel_unread and mode not in ('discover', 'moments') %} class="unread"{% endif %}{% if mode in ('discover', 'moments') %} aria-current="page"{% endif %}><span aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5 5-2Z"/></svg></span>发现</a>
     <a class="dock-plus" id="dockPlus" href="{{ url_for('new_chat') }}" aria-label="{{ '发朋友圈' if mode == 'moments' and not why else skin.words.new }}" data-moments="{{ 1 if mode == 'moments' and not why else 0 }}"><svg width="24" height="24" viewBox="0 0 24 24" focusable="false"><path d="M12 5v14M5 12h14"/></svg></a>
     <a href="{{ url_for('profile') }}"{% if mode == 'profile' %} aria-current="page"{% endif %}><span aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg></span>我的</a>
@@ -96,5 +97,30 @@
   };
   applyAvatars();
 </script>
+{% if role is defined and role %}
+<div id="newMsgToast" role="status" aria-live="polite" hidden style="position:fixed;left:50%;transform:translateX(-50%);top:12px;z-index:50;max-width:440px;width:calc(100% - 32px);padding:10px 14px;border-radius:14px;background:var(--bg);border:1px solid var(--line);box-shadow:0 8px 24px rgba(0,0,0,.16)"><a id="newMsgLink" href="#" style="display:block;color:var(--text)"></a></div>
+<script>
+  // 新消息：页面开着时每 30 秒问一次（照老系统）。未读变多了就在顶上弹一条，底栏「消息」亮红点，标题前面带未读数。
+  (function () {
+    var last = {{ (phone_unread or 0)|tojson }}, base = document.title, toast = document.getElementById('newMsgToast'), link = document.getElementById('newMsgLink');
+    function show(n) { document.title = n ? '(' + n + ') ' + base : base; var nav = document.getElementById('navInbox'); if (nav) nav.classList.toggle('unread', n > 0); }
+    show(last);
+    function tick() {
+      if (document.hidden) return;
+      fetch({{ url_for('poll')|tojson }}, { credentials: 'same-origin', cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+        if (!d) return;
+        if (d.total > last && d.top) {
+          link.textContent = '💬 ' + d.top.name + ' · ' + d.top.label + '（点开看）';
+          link.href = d.top.url; toast.hidden = false;
+          clearTimeout(toast._t); toast._t = setTimeout(function () { toast.hidden = true; }, 8000);
+        }
+        last = d.total; show(last);
+      }).catch(function () {});
+    }
+    setInterval(tick, 30000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) tick(); });
+  })();
+</script>
+{% endif %}
 </body>
 </html>

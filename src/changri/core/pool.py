@@ -2,7 +2,7 @@
 官方机器人读不到真实群号、踢不了人，所以群号要管理员在设置平台填，清场也要人工确认。"""
 import time
 
-from .db import get_conn, get_config
+from .db import get_conn, get_config, set_config
 
 
 QQ_PREFIX = "qq:"          # 只有群号、卡拉不在里面的群（QQ 号监听那条线管着）：group_openid 用 qq:群号 占位
@@ -139,6 +139,27 @@ def allocate(room_id: int):
         return g
 
 
+def note_exhausted(kind: str) -> None:
+    """有房间因为没有空群没开成：记一笔，定时任务据此提醒后台群「备用群池用完了」（不排队，房间已经撤掉）。"""
+    set_config("pool_exhausted_n", str(int(get_config("pool_exhausted_n", "0") or 0) + 1))
+    set_config("pool_exhausted_kind", kind)
+    set_config("pool_exhausted_ts", str(int(time.time())))
+
+
+EXHAUST_WARN_GAP = 1800          # 后台群的「群池用完了」提醒，最多 30 分钟一条
+
+
+def take_exhausted(now: int | None = None) -> dict | None:
+    """该提醒后台群了就返回 {n: 这段时间没开成几次, kind: 最近一次的类型}，并清零；不该提醒返回 None。"""
+    now = int(now if now is not None else time.time())
+    n = int(get_config("pool_exhausted_n", "0") or 0)
+    if not n or now - int(get_config("pool_exhausted_told_ts", "0") or 0) < EXHAUST_WARN_GAP:
+        return None
+    set_config("pool_exhausted_n", "0")
+    set_config("pool_exhausted_told_ts", str(now))
+    return {"n": n, "kind": get_config("pool_exhausted_kind", "")}
+
+
 def release(pool_id: int, to: str = "cleaning") -> None:
     with get_conn() as c:
         c.execute("UPDATE pool_groups SET state=?, room_id=NULL WHERE id=?", (to, pool_id))
@@ -151,14 +172,6 @@ def counts() -> dict:
             r[row["state"]] = row["n"]
         r["waiting"] = c.execute("SELECT COUNT(*) FROM rooms WHERE status='open' AND pool_id IS NULL").fetchone()[0]
         return r
-
-
-def player_qqs() -> set[str]:
-    """所有登记过的玩家 QQ 号（恋综绑定 + 跑团身份）。靠它判断一个群里有没有玩家。"""
-    with get_conn() as c:
-        out = {r["qq"] for r in c.execute("SELECT qq FROM person_qq")}
-        out |= {r["member_openid"][3:] for r in c.execute("SELECT member_openid FROM trpg_identities WHERE member_openid LIKE 'qq:%'")}
-    return out
 
 
 def room_qqs(room_id: int) -> set[str]:

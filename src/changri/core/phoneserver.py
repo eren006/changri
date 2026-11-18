@@ -22,6 +22,7 @@ from . import db as _db
 from .db import GLOBAL_CONFIG_PREFIXES, get_config, list_bot_ids, set_config, use_bot
 
 _lock = threading.Lock()
+_start_lock = threading.RLock()          # 启停整个过程串行：开机、QQ 号掉线/恢复、后台保存可能同时调 start()，不能各起一个 uvicorn 抢同一个端口
 _server: dict = {}                      # {"server", "thread", "port"}
 _apps: dict[str, object] = {}           # AppID → 这个机器人的小手机（WSGI）
 DEFAULT_PORT = 5092
@@ -215,7 +216,8 @@ def stop(app_id: str = "") -> None:
     if app_id:
         start()
         return
-    _stop_server()
+    with _start_lock:
+        _stop_server()
 
 
 def _stop_server() -> None:
@@ -229,6 +231,20 @@ def _stop_server() -> None:
 
 def start(app_id: str = "") -> str:  # noqa: ARG001  兼容老调用
     """按当前设置启动/重启/关闭监听。返回给界面看的一句话。"""
+    with _start_lock:
+        return _start()
+
+
+def _serve(server, p: int) -> None:
+    """uvicorn 绑不上端口会 sys.exit(3)：在这里接住，记一条看得懂的话，不让「SystemExit: 3」刷屏。"""
+    try:
+        server.run()
+    except SystemExit:
+        from . import errlog
+        errlog.record("error", "线程 phone-web", f"小手机没能在 {p} 端口启动：端口被占用（可能是上一个进程还没退干净，或别的程序占着）", "")
+
+
+def _start() -> str:
     import uvicorn
 
     if not phone_bots(fresh=True):
@@ -239,16 +255,22 @@ def start(app_id: str = "") -> str:  # noqa: ARG001  兼容老调用
         if _server and _server["port"] == p and _server["thread"].is_alive():
             return f"小手机在 {p} 端口运行"
     _stop_server()
+    if not _bindable(p):                                     # 端口被别的程序占着：不起 uvicorn（起了也只会 SystemExit: 3）
+        return f"没能在 {p} 端口启动（被别的程序占用了），换一个端口试试"
     server = uvicorn.Server(uvicorn.Config(_build_asgi(), host="0.0.0.0", port=p, log_level="warning"))
     server.install_signal_handlers = lambda: None          # 只有主线程能装信号处理
-    thread = threading.Thread(target=server.run, name="phone-web", daemon=True)
+    thread = threading.Thread(target=_serve, args=(server, p), name="phone-web", daemon=True)
     thread.start()
     for _ in range(30):                                      # 最多等 3 秒，看有没有真的起来（端口被占会很快退出）
         time.sleep(0.1)
         if server.started or not thread.is_alive():
             break
-    if not thread.is_alive() or not server.started:
+    if not thread.is_alive():
         return f"没能在 {p} 端口启动（可能被别的程序占用了），换一个端口试试"
+    if not server.started:                                   # 3 秒还没起来但线程还活着：照样记下来，下次 start() 能先把它关掉，不会再起一个抢端口
+        with _lock:
+            _server.update(server=server, thread=thread, port=p)
+        return f"小手机正在 {p} 端口启动，稍等几秒刷新看看"
     with _lock:
         _server.update(server=server, thread=thread, port=p)
     return f"小手机已在 {p} 端口运行"

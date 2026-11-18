@@ -34,6 +34,7 @@
         {% else %}
         <div class="bubble{{ ' has-img' if m.imgs }}">{% if m.text %}{{ m.text }}{% endif %}{% for i in m.imgs %}<a href="{{ url_for('msg_image', img_id=i) }}" target="_blank" rel="noopener"><img class="msg-img" src="{{ url_for('msg_image', img_id=i) }}" alt="图片" loading="lazy"></a>{% endfor %}</div>
         {% endif %}
+{% if admin_viewing and m.id %}<form method="post" action="{{ url_for('admin_msg_delete', mid=m.id) }}" onsubmit="return confirm('删除这条？收发双方的小手机里都不再显示；已经发到 QQ 群里的撤不回来。')" style="align-self:center"><input type="hidden" name="_csrf" value="{{ csrf() }}"><button type="submit" class="linkbtn" style="font-size:12px;color:#c33">删除</button></form>{% endif %}{% if admin_viewing and false %}<form method="post" action="{{ url_for('admin_song_delete', sid=m.song_id) }}" onsubmit="return confirm('删除这条点歌？')" style="align-self:center"><input type="hidden" name="_csrf" value="{{ csrf() }}"><button type="submit" class="linkbtn" style="font-size:12px;color:#c33">删除</button></form>{% endif %}
         <form method="post" action="{{ url_for('fav_toggle') }}" class="favf"><input type="hidden" name="_csrf" value="{{ csrf() }}"><input type="hidden" name="id" value="{{ m.id }}"><input type="hidden" name="next" value="{{ url_for('thread', other=other_id) }}#m{{ m.id }}"><button type="submit" class="favb{{ ' on' if m.fav }}" aria-label="{{ '取消收藏' if m.fav else '收藏这条' }}" title="收藏">{{ '★' if m.fav else '☆' }}</button></form>
       </div>
       {% else %}
@@ -53,7 +54,7 @@
     <button class="icon gift-toggle" type="button" id="giftToggle" title="送礼物" aria-label="切换送礼物">{{ phone_symbol('gift') }}</button>
     <div class="stickers preset-panel" id="presetPanel" hidden>
       {% for g in items_catalog %}<button type="button" class="preset-item" data-name="{{ g }}"><b>{{ g }}</b></button>
-      {% else %}<div class="preset-empty">礼品店还没有上架礼物{% if not only_preset %}，直接写礼物名就行{% endif %}</div>{% endfor %}
+      {% else %}<div class="preset-empty">你的图鉴里还没有礼物，去「礼品店」逛逛收集{% if not only_preset %}；也可以直接写礼物名{% endif %}</div>{% endfor %}
     </div>
     <div class="gift-row">
       <input class="gift-name" name="gift_name" id="giftName" maxlength="30" autocomplete="off" aria-label="礼物" placeholder="{{ '从礼品店选一件礼物' if only_preset else '礼物，比如：一束玫瑰' }}" value="{{ draft_gift }}"{% if only_preset %} readonly{% endif %}>

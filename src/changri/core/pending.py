@@ -10,11 +10,37 @@ def register(name: str, fn: Callable) -> None:
     _PROVIDERS = [p for p in _PROVIDERS if p[0] != name] + [(name, fn)]
 
 
-def collect(role) -> list[str]:
-    out: list[str] = []
+def collect_entries(role) -> list[tuple[str, str]]:
+    """[(key, 文字)]。扩展可以返回字符串，也可以返回 (key, 文字)：key 给小手机「暂不提醒」认是不是同一次等待；
+    只给字符串时按文字算 key（文字变了就当新的一条）。"""
+    import hashlib
+    out: list[tuple[str, str]] = []
     for name, fn in _PROVIDERS:
         try:
-            out += list(fn(role) or [])
+            for x in list(fn(role) or []):
+                out.append(x if isinstance(x, tuple) else (f"p:{name}:" + hashlib.sha1(x.encode()).hexdigest()[:12], x))
         except Exception as e:  # noqa: BLE001 一个扩展出错不能拖垮整条指令
-            out.append(f"（{name} 的待办读取失败：{str(e)[:40]}）")
+            out.append((f"err:{name}", f"（{name} 的待办读取失败：{str(e)[:40]}）"))
     return out
+
+
+def collect(role) -> list[str]:
+    return [t for _k, t in collect_entries(role)]
+
+
+# ---------- 小手机「暂不提醒」 ----------
+
+def dismissed(role_id: int) -> set[str]:
+    from .db import get_conn
+    with get_conn() as c:
+        return {r["key"] for r in c.execute("SELECT key FROM pending_dismiss WHERE role_id=?", (role_id,))}
+
+
+def set_dismissed(role_id: int, key: str, on: bool) -> None:
+    import time
+    from .db import get_conn
+    with get_conn() as c:
+        if on:
+            c.execute("INSERT OR IGNORE INTO pending_dismiss(role_id, key, created_ts) VALUES(?,?,?)", (role_id, key[:200], int(time.time())))
+        else:
+            c.execute("DELETE FROM pending_dismiss WHERE role_id=? AND key=?", (role_id, key))

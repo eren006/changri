@@ -173,7 +173,15 @@ from changri.core import pending  # noqa: E402
 def _pending_rels(role) -> list[str]:
     if not relations.enabled():
         return []
-    return [f"关系线：「{r['other_name']}」回了你，轮到你回（查看关系线 {r['other_name']}）" for r in relations.list_for(role["id"]) if r["pending"]]
+    from changri.core.overview import fmt_wait
+    waits = {x["rel_id"]: x for x in relations.waiting_lines()}
+    out = []
+    for r in relations.list_for(role["id"]):
+        if r["pending"]:
+            w = waits.get(r["rel_id"])
+            since = f"，已经等了 {fmt_wait(w['hours'] * 3600)}" if w else ""
+            out.append((f"rel:{r['rel_id']}:{r['count']}", f"🔗 关系线：「{r['other_name']}」回了你，轮到你回{since}（查看关系线 {r['other_name']}）"))
+    return out
 
 
 pending.register("关系线", _pending_rels)

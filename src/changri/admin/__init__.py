@@ -214,17 +214,13 @@ def create_app() -> Flask:
                 return render_template("picker.html", cards=cards)
         from changri.core import errlog
         with get_conn() as conn:
-            rrows = conn.execute("SELECT * FROM roles ORDER BY id").fetchall()
-        role_items = [{"role": r, "groups": roles_core.list_groups(r["id"])} for r in rrows]
-        with get_conn() as conn:
             live = conn.execute("SELECT * FROM rooms WHERE status='open' ORDER BY id").fetchall()
         live_rooms = [{**dict(r), "slot": ("不占时间线" if r["kind"] == "微信" else f"D{r['day']} {r['start_hm']}-{r['end_hm']}"),
                        "who": "、".join(m["name"] for m in rooms_core.members(r["id"])),
                        "grp": (pool_core.get(r["pool_id"]) if r["pool_id"] else None)} for r in live]
-        return render_template("dashboard.html", d=_dashboard(), errors=errlog.recent(30), err_url=errlog.report_url(), role_items=role_items,
+        return render_template("dashboard.html", d=_dashboard(), errors=errlog.recent(30), err_url=errlog.report_url(),
                                cal=season_core.month_grid(request.args.get("cal", "")), cal_line=season_core.upcoming_line(),
-                               live_rooms=live_rooms, waiting_rooms=sum(1 for r in live_rooms if not r["grp"]),
-                               code=request.args.get("code", ""), code_role=request.args.get("role", ""))
+                               live_rooms=live_rooms, waiting_rooms=sum(1 for r in live_rooms if not r["grp"]))
 
     @app.post("/rooms/notify")
     @login_required

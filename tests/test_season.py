@@ -110,7 +110,7 @@ class SeasonTests(unittest.TestCase):
         self.assertEqual(season.phase(), "ended")
 
     def _prep_stuff(self):
-        """筹备期里攒下的东西：短信、心动信、关系线、悬赏心愿、已结束和进行中的房间。"""
+        """筹备期里攒下的东西：短信、心动信、关系线、心愿、已结束和进行中的房间。"""
         with get_conn() as c:
             for t in ("rooms", "wishes"):
                 c.execute(f"DELETE FROM {t}")

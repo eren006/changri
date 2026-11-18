@@ -86,6 +86,9 @@ def _room_text(room, who_from: str = "") -> str:
     mem = "、".join(m["name"] for m in rooms.members(room["id"]))
     head = f"💌 {who_from} 向你发起了{room['kind']}" if who_from else f"💌 {room['kind']}"
     tips = [RP_FORMAT_TIP]
+    gi = rooms.group_info(room)
+    if gi and not gi[1].startswith(pool.QQ_PREFIX):                     # 官方机器人的群：它查不了群成员，要说过话才算到场
+        tips.append("到场 ➜ 进群后随便说一句，才算到场")
     if room["kind"] not in rooms.NO_TIMELINE:
         tips += [f"修改时间 ➜ 修改时间线 R{room['id']} D{room['day']} 新时间（个人群里也能发）", f"不想参加 ➜ 拒绝时间线 R{room['id']}"]
     tips.append(f"结束互动 ➜ 在约会群里直接发「结束{room['kind']}」")
@@ -316,6 +319,9 @@ async def _start_room(matcher, bot: Bot, event: GroupMessageCreateEvent, kind: s
     me = _me(bot, event)
     if not me:
         await matcher.finish(NEED_ROLE)
+    if re.fullmatch(r"[Dd]\d+", time_text):          # 「约会 D2 1400-1500 …」：玩家只能约当天，不然后面的字整体错位，报成「找不到角色」
+        await matcher.finish(f"❌ {kind}只能约当天，前面不用写 {time_text.upper()}。\n"
+                             f"想约到别的天：先约当天，再在房间里发「修改时间线 R房间号 {time_text.upper()} 新时间」，所有人同意后生效。")
     targets, missing = _resolve(names)
     if missing:
         await matcher.finish(f"❌ 找不到角色：{missing}。")
@@ -574,37 +580,38 @@ async def _warn_expiring() -> None:
 NO_GROUP_TEXT = "备用群池暂时没有空闲的群，这次{kind}没能开成，请稍后再试，或联系管理员多准备几个备用群。"
 
 
-async def _ensure_clean(room_id: int) -> bool:
-    """分到的群如果是 QQ 号监听那条线的群，就查一遍群成员：还有别的玩家在里面，
-    这个群先放一边（等人退群），给房间换一个。问不到群成员就当没人。
-    换不到干净的群就当没有空群：房间删掉（不排队），返回 False；其余情况返回 True。"""
-    for _ in range(8):
+async def _ensure_clean(room_id: int, drop: bool = True) -> bool:
+    """分到的群如果是 QQ 号监听那条线的群，就查一遍群成员：除了群主、管理员、我们的 QQ 号和这场的参与者，
+    还有别人在里面（绑没绑 QQ 都算），这个群先放一边（等人退群），给房间换一个。问不到群成员就当没人。
+    换来的每个群都照样查，直到分到干净的或者没群可换（每换一次就有一个空群变成「等人退群」，一定会停）。
+    换不到干净的群：drop=True（刚发起的房间）当没有空群，房间删掉（不排队）；
+    drop=False（已经在排队的房间）房间留着、退回未分群，下一轮接着排。两种都返回 False；其余情况返回 True。"""
+    while True:
         room = rooms.get(room_id)
         if not room or room["status"] != "open" or not room["pool_id"]:
             return True
         g = pool.get(room["pool_id"])
         if not g or not pool.is_qq_only(g):
             return True
-        members = await qqmanager.group_members(g["bot_id"], g["real_gid"])
-        if members is None:
-            return True
-        if not (members & pool.player_qqs()) - pool.room_qqs(room_id):
+        others = await qqmanager.group_others(g["bot_id"], g["real_gid"])
+        if others is None or not others - pool.room_qqs(room_id):
             return True
         pool.reject(g["id"], room_id)
         if not pool.allocate(room_id):
-            with get_conn() as c:
-                c.execute("DELETE FROM rooms WHERE id=?", (room_id,))
+            if drop:
+                with get_conn() as c:
+                    c.execute("DELETE FROM rooms WHERE id=?", (room_id,))
+                pool.note_exhausted(room["kind"])                                # 定时任务会提醒后台群
             return False
-    return True
 
 
 async def _sweep_cleaning() -> None:
-    """等人退群的群：群里已经没有玩家了就自动放回池。"""
+    """等人退群的群：除了群主、管理员和我们的 QQ 号，群里没别人了（绑没绑 QQ 都算）就自动放回池。"""
     for g in pool.all_groups():
         if g["state"] != "cleaning" or not g["in_pool"] or not pool.is_qq_only(g):
             continue
-        members = await qqmanager.group_members(g["bot_id"], g["real_gid"])
-        if members is not None and not members & pool.player_qqs():
+        others = await qqmanager.group_others(g["bot_id"], g["real_gid"])
+        if others is not None and not others:
             pool.release(g["id"], "free")
 
 
@@ -855,8 +862,8 @@ async def _(bot: Bot, event: GroupMessageCreateEvent):
     me = _me(bot, event)
     if not me:
         await todo.finish(NEED_ROLE)
-    from changri.core.overview import todo_items
-    items = todo_items(me)
+    from changri.core.overview import lingering, todo_items
+    items = todo_items(me, await lingering(me))
     await reply_long(todo, "📋 你的待回\n" + ("\n".join(f"· {x}" for x in items) if items else "没有要回的事。"))
 
 
@@ -990,6 +997,10 @@ async def _(bot: Bot, event: GroupMessageCreateEvent):
     if _ext.is_enabled("wishes"):
         lines.append(f"挂心愿 {one(wishes.day_count(me['id'], 'post'), get_int('limit_挂心愿', 0))}")
         lines.append(f"摘心愿 {one(wishes.day_count(me['id'], 'take'), get_int('limit_摘心愿', 0))}")
+    from changri.core.overview import day_totals
+    t = day_totals()
+    kinds = ["约会", "电话"] + (["踩点"] if rooms.stakeout_enabled() else []) + ["短信", "礼物"] + (["心愿"] if _ext.is_enabled("wishes") else [])
+    lines.append("🌐 全员今天：" + "｜".join(f"{k} {t.get(k, 0)}" for k in kinds))
     await my_count.finish("\n".join(lines))
 
 
@@ -1029,26 +1040,53 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
 async def _tick():
     if not nonebot.get_bots():
         return
-    try:
-        from changri.core import specials
-        for row in specials.take_outbox():                # 窃听器 / 截信器 / 回音壁抄到的、捕鼠器的提醒
-            await messaging.push_to_role(row["owner_id"], row["text"], make_send())
-        await _warn_expiring()
-        for r in rooms.expired():
-            await _finish_room(r["id"], "ended", "", timeout=True)
-        await _sweep_cleaning()
-        for rid in rooms.assign_waiting():
-            await _ensure_clean(rid)
-            room = rooms.get(rid)
-            if not room or not room["pool_id"]:
-                continue
-            for m in rooms.members(rid):
-                await _push(m["role_id"], f"🔔 R{rid} {room['kind']}有空群了。\n{_slot(room)}")
-                await _push_group(m["role_id"], room)
-            await _announce_in_room(rid)
-        await _check_presence()
-    except Exception as e:  # noqa: BLE001
-        logger.warning(f"[房间] 定时任务出错：{e}")
+    # 每一步单独接住错误：一步出错（比如某个群查成员时连接断了）不能让后面补群、查到场整轮都跳过
+    for step in (_tick_outbox, _warn_expiring, _tick_expired, _sweep_cleaning, _tick_assign, _check_presence, _tick_pool_alert):
+        try:
+            await step()
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[房间] 定时任务 {step.__name__} 出错：{e}")
+
+
+async def _tick_pool_alert() -> None:
+    """有房间因为没有空群没开成：提醒后台群（最多 30 分钟一条）。没设后台群就不发，不退回公告群。"""
+    staff = announce.get_backstage()
+    if not staff:
+        return
+    hit = pool.take_exhausted()
+    if not hit:
+        return
+    c = pool.counts()
+    await _to_group(staff[0], staff[1],
+                    f"⚠️ 备用群池用完了：最近有 {hit['n']} 次发起没开成（最后一次是{hit['kind']}），玩家已收到「没能开成」。\n"
+                    f"现在：空闲 {c['free']}，占用中 {c['occupied']}，等人退群 {c['cleaning']}。"
+                    "可以把退光人的群放回池（「放回备用群」或后台「群池」页），或者多准备几个备用群。"
+                    + ("\n（显示有空闲却还是没分到：多半是管这些群的 QQ 小号掉线了。）" if c["free"] else ""))
+
+
+async def _tick_outbox() -> None:
+    from changri.core import specials
+    for row in specials.take_outbox():                    # 窃听器 / 截信器 / 回音壁抄到的、捕鼠器的提醒
+        await messaging.push_to_role(row["owner_id"], row["text"], make_send())
+
+
+async def _tick_expired() -> None:
+    for r in rooms.expired():
+        await _finish_room(r["id"], "ended", "", timeout=True)
+
+
+async def _tick_assign() -> None:
+    """有空群了，给排队的房间补群。分到的群不干净又换不到：房间留着接着排队（不删、不通知）。"""
+    for rid in rooms.assign_waiting():
+        if not await _ensure_clean(rid, drop=False):
+            continue
+        room = rooms.get(rid)
+        if not room or not room["pool_id"]:
+            continue
+        for m in rooms.members(rid):
+            await _push(m["role_id"], f"🔔 R{rid} {room['kind']}有空群了。\n{_slot(room)}")
+            await _push_group(m["role_id"], room)
+        await _announce_in_room(rid)
 
 
 async def _receipt_all_here(room) -> None:

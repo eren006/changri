@@ -119,7 +119,7 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
     if not role:
         await mine.finish("你还没有角色。在你的个人群里发「创建新角色 名字」。")
     items = formats.mine()
-    await reply_buttons(mine, f"「{role['name']}」\n点下面的按钮查看（也可以直接发：" + "、".join(c for _l, c in items) + "）",
+    await reply_buttons(mine, f"「{role['name']}」自查速查（点按钮，或者直接发指令）：\n" + formats.mine_text(),
                         [Btn(label, cmd) for label, cmd in items], per_row=4)
     await mine.finish()
 
@@ -155,14 +155,17 @@ KIND_NAME = {"sms": "短信", "gift": "礼物"}
 
 async def _social_rule(bot: Bot, event: GroupMessageCreateEvent, state: T_State) -> bool:
     """认「短信 …」「署名短信 …」「【短信】…」「送礼 …」。带署名前缀的，署名得是自己的角色名（或管理员开放了自定义署名），
-    否则多半是聊天里碰巧带了「短信」两个字，不理。"""
+    否则多半是聊天里碰巧带了「短信」两个字，不理。
+    竖着写的【短信】【送礼】是明确在发指令：署名没开放时照常用角色名发出，回执里说一声（以前整条不理，玩家照模板填了署名就没反应）。"""
     p = forms.match_social(event.get_plaintext())
     if not p:
         return False
     if p["sign"]:
         me = roles.find_role_for_sender(bot.self_id, event.group_openid, event.author.member_openid)
         if not (me and p["sign"] == me["name"]) and get_config("allow_custom_sign", "0") != "1":
-            return False
+            if not p.get("form"):
+                return False
+            p = {**p, "sign": "", "sign_dropped": True}
     state["social"] = p
     return True
 
@@ -188,7 +191,8 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, state: T_State):
     if target["id"] == me["id"]:
         await social_msg.finish("不能发给自己。")
     ok, text = await sendmsg.send(me, target, kind, p["gift"], p["content"], p["sign"], _make_send(), images)
-    await social_msg.finish(text + ("\n🖼 图片已一起发送。" if images and ok else ""))
+    await social_msg.finish(text + ("\n🖼 图片已一起发送。" if images and ok else "")
+                            + ("\n（管理员没有开放自定义署名，这条用你的角色名发出。）" if ok and p.get("sign_dropped") else ""))
 
 
 recall = _cmd("撤回")
@@ -235,19 +239,51 @@ async def _(args=CommandArg()):
     await fmt.finish()
 
 
-album = _cmd("我的图鉴", {"图鉴", "我的礼物"})
+album = _cmd("我的图鉴", {"图鉴"})
+my_gifts = _cmd("我的礼物")
+
+
+def _received_text(me) -> str:
+    rows = gifts.received(me["id"])
+    if not rows:
+        return "还没有人送过你礼物。"
+    return f"🎁 「{me['name']}」收到过的礼物（共 {sum(r['n'] for r in rows)} 件）：\n" + "\n".join(f"{r['title']} ×{r['n']}" for r in rows)
 
 
 @album.handle()
-async def _(event: GroupMessageCreateEvent):
+async def _(event: GroupMessageCreateEvent, args=CommandArg()):
+    """礼品店开着：图鉴 = 逛礼品店收集到的礼物（「图鉴 #编号」看详细）；关着：图鉴 = 收到过的礼物（老样子）。"""
     me = _sender_role(event)
     if not me:
         await album.finish("你还没有角色。")
-    rows = gifts.received(me["id"])
-    if not rows:
-        await album.finish("图鉴还是空的，还没有人送过你礼物。")
-    lines = [f"{r['title']} ×{r['n']}" for r in rows]
-    await reply_long(album, f"📖 「{me['name']}」收到过的礼物（共 {sum(r['n'] for r in rows)} 件）：\n" + "\n".join(lines))
+    if not gifts.enabled():
+        await reply_long(album, _received_text(me).replace("还没有人送过你礼物。", "图鉴还是空的，还没有人送过你礼物。"))
+        return
+    total = len(gifts.items())
+    if not total:
+        await album.finish("📚 图鉴暂无礼物，管理员还没有在礼品店上架任何礼物。")
+    mine = gifts.unlocked(me["id"])
+    heat = gifts.heat()
+    rank = {name: 1 + sum(1 for v in heat.values() if v > heat.get(name, 0)) for name in (x["name"] for x in gifts.items())}
+    q = gifts.parse_code(args.extract_plain_text())
+    if q is not None:
+        hit = next((x for x in mine if x["id"] == q), None)
+        if not hit:
+            await album.finish(f"🔒 {gifts.code(q)} 不在你的图鉴里。")
+        await album.finish(f"📖 {gifts.code(hit['id'])}「{hit['name']}」\n🔥 热度第 {rank[hit['name']]} 名\n{'━' * 14}\n{hit['note'] or '（没有描述）'}")
+    if not mine:
+        await album.finish(f"📚 图鉴（0/{total}）\n发「礼品店」开始收集！")
+    text = f"📚 我的图鉴（{len(mine)}/{total}）\n{'━' * 14}\n💌 图鉴里的礼物可以无限送：送礼 对方名 #编号\n发「图鉴 #编号」看详细描述\n"
+    text += "\n".join(f"{gifts.code(x['id'])}「{x['name']}」 🔥第{rank[x['name']]}名" for x in mine)
+    await reply_long(album, text)
+
+
+@my_gifts.handle()
+async def _(event: GroupMessageCreateEvent):
+    me = _sender_role(event)
+    if not me:
+        await my_gifts.finish("你还没有角色。")
+    await reply_long(my_gifts, _received_text(me))
 
 
 # ---------- 拉群引导 ----------
@@ -273,6 +309,22 @@ async def _(bot: Bot, event: GroupAddRobotEvent):
 
 
 # ---------- 重试 ----------
+
+@scheduler.scheduled_job("interval", seconds=10, id="phone_webpush", max_instances=1, coalesce=True)
+@per_bot
+async def _webpush():
+    """小手机网页推送：扫一次新消息，给开了提醒的人各推一条（照老系统，约 10 秒一次；只说收到了什么，不写是谁、写了什么）。"""
+    from changri.core import extensions, webpush
+    if not extensions.is_enabled("phone"):
+        return
+    import asyncio
+    try:
+        n = await asyncio.to_thread(webpush.scan_once)
+        if n:
+            logger.info(f"[网页推送] 推给了 {n} 个人")
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[网页推送] 出错：{e}")
+
 
 @scheduler.scheduled_job("interval", seconds=60, id="messaging_retry", max_instances=1, coalesce=True)
 @per_bot

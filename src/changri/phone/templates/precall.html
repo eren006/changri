@@ -1,33 +1,263 @@
 {% extends 'base.html' %}
 {% block title %}前置电话 · {{ brand }}{% endblock %}
 {% block body %}
-  {% include '_form_css.html' %}
-  <style>textarea.pc{width:100%;box-sizing:border-box;min-height:100px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--text,inherit);font:inherit;font-size:15px}
-  .pc-item{padding:12px 20px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:flex-start}.pc-no{font-weight:700;min-width:3.2em}.pc-tx{flex:1;min-width:0;white-space:pre-wrap;line-height:1.55}
-  .pc-item form{margin:0}.pc-dial{height:34px;padding:0 14px;border:0;border-radius:17px;background:var(--mine);color:#fff;font:inherit;font-size:14px;cursor:pointer}</style>
-  <header class="bar"><a class="back" href="{{ url_for('discover') }}">发现</a><div class="title">前置电话</div></header>
-  <div class="scroll list">
-    {% include '_flash.html' %}
-    <div class="disc-label">我的前置电话{% if mine %} · #{{ mine.no }}（{{ mine.grp or '未分组' }}）{% endif %}</div>
-    <form method="post" action="{{ url_for('precall_submit') }}" style="padding:6px 20px 12px">
-      <input type="hidden" name="_csrf" value="{{ csrf() }}">
-      <textarea class="pc" name="text" maxlength="{{ text_max }}" placeholder="写一段自我介绍，最多 {{ text_max }} 字" required>{{ mine.text if mine else '' }}</textarea>
-      <p style="color:var(--mute);font-size:13px">提交后是「未分组」，管理员分好组并开放后，别人才看得到。{{ usage }}。</p>
-      <button class="send" type="submit">{{ '修改' if mine else '提交' }}</button>
-    </form>
-    {% if mine %}<form method="post" action="{{ url_for('precall_withdraw') }}" onsubmit="return confirm('撤回你的前置电话？编号会作废。')" style="padding:0 20px 8px;text-align:center">
-      <input type="hidden" name="_csrf" value="{{ csrf() }}"><button class="linkbtn" type="submit">撤回我的前置电话</button></form>{% endif %}
+{# 前置电话（照老系统小手机 _phone_precall.html）：选人 / 我的电话 / 我的资料 三个分页。颜色走主题变量 #}
+<header class="bar">
+  <a class="back" href="{{ url_for('discover') }}">发现</a>
+  <div class="title">前置电话</div>
+  <div class="right"></div>
+</header>
+<div class="scroll pc-page">
+  <nav class="pc-seg" aria-label="前置电话">
+    <a href="{{ url_for('precall_page', view='deck') }}"{% if pview == 'deck' %} aria-current="page"{% endif %}>选人</a>
+    <a href="{{ url_for('precall_page', view='calls') }}"{% if pview == 'calls' %} aria-current="page"{% endif %}>我的电话{% if call_badge %}<b>{{ call_badge }}</b>{% endif %}</a>
+    <a href="{{ url_for('precall_page', view='profile') }}"{% if pview == 'profile' %} aria-current="page"{% endif %}>我的资料</a>
+  </nav>
+  {% for m in get_flashed_messages() %}<div class="pc-flash" role="status">{{ m }}</div>{% endfor %}
 
-    {% if calls %}<div class="disc-label">进行中的电话</div>
-    {% for r in calls %}<a class="row" href="{{ url_for('room_page', rid=r.id) }}"><div class="body"><div class="top"><span class="name">R{{ r.id }} 前置电话</span><span class="recipient-arrow" aria-hidden="true">›</span></div><div class="preview">{{ r.who }}</div></div></a>{% endfor %}{% endif %}
-
-    <div class="disc-label">可以拨打的前置电话</div>
-    {% set ns = namespace(g=None) %}
-    {% for it in items %}
-      {% if it.grp != ns.g %}{% set ns.g = it.grp %}<div style="padding:10px 20px 2px;color:var(--mute);font-size:13px">【{{ it.grp }}】</div>{% endif %}
-      <div class="pc-item"><span class="pc-no">#{{ it.no }}</span><span class="pc-tx">{{ it.text }}</span>
-        {% if not mine or it.no != mine.no %}<form method="post" action="{{ url_for('precall_dial') }}" onsubmit="return confirm('拨打 #{{ it.no }}？')"><input type="hidden" name="_csrf" value="{{ csrf() }}"><input type="hidden" name="no" value="{{ it.no }}"><button class="pc-dial" type="submit">拨打</button></form>{% else %}<span style="color:var(--mute);font-size:13px">（你）</span>{% endif %}
-      </div>
-    {% else %}<div class="empty" style="padding:16px 20px">现在没有开放选择的前置电话，等管理员分好组。</div>{% endfor %}
+  {% if pview == 'deck' %}
+  <div class="pc-rule">
+    本轮还可以选 <b id="pcLeft">{{ left }}</b> / {{ cfg.max_picks }} 位 ·
+    {{ '互相选了才会开电话' if cfg.mutual else '你选了 ta 就会开一个电话' }}
   </div>
+  {% if cfg.group_mode == 'split' %}
+  <div class="pc-chips" id="pcChips" role="tablist">
+    <button type="button" class="on" data-g="all">全部</button><button type="button" data-g="m">男生</button><button type="button" data-g="f">女生</button><button type="button" data-g="x">不限</button>
+  </div>
+  {% endif %}
+  <div class="pc-stage" id="pcStage" aria-live="polite"></div>
+  <div class="pc-empty" id="pcEmpty" hidden><span>🌙</span>{{ '这一轮的人都看完了' if cands else '暂时没有可以选的人' }}<small>有新的人填了资料会出现在这里</small></div>
+  <div class="pc-actions" id="pcActions">
+    <button type="button" class="pc-act pick" id="pcPick" aria-label="选 TA"><i>♥</i><span>选 TA</span></button>
+    <button type="button" class="pc-act next" id="pcNext" aria-label="下一位"><i>›</i><span>下一位</span></button>
+  </div>
+  <p class="pc-tip">{% if cfg.anonymous %}选人时看不到名字，电话接通后会互相公开名字。<br>{% endif %}向左滑 或 点 ♥ 表示选 TA（会再让你确认一次，选了不能撤回）；向右滑 或 点「下一位」只是翻过去，不会记录，后面还能看到。</p>
+
+  <dialog class="pc-dialog" id="pcConfirm" aria-labelledby="pcConfirmTitle">
+    <h2 id="pcConfirmTitle">确定选择 <span id="pcConfirmName"></span> 吗？</h2>
+    <p>选了之后<b>不能撤回</b>，也不会再出现在你的列表里。<br>本轮选完这位还剩 <b id="pcConfirmLeft"></b> 次。</p>
+    <div class="pc-dlg-btns"><button type="button" id="pcConfirmNo">再想想</button><button type="button" class="yes" id="pcConfirmYes">确定选择</button></div>
+  </dialog>
+  <dialog class="pc-dialog" id="pcResult" aria-labelledby="pcResultTitle">
+    <h2 id="pcResultTitle"></h2><p id="pcResultText"></p>
+    <div class="pc-dlg-btns"><button type="button" id="pcResultClose">继续看看</button><a class="yes" id="pcResultGo" href="#" hidden>去聊天</a></div>
+  </dialog>
+
+  {% elif pview == 'calls' %}
+  {% if calls %}
+  <ul class="pc-list">
+    {% for c in calls %}
+    <li><a class="pc-row" href="{{ url_for('precall_call', session_id=c.id) }}">
+      <span class="pc-ava">{{ c.ini }}</span>
+      <span class="pc-main"><b>{{ c.name }}</b><small>{% if c.last %}{{ '我：' if c.last_mine else '' }}{{ c.last }}{% else %}刚配对，说句话吧{% endif %}</small></span>
+      <span class="pc-side"><small>{{ c.time }}</small>{% if c.ended %}<em>已结束</em>{% elif c.unread %}<b class="pc-dot">{{ c.unread }}</b>{% elif c.fresh %}<b class="pc-dot">新</b>{% endif %}</span>
+    </a></li>
+    {% endfor %}
+  </ul>
+  {% else %}<div class="pc-empty"><span>📞</span>还没有电话<small>去「选人」里选一个吧</small></div>{% endif %}
+
+  {% else %}
+  <form class="pc-form" method="post" action="{{ url_for('precall_profile') }}" enctype="multipart/form-data">
+    <input type="hidden" name="_csrf" value="{{ csrf() }}">
+    <p class="pc-note">这份资料会公开给所有人看，别写真实姓名、联系方式、住址等个人信息。</p>
+    <label class="pc-photo-pick">
+      <span class="pc-photo{{ ' has' if photo_url else '' }}" id="pcPhotoBox"{% if photo_url %} style="background-image:url('{{ photo_url }}')"{% endif %}><i>{{ '更换照片' if photo_url else '＋ 上传照片' }}</i></span>
+      <input type="file" name="photo" id="pcPhotoInput" accept="image/*" hidden>
+    </label>
+    {% if photo_url %}<label class="pc-check"><input type="checkbox" name="remove_photo" value="1"> 不要照片了，只留文字</label>{% endif %}
+    <h3>我是</h3>
+    <div class="pc-radios">{% for k, v in genders.items() %}<label><input type="radio" name="gender" value="{{ k }}"{% if (me.gender if me else 'x') == k %} checked{% endif %}><span>{{ v }}</span></label>{% endfor %}</div>
+    <h3>一段介绍</h3>
+    <textarea name="bio" rows="5" maxlength="{{ bio_max }}" placeholder="想让大家知道的…（和照片至少填一样）" id="pcBio">{{ me.bio if me else '' }}</textarea>
+    <div class="pc-count"><span id="pcBioN">0</span> / {{ bio_max }}</div>
+    <button type="submit" class="pc-save">保存资料</button>
+  </form>
+  {% endif %}
+</div>
+
+<style>
+  .pc-page { padding: 0 0 36px; }
+  .pc-seg { display: flex; margin: 12px 16px 0; padding: 3px; border-radius: 12px; background: var(--theirs); }
+  .pc-seg a { flex: 1; text-align: center; padding: 8px 4px; border-radius: 9px; font-size: 14px; font-weight: 600; color: var(--muted); text-decoration: none; position: relative; }
+  .pc-seg a[aria-current] { background: var(--bg); color: var(--text); box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+  .pc-seg b { margin-left: 4px; padding: 1px 6px; border-radius: 9px; background: #d64545; color: #fff; font-size: 11px; }
+  .pc-flash { margin: 12px 16px 0; padding: 11px 14px; border-radius: 14px; background: var(--theirs); font-size: 14px; }
+  .pc-rule { margin: 14px 20px 0; font-size: 13px; color: var(--muted); text-align: center; }
+  .pc-rule b { color: var(--mine); font-size: 15px; }
+  .pc-chips { display: flex; gap: 8px; justify-content: center; margin: 12px 16px 0; }
+  .pc-chips button { border: 0; padding: 6px 14px; border-radius: 999px; background: var(--theirs); color: var(--theirs-text); font: inherit; font-size: 13px; }
+  .pc-chips button.on { background: var(--mine); color: var(--mine-text); }
+  .pc-stage { position: relative; width: min(82vw, 330px); aspect-ratio: 3 / 4; margin: 16px auto 0; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+  .pc-card { position: absolute; inset: 0; border-radius: 24px; overflow: hidden; background: var(--theirs); box-shadow: 0 10px 30px rgba(0,0,0,.18); will-change: transform; cursor: grab; transition: transform .28s cubic-bezier(.2,.8,.3,1), opacity .28s; }
+  .pc-card.drag { transition: none; cursor: grabbing; }
+  .pc-card .ph { position: absolute; inset: 0; background-size: cover; background-position: center; }
+  .pc-card .ph.none { display: flex; align-items: center; justify-content: center; padding: 28px; font-size: 20px; line-height: 1.7; text-align: center;
+    background: linear-gradient(160deg, color-mix(in srgb, var(--mine) 22%, var(--bg)), color-mix(in srgb, var(--mine) 8%, var(--bg))); color: var(--text); }
+  .pc-card .shade { position: absolute; left: 0; right: 0; bottom: 0; padding: 60px 18px 18px; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,.72)); }
+  .pc-card .shade h3 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -.01em; }
+  .pc-card .shade h3 em { margin-left: 8px; font-style: normal; font-size: 12px; font-weight: 500; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,.25); vertical-align: middle; }
+  .pc-card .shade p { margin: 6px 0 0; font-size: 14px; line-height: 1.5; opacity: .95; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .pc-card.open .shade p { -webkit-line-clamp: unset; max-height: 46vh; overflow: auto; }
+  .pc-card.under { transform: scale(.95) translateY(10px); opacity: .9; pointer-events: none; }
+  .pc-card.under2 { transform: scale(.9) translateY(20px); opacity: .7; pointer-events: none; }
+  .pc-stamp { position: absolute; top: 28px; padding: 6px 14px; border: 3px solid; border-radius: 10px; font-size: 24px; font-weight: 800; letter-spacing: .05em; opacity: 0; transform: rotate(-12deg); pointer-events: none; }
+  .pc-stamp.pick { right: 22px; color: #ff4d79; border-color: #ff4d79; transform: rotate(12deg); background: rgba(255,255,255,.85); }
+  .pc-stamp.next { left: 22px; color: #6c7a89; border-color: #6c7a89; background: rgba(255,255,255,.85); }
+  .pc-actions { display: flex; justify-content: center; gap: 36px; margin: 22px 16px 0; }
+  .pc-act { display: flex; flex-direction: column; align-items: center; gap: 6px; border: 0; background: none; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
+  .pc-act i { display: flex; align-items: center; justify-content: center; width: 62px; height: 62px; border-radius: 50%; font-style: normal; font-size: 30px; line-height: 1; background: var(--bg); box-shadow: 0 4px 14px rgba(0,0,0,.16); }
+  .pc-act.pick i { color: #ff4d79; }
+  .pc-act.next i { color: var(--muted); font-size: 38px; padding-bottom: 4px; }
+  .pc-act:active i { transform: scale(.92); }
+  .pc-act[disabled] { opacity: .35; cursor: not-allowed; }
+  .pc-tip { margin: 16px 28px 0; font-size: 12px; line-height: 1.6; color: var(--muted); text-align: center; }
+  .pc-empty { margin: 60px 24px; text-align: center; color: var(--muted); font-size: 16px; line-height: 1.6; }
+  .pc-empty span { display: block; font-size: 40px; margin-bottom: 8px; }
+  .pc-empty small { display: block; font-size: 13px; opacity: .8; }
+  .pc-dialog { margin: auto; max-height: calc(100dvh - 40px); border: 0; border-radius: 22px; padding: 24px 22px 18px; width: min(86vw, 320px); background: var(--bg); color: var(--text); box-shadow: 0 20px 60px rgba(0,0,0,.35); text-align: center; }
+  .pc-dialog::backdrop { background: rgba(0,0,0,.4); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+  .pc-dialog h2 { margin: 0 0 8px; font-size: 18px; }
+  .pc-dialog p { margin: 0 0 18px; font-size: 14px; line-height: 1.6; color: var(--muted); }
+  .pc-dlg-btns { display: flex; gap: 10px; }
+  .pc-dlg-btns button, .pc-dlg-btns a { flex: 1; min-height: 44px; display: flex; align-items: center; justify-content: center; border: 0; border-radius: 999px; font: inherit; font-size: 16px; font-weight: 600; text-decoration: none; background: var(--theirs); color: var(--theirs-text); cursor: pointer; }
+  .pc-dlg-btns .yes { background: var(--mine); color: var(--mine-text); }
+  .pc-list { list-style: none; margin: 14px 16px 0; padding: 0; border-radius: 16px; overflow: hidden; background: var(--bg); box-shadow: 0 0 0 .5px var(--line); }
+  .pc-list li + li { border-top: .5px solid var(--line); }
+  .pc-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; color: var(--text); text-decoration: none; }
+  .pc-ava { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; font-weight: 700; color: var(--mine); background: color-mix(in srgb, var(--mine) 16%, var(--bg)); }
+  .pc-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .pc-main b { font-size: 16px; } .pc-main small { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pc-side { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; font-size: 12px; color: var(--muted); }
+  .pc-side em { font-style: normal; } .pc-dot { min-width: 18px; padding: 0 5px; border-radius: 9px; background: #d64545; color: #fff; font-size: 11px; line-height: 18px; text-align: center; }
+  .pc-form { margin: 14px 16px 0; }
+  .pc-note { margin: 0 0 12px; font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .pc-photo-pick { display: block; }
+  .pc-photo { display: flex; align-items: center; justify-content: center; width: 168px; aspect-ratio: 3 / 4; margin: 0 auto; border-radius: 20px; background: var(--theirs) center / cover; border: 1.5px dashed var(--line); color: var(--muted); font-size: 15px; cursor: pointer; }
+  .pc-photo.has { border-style: solid; } .pc-photo.has i { padding: 4px 12px; border-radius: 999px; background: rgba(0,0,0,.5); color: #fff; font-size: 12px; font-style: normal; margin-top: 150px; }
+  .pc-photo i { font-style: normal; }
+  .pc-check { display: block; text-align: center; margin-top: 8px; font-size: 13px; color: var(--muted); }
+  .pc-form h3 { margin: 18px 4px 8px; font-size: 14px; color: var(--muted); font-weight: 600; }
+  .pc-radios { display: flex; gap: 8px; } .pc-radios label { flex: 1; } .pc-radios input { position: absolute; opacity: 0; }
+  .pc-radios span { display: block; text-align: center; padding: 10px 0; border-radius: 12px; background: var(--theirs); color: var(--theirs-text); font-size: 15px; }
+  .pc-radios input:checked + span { background: var(--mine); color: var(--mine-text); font-weight: 600; }
+  .pc-form textarea { width: 100%; box-sizing: border-box; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); color: var(--text); font: inherit; font-size: 16px; line-height: 1.6; resize: none; }
+  .pc-count { text-align: right; margin: 4px 6px 0; font-size: 12px; color: var(--muted); }
+  .pc-save { width: 100%; min-height: 50px; margin-top: 16px; border: 0; border-radius: 999px; background: var(--mine); color: var(--mine-text); font: inherit; font-size: 17px; font-weight: 600; cursor: pointer; }
+  .pc-chat { padding: 0 0 12px; }
+  .pc-top { display: flex; align-items: flex-start; gap: 8px; margin: 10px 16px 0; }
+  .pc-top .pc-peer { flex: 1; margin: 0; min-width: 0; }
+  .pc-peer { margin: 10px 16px 0; padding: 10px 14px; border-radius: 14px; background: var(--theirs); font-size: 14px; }
+  .pc-peer summary { display: flex; align-items: center; gap: 10px; cursor: pointer; list-style: none; }
+  .pc-peer .pc-ava { width: 28px; height: 28px; font-size: 13px; }
+  .pc-peer img { display: block; margin: 12px auto 0; border-radius: 14px; max-width: 100%; }
+  .pc-peer p { margin: 10px 0 0; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .pc-thread { display: flex; flex-direction: column; padding: 14px 14px 6px; gap: 6px; }
+  .pc-msg { display: flex; } .pc-msg.mine { justify-content: flex-end; }
+  .pc-bubble { max-width: 80%; padding: 9px 14px; border-radius: 19px; background: var(--theirs); color: var(--theirs-text); font-size: 16px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .pc-msg.mine .pc-bubble { background: var(--mine); color: var(--mine-text); }
+  .pc-sys { text-align: center; font-size: 12px; color: var(--muted); padding: 10px 0; }
+  .pc-bar { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 14px calc(8px + env(safe-area-inset-bottom)); background: color-mix(in srgb, var(--bg) 80%, transparent);
+    -webkit-backdrop-filter: saturate(1.8) blur(18px); backdrop-filter: saturate(1.8) blur(18px); border-top: .5px solid var(--line); }
+  .pc-bar textarea { flex: 1; min-height: 40px; max-height: 120px; box-sizing: border-box; padding: 9px 14px; border: 1px solid var(--line); border-radius: 20px; background: var(--bg); color: var(--text); font: inherit; font-size: 16px; resize: none; }
+  .pc-bar button { flex: none; min-width: 64px; border: 0; border-radius: 20px; background: var(--mine); color: var(--mine-text); font: inherit; font-weight: 600; }
+  .pc-bar button[disabled] { opacity: .4; } .pc-left { flex-basis: 100%; margin: 0; text-align: center; font-size: 12px; color: var(--muted); }
+  .pc-end { flex: none; border: 0; padding: 11px 14px; border-radius: 14px; background: color-mix(in srgb, #d64545 12%, var(--bg)); color: #d64545; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+  @media (prefers-reduced-motion: reduce) { .pc-card { transition: none; } }
+</style>
+{% if pview == 'deck' %}
+<script>
+(function () {
+  var csrf = {{ csrf()|tojson }}, SWIPE_URL = {{ url_for('precall_swipe')|tojson }};
+  var all = {{ cands|tojson }}, left = {{ left }}, filter = 'all';
+  var stage = document.getElementById('pcStage'), empty = document.getElementById('pcEmpty'), actions = document.getElementById('pcActions');
+  var leftEl = document.getElementById('pcLeft'), G = {{ genders|tojson }};
+  var queue = all.slice();            // 翻牌队列：「下一位」把最上面一张放到队尾，不记录
+  function visible() { return filter === 'all' ? queue : queue.filter(function (c) { return c.gender === filter; }); }
+  function esc(t) { var d = document.createElement('div'); d.textContent = t == null ? '' : t; return d.innerHTML; }
+  function render() {
+    var v = visible().slice(0, 3);
+    stage.innerHTML = '';
+    leftEl.textContent = left;
+    document.getElementById('pcPick').disabled = !v.length || left <= 0;
+    document.getElementById('pcNext').disabled = visible().length < 2;
+    empty.hidden = !!v.length; actions.hidden = !v.length; stage.hidden = !v.length;
+    v.slice().reverse().forEach(function (c, idx) {
+      var depth = v.length - 1 - idx;
+      var el = document.createElement('div');
+      el.className = 'pc-card' + (depth === 1 ? ' under' : depth === 2 ? ' under2' : '');
+      el.dataset.pid = c.pid;
+      el.innerHTML = (c.photo ? '<div class="ph" style="background-image:url(\'' + c.photo + '\')"></div>' : '<div class="ph none">' + esc(c.bio) + '</div>') +
+        '<div class="shade"><h3>' + esc(c.name) + '<em>' + esc(G[c.gender] || '') + '</em></h3>' + (c.photo && c.bio ? '<p>' + esc(c.bio) + '</p>' : '') + '</div>' +
+        '<div class="pc-stamp pick">选 TA</div><div class="pc-stamp next">下一位</div>';
+      stage.appendChild(el);
+      if (depth === 0) bind(el, c);
+    });
+  }
+  function bind(el, c) {
+    var sx = 0, dx = 0, dragging = false, moved = false;
+    var stPick = el.querySelector('.pick'), stNext = el.querySelector('.next');
+    el.addEventListener('pointerdown', function (e) { dragging = true; moved = false; sx = e.clientX; dx = 0; el.classList.add('drag'); el.setPointerCapture(e.pointerId); });
+    el.addEventListener('pointermove', function (e) {
+      if (!dragging) return; dx = e.clientX - sx; if (Math.abs(dx) > 6) moved = true;
+      el.style.transform = 'translateX(' + dx + 'px) rotate(' + (dx / 18) + 'deg)';
+      stPick.style.opacity = dx < 0 ? Math.min(1, -dx / 90) : 0; stNext.style.opacity = dx > 0 ? Math.min(1, dx / 90) : 0;
+    });
+    function end() {
+      if (!dragging) return; dragging = false; el.classList.remove('drag');
+      if (dx < -90) { reset(el); askPick(c); }
+      else if (dx > 90) fling(el, 1, function () { next(); });
+      else { reset(el); if (!moved) el.classList.toggle('open'); }
+    }
+    el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
+  }
+  function reset(el) { el.style.transform = ''; el.querySelectorAll('.pc-stamp').forEach(function (s) { s.style.opacity = 0; }); }
+  function fling(el, dir, done) { el.style.transform = 'translateX(' + (dir * 480) + 'px) rotate(' + (dir * 24) + 'deg)'; el.style.opacity = 0; setTimeout(done, 240); }
+  function next() { var v = visible(); if (v.length < 2) { render(); return; } var top = v[0]; queue.splice(queue.indexOf(top), 1); queue.push(top); render(); }
+  var dlg = document.getElementById('pcConfirm'), res = document.getElementById('pcResult'), pending = null, busy = false;
+  function toast(t, ttl) { document.getElementById('pcResultTitle').textContent = ttl || '提示'; document.getElementById('pcResultText').textContent = t; document.getElementById('pcResultGo').hidden = true; res.showModal(); }
+  function askPick(c) {
+    if (left <= 0) { toast('这一轮的选人次数已经用完了', '没有次数了'); return; }
+    pending = c;
+    document.getElementById('pcConfirmName').textContent = '「' + c.name + '」';
+    document.getElementById('pcConfirmLeft').textContent = left - 1;
+    dlg.showModal(); if (document.activeElement) document.activeElement.blur();
+  }
+  document.getElementById('pcConfirmNo').onclick = function () { dlg.close(); pending = null; };
+  document.getElementById('pcConfirmYes').onclick = function () {
+    if (!pending || busy) return; busy = true; var c = pending;
+    var fd = new FormData(); fd.append('_csrf', csrf); fd.append('to', c.pid); fd.append('confirm', '1');
+    fetch(SWIPE_URL, { method: 'POST', credentials: 'same-origin', body: fd })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        dlg.close(); busy = false; pending = null;
+        if (!d.ok) { toast(d.msg || '没选成功，稍后再试'); if (typeof d.left === 'number') left = d.left; render(); return; }
+        left = d.left; queue = queue.filter(function (x) { return x.pid !== c.pid; }); render();
+        var go = document.getElementById('pcResultGo');
+        document.getElementById('pcResultTitle').textContent = d.matched ? '电话接通了 📞' : '已选择 ✓';
+        document.getElementById('pcResultText').textContent = d.matched ? '你和「' + c.name + '」的电话开好了，去聊聊吧。' : '已经选了「' + c.name + '」。对方也选你的时候，电话才会开。';
+        if (d.matched) { go.href = d.session; go.hidden = false; } else go.hidden = true;
+        res.showModal(); if (document.activeElement) document.activeElement.blur();
+      }).catch(function () { dlg.close(); busy = false; toast('网络不太好，稍后再试'); });
+  };
+  document.getElementById('pcResultClose').onclick = function () { res.close(); };
+  document.getElementById('pcPick').onclick = function () { var v = visible(); if (v.length) askPick(v[0]); };
+  document.getElementById('pcNext').onclick = function () { var top = stage.querySelector('.pc-card:last-child'); if (top) fling(top, 1, next); };
+  document.addEventListener('keydown', function (e) {
+    if (dlg.open || res.open) return;
+    if (e.key === 'ArrowLeft') document.getElementById('pcPick').click(); else if (e.key === 'ArrowRight') document.getElementById('pcNext').click();
+  });
+  var chips = document.getElementById('pcChips');
+  if (chips) chips.addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; filter = b.dataset.g; chips.querySelectorAll('button').forEach(function (x) { x.classList.toggle('on', x === b); }); render(); });
+  render();
+})();
+</script>
+{% elif pview == 'profile' %}
+<script>
+(function () {
+  var inp = document.getElementById('pcPhotoInput'), box = document.getElementById('pcPhotoBox'), bio = document.getElementById('pcBio'), n = document.getElementById('pcBioN');
+  inp.addEventListener('change', function () { var f = inp.files[0]; if (!f) return; box.style.backgroundImage = "url('" + URL.createObjectURL(f) + "')"; box.classList.add('has'); box.firstElementChild.textContent = '更换照片'; });
+  function cnt() { n.textContent = bio.value.length; } bio.addEventListener('input', cnt); cnt();
+})();
+</script>
+{% endif %}
 {% endblock %}

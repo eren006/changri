@@ -131,3 +131,10 @@ def overview() -> list[dict]:
         roles = c.execute("SELECT id, name FROM roles ORDER BY id").fetchall()
         have = {(r["role_id"], r["kind"]): r["updated_ts"] for r in c.execute("SELECT role_id, kind, updated_ts FROM sheets")}
     return [{"id": r["id"], "name": r["name"], "gongzhi": have.get((r["id"], "gongzhi")), "erbiao": have.get((r["id"], "erbiao"))} for r in roles]
+
+
+def set_text(role_id: int, kind: str, text: str) -> bool:
+    """管理员改某人公知/二表的文字（照老系统管理手机「改公知」）：只改文字，图片不动；玩家之后重新提交会覆盖。"""
+    with get_conn() as c:
+        return c.execute("UPDATE sheets SET text=?, updated_ts=? WHERE role_id=? AND kind=?",
+                         ((text or "").strip()[:TEXT_MAX], int(time.time()), role_id, kind)).rowcount > 0

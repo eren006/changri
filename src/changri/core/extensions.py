@@ -52,6 +52,8 @@ def is_enabled(ext_id: str) -> bool:
     default = "1" if next((e.get("default_on", True) for e in OFFICIAL if e["id"] == ext_id), True) else "0"
     if ext_id == "giftshop" and get_config("gift_catalog", "").strip():
         default = "1"            # 升级前已经上架了礼物的，礼品店保持开启
+    if ext_id == "stakeout" and get_config("stakeout_enabled", "0") == "1":
+        default = "1"            # 以前在「约会房间」设置里打开过踩点的，变成扩展卡片后保持开启
     if ext_id == "phone" and get_config("phone_enabled", "0") == "1":
         default = "1"            # 升级前已经在用小手机的，不能因为它变成可选项就被关掉
     return get_config(f"ext:{ext_id}", default) != "0"

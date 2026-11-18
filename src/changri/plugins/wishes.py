@@ -1,4 +1,4 @@
-"""心愿（官方扩展，可在「功能与设置」的「额外」里开关，默认关闭，改了要重启）：挂心愿、悬赏心愿、看心愿、摘心愿、撤心愿。
+"""心愿（官方扩展，可在「功能与设置」的「额外」里开关，默认关闭，改了要重启）：挂心愿、看心愿、摘心愿、撤心愿（悬赏心愿已去掉）。
 规则和数据在 core/wishes.py；摘走后开的约会房间走 play.py 里的房间逻辑。开放时段、数量上限在设置里的「心愿」。"""
 import re
 
@@ -13,45 +13,25 @@ from changri.core.buttons import Btn
 from changri.core.qqsend import make_send, reply_buttons
 from changri.plugins.play import NEED_ROLE, _announce_in_room, _cmd, _group_line, _invite, _me, _push, _room_arg, _slot
 
-def _wish_line(w) -> str:
-    who = w["sign"] or w["poster_name"]
-    return f"#{w['id']} D{w['day']} {w['start_hm']}-{w['end_hm']} @{w['place']}：{w['content']}" + (f"｜悬赏：{w['reward']}" if w["reward"] else "") + f"（{who}）"
+async def _broadcast(w) -> None:
+    """开了「挂心愿时同步发到公告群」才发；只显示性别符号 + 昵称，不显示真名。"""
+    if get_config("wish_public_send", "0") != "1":
+        return
+    ann = announce.get_announce()
+    if not ann:
+        return
+    try:
+        text = wishes.broadcast_text(w)
+        await make_send()(ann[0], ann[1], text)
+        publicfeed.record("wish", text)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("心愿公开播报失败：{}", e)
 
 
-async def _post_wish(matcher, bot, event, args, bounty: bool):
-    me = _me(bot, event)
-    if not me:
-        await matcher.finish(NEED_ROLE)
-    text = args.extract_plain_text().strip()
-    sign = ""
-    reward = ""
-    if "|" in text or "｜" in text:
-        text, reward = re.split(r"[|｜]", text, 1)
-        text, reward = text.strip(), reward.strip()
-    if bounty and not reward:
-        await matcher.finish(f"用法：悬赏心愿 时间 地点 内容 | 奖励\n例：悬赏心愿 {storycal.example_time()} 图书馆 陪我看书 | 滋补汤 1")
-    p = text.split(None, 2)
-    if len(p) < 3:
-        await matcher.finish(f"用法：挂心愿 时间 地点 内容\n例：挂心愿 {storycal.example_time()} 花园 一起散步")
-    ok, info = wishes.post(me["id"], p[0], p[1], p[2], reward, sign)
-    if not ok:
-        await matcher.finish(f"❌ {info}")
-    if get_config("wish_public_send", "0") == "1":
-        ann = announce.get_announce()
-        if ann:
-            try:
-                line = "📌 新心愿 " + _wish_line(wishes.get(int(info)))
-                await make_send()(ann[0], ann[1], line)
-                publicfeed.record("wish", line)
-            except Exception as e:  # noqa: BLE001
-                logger.warning("心愿公开播报失败：{}", e)
-    from changri.core import letters
-    paid = letters.paid_note(me["id"], "wish")
-    await matcher.finish(f"✅ 心愿 #{info} 已挂出，等人来摘。" + (f"\n{paid}" if paid else "") + ("\n（奖励只是登记，兑现靠你们自己，机器人不转物品。）" if reward else ""))
+USAGE = "用法：挂心愿 时间 地点 内容 [| 昵称]\n例：挂心愿 {t} 花园 一起散步 | 神秘人A\n（昵称最多 10 个字；对外只显示性别和昵称，不显示真名）"
 
 
 wish_post = _cmd("挂心愿")
-wish_bounty = _cmd("悬赏心愿")
 wish_list = _cmd("看心愿")
 wish_take = _cmd("摘心愿")
 wish_back = _cmd("撤心愿")
@@ -59,21 +39,32 @@ wish_back = _cmd("撤心愿")
 
 @wish_post.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
-    await _post_wish(wish_post, bot, event, args, False)
-
-
-@wish_bounty.handle()
-async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
-    await _post_wish(wish_bounty, bot, event, args, True)
+    me = _me(bot, event)
+    if not me:
+        await wish_post.finish(NEED_ROLE)
+    text, sign = args.extract_plain_text().strip(), ""
+    if re.search(r"[|｜]", text):
+        text, sign = (x.strip() for x in re.split(r"[|｜]", text, 1))
+    p = text.split(None, 2)
+    if len(p) < 3:
+        await wish_post.finish(USAGE.format(t=storycal.example_time()))
+    ok, info = wishes.post(me["id"], p[0], p[1], p[2], sign)
+    if not ok:
+        await wish_post.finish(f"❌ {info}")
+    w = wishes.get(int(info))
+    await _broadcast(w)
+    from changri.core import letters
+    paid = letters.paid_note(me["id"], "wish")
+    await wish_post.finish(wishes.post_ok_text(w) + (f"\n{paid}" if paid else ""))
 
 
 @wish_list.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent):
     ws = wishes.list_open()
     if not ws:
-        await wish_list.finish("现在没有开放的心愿。")
+        await wish_list.finish("当前没有漂浮的心愿。")
     # 摘心愿会马上开房间、通知对方：按钮只把指令填进输入框，玩家自己按发送
-    await reply_buttons(wish_list, "🌠 开放的心愿\n" + "\n".join(_wish_line(w) for w in ws) + "\n摘一个发「摘心愿 编号」",
+    await reply_buttons(wish_list, "📜 当前心愿：\n" + "\n".join(wishes.line(w) for w in ws) + "\n\n摘一个发「摘心愿 编号」",
                         [Btn(f"摘 #{w['id']}", f"摘心愿 {w['id']}", enter=False) for w in ws], per_row=4)
     await wish_list.finish()
 
@@ -93,7 +84,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     await _push(w["poster_id"], f"🌠 你的心愿 #{n} 被 {me['name']} 摘走了！")
     await _invite(w["poster_id"], room, fix=("💌 心愿", "💌 心愿约会"))
     await _announce_in_room(room_id)
-    await wish_take.finish(f"✅ 你摘了心愿 #{n}，{w['poster_name']} 已收到通知。\n{_slot(room)}\n{_group_line(room)}\n房间号 R{room_id}")
+    await wish_take.finish(f"✅ 你摘了心愿 #{n}，对方已收到通知。\n{_slot(room)}\n{_group_line(room)}\n房间号 R{room_id}")
 
 
 @wish_back.handle()
@@ -102,8 +93,10 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     if not me:
         await wish_back.finish(NEED_ROLE)
     n = _room_arg(args.extract_plain_text())
-    if not n:
-        await wish_back.finish("用法：撤心愿 编号")
+    if not n:                                   # 不带编号：列出自己挂着的（照老系统）
+        mine = wishes.list_open(me["id"])
+        await wish_back.finish(("📜 你发布的心愿：\n" + "\n".join(wishes.line(w) for w in mine) if mine else "你现在没有挂着的心愿。")
+                               + "\n\n使用「撤心愿 编号」撤回")
     ok, why = wishes.withdraw(n, me["id"])
     await wish_back.finish(f"✅ 心愿 #{n} 已撤回。" if ok else f"❌ {why}")
 

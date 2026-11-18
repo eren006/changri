@@ -9,9 +9,22 @@ import time
 from . import rooms, season, storycal
 from .db import get_config, get_conn, set_config
 
-# 功能 → 给玩家看的名字。官约是管理员发起的，不在里面
-FEATURES = {"sms": "短信", "gift": "礼物", "约会": "约会", "电话": "电话", "微信": "微信", "lovemail": "心动信", "wish": "心愿", "forum": "论坛"}
+# 功能 → 给玩家看的名字。官约是管理员发起的，不在里面。
+# 「微信」这种房间现在只有小手机的多人群聊会建（群里的「微信」指令已经改成去小手机），所以对外叫「多人群聊」；键名不改，库里存的还是「微信」。
+FEATURES = {"sms": "短信", "gift": "礼物", "约会": "约会", "电话": "电话", "微信": "多人群聊", "lovemail": "心动信", "wish": "心愿", "forum": "论坛"}
 ROOM_KINDS = ("约会", "电话", "微信")
+
+
+def shown_features() -> dict[str, str]:
+    """上帝模式页上列出来的开关。小手机多人群聊没开时不列「多人群聊」：那时它管不到任何东西，列出来只会让人以为群里还有「微信」。
+    后台保存开关时也只处理这里列出的，没列出的保持原样（不然藏起来的开关每次保存都会被当成关掉）。"""
+    from . import extensions
+    out = dict(FEATURES)
+    if not extensions.is_enabled("groupchat"):
+        out.pop("微信")
+    else:
+        out["微信"] = "多人群聊（小手机）"
+    return out
 
 
 # ---------- 功能权限 ----------

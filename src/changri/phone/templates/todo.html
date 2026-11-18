@@ -3,8 +3,15 @@
 {% block body %}
   <header class="bar"><a class="back" href="{{ url_for('discover') }}">发现</a><div class="title">我的待回</div></header>
   <div class="scroll list">
-    {% for x in items %}<div style="padding:13px 20px;border-bottom:1px solid var(--line);line-height:1.6">{{ x }}</div>{% endfor %}
-    {% if items %}<p style="padding:12px 20px;color:var(--mute);font-size:13px">加入申请、约会可以到「发现 → 邀约」处理；其他事回 QQ 群里用指令处理。</p>
-    {% else %}<div class="empty">没有要回的事。</div>{% endif %}
+    {% for key, x in items %}<div style="padding:13px 20px;border-bottom:1px solid var(--line);line-height:1.6;white-space:pre-line">{{ x }}
+      <form method="post" action="{{ url_for('todo_dismiss') }}" style="margin-top:6px"><input type="hidden" name="_csrf" value="{{ csrf() }}"><input type="hidden" name="key" value="{{ key }}"><button type="submit" class="pick-tab" style="font-size:13px">暂不提醒</button></form>
+    </div>{% endfor %}
+    {% if items %}<p style="padding:12px 20px;color:var(--mute);font-size:13px">加入申请、约会可以到「发现 → 邀约」处理；其他事回 QQ 群里用指令处理。「暂不提醒」只是不在小手机上提醒，不算已回复，群里「我的待回」照旧列出；对方再回一轮又会提醒。</p>
+    {% elif not folded %}<div class="empty">没有要回的事。</div>{% endif %}
+    {% if folded %}<details style="padding:12px 20px"><summary style="color:var(--mute)">已暂不提醒（{{ folded|length }}）</summary>
+      {% for key, x in folded %}<div style="padding:10px 0;border-bottom:1px solid var(--line);line-height:1.6;color:var(--mute);white-space:pre-line">{{ x }}
+        <form method="post" action="{{ url_for('todo_dismiss') }}" style="margin-top:6px"><input type="hidden" name="_csrf" value="{{ csrf() }}"><input type="hidden" name="key" value="{{ key }}"><input type="hidden" name="action" value="restore"><button type="submit" class="pick-tab" style="font-size:13px">恢复提醒</button></form>
+      </div>{% endfor %}
+    </details>{% endif %}
   </div>
 {% endblock %}

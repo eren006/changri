@@ -3,7 +3,8 @@
 - 玩家在自己群里发「修改性别 男」「修改年龄 20」「修改皮相 明星名」「修改签名 …」「修改简称 …」，
   可以一次发多行一起改（每行一条）。
 - 皮相没自己填过时按性别给默认值（男 亨利卡维尔 / 女 刘亦菲），改了性别默认皮相跟着换。
-- 签名 12 小时只能改一次。
+- 签名 12 小时只能改一次，皮相 2 小时只能改一次。
+- 「修改名字 新名字」改本名（跟别人的本名、简称都不能重复）；房间、短信这些都按角色编号记，改名不影响。
 - 简称：数字、英文字母、汉字，1–10 个字，跟所有人的本名、简称都不能重复；短信、约会这些要填名字的地方都能用它代替本名
   （roles.get_role_by_name 找不到本名时按简称再找一遍，所以各个指令不用单独适配）。填回自己的本名 = 清除简称。
 和小手机里的「微信名」是两回事：微信名只影响显示，简称是填指令用的。
@@ -13,9 +14,10 @@ import time
 
 from .db import get_conn
 
-PREFIXES = ("修改性别", "修改年龄", "修改皮相", "修改签名", "修改简称")
+PREFIXES = ("修改名字", "修改性别", "修改年龄", "修改皮相", "修改签名", "修改简称")
 DEFAULT_LOOKS = {"男": "亨利卡维尔", "女": "刘亦菲"}
 BIO_COOLDOWN = 12 * 3600
+LOOK_COOLDOWN = 2 * 3600
 LOOK_MAX = 20
 BIO_MAX = 100
 SHORT_RE = re.compile(r"[0-9A-Za-z一-龥]{1,10}")
@@ -25,7 +27,7 @@ def get(role_id: int) -> dict:
     """{gender, age, look, bio, bio_ts, short}，没存过就是默认值。look 没自己填过时按性别给默认皮相。"""
     with get_conn() as c:
         r = c.execute("SELECT * FROM role_profiles WHERE role_id=?", (role_id,)).fetchone()
-    p = dict(r) if r else {"role_id": role_id, "gender": "女", "age": 18, "look": "", "bio": "", "bio_ts": 0, "short": ""}
+    p = dict(r) if r else {"role_id": role_id, "gender": "女", "age": 18, "look": "", "look_ts": 0, "bio": "", "bio_ts": 0, "short": ""}
     p["look"] = p["look"] or DEFAULT_LOOKS.get(p["gender"], "")
     return p
 
@@ -65,10 +67,28 @@ def set_short(role, val: str) -> str:
     return f"✅ 简称已设为「{val}」，以后短信、约会等填名字的地方都能用它代替「{role['name']}」。"
 
 
-def edit_line(role, line: str, now: int | None = None) -> str:
+def rename(role, val: str) -> str:
+    from . import roles
+    if not val:
+        return "❌ 请输入新名字，例：修改名字 林晚"
+    if val == role["name"]:
+        return "❌ 新名字和现在的一样。"
+    if not roles._valid_name(val):
+        return f"❌ 角色名要在 {roles.NAME_MAX} 字以内，且不能带空格。"
+    if name_taken(val, role["id"]):
+        return f"❌ 「{val}」已经是别人的名字或简称了，换一个。"
+    with get_conn() as c:
+        c.execute("UPDATE roles SET name=? WHERE id=?", (val, role["id"]))
+        c.execute("UPDATE role_profiles SET short='' WHERE role_id=? AND short=?", (role["id"], val))   # 改成自己的简称：简称就不用了
+    return f"✅ 名字已从「{role['name']}」改为「{val}」。"
+
+
+def edit_line(role, line: str, now: int | None = None, admin: bool = False) -> str:
     """处理一行「修改xx 值」，返回回执。"""
     line = line.strip()
     key, val = line[:4], line[4:].strip()
+    if key == "修改名字":
+        return rename(role, val)
     if key == "修改性别":
         if val not in ("男", "女"):
             return "❌ 性别只能填：男 / 女"
@@ -84,7 +104,11 @@ def edit_line(role, line: str, now: int | None = None) -> str:
             return "❌ 请输入明星名，例：修改皮相 刘亦菲"
         if len(val) > LOOK_MAX or "\n" in val:
             return f"❌ 皮相最多 {LOOK_MAX} 个字。"
-        _save(role["id"], look=val)
+        now = now or int(time.time())
+        last = get(role["id"]).get("look_ts") or 0
+        if last and now - last < LOOK_COOLDOWN and not admin:
+            return f"⏳ 皮相 2 小时只能改一次，还要等 {-(-(LOOK_COOLDOWN - (now - last)) // 60)} 分钟。"
+        _save(role["id"], look=val, look_ts=now)
         return f"✅ 皮相已改为：{val}"
     if key == "修改签名":
         if not val:
@@ -93,7 +117,7 @@ def edit_line(role, line: str, now: int | None = None) -> str:
             return f"❌ 签名最多 {BIO_MAX} 个字。"
         now = now or int(time.time())
         last = get(role["id"])["bio_ts"]
-        if last and now - last < BIO_COOLDOWN:
+        if last and now - last < BIO_COOLDOWN and not admin:
             return f"⏳ 签名 12 小时只能改一次，还要等 {-(-(BIO_COOLDOWN - (now - last)) // 60)} 分钟。"
         _save(role["id"], bio=val, bio_ts=now)
         return f"✅ 签名已改为：{val}"
@@ -102,12 +126,17 @@ def edit_line(role, line: str, now: int | None = None) -> str:
     return f"❌ 认不出这一行：{line}"
 
 
-def edit(role, text: str) -> str:
+def edit(role, text: str, admin: bool = False) -> str:
     """整条消息：一行一条，每行都要以「修改性别/年龄/皮相/签名/简称」开头。签名只能单独一行写，不跨行。"""
     lines = [x.strip() for x in text.splitlines() if x.strip()]
     if len(lines) > 1 and not all(x.startswith(PREFIXES) for x in lines):
-        return "❌ 一次改多项时，每一行都要以「修改性别 / 修改年龄 / 修改皮相 / 修改签名 / 修改简称」开头。"
-    return "\n".join(edit_line(role, x) for x in lines)
+        return "❌ 一次改多项时，每一行都要以「修改名字 / 修改性别 / 修改年龄 / 修改皮相 / 修改签名 / 修改简称」开头。"
+    from . import roles
+    out = []
+    for x in lines:
+        out.append(edit_line(role, x, admin=admin))
+        role = roles.get_role(role["id"]) or role          # 同一条里先改了名字，后面几行按新名字算
+    return "\n".join(out)
 
 
 def summary_lines(role) -> list[str]:
@@ -122,9 +151,10 @@ def summary_lines(role) -> list[str]:
 
 
 HELP = ("💡 可以发这些修改档案（可以一次发多行一起改，每行一条）：\n"
+        "  修改名字 新名字\n"
         "  修改性别 男/女\n"
         "  修改年龄 数字\n"
-        "  修改皮相 明星名\n"
+        "  修改皮相 明星名（2 小时能改一次）\n"
         "  修改签名 你的签名（12 小时能改一次）\n"
         "  修改简称 简称（名字长的话，短信、约会等填名字的地方都能用简称代替本名）\n"
         "例：\n  修改年龄 20\n  修改简称 阿明")

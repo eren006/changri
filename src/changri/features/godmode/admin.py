@@ -1,7 +1,38 @@
-"""设置平台 · 上帝模式。由 changri.admin.create_app 调用 register(app, login_required) 挂上路由（路由名不变，模板里的 url_for 照常用）。"""
+"""设置平台 · 角色（原「上帝模式」）。所有角色在一个地方：列表 + 每人一页
+（概况：档案、个人群、激活码、QQ 号；功能、背包、时间、次数、关系线）。
+由 changri.admin.create_app 调用 register(app, login_required) 挂上路由（路由名 god_* 不变，老链接照常用）。"""
 from flask import flash, redirect, render_template, request, url_for
-from changri.core import godmode as god_core, relations as relations_core, rpg as rpg_core
+from changri.core import charprofile, extensions, godmode as god_core, relations as relations_core, roles as roles_core, rpg as rpg_core
 from changri.core.db import get_conn
+
+TABS = ("info", "perm", "bag", "time", "count", "rel")
+
+
+def _phone_code(role_id: int) -> str:
+    """只读：有激活码就返回，没有返回空（phonecodes.code_for_role 读不到会顺手生成，这里不要）。"""
+    with get_conn() as c:
+        r = c.execute("SELECT code FROM phone_codes WHERE role_id=?", (role_id,)).fetchone()
+    return r["code"] if r else ""
+
+
+def _people() -> list[dict]:
+    """列表每人一行：名字、简称、性别年龄、NPC、个人群状态、有没有被干预。"""
+    with get_conn() as c:
+        rows = [dict(r) for r in c.execute(
+            "SELECT r.id, r.name, r.is_npc, p.short, p.gender, p.age FROM roles r LEFT JOIN role_profiles p ON p.role_id=r.id ORDER BY r.name")]
+    closed, locked = {}, {}
+    for c_ in god_core.closed_list():
+        closed[c_["role_id"]] = closed.get(c_["role_id"], 0) + 1
+    for l in god_core.locks():
+        locked[l["role_id"]] = locked.get(l["role_id"], 0) + 1
+    for p in rows:
+        gs = roles_core.list_groups(p["id"])
+        p["gid"] = next((g["real_gid"] for g in gs if g["real_gid"]), "")
+        p["bound"] = any(g["group_openid"] for g in gs)
+        p["gender"] = p["gender"] or "女"                                 # 没改过档案 = 默认值（同 charprofile.get）
+        p["age"] = p["age"] if p["age"] is not None else 18
+        p["closed"], p["locked"] = closed.get(p["id"], 0), locked.get(p["id"], 0)
+    return rows
 
 
 def register(app, login_required):
@@ -12,41 +43,45 @@ def register(app, login_required):
     @app.route("/god")
     @login_required
     def god_page():
-        with get_conn() as c:
-            people = [dict(r) for r in c.execute("SELECT id, name FROM roles ORDER BY name")]
+        people = _people()
         rid = request.args.get("role", type=int)
         role = next((p for p in people if p["id"] == rid), None)
+        any_global = bool(god_core.global_locks() or any(god_core.global_off(k) for k in god_core.FEATURES))
         if request.args.get("role") == "all":                 # 全体：对所有人一起生效的开关和时间锁定
             return render_template("god.html", people=people, role=None, everyone=True, tab="", god=god_core,
                                    g_off={k for k in god_core.FEATURES if god_core.global_off(k)}, g_locks=god_core.global_locks())
-        tab = request.args.get("tab", "perm")
-        tab = tab if tab in ("perm", "bag", "time", "count", "rel") else "perm"
+        tab = request.args.get("tab", "info")
+        tab = tab if tab in TABS else "info"
         ctx = {}
         if role:
             counts = god_core.today_counts(rid)
             with get_conn() as c:
                 perms = {r["feature"] for r in c.execute("SELECT feature FROM role_perms WHERE role_id=?", (rid,))}
-            with get_conn() as c:
                 my_attrs = [dict(r) for r in c.execute("SELECT name, value FROM role_attrs WHERE role_id=? ORDER BY name", (rid,))]
-            bag = rpg_core.inventory(rid)
-            ctx = dict(my_attrs=my_attrs, bag=bag, all_items=rpg_core.items(), attr_defs=rpg_core.attr_defs(), perms=perms, counts=counts, locks=[l for l in god_core.locks() if l["role_id"] == rid],
-                       timeline=god_core.timeline_all(rid), rels=relations_core.list_for(rid), others=[p for p in people if p["id"] != rid])
-        else:                                            # 没选人：给每个人标上「有没有被干预过」
-            closed, locked = {}, {}
-            for c_ in god_core.closed_list():
-                closed[c_["role_id"]] = closed.get(c_["role_id"], 0) + 1
-            for l in god_core.locks():
-                locked[l["role_id"]] = locked.get(l["role_id"], 0) + 1
-            for p in people:
-                p["closed"], p["locked"] = closed.get(p["id"], 0), locked.get(p["id"], 0)
-        return render_template("god.html", people=people, role=role, everyone=False, tab=tab, god=god_core,
-                               any_global=bool(god_core.global_locks() or any(god_core.global_off(k) for k in god_core.FEATURES)), **ctx)
+            ctx = dict(my_attrs=my_attrs, bag=rpg_core.inventory(rid), all_items=rpg_core.items(), attr_defs=rpg_core.attr_defs(), perms=perms, counts=counts,
+                       locks=[l for l in god_core.locks() if l["role_id"] == rid], timeline=god_core.timeline_all(rid), rels=relations_core.list_for(rid),
+                       others=[p for p in people if p["id"] != rid],
+                       profile=charprofile.get(rid), my_groups=roles_core.list_groups(rid), qqs=roles_core.qqs_of_role(rid),
+                       phone_on=extensions.is_enabled("phone"), phone_code=_phone_code(rid),
+                       bind_code=request.args.get("code", ""))
+        return render_template("god.html", people=people, role=role, everyone=False, tab=tab, god=god_core, any_global=any_global, **ctx)
+
+    @app.post("/god/<int:role_id>/profile")
+    @login_required
+    def god_profile(role_id):
+        """管理员替玩家改档案：和群里一样一行一条（修改性别 男 / 修改年龄 20 …），不受冷却限制。"""
+        role = roles_core.get_role(role_id)
+        text = request.form.get("lines", "").strip()
+        if role and text:
+            lines = [x if x.startswith("修改") else "修改" + x for x in (y.strip() for y in text.splitlines()) if x]
+            flash(charprofile.edit(role, "\n".join(lines), admin=True).replace("\n", "；"))
+        return _god_back(role_id)
 
     @app.post("/god/all/perm")
     @login_required
     def god_all_perm():
         on = set(request.form.getlist("on"))
-        for k in god_core.FEATURES:
+        for k in god_core.shown_features():          # 只动页面上列出的开关，藏起来的保持原样
             god_core.set_global(k, k in on)
         flash("全体功能开关已保存")
         return redirect(url_for("god_page", role="all"))
@@ -70,7 +105,7 @@ def register(app, login_required):
     @login_required
     def god_perm(role_id):
         feats = request.form.getlist("on")
-        for k in god_core.FEATURES:
+        for k in god_core.shown_features():          # 只动页面上列出的开关，藏起来的保持原样
             god_core.set_perm(role_id, k, k in feats)
         flash("功能权限已保存")
         return _god_back(role_id)

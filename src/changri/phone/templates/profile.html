@@ -1,5 +1,57 @@
 {% extends 'base.html' %}
-{% block title %}我的 · {{ brand }}{% endblock %}
+{% block title %}我的 · {{ brand }}{% if https %}
+<script>
+  // 网页提醒（照老系统 _phone_push.html；表单提交，带 _csrf）
+  (function () {
+    var CSRF = {{ csrf()|tojson }};
+    var supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+    var btn = document.getElementById('pushToggle'), test = document.getElementById('pushTest'), msg = document.getElementById('pushMsg');
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/p/sw.js', { scope: '/p/' }).catch(function () {});
+    var standalone = (window.navigator.standalone === true) || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+    var ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    function say(t) { msg.textContent = t; }
+    function post(url, data) {
+      var b = new FormData(); b.append('_csrf', CSRF); Object.keys(data || {}).forEach(function (k) { b.append(k, data[k]); });
+      return fetch(url, { method: 'POST', credentials: 'same-origin', body: b }).then(function (r) { return r.json(); });
+    }
+    function b64(s) { var p = '='.repeat((4 - s.length % 4) % 4), raw = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')), a = new Uint8Array(raw.length); for (var i = 0; i < raw.length; i++) a[i] = raw.charCodeAt(i); return a; }
+    function current() { return navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription(); }); }
+    function refresh() {
+      if (!supported || (ios && !standalone)) {
+        btn.disabled = true; test.hidden = true;
+        say(ios && !standalone ? '苹果设备要先点浏览器的「分享」→「添加到主屏幕」，再从主屏幕的图标打开小手机，才能开启提醒（需要 iOS 16.4 以上）。'
+                               : '这个浏览器不支持网页提醒，换系统自带浏览器或 Chrome 试试；微信、QQ 里打开的页面一般不行。');
+        return;
+      }
+      if (Notification.permission === 'denied') { btn.disabled = true; test.hidden = true; say('通知权限被关掉了，要去系统或浏览器设置里重新允许。'); return; }
+      current().then(function (sub) {
+        btn.textContent = sub ? '关闭这台设备的提醒' : '开启消息提醒'; btn.dataset.on = sub ? '1' : ''; test.hidden = !sub;
+        say(sub ? '已开启：收到短信、礼物、心动信、关系线留言，或者有人动了你的图鉴时会弹通知（不显示是谁、写了什么）。' : '开启后，离开或关掉网页也能收到新消息提醒。');
+      });
+    }
+    btn.addEventListener('click', function () {
+      btn.disabled = true;
+      if (btn.dataset.on) {
+        current().then(function (sub) { if (!sub) return; var ep = sub.endpoint; return sub.unsubscribe().then(function () { return post('/p/push/unsubscribe', { endpoint: ep }); }); })
+          .then(function () { btn.disabled = false; refresh(); });
+        return;
+      }
+      Notification.requestPermission().then(function (perm) {
+        if (perm !== 'granted') { btn.disabled = false; refresh(); return; }
+        return fetch('/p/push/key', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (k) {
+          if (!k.ok) throw new Error(k.msg || '暂时开不了');
+          return navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64(k.key) }); });
+        }).then(function (sub) { var j = sub.toJSON(); return post('/p/push/subscribe', { endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth }); })
+          .then(function (r) { btn.disabled = false; refresh(); if (!r.ok) say('❌ ' + (r.msg || '开启失败')); })
+          .catch(function (e) { btn.disabled = false; refresh(); say('❌ 开启失败：' + (e && e.message ? e.message : e)); });
+      });
+    });
+    test.addEventListener('click', function () { post('/p/push/test').then(function (r) { say((r.ok ? '✓ ' : '❌ ') + (r.msg || '')); }); });
+    refresh();
+  })();
+</script>
+{% endif %}
+{% endblock %}
 {% block body %}
   <header class="bar tab-bar"><div class="tab-head"><h1>我的</h1></div></header>
   <div class="scroll profile-page">
@@ -25,6 +77,12 @@
       </div>
       <p style="margin:10px 0 0;font-size:13px;line-height:1.7;color:var(--muted)">只换外观，保存在这台设备；页面用语跟随本季设置。</p>
     </form>
+    <div class="pf-group" id="pushBox" style="padding:14px 18px">
+      <div style="font-size:15px;font-weight:600;margin-bottom:6px">消息提醒</div>
+      <p id="pushMsg" style="margin:0 0 10px;font-size:13px;line-height:1.7;color:var(--muted)">{% if not https %}网页提醒要 HTTPS 才能用，请管理员开通 HTTPS。{% else %}检查中…{% endif %}</p>
+      <button type="button" class="choice" id="pushToggle"{% if not https %} disabled{% endif %}>开启消息提醒</button>
+      <button type="button" class="choice" id="pushTest" hidden>发一条测试通知</button>
+    </div>
     <div class="pf-group">
       <a class="pf-row" href="{{ url_for('guide') }}"><span class="tile">{{ phone_symbol('book') }}</span><span class="name">使用指南</span><span class="chev" aria-hidden="true">›</span></a>
     </div>
@@ -72,4 +130,56 @@
     });
   })();
 </script>
+{% if https %}
+<script>
+  // 网页提醒（照老系统 _phone_push.html；表单提交，带 _csrf）
+  (function () {
+    var CSRF = {{ csrf()|tojson }};
+    var supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+    var btn = document.getElementById('pushToggle'), test = document.getElementById('pushTest'), msg = document.getElementById('pushMsg');
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/p/sw.js', { scope: '/p/' }).catch(function () {});
+    var standalone = (window.navigator.standalone === true) || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+    var ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    function say(t) { msg.textContent = t; }
+    function post(url, data) {
+      var b = new FormData(); b.append('_csrf', CSRF); Object.keys(data || {}).forEach(function (k) { b.append(k, data[k]); });
+      return fetch(url, { method: 'POST', credentials: 'same-origin', body: b }).then(function (r) { return r.json(); });
+    }
+    function b64(s) { var p = '='.repeat((4 - s.length % 4) % 4), raw = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')), a = new Uint8Array(raw.length); for (var i = 0; i < raw.length; i++) a[i] = raw.charCodeAt(i); return a; }
+    function current() { return navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription(); }); }
+    function refresh() {
+      if (!supported || (ios && !standalone)) {
+        btn.disabled = true; test.hidden = true;
+        say(ios && !standalone ? '苹果设备要先点浏览器的「分享」→「添加到主屏幕」，再从主屏幕的图标打开小手机，才能开启提醒（需要 iOS 16.4 以上）。'
+                               : '这个浏览器不支持网页提醒，换系统自带浏览器或 Chrome 试试；微信、QQ 里打开的页面一般不行。');
+        return;
+      }
+      if (Notification.permission === 'denied') { btn.disabled = true; test.hidden = true; say('通知权限被关掉了，要去系统或浏览器设置里重新允许。'); return; }
+      current().then(function (sub) {
+        btn.textContent = sub ? '关闭这台设备的提醒' : '开启消息提醒'; btn.dataset.on = sub ? '1' : ''; test.hidden = !sub;
+        say(sub ? '已开启：收到短信、礼物、心动信、关系线留言，或者有人动了你的图鉴时会弹通知（不显示是谁、写了什么）。' : '开启后，离开或关掉网页也能收到新消息提醒。');
+      });
+    }
+    btn.addEventListener('click', function () {
+      btn.disabled = true;
+      if (btn.dataset.on) {
+        current().then(function (sub) { if (!sub) return; var ep = sub.endpoint; return sub.unsubscribe().then(function () { return post('/p/push/unsubscribe', { endpoint: ep }); }); })
+          .then(function () { btn.disabled = false; refresh(); });
+        return;
+      }
+      Notification.requestPermission().then(function (perm) {
+        if (perm !== 'granted') { btn.disabled = false; refresh(); return; }
+        return fetch('/p/push/key', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (k) {
+          if (!k.ok) throw new Error(k.msg || '暂时开不了');
+          return navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64(k.key) }); });
+        }).then(function (sub) { var j = sub.toJSON(); return post('/p/push/subscribe', { endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth }); })
+          .then(function (r) { btn.disabled = false; refresh(); if (!r.ok) say('❌ ' + (r.msg || '开启失败')); })
+          .catch(function (e) { btn.disabled = false; refresh(); say('❌ 开启失败：' + (e && e.message ? e.message : e)); });
+      });
+    });
+    test.addEventListener('click', function () { post('/p/push/test').then(function (r) { say((r.ok ? '✓ ' : '❌ ') + (r.msg || '')); }); });
+    refresh();
+  })();
+</script>
+{% endif %}
 {% endblock %}

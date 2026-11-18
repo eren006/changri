@@ -150,4 +150,5 @@ def register(app, login_required):
     def phone_reset(role_id):
         phonecodes.reset(role_id)
         flash("已重置，旧码立刻失效")
-        return redirect(url_for("phone_page"))
+        nxt = request.form.get("next", "")
+        return redirect(nxt if nxt.startswith("/") and not nxt.startswith("//") else url_for("phone_page"))

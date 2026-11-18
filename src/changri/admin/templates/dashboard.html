@@ -74,7 +74,7 @@ a.tile:active{transform:scale(.97)}
 {% block body %}
 {% set nx = (d.sheet|selectattr('state','equalto','next')|list|first) if d.sheet else none %}
 {% set facts = d.facts %}
-{% set fact_ico = [('person','c-pink','#roles'),('door','c-blue',url_for('backup_pool_page')),('chat','c-green',url_for('reviews_page', tab='sms')),('mail','c-orange',url_for('lovemail_page')),('link','c-purple',url_for('relations_page'))] %}
+{% set fact_ico = [('person','c-pink',url_for('god_page')),('door','c-blue',url_for('backup_pool_page')),('chat','c-green',url_for('reviews_page', tab='sms')),('mail','c-orange',url_for('lovemail_page')),('link','c-purple',url_for('relations_page'))] %}
 <div class="ios">
 <h1 class="lt">{{ d.date }}</h1>
 <p class="lt-sub">现在 <b>{{ d.now }}</b></p>
@@ -148,16 +148,6 @@ a.tile:active{transform:scale(.97)}
   <div class="body">
     {% with live=live_rooms %}{% include "_rooms_block.html" %}{% endwith %}
     <p class="note">玩家在房间群里发「结束约会」、管理员发「强结约会 R号」可以结束并通知大家；这里的「结束」只改状态，不通知。房间用的群在左侧「模式」里管理。</p>
-  </div>
-</details>
-
-<details class="card dcard" id="roles"{% if code %} open{% endif %}>
-  <summary><span class="ico c-pink" aria-hidden="true">{{ icon('users') }}</span>
-    <div class="tx"><b>角色与群</b><span>个人群</span></div>
-    <span class="badge">{{ role_items|length }}</span><i class="chev" aria-hidden="true"></i></summary>
-  <div class="body">
-    <p class="note" style="margin:0 0 16px">玩家在自己的个人群里发「创建新角色 名字」就会出现在这里。每个角色有一个个人群，消息都发到这里。</p>
-    {% with items=role_items %}{% include "_roles_block.html" %}{% endwith %}
   </div>
 </details>
 

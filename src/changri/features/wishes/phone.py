@@ -15,8 +15,8 @@ def register(app, ctx):
             return bad
         from changri.core import godmode, windows
         why = ("NPC 不能挂心愿。" if role["is_npc"] else "" ) or ("现在不是进行中的季度，不能挂心愿。" if season.phase() != "playing" else "") or windows.check("wish") or godmode.check(role["id"], "wish")
-        wall = [{"id": w["id"], "who": w["sign"] or w["poster_name"], "mine": w["poster_id"] == role["id"], "day": f"D{w['day']}", "time": f"{w['start_hm']}-{w['end_hm']}",
-                 "place": w["place"], "content": w["content"], "reward": w["reward"]} for w in wishes.list_open()]
+        wall = [{"id": w["id"], "who": wishes.label(w), "mine": w["poster_id"] == role["id"], "day": f"D{w['day']}", "time": f"{w['start_hm']}-{w['end_hm']}",
+                 "place": w["place"], "content": w["content"], "left": wishes.left_hours(w)} for w in wishes.list_open()]
         return page("wishes.html", role=role, mode="wishes", why=why, wall=wall, places=[p["name"] for p in rpg.places()], max_content=200, rewards=[], room_on=True)
 
     @app.post("/p/me/wishes/post")
@@ -27,11 +27,11 @@ def register(app, ctx):
             return bad
         f = request.form
         t1, t2 = f.get("t1", "").replace(":", ""), f.get("t2", "").replace(":", "")
-        why = _gate(role, "心愿", f.get("content", ""), f.get("place", ""), f.get("reward", ""), f.get("nick", ""))
+        why = _gate(role, "心愿", f.get("content", ""), f.get("place", ""), f.get("nick", ""))
         if why:
             flash(why)
             return redirect(url_for("wishes_page"))
-        ok, info = wishes.post(role["id"], f"{t1}-{t2}", f.get("place", "").strip(), f.get("content", "").strip(), f.get("reward", "").strip(), f.get("nick", "").strip()[:10])
+        ok, info = wishes.post(role["id"], f"{t1}-{t2}", f.get("place", "").strip(), f.get("content", "").strip(), f.get("nick", "").strip())
         if not ok:
             flash(info)
             return redirect(url_for("wishes_page"))
@@ -39,15 +39,14 @@ def register(app, ctx):
             from changri.core import announce
             ann = announce.get_announce()
             if ann:
-                w = wishes.get(int(info))
-                line = f"#{w['id']} D{w['day']} {w['start_hm']}-{w['end_hm']} @{w['place']}：{w['content']}" + (f"｜悬赏：{w['reward']}" if w["reward"] else "") + f"（{w['sign'] or w['poster_name']}）"
+                text = wishes.broadcast_text(wishes.get(int(info)))
                 try:
-                    loopbridge.run(_send_fn()(ann[0], ann[1], "📌 新心愿 " + line))
-                    publicfeed.record("wish", "📌 新心愿 " + line)
+                    loopbridge.run(_send_fn()(ann[0], ann[1], text))
+                    publicfeed.record("wish", text)
                 except Exception:  # noqa: BLE001
                     pass
         from changri.core import letters
-        flash(f"✅ 心愿 #{info} 已挂出，等人来摘。" + letters.paid_note(role["id"], "wish"))
+        flash(wishes.post_ok_text(wishes.get(int(info))) + letters.paid_note(role["id"], "wish"))
         return redirect(url_for("wishes_page"))
 
     @app.post("/p/me/wishes/<int:wid>/withdraw")
@@ -83,7 +82,7 @@ def register(app, ctx):
             await play._push(w["poster_id"], f"🌠 你的心愿 #{wid} 被 {role['name']} 摘走了！")
             await play._invite(w["poster_id"], room, fix=("💌 心愿", "💌 心愿约会"))
             await play._announce_in_room(room_id)
-            return f"✅ 你摘了心愿 #{wid}，{w['poster_name']} 已收到通知。\n{play._slot(room)}\n{play._group_line(room)}\n房间号 R{room_id}"
+            return f"✅ 你摘了心愿 #{wid}，对方已收到通知。\n{play._slot(room)}\n{play._group_line(room)}\n房间号 R{room_id}"
         try:
             flash(loopbridge.run(go()))
         except Exception as e:  # noqa: BLE001

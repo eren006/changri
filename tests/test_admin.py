@@ -275,3 +275,38 @@ class AdminTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BottleRecordTests(AdminTests):
+    def test_bottle_records_show_real_names(self):
+        """漂流瓶记录（照老系统管理手机）：后台能看到真正的抛瓶人、捡瓶人和每一句；功能关着时页面 404。"""
+        import time as _t
+
+        from changri.core import roles as _roles
+        from changri.core.db import set_config as _set
+        self.login()
+        _roles.create_role("甲", "B1", "G1", "M1"); _roles.create_role("乙", "B1", "G2", "M2")
+        a, b = _roles.get_role_by_name("甲")["id"], _roles.get_role_by_name("乙")["id"]
+        with get_conn() as c:
+            bid = c.execute("INSERT INTO drift_bottles(thrower_id, catcher_id, created_ts) VALUES(?,?,?)", (a, b, int(_t.time()))).lastrowid
+            c.execute("INSERT INTO drift_msgs(bottle_id, from_id, content, ts) VALUES(?,?,?,?)", (bid, a, "有人在吗", int(_t.time())))
+            c.execute("INSERT INTO drift_msgs(bottle_id, from_id, content, ts) VALUES(?,?,?,?)", (bid, b, "我在", int(_t.time())))
+        self.assertEqual(self.c.get("/bottles").status_code, 404)
+        _set("ext:bottle", "1")
+        html = self.c.get("/bottles").get_data(as_text=True)
+        for w in ("抛瓶人：<b>甲</b>", "捡瓶人：<b>乙</b>", "有人在吗", "我在"):
+            self.assertIn(w, html)
+        self.assertNotIn("有人在吗", self.c.get("/bottles?q=丙").get_data(as_text=True))
+
+
+class GongzhiEditTests(AdminTests):
+    def test_admin_edits_gongzhi_text(self):
+        from changri.core import roles as _roles, sheets
+        self.login()
+        _roles.create_role("甲", "B1", "G1", "M1")
+        a = _roles.get_role_by_name("甲")["id"]
+        sheets.submit(a, "gongzhi", "原来的公知")
+        tok = token(self.c, "/relations?view=sheets")
+        self.c.post(f"/sheets/gongzhi/{a}/edit", data={"_csrf": tok, "text": "管理员改过的公知"})
+        self.assertEqual(sheets.get(a, "gongzhi")["text"], "管理员改过的公知")
+        self.assertIn("gzEdit", self.c.get("/relations?view=sheets").get_data(as_text=True))

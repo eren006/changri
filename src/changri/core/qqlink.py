@@ -204,7 +204,7 @@ class QQLink:
         except asyncio.TimeoutError:
             self._pending.pop(echo, None)
             raise QQLinkError("QQ 号没有回应") from None
-        if resp.get("status") != "ok" and resp.get("retcode", 0) != 0:
+        if resp.get("status") == "failed" or resp.get("retcode", 0) not in (0, 1):     # OneBot：ok=0、async=1，其余都是失败
             raise QQLinkError(str(resp.get("wording") or resp.get("message") or f"失败（retcode {resp.get('retcode')}）"))
         return resp.get("data")
 
@@ -239,10 +239,17 @@ class QQLink:
     async def group_list(self) -> list[dict]:
         return await self.call("get_group_list") or []
 
+    async def member_rows(self, group_id: str) -> list[dict]:
+        """群里所有成员：[{"qq": QQ 号, "role": owner / admin / member}]（要这个号自己在群里）。
+        要强制刷新：不带 no_cache，SnowLuma 会给缓存的旧名单，刚进群的人看不到。"""
+        rows = await self.call("get_group_member_list", {"group_id": int(group_id), "no_cache": True})
+        if rows is None:
+            raise QQLinkError("没拿到群成员名单")
+        return [{"qq": str(r.get("user_id")), "role": str(r.get("role") or "member")} for r in rows if r.get("user_id")]
+
     async def member_list(self, group_id: str) -> list[str]:
-        """群里所有成员的 QQ 号（要这个号自己在群里）。要强制刷新：不带 no_cache，SnowLuma 会给缓存的旧名单，刚进群的人看不到。"""
-        rows = await self.call("get_group_member_list", {"group_id": int(group_id), "no_cache": True}) or []
-        return [str(r.get("user_id")) for r in rows if r.get("user_id")]
+        """群里所有成员的 QQ 号。"""
+        return [r["qq"] for r in await self.member_rows(group_id)]
 
     async def login_info(self) -> dict:
         return await self.call("get_login_info") or {}

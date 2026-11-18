@@ -196,3 +196,10 @@ async def retry_pending(send: Send) -> int:
         if await deliver(i, send):
             ok += 1
     return ok
+
+
+def admin_delete(msg_id: int) -> bool:
+    """管理员删一条短信/礼物（照老系统管理手机「删除」）：收发双方的小手机里都不再显示；已经发到 QQ 群里的那一条撤不回来。"""
+    with get_conn() as conn:
+        conn.execute("DELETE FROM message_images WHERE msg_id=?", (msg_id,))
+        return conn.execute("DELETE FROM messages WHERE id=?", (msg_id,)).rowcount > 0

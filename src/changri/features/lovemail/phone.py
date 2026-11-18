@@ -14,6 +14,9 @@ def register(app, ctx):
         if bad:
             return bad
         view = request.args.get("view") if request.args.get("view") in ("sent", "write") else "inbox"
+        if view == "inbox" and not ctx.is_admin():
+            from changri.core import phoneunread
+            phoneunread.mark_read(role["id"], "lovemail")
         recv, sent = lovemail.history(role["id"])
         recv = [{**m, "game_day": m["day"]} for m in recv]
         sent = [{**m, "game_day": m["day"], "to": m["to_name"]} for m in sent]

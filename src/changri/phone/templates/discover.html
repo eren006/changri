@@ -9,7 +9,7 @@
       <a class="row" href="{{ url_for('search_page') }}">{{ admin_app_icon('guide') }}<span class="name">搜索与收藏</span><span class="chev" aria-hidden="true">›</span></a>
       <a class="row" href="{{ url_for('char_page') }}">{{ admin_app_icon('rpg') }}<span class="name">RPG</span><span class="chev" aria-hidden="true">›</span></a>
       {% if on.relations %}<a class="row{% if rel_unread %} unread{% endif %}" href="{{ url_for('rel_page') }}">{{ admin_app_icon('rel') }}<span class="name">关系线</span><span class="chev" aria-hidden="true">›</span></a>{% endif %}
-      {% if on.precall %}<a class="row" href="{{ url_for('precall_page') }}">{{ admin_app_icon('precall') }}<span class="name">前置电话</span><span class="chev" aria-hidden="true">›</span></a>{% endif %}
+      {% if on.precall %}<a class="row" href="{{ url_for('precall_page') }}">{{ admin_app_icon('precall') }}<span class="name">前置电话</span>{% if precall_badge %}<span class="unread-count" aria-label="{{ precall_badge }} 条新电话消息" style="min-width:18px;padding:0 5px;border-radius:9px;background:#c62a2f;color:#fff;font-size:11px;text-align:center">{{ precall_badge }}</span>{% endif %}<span class="chev" aria-hidden="true">›</span></a>{% endif %}
       {% if on.chatroom or on.groupchat %}<a class="row" href="{{ url_for('appoint_page') }}">{{ admin_app_icon('appt') }}<span class="name">邀约</span><span class="chev" aria-hidden="true">›</span></a>{% endif %}
       <a class="row" href="{{ url_for('timeline_page') }}">{{ admin_app_icon('appt') }}<span class="name">时间线与统计</span><span class="chev" aria-hidden="true">›</span></a>
       <a class="row" href="{{ url_for('todo_page') }}">{{ admin_app_icon('urge') }}<span class="name">我的待回</span><span class="chev" aria-hidden="true">›</span></a>

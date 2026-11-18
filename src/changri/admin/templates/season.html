@@ -170,7 +170,14 @@
           <div class="actions"><button class="btn" type="submit">设为 NPC</button>{{ cancel() }}</div></form>{% endif %}
       </div></details></span></div>
   {% if npcs %}<div class="rowlist">{% for n in npcs %}
-    <div class="row"><div class="nm"><b>{{ n.name }}</b><div class="muted">{{ '有个人群' if n.groups else '没有个人群' }}</div></div>
+    <div class="row"><div class="nm"><b>{{ n.name }}</b><div class="muted">{{ '有个人群（也可以在群里自己发「修改皮相」这些指令）' if n.groups else '没有个人群' }}</div><div class="muted">{{ n.profile }}</div>
+        <details><summary class="linkbtn">改档案</summary>
+          <form method="post" action="{{ url_for('season_npc_profile', role_id=n.id) }}" class="form" style="margin-top:6px">{{ csrf() }}
+            <textarea name="lines" rows="3" placeholder="和玩家在群里发的一样，一行一条：&#10;修改皮相 某某&#10;修改年龄 30&#10;修改简称 阿某"></textarea>
+            <p class="muted" style="margin:4px 0">能改：修改名字 / 修改性别 / 修改年龄 / 修改皮相 / 修改签名 / 修改简称。后台代改不受冷却限制。</p>
+            <div class="actions"><button class="btn sm" type="submit">保存</button></div>
+          </form>
+        </details></div>
       <div class="acts"><form method="post" action="{{ url_for('season_npc_flag') }}" onsubmit="return confirm('改回普通角色？')">{{ csrf() }}<input type="hidden" name="name" value="{{ n.name }}"><input type="hidden" name="on" value="0"><button class="linkbtn">取消 NPC</button></form></div></div>{% endfor %}</div>
   {% else %}<p class="empty">还没有 NPC。NPC 不参与出场抽签、漂流瓶、群体闹钟，群里管理员也可以发「设为NPC 角色名」「创建NPC 名字」。</p>{% endif %}
 </section>

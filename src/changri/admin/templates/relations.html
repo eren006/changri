@@ -100,7 +100,11 @@
 </details>
 {% endif %}
 
-<dialog class="dlg" id="dlg"><div class="dh"><h3 id="dt"></h3><span class="muted" id="ds"></span><button class="btn sm ghost" type="button" onclick="document.getElementById('dlg').close()">关闭</button></div><div id="db"></div></dialog>
+<dialog class="dlg" id="dlg"><div class="dh"><h3 id="dt"></h3><span class="muted" id="ds"></span><button class="btn sm ghost" type="button" onclick="document.getElementById('dlg').close()">关闭</button></div><div id="db"></div>
+  <form method="post" id="gzEdit" class="form" hidden style="margin-top:10px">{{ csrf() }}
+    <label>改公知文字（图片不动；玩家之后重新提交会覆盖）<textarea name="text" rows="6"></textarea></label>
+    <div class="actions"><button class="btn sm" type="submit">保存</button></div>
+  </form></dialog>
 <script>
 (function(){
 var dlg=document.getElementById('dlg'),dt=document.getElementById('dt'),ds=document.getElementById('ds'),db=document.getElementById('db');
@@ -110,6 +114,9 @@ function open(url,fill){fetch(url,{credentials:'same-origin'}).then(function(r){
 var base={{ (request.script_root ~ '') | tojson }};
 document.querySelectorAll('[data-sheet]').forEach(function(b){b.addEventListener('click',function(){
   open(base+'/sheets/view/'+b.dataset.sheet,function(d){ds.textContent='更新于 '+d.ts;
+    var gz=document.getElementById('gzEdit'),parts=b.dataset.sheet.split('/');
+    gz.hidden=parts[0]!=='gongzhi';
+    if(!gz.hidden){gz.action=base+'/sheets/gongzhi/'+parts[1]+'/edit';gz.querySelector('textarea').value=d.text||'';}
     if(d.text)db.appendChild(el('div','txt',d.text));
     d.images.forEach(function(u){var i=el('img');i.src=u;i.loading='lazy';i.alt='';db.appendChild(i)});})})});
 document.querySelectorAll('[data-rel]').forEach(function(b){b.addEventListener('click',function(){

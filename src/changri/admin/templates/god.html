@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}上帝模式{% endblock %}
+{% block title %}{{ role.name if role else ('全体设置' if everyone else '角色') }}{% endblock %}
 {% block body %}
 {% macro tabs_nav() %}
 <nav class="tabs godtabs" aria-label="分类">
-  {% for k, label, n in [('perm','功能', perms|length), ('bag','背包', 0), ('time','时间', (locks|length)), ('count','次数', 0), ('rel','关系线', rels|length)] %}
+  {% for k, label, n in [('info','概况', 0), ('perm','功能', perms|length), ('bag','背包', 0), ('time','时间', (locks|length)), ('count','次数', 0), ('rel','关系线', rels|length)] %}
   <a href="{{ url_for('god_page', role=role.id, tab=k) }}" {% if tab == k %}aria-current="page"{% endif %}>{{ label }}{% if n %}<span class="n">{{ n }}</span>{% endif %}</a>
   {% endfor %}
 </nav>
@@ -11,13 +11,13 @@
 
 {% if everyone %}
 <p class="back"><a href="{{ url_for('god_page') }}">← 所有角色</a></p>
-<h1>全体</h1>
+<h1>全体设置</h1>
 <p class="lede">对<b>所有人</b>一起生效。比如临时关掉所有人的短信，或者把某个时段对所有人封住。个人的设置在各自的页面里，两边只要有一边关着就用不了。</p>
 <section>
   <div class="sec-head keep"><h2>功能开关</h2></div>
   <p class="note" style="margin-top:0">取消勾选 = 所有人都用不了这个功能。点一下立刻生效。</p>
   <form method="post" action="{{ url_for('god_all_perm') }}" class="swgrid">{{ csrf() }}
-    {% for k, label in god.FEATURES.items() %}
+    {% for k, label in god.shown_features().items() %}
     <label class="check"><span class="sw"><input type="checkbox" name="on" value="{{ k }}" {{ 'checked' if k not in g_off }} onchange="this.form.submit()"><i></i></span>{{ label }}</label>
     {% endfor %}
   </form>
@@ -41,38 +41,111 @@
 </section>
 
 {% elif not role %}
-<h1>上帝模式</h1>
-<p class="lede">管理员对玩家和 NPC 的干预都在这里。点一个人，进去就只看 TA 的设置：功能开关、时间、今天的次数、关系线。</p>
-<div class="godfind"><input type="search" id="find" placeholder="找角色…" autocomplete="off" aria-label="找角色"></div>
-<div class="godgrid" id="grid">
-  <a class="gp all" href="{{ url_for('god_page', role='all') }}" data-n="全体"><span class="av">全</span><span class="nm">全体（所有人）</span>{% if any_global %}<span class="dot bad" title="有全体设置生效中"></span>{% endif %}</a>
-  {% for p in people %}
-  <a class="gp" href="{{ url_for('god_page', role=p.id) }}" data-n="{{ p.name }}"><span class="av">{{ p.name[:1] }}</span><span class="nm">{{ p.name }}</span>
-    {% if p.closed %}<span class="dot bad" title="有功能被关"></span>{% endif %}{% if p.locked %}<span class="dot warn" title="有锁定的时间"></span>{% endif %}</a>
-  {% else %}<p class="empty">还没有角色。</p>{% endfor %}
+<div class="rolehead">
+  <h1>角色</h1>
+  <a class="btn ghost" href="{{ url_for('god_page', role='all') }}">{% if any_global %}<span class="dot bad" title="有对所有人生效的设置"></span>{% endif %}全体设置</a>
 </div>
-<p class="note">这里的操作都不会通知玩家。</p>
+<p class="lede">所有玩家和 NPC 都在这里。点进一个人，看档案和个人群，管功能开关、背包、时间、今天的次数和关系线。这里的操作都不会通知玩家。</p>
+{% if people %}
+<div class="rolebar">
+  <input type="search" id="find" placeholder="搜名字或简称" autocomplete="off" aria-label="搜名字或简称">
+  <span class="muted" id="cnt" aria-live="polite">共 {{ people|length }} 人</span>
+</div>
+<div class="rowlist rolelist" id="grid">
+  {% for p in people %}
+  <a class="row rp" href="{{ url_for('god_page', role=p.id) }}" data-n="{{ p.name }} {{ p.short or '' }}">
+    <span class="av" aria-hidden="true">{{ p.name[:1] }}</span>
+    <div class="nm"><b>{{ p.name }}</b>{% if p.short %} <span class="short">{{ p.short }}</span>{% endif %}{% if p.is_npc %} <span class="kind">NPC</span>{% endif %}
+      <div class="muted">{{ p.gender }} · {{ p.age }} 岁{% if p.gid %} · 个人群 <span class="tabular">{{ p.gid }}</span>{% endif %}</div></div>
+    {% if not p.bound or p.closed or p.locked %}<div class="flags">
+      {% if not p.bound %}<span class="kind warn">等待认群</span>{% endif %}
+      {% if p.closed %}<span class="kind bad">{{ p.closed }} 项功能关了</span>{% endif %}
+      {% if p.locked %}<span class="kind warn">{{ p.locked }} 段时间锁了</span>{% endif %}
+    </div>{% endif %}
+    <svg class="go" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+  </a>
+  {% endfor %}
+</div>
+<p class="empty" id="none" hidden>没有找到。名字和简称都能搜。</p>
 <script>
-document.getElementById('find').addEventListener('input', function () {
-  var q = this.value.trim();
-  document.querySelectorAll('#grid .gp').forEach(function (a) { a.hidden = q && a.dataset.n.indexOf(q) < 0; });
-});
+(function () {
+  var rows = document.querySelectorAll('#grid .rp'), cnt = document.getElementById('cnt'), none = document.getElementById('none');
+  document.getElementById('find').addEventListener('input', function () {
+    var q = this.value.trim().toLowerCase(), shown = 0;
+    rows.forEach(function (a) { var hit = !q || a.dataset.n.toLowerCase().indexOf(q) >= 0; a.hidden = !hit; if (hit) shown++; });
+    cnt.textContent = q ? ('找到 ' + shown + ' 人') : ('共 ' + rows.length + ' 人');
+    none.hidden = shown > 0;
+  });
+})();
 </script>
+{% else %}
+<p class="empty">还没有角色。玩家在自己的个人群里发「创建新角色 名字」，就会出现在这里。</p>
+{% endif %}
 
 {% else %}
 <p class="back"><a href="{{ url_for('god_page') }}">← 所有角色</a></p>
 <div class="godhead">
   <span class="av big">{{ role.name[:1] }}</span>
-  <div><h1>{{ role.name }}</h1>
-    <p class="muted">{% if perms %}{{ perms|length }} 项功能被关　{% endif %}{% if locks %}{{ locks|length }} 段时间被锁　{% endif %}{% if not perms and not locks %}没有被干预{% endif %}</p></div>
+  <div><h1>{{ role.name }}{% if profile.short %} <span class="short">{{ profile.short }}</span>{% endif %}{% if role.is_npc %} <span class="kind">NPC</span>{% endif %}</h1>
+    <p class="muted">{{ profile.gender }} · {{ profile.age }} 岁 · 皮相 {{ profile.look or '未填' }}{% if perms %}　·　<span class="warnt">{{ perms|length }} 项功能关了</span>{% endif %}{% if locks %}　·　<span class="warnt">{{ locks|length }} 段时间锁了</span>{% endif %}</p></div>
   <form method="get" class="swap"><input type="hidden" name="tab" value="{{ tab }}"><select name="role" onchange="this.form.submit()" aria-label="换一个人">{% for p in people %}<option value="{{ p.id }}" {{ 'selected' if p.id == role.id }}>{{ p.name }}</option>{% endfor %}</select></form>
 </div>
 {{ tabs_nav() }}
 
-{% if tab == 'perm' %}
-<p class="note" style="margin-top:0">关着的功能，这个人就用不了。约会、电话、微信关了，既不能发起，也不能被别人邀请。点一下立刻生效。标着「全体已关」的，是在「全体」里对所有人关掉了：个人这里开着也用不了，要先在「全体」里打开。</p>
+{% if tab == 'info' %}
+{% if bind_code %}
+<section class="callout">
+  <h3 style="margin:0 0 4px">「{{ role.name }}」的认群码</h3>
+  <div class="code">{{ bind_code }}</div>
+  <p class="note">24 小时内有效，只能用一次。把机器人拉进那个群，在群里发：认群 {{ bind_code }}</p>
+</section>
+{% endif %}
+<section>
+  <div class="sec-head keep"><h2>档案</h2></div>
+  <dl class="facts">
+    <div><dt>性别</dt><dd>{{ profile.gender }}</dd></div>
+    <div><dt>年龄</dt><dd class="tabular">{{ profile.age }}</dd></div>
+    <div><dt>皮相</dt><dd>{{ profile.look or '未填' }}</dd></div>
+    <div><dt>简称</dt><dd>{{ profile.short or '没有' }}</dd></div>
+    <div class="wide"><dt>签名</dt><dd>{{ profile.bio or '没写' }}</dd></div>
+  </dl>
+  <details class="panel"><summary class="btn sm ghost">替 TA 改档案</summary>
+    <form class="form" method="post" action="{{ url_for('god_profile', role_id=role.id) }}">{{ csrf() }}<input type="hidden" name="tab" value="info">
+      <div class="fields"><div class="wide"><label for="pf">一行改一项，写法和群里一样</label>
+        <textarea id="pf" name="lines" rows="3" placeholder="性别 男&#10;年龄 20&#10;简称 阿明" required></textarea></div></div>
+      <p class="note">能改：名字、性别、年龄、皮相、签名、简称。管理员改不受冷却限制，也不会通知玩家。</p>
+      <div class="actions"><button class="btn" type="submit">保存</button><button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
+    </form></details>
+</section>
+<section>
+  <div class="sec-head keep"><h2>个人群</h2>
+    <span class="btns"><details class="panel"><summary class="btn ghost">换绑群号</summary>
+      <form class="form" method="post" action="{{ url_for('add_slot', role_id=role.id) }}">{{ csrf() }}
+        <div class="fields"><div><label for="gid">新的群号</label><input id="gid" type="text" name="real_gid" required pattern="\d{5,12}" inputmode="numeric"></div></div>
+        <p class="note">生成一个认群码，玩家在新群里发「认群 码」就换过去了。</p>
+        <div class="actions"><button class="btn" type="submit">生成认群码</button><button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
+      </form></details></span></div>
+  <div class="rowlist">{% for g in my_groups %}
+    <div class="row"><div class="nm">{% if g.real_gid %}<b class="tabular">{{ g.real_gid }}</b>{% else %}<b>个人群</b>{% endif %}
+      <div class="muted">{% if not g.real_gid %}没登记群号，不影响收发{% if g.bot_id %} · {% endif %}{% endif %}{% if g.bot_id %}机器人 <span class="tabular">{{ g.bot_id }}</span>{% endif %}</div></div>
+      <div>{% if g.group_openid %}<span class="dot ok"></span>已认群{% else %}<span class="dot warn"></span>等待认群{% endif %}</div></div>
+  {% else %}<p class="empty">没有个人群。</p>{% endfor %}</div>
+</section>
+<section>
+  <div class="sec-head keep"><h2>账号</h2></div>
+  <div class="rowlist">
+    <div class="row"><div class="nm"><b>绑定的 QQ 号</b><div class="muted">{% if qqs %}<span class="tabular">{{ qqs|join('、') }}</span>{% else %}还没绑。玩家在个人群里发「绑定QQ」就行。{% endif %}</div></div></div>
+    {% if phone_on %}
+    <div class="row"><div class="nm"><b>小手机激活码</b><div class="muted">{% if phone_code %}<span class="tabular">{{ phone_code }}</span>{% else %}还没有。玩家在个人群里发「手机码」就会生成。{% endif %}</div></div>
+      {% if phone_code %}<form method="post" action="{{ url_for('phone_reset', role_id=role.id) }}" onsubmit="return confirm('重置 {{ role.name }} 的激活码？旧码立刻失效，玩家要重新登录。')">{{ csrf() }}<input type="hidden" name="next" value="{{ url_for('god_page', role=role.id) }}"><button class="linkbtn">重置</button></form>{% endif %}</div>
+    {% endif %}
+  </div>
+</section>
+
+{% elif tab == 'perm' %}
+<p class="note" style="margin-top:0">关着的功能，这个人就用不了。约会、电话、多人群聊关了，既不能发起，也不能被别人邀请。点一下立刻生效。标着「全体已关」的，是在「全体」里对所有人关掉了：个人这里开着也用不了，要先在「全体」里打开。</p>
 <form method="post" action="{{ url_for('god_perm', role_id=role.id) }}" class="swgrid">{{ csrf() }}<input type="hidden" name="tab" value="perm">
-  {% for k, label in god.FEATURES.items() %}
+  {% for k, label in god.shown_features().items() %}
   <label class="check"><span class="sw"><input type="checkbox" name="on" value="{{ k }}" {{ 'checked' if k not in perms }} onchange="this.form.submit()"><i></i></span>{{ label }}{% if god.global_off(k) %}<span class="tag" title="全体关着时，这里开着也用不了">全体已关</span>{% endif %}</label>
   {% endfor %}
 </form>
@@ -167,13 +240,28 @@ document.getElementById('find').addEventListener('input', function () {
 {% endif %}
 
 <style>
-.ui .godfind{margin:0 0 18px;max-width:360px}
-.ui .godgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:12px;margin:0 0 20px}
-.ui .gp{display:flex;align-items:center;gap:12px;padding:12px 14px;min-height:44px;border:1px solid var(--card-line);background:var(--surface);border-radius:var(--r-card);box-shadow:var(--shadow-sm);text-decoration:none;color:var(--ink)}
-.ui .gp.all{border-color:var(--dusk)}
-.ui .gp:hover{border-color:var(--dusk)}
-.ui .gp[hidden]{display:none}
-.ui .gp .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.ui .rolehead{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.ui .rolehead h1{margin:0}
+.ui .rolehead+.lede{margin-top:12px;margin-bottom:28px}
+.ui .rolebar{display:flex;align-items:center;gap:16px;margin:0 0 4px}
+.ui .rolebar #cnt{white-space:nowrap}
+.ui .rolebar input{max-width:320px}
+.ui .rolelist>.row.rp{align-items:center;padding:14px 4px;text-decoration:none;color:var(--ink);border-radius:var(--r-ctl)}
+.ui .rolelist>.row.rp:hover{background:var(--soft)}
+.ui .rolelist>.row.rp:focus-visible{outline:2px solid var(--dusk);outline-offset:2px}
+.ui .rolelist>.row.rp[hidden]{display:none}
+.ui .rp .flags{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.ui .rp .go{flex:none;width:18px;height:18px;fill:none;stroke:var(--mute);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ui .short{font:400 14px var(--sans);color:var(--mute)}
+.ui .godhead .short{font-size:16px}
+.ui .godhead .kind{vertical-align:6px}
+.ui .warnt{color:var(--warn)}
+.ui .facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px 28px;margin:0 0 18px;max-width:720px}
+.ui .facts .wide{grid-column:1/-1}
+.ui .facts dt{font-size:13px;color:var(--mute);margin:0 0 3px}
+.ui .facts dd{margin:0;font-size:16px;overflow-wrap:anywhere}
+.ui textarea{width:100%;box-sizing:border-box;font:inherit}
+.ui .rp .go{margin-left:4px}
 .ui .av{flex:none;width:34px;height:34px;border-radius:50%;background:var(--soft);display:grid;place-items:center;font:700 15px var(--serif,Georgia,serif);color:var(--dusk)}
 .ui .av.big{width:56px;height:56px;font-size:24px}
 .ui .back{margin:0 0 14px;font-size:14px}
@@ -185,7 +273,7 @@ document.getElementById('find').addEventListener('input', function () {
 .ui .godtabs a{padding:10px 18px;min-height:44px;box-sizing:border-box;text-decoration:none;color:var(--ink);border-bottom:2px solid transparent;margin-bottom:-1px}
 .ui .godtabs a[aria-current="page"]{color:var(--dusk);border-bottom-color:var(--dusk);font-weight:600}
 .ui .godtabs a .n{margin-left:6px;font-size:12px;color:var(--mute)}
-.ui .swgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:2px 18px;max-width:640px}
+.ui .swgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:2px 18px;max-width:640px}
 .ui .swgrid .check{min-height:48px}
 .ui .stat button{margin-top:6px}
 .ui .mini{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
@@ -194,5 +282,16 @@ document.getElementById('find').addEventListener('input', function () {
 .ui .addrow{margin:12px 0 0}
 .ui form.stat{display:block}
 .ui section.erase{margin-top:40px;padding-top:16px;border-top:1px solid var(--line)}
+/* 列数固定、列宽可缩：auto-fill 的网格在算最小宽度时会按最多列数算，把手机上的整页撑宽 */
+@media (max-width:720px){
+  .ui .swgrid,.ui .facts{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ui .rolebar input{max-width:none}
+  .ui .rolelist>.row.rp{display:grid;grid-template-columns:34px minmax(0,1fr) 18px;gap:4px 12px;align-items:center}
+  .ui .rolelist>.row.rp .nm{flex:none}
+  .ui .rp .flags{grid-column:2;grid-row:2;justify-content:flex-start}
+  .ui .rp .go{grid-column:3;grid-row:1}
+  .ui .godhead .swap{margin-left:0;flex:1 1 100%}
+  .ui .godtabs a{padding:10px 12px}
+}
 </style>
 {% endblock %}

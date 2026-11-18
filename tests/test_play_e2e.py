@@ -30,7 +30,6 @@ except ValueError:
     extensions.load_all()
 
 nonebot.load_plugin("changri.plugins.wishes")
-nonebot.load_plugin("changri.plugins.precall")          # 心愿默认关，不在 load_all 里；测试里直接加载
 from nonebot.message import handle_event  # noqa: E402
 from changri.core import qq_compat  # noqa: E402
 
@@ -52,7 +51,7 @@ class FakeBot(QBot):
         SENT.append(f"[{group_openid}] {message}")
 
 
-TABLES = ("person_qq", "room_lines", "precall_calls", "precall_picks", "precall_entries", "precall_groups", "votes", "join_requests", "replies", "posts", "wishes", "room_members", "rooms", "pool_groups", "seasons", "entrance", "role_groups", "roles", "admins", "admin_codes", "config", "blocks")
+TABLES = ("person_qq", "room_lines", "votes", "join_requests", "replies", "posts", "wishes", "room_members", "rooms", "pool_groups", "seasons", "entrance", "role_groups", "roles", "admins", "admin_codes", "config", "blocks")
 
 
 @links_up
@@ -221,7 +220,7 @@ class PlayE2E(unittest.TestCase):
 
         async def fake(app_id, gid):
             return members[gid]
-        old, qqmanager.group_members = qqmanager.group_members, fake
+        old, qqmanager.group_others = qqmanager.group_others, fake
         try:
             out = self.say("约会 1400-1500 咖啡厅 乙")
             self.assertFalse(any("请申请入群" in o and "100001" in o for o in out), out)     # 有人的群不能分给房间
@@ -235,7 +234,91 @@ class PlayE2E(unittest.TestCase):
             out = self.say("约会 1400-1500 咖啡厅 乙")
             self.assertTrue(any("请申请入群" in o and "100001" in o for o in out), out)
         finally:
-            qqmanager.group_members = old
+            qqmanager.group_others = old
+
+    def test_web_rooms_not_given_qq_group(self):
+        """微信房间、聊天室模式下的房间只用小手机网页聊天室：定时补群不给它们分 QQ 群；聊天室关掉后，没结束的聊天室房间才补群。"""
+        from changri.core import extensions
+        from changri.core.db import use_bot
+        from changri.plugins import play
+        self.add_pool(2)
+        a, b = (roles.get_role_by_name(n)["id"] for n in ("甲", "乙"))
+        wx = rooms.create("微信", a, [b], "", "")[2]
+        extensions.set_enabled("phone", True)
+        extensions.set_enabled("chatroom", True)
+        try:
+            web = rooms.create("电话", a, [b], "1400-1500")[2]
+            self.assertIsNone(rooms.get(web)["pool_id"])
+            with use_bot("B1"):
+                asyncio.run(play._tick_assign())
+            self.assertIsNone(rooms.get(wx)["pool_id"])                     # 微信不补
+            self.assertIsNone(rooms.get(web)["pool_id"])                    # 聊天室开着不补
+            extensions.set_enabled("chatroom", False)
+            with use_bot("B1"):
+                asyncio.run(play._tick_assign())
+            self.assertIsNone(rooms.get(wx)["pool_id"])                     # 微信还是不补
+            self.assertIsNotNone(rooms.get(web)["pool_id"])                 # 聊天室关了：补到 QQ 群
+        finally:
+            extensions.set_enabled("chatroom", False)
+            extensions.set_enabled("phone", False)
+
+    def test_waiting_room_kept_when_group_dirty(self):
+        """排队等群的房间：补到的群里还有别的玩家、又没有别的空群，房间要留着接着排队，不能被悄悄删掉；人退光后下一轮补上。"""
+        from changri.core import qqmanager, qqpool
+        from changri.core.db import use_bot
+        from changri.plugins import play
+        qqpool.add_rooms("B1", "100001", "A组")
+        members = {"100001": set()}
+
+        async def fake(app_id, gid):
+            return members[gid]
+        old, qqmanager.group_others = qqmanager.group_others, fake
+        try:
+            out = self.say("约会 1400-1500 咖啡厅 乙")
+            self.assertTrue(any("请申请入群" in o for o in out), out)
+            rid = get_conn().execute("SELECT id FROM rooms").fetchone()["id"]
+            g = [x for x in pool.all_groups() if x["real_gid"] == "100001"][0]
+            with get_conn() as c:                                           # 退回排队：房间没群，群空出来
+                c.execute("UPDATE rooms SET pool_id=NULL WHERE id=?", (rid,))
+            pool.release(g["id"], "free")
+            roles.bind_qq(roles.get_role_by_name("丙")["id"], "5550009")
+            members["100001"] = {"5550009"}                                  # 丙（不在这场）还留在群里
+            with use_bot("B1"):
+                asyncio.run(play._tick_assign())
+            room = rooms.get(rid)
+            self.assertIsNotNone(room)                                       # 房间还在
+            self.assertIsNone(room["pool_id"])                               # 还在排队
+            self.assertEqual(pool.get(g["id"])["state"], "cleaning")
+            members["100001"] = set()                                        # 人退光了
+            with use_bot("B1"):
+                asyncio.run(play._sweep_cleaning())
+                asyncio.run(play._tick_assign())
+            self.assertEqual(rooms.get(rid)["pool_id"], g["id"])
+        finally:
+            qqmanager.group_others = old
+
+    def test_unbound_stranger_and_many_dirty_groups(self):
+        """群里留着的人没绑过 QQ 也算人：不分给新房间、不自动放回池；连着很多个群都有人，也要一个个查到干净的那个。"""
+        from changri.core import qqmanager, qqpool
+        from changri.plugins import play
+        for i in range(12):
+            qqpool.add_rooms("B1", f"2000{i:02d}", "A组")
+        checked = []
+
+        async def fake(app_id, gid):                                        # 前 9 个群都有没绑过 QQ 的陌生人，第 10 个是干净的
+            checked.append(gid)
+            return set() if len(checked) >= 10 and gid == checked[9] else {"8880000"}
+        old, qqmanager.group_others = qqmanager.group_others, fake
+        try:
+            out = self.say("约会 1400-1500 咖啡厅 乙")
+            self.assertEqual(len(checked), 10)                               # 以前最多查 8 次，第 9 个群没查就分出去了
+            self.assertTrue(any("请申请入群" in o and checked[9] in o for o in out), out)
+            st = {g["real_gid"]: g["state"] for g in pool.all_groups()}
+            self.assertEqual(sorted(k for k, v in st.items() if v == "cleaning"), sorted(checked[:9]))
+            asyncio.run(play._sweep_cleaning())                              # 陌生人还在：不放回
+            self.assertEqual(sum(1 for g in pool.all_groups() if g["state"] == "cleaning"), 9)
+        finally:
+            qqmanager.group_others = old
 
     def test_listener_room_commands_in_qq_group(self):
         """房间群没有卡拉：监听的 QQ 号听到「结束约会」「修改时间线」等，按绑定的 QQ 认人，由 QQ 号在群里回。"""
@@ -276,6 +359,52 @@ class PlayE2E(unittest.TestCase):
         self.add_pool(1)                                         # 补了群之后就能开
         self.assertTrue(any("电话已发起" in o for o in self.say("电话 1400-1500 乙")))
 
+    def test_pool_exhausted_tells_backstage(self):
+        """没有空群：玩家收到没开成；后台群收到「群池用完了」（最多 30 分钟一条，次数攒着）；没设后台群不发。"""
+        from changri.core import announce
+        from changri.core.db import use_bot
+        from changri.plugins import play
+        tick = lambda: asyncio.run(play._tick_pool_alert())                 # noqa: E731
+        self.say("电话 1400-1500 乙")
+        with use_bot("B1"):
+            before = len(SENT)
+            tick()
+            self.assertEqual(SENT[before:], [])                              # 没设后台群：不发
+            announce.set_backstage("B1", "BACK")
+            self.say("约会 1600-1700 咖啡厅 乙")
+            before = len(SENT)
+            tick()
+            out = SENT[before:]
+            self.assertEqual(len(out), 1, out)
+            self.assertTrue(out[0].startswith("[BACK]") and "备用群池用完了" in out[0] and "2 次" in out[0] and "约会" in out[0], out)
+            self.say("电话 1800-1900 乙")
+            before = len(SENT)
+            tick()
+            self.assertEqual(SENT[before:], [])                              # 30 分钟内不重复
+            set_config("pool_exhausted_told_ts", "0")
+            tick()
+            self.assertTrue(any("1 次" in o for o in SENT[before:]), SENT[before:])
+
+    def test_official_invite_says_speak_to_arrive(self):
+        """官方机器人的群：邀请里写「进群后随便说一句，才算到场」；小号的群不写。"""
+        from changri.core import qqmanager, qqpool
+        self.add_pool(1)
+        out = self.say("约会 1400-1500 咖啡厅 乙")
+        self.assertTrue(any("进群后随便说一句，才算到场" in o for o in out), out)
+        with get_conn() as c:
+            c.execute("DELETE FROM pool_groups")
+        qqpool.add_rooms("B1", "100001", "A组")
+
+        async def fake(app_id, gid):
+            return set()
+        old, qqmanager.group_others = qqmanager.group_others, fake
+        try:
+            out = self.say("约会 1600-1700 咖啡厅 乙")
+        finally:
+            qqmanager.group_others = old
+        self.assertTrue(any("请申请入群" in o and "100001" in o for o in out), out)
+        self.assertFalse(any("才算到场" in o for o in out), out)
+
     def test_phone_cap_and_daily_limit(self):
         self.add_pool(4)
         set_config("phone_open_cap", "1")
@@ -288,7 +417,7 @@ class PlayE2E(unittest.TestCase):
     def test_stakeout_solo_room(self):
         self.add_pool(1)
         self.assertIn("没有开放", self.say("踩点 1400-1500 大图书馆")[0])          # 默认关
-        set_config("stakeout_enabled", "1")
+        set_config("ext:stakeout", "1")
         self.assertIn("用法", self.say("踩点 1400-1500")[0])
         out = self.say("踩点 1400-1500 大图书馆")
         self.assertTrue(any("踩点已发起" in o and "只有你一个人" in o and "1234560" in o for o in out))
@@ -303,8 +432,12 @@ class PlayE2E(unittest.TestCase):
         self.assertTrue(any("已经结束" in o for o in out))
         set_config("limit_踩点", "1")
         self.assertIn("次数用完", self.say("踩点 1800-1900 花园")[0])
-        set_config("stakeout_enabled", "0")
+        set_config("ext:stakeout", "0")
         self.assertIn("没有开放", rooms.create("踩点", b, [], "1600-1700", "花园")[1])
+        with get_conn() as c:
+            c.execute("DELETE FROM config WHERE key='ext:stakeout'")
+        set_config("stakeout_enabled", "1")                                           # 老设置里开过：升级后保持开启
+        self.assertTrue(rooms.stakeout_enabled())
 
     def test_wechat_no_timeline(self):
         a, b, c = (roles.get_role_by_name(n)["id"] for n in ("甲", "乙", "丙"))
@@ -350,27 +483,6 @@ class PlayE2E(unittest.TestCase):
         blocks.block(b, a, False)
         self.assertFalse(rooms.create("微信", a, [b], "", "")[0])
 
-    def test_precall_commands(self):
-        from changri.core import precall
-        self.add_pool(1)
-        set_config("ext:precall", "1")
-        try:
-            self.assertIn("编号是 #1", self.say("提交前置电话 喜欢下雨天")[0])
-            self.say("提交前置电话 夜猫子", member="M1", group="P1")
-            self.assertIn("还没有开放", self.say("查看前置电话")[0])                     # 都没分组
-            self.assertIn("已把 2 条归到「A组」", self.say("前置电话分组 A组 1 2", member="ADMIN", group="ADM")[0])
-            self.say("可选 A组", member="ADMIN", group="ADM")
-            out = self.say("查看前置电话")[0]
-            self.assertIn("#2", out)
-            self.assertIn("夜猫子", out)
-            self.assertIn("不能拨给自己", self.say("拨打前置电话 1")[0])
-            out = self.say("拨打 2")
-            self.assertTrue(any("已拨打 #2" in o for o in out), out)
-            self.assertEqual(rooms.my_open(roles.get_role_by_name("乙")["id"])[0]["kind"], "前置电话")
-            self.assertIn("已经通过话", self.say("拨打前置电话 2")[0])
-        finally:
-            set_config("ext:precall", "0")
-
     def test_official_and_cancel(self):
         self.add_pool(1)
         self.assertIn("权限不足", self.say("发起官约 1400-1500 后山 乙/丙")[0])
@@ -381,6 +493,25 @@ class PlayE2E(unittest.TestCase):
         self.assertIn("已取消", self.say(f"取消官约 R{rid}", member="ADMIN", group="ADM")[-1])
         self.assertEqual(rooms.get(rid)["status"], "cancelled")
         self.assertIn("时间线还是空的", self.say("时间线", member="M1", group="P1")[0])
+
+    def test_official_conflict_names_the_person(self):
+        """官约撞时间：提示写出是谁撞了。名单第一个人在库里是发起人，以前会写成「你」，管理员以为是自己。"""
+        self.add_pool(2)
+        self.assertTrue(any("约会已发起" in o for o in self.say("约会 1400-1500 咖啡厅 丙", member="M1", group="P1")))
+        out = self.say("发起官约 1400-1500 后山 乙/甲", member="ADMIN", group="ADM")[0]
+        self.assertIn("「乙」在 D1 14:00-15:00 已经有安排", out)
+        self.assertNotIn("你在", out)
+        self.assertIn("你在 D1 14:00-15:00", self.say("约会 1430-1530 花园 甲", member="M1", group="P1")[0])   # 玩家自己发起的还是「你」
+
+    def test_room_with_day_prefix_explains(self):
+        """玩家约会只能约当天：写了 D2 要直接说清楚，不能报成「找不到角色：咖啡厅 乙」。"""
+        self.add_pool(1)
+        for cmd in ("约会 D2 1400-1500 咖啡厅 乙", "电话 d2 1400-1500 乙"):
+            out = self.say(cmd)[0]
+            self.assertIn("只能约当天", out)
+            self.assertIn("修改时间线 R房间号 D2", out)
+            self.assertNotIn("找不到角色", out)
+        self.assertEqual(rooms.timeline(roles.get_role_by_name("甲")["id"]), [])
 
     def test_official_without_place_and_with_day(self):
         self.add_pool(4)
@@ -462,9 +593,9 @@ class PlayE2E(unittest.TestCase):
         self.assertTrue(any(o.startswith("[BACK]") and "在等人退群" in o for o in out), out)
 
     def test_create_role_receipt(self):
-        """建角色的回执：列出接下来能填/能改的东西，并说明名字写错要找管理员删。"""
+        """建角色的回执：列出接下来能填/能改的东西，名字写错可以自己「修改名字」。"""
         out = self.say("创建新角色 丁", member="M9", group="P9")[0]
-        for word in ("创建好了", "提交公知", "提交二表", "换绑码", "我的", "找管理员"):
+        for word in ("创建好了", "提交公知", "提交二表", "换绑码", "我的", "修改名字"):
             self.assertIn(word, out)
         self.assertNotIn("提交公知", self.say("创建新角色 戊", member="M9", group="P9")[0])   # 失败时只回原因
 
@@ -851,6 +982,7 @@ class PlayE2E(unittest.TestCase):
         self.add_pool(1)
         self.say("约会 1400-1500 咖啡厅 乙")
         out = self.say("我的数量")[0]
+        self.assertIn("🌐 全员今天：", out)
         self.assertIn("约会 1/3", out); self.assertIn("电话 0（不限）", out)
 
     def test_forum_delete(self):
@@ -869,19 +1001,32 @@ class PlayE2E(unittest.TestCase):
     def test_wishes(self):
         self.add_pool(1)
         self.assertIn("用法", self.say("挂心愿 1400-1500 花园")[0])
-        self.assertIn("已挂出", self.say("挂心愿 1400-1500 花园 一起散步")[0])
+        out = self.say("挂心愿 1400-1500 花园 一起散步 | 神秘人A")[0]
+        self.assertIn("心愿已漂走", out); self.assertIn("有效期：24小时", out); self.assertIn("显示昵称：神秘人A", out)
         w1 = wishes.list_open()[0]["id"]
-        self.assertIn("花园", self.say("看心愿", member="M1", group="P1")[0])
+        wall = self.say("看心愿", member="M1", group="P1")[0]
+        self.assertIn("花园", wall); self.assertIn("神秘人A", wall); self.assertIn("剩24h", wall)
+        self.assertNotIn("甲", wall)                                                      # 对外不显示真名
         self.assertIn("不能摘自己", self.say(f"摘心愿 {w1}")[0])
         out = self.say(f"摘心愿 {w1}", member="M1", group="P1")
-        self.assertTrue(any("摘了心愿" in o for o in out) and any("[P0]" in o and "被 乙 摘走" in o for o in out))
-        self.assertIn("没有开放", self.say("看心愿")[0])
-        self.assertIn("已经被摘走", self.say(f"摘心愿 {w1}", member="M2", group="P2")[0])
+        self.assertTrue(any("摘了心愿" in o and "甲" not in o for o in out) and any("[P0]" in o and "被 乙 摘走" in o for o in out))
+        self.assertIn("没有漂浮的心愿", self.say("看心愿")[0])
+        self.assertIn("已过期", self.say(f"摘心愿 {w1}", member="M2", group="P2")[0])
         self.assertIn("14:00-15:00 心愿", self.say("时间线")[0])
-        self.say("悬赏心愿 1600-1700 图书馆 陪我看书 | 滋补汤 1")
-        self.assertIn("悬赏：滋补汤 1", self.say("看心愿")[0])
+        self.say("挂心愿 1600-1700 图书馆 陪我看书")
+        self.assertIn("👩", self.say("看心愿")[0])                                          # 没写昵称：只显示性别
+        self.assertIn("你发布的心愿", self.say("撤心愿")[0])                                 # 不带编号：列出自己的
         self.assertIn("已撤回", self.say(f"撤心愿 {wishes.list_open()[0]['id']}")[0])
-        self.assertIn("用法", self.say("悬赏心愿 1600-1700 图书馆 陪我看书")[0])
+        self.assertIn("昵称最多 10 个字", self.say("挂心愿 1600-1700 图书馆 看书 | 一二三四五六七八九十一")[0])
+
+    def test_wish_expire_and_cap(self):
+        for t in ("0800-0900", "0900-1000", "1000-1100"):
+            self.say(f"挂心愿 {t} 花园 散步")
+        self.assertIn("最多同时挂 3 个", self.say("挂心愿 1100-1200 花园 散步")[0])
+        with get_conn() as c:
+            c.execute("UPDATE wishes SET created_ts=created_ts-24*3600-1")                       # 24 小时过去
+        self.assertIn("没有漂浮的心愿", self.say("看心愿")[0])
+        self.assertIn("心愿已漂走", self.say("挂心愿 0800-0900 花园 散步")[0])                # 过期的不占时间、不占名额
 
     def test_wish_limits(self):
         set_config("limit_挂心愿", "1")
@@ -911,6 +1056,7 @@ class PlayE2E(unittest.TestCase):
         self.say("拉线 乙 小时候是邻居", member="M0", group="P0")
         out = self.say("我的待回", member="M1", group="P1")[0]
         self.assertIn("关系线", out)
+        self.assertIn("已经等了", out)                                                  # 写清等了多久
         self.assertIn("没有要回", self.say("我的待回", member="M2", group="P2")[0])
 
 

@@ -22,7 +22,13 @@ def listing() -> list[dict]:
     with get_conn() as c:
         rows = c.execute("SELECT r.id, r.name, (SELECT COUNT(*) FROM role_groups g WHERE g.role_id=r.id) AS groups "
                          "FROM roles r WHERE r.is_npc=1 ORDER BY r.id").fetchall()
-    return [dict(r) for r in rows]
+    from . import charprofile
+    out = []
+    for r in rows:
+        d = dict(r)
+        d["profile"] = "　".join(charprofile.summary_lines(r))
+        out.append(d)
+    return out
 
 
 def set_flag(name: str, on: bool) -> tuple[bool, str]:

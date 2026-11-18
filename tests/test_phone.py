@@ -20,7 +20,7 @@ class Phone(unittest.TestCase):
     def setUp(self):
         init_db()
         with get_conn() as c:
-            for t in ("phone_codes", "phone_seen", "messages", "roles", "role_groups", "config"):
+            for t in ("phone_codes", "phone_seen", "messages", "roles", "role_groups", "config", "gift_unlocks", "gift_shop_visits", "gift_shop"):
                 c.execute(f"DELETE FROM {t}")
         set_config("phone_enabled", "1")                          # 默认是关的，要走过初始化才开；这里直接开
         roles.create_role("甲", "B1", "P0", "M0")
@@ -151,7 +151,12 @@ class Phone(unittest.TestCase):
     def test_shop_and_new(self):
         set_config("gift_catalog", "白玫瑰、手写信")
         self._login(self.a)
-        self.assertIn("白玫瑰", self.c.get("/p/me/shop").get_data(as_text=True))
+        self.assertIn("0/2", self.c.get("/p/me/shop").get_data(as_text=True))           # 还没逛：图鉴是空的
+        set_config("gift_shop_bonus_pct", "100")
+        r = self.c.post("/p/me/shop/visit", data={"_csrf": self.csrf("/p/me/shop")}, follow_redirects=True).get_data(as_text=True)
+        self.assertIn("两件都收入图鉴", r)                                               # 逛一逛：收进图鉴
+        self.assertIn("白玫瑰", r)
+        self.assertIn("白玫瑰", self.c.get(f"/p/me/{self.b['id']}").get_data(as_text=True))   # 送礼面板只列图鉴里的
         html = self.c.get("/p/me/new?gift=白玫瑰").get_data(as_text=True)
         self.assertIn("乙", html)
         self.assertIn("gift=", html)
@@ -208,6 +213,14 @@ class TimelineTodoPages(Phone):
         self.assertIn("花园", tl)
         self.assertIn("乙", tl)
         self.assertIn("R901", self.c.get("/p/me/todo").get_data(as_text=True))
+        from changri.core import overview as ov
+        key = ov.todo_entries(self.a)[0][0]
+        tok = self.csrf("/p/me/todo")
+        html = self.c.post("/p/me/todo/dismiss", data={"_csrf": tok, "key": key}, follow_redirects=True).get_data(as_text=True)
+        self.assertIn("已暂不提醒（1）", html)                                           # 收进折叠里，不算已回复
+        self.assertIn("R901", overview.todo_items(self.a)[0])                           # 群里「我的待回」照旧
+        html = self.c.post("/p/me/todo/dismiss", data={"_csrf": tok, "key": key, "action": "restore"}, follow_redirects=True).get_data(as_text=True)
+        self.assertNotIn("已暂不提醒", html)
 
 
 class PhoneExtras(Phone):
@@ -648,112 +661,80 @@ class PhoneSearchSongs(Phone):
 
 
 class PhonePrecall(Phone):
+    """前置电话（照老系统小手机的滑卡玩法）：填资料 → 翻卡选人 → 接通后在小手机里聊。"""
+
     def _wipe(self):
         with get_conn() as c:
-            for t in ("precall_calls", "precall_picks", "precall_entries", "precall_groups", "room_members", "rooms", "pool_groups"):
+            for t in ("precall_msgs", "precall_sessions", "precall_likes", "precall_profiles"):
                 c.execute(f"DELETE FROM {t}")
-        from changri.core import pool                      # 备用群池没有空群时前置电话也接不通（不排队），先放几个群
-        for i in range(3):
-            pool.register("B1", f"POOLP{i}", real_gid=f"98000{i}", set_name="A组")
-            pool.set_in_pool(pool.is_pool_group("B1", f"POOLP{i}")["id"], True)
+            c.execute("DELETE FROM config WHERE key IN ('precall_max_picks','precall_mutual','precall_group_mode','precall_anonymous','precall_msg_limit','precall_round')")
 
-    def test_precall_flow(self):
-        from changri.core import precall, rooms
-        roles.create_role("丙", "B1", "P2", "M2")
-        c_ = roles.get_role_by_name("丙")
+    def test_rules(self):
+        from changri.core import precall
         self._wipe()
-        a, b, cc = self.a["id"], self.b["id"], c_["id"]
-        set_config("ext:precall", "0")
-        self.assertFalse(precall.submit(a, "你好")[0])                           # 关着不能交
-        set_config("ext:precall", "1")
-        try:
-            for k_ in ("precall_dial_limit", "precall_total_limit", "precall_mutual"):
-                set_config(k_, "")
-            n1 = precall.submit(a, "喜欢下雨天")[2]
-            n2 = precall.submit(b, "夜猫子")[2]
-            n3 = precall.submit(cc, "不爱说话")[2]
-            self.assertEqual((precall.submit(a, "改一下")[2]), n1)                # 改内容不改编号
-            self.assertEqual(len({n1, n2, n3}), 3)
-            self.assertEqual(precall.visible(), [])                               # 都未分组：看不到
-            self.assertEqual(precall.assign([n1, n2], "A组")[0], 2)
-            self.assertEqual(precall.visible(), [])                               # 组还没开放
-            self.assertTrue(precall.set_group_open("A组", True))
-            self.assertEqual([x["no"] for x in precall.visible()], [n1, n2])      # 只有 A 组的
-            self.assertEqual(precall.assign([n3], "B组")[0], 1)                   # 编号不因分组改变
-            self.assertEqual(precall.entry_of(cc)["no"], n3)
-            self.assertFalse(precall.dial(a, n3)[0])                              # B 组没开放
-            self.assertFalse(precall.dial(a, n1)[0])                              # 不能拨自己
-            ok, msg, rid = precall.dial(a, n2)
-            self.assertTrue(ok)
-            r = rooms.get(rid)
-            self.assertEqual(r["kind"], "前置电话")
-            self.assertEqual({m["role_id"] for m in rooms.members(rid)}, {a, b})
-            self.assertEqual(rooms.timeline(a), [])                               # 不占时间线
-            self.assertFalse(precall.dial(b, n1)[0])                              # 已经通过话
-            precall.set_group_open("B组", True)
-            set_config("precall_dial_limit", "1"); set_config("precall_total_limit", "0")
-            self.assertFalse(precall.dial(a, n3)[0])                              # 主动拨出上限
-            set_config("precall_dial_limit", "0"); set_config("precall_total_limit", "1")
-            self.assertFalse(precall.dial(a, n3)[0])                              # 我的总通话满了
-            self.assertFalse(precall.dial(cc, n2)[0])                             # 对方（乙）总通话满了
-            set_config("precall_dial_limit", "0"); set_config("precall_total_limit", "0")      # 不限
-            self.assertTrue(precall.dial(a, n3)[0])
-            self.assertEqual(precall.dialed(a), 2)
-            self.assertEqual(precall.assign([n1], "")[0], 1)                      # 移回未分组
-            # 双方共同选择
-            self._wipe()
-            for k_ in ("precall_dial_limit", "precall_total_limit"):
-                set_config(k_, "0")
-            set_config("precall_mutual", "1")
-            ids = {x: precall.submit(r_, "介绍")[2] for x, r_ in (("a", a), ("b", b))}
-            precall.assign(list(ids.values()), "A组")
-            precall.set_group_open("A组", True)
-            ok, msg, rid = precall.dial(a, ids["b"])
-            self.assertEqual((ok, rid), (True, 0), msg)                           # 只选了，没接通
-            self.assertEqual(precall.calls(), [])
-            self.assertFalse(precall.dial(a, ids["b"])[0])                        # 不能重复选
-            self.assertEqual(precall.dialed(a), 1)
-            ok, msg, rid = precall.dial(b, ids["a"])                              # 对方也选了你 → 接通
-            self.assertTrue(ok)
-            self.assertGreater(rid, 0)
-            self.assertEqual(len(precall.calls()), 1)
-        finally:
-            set_config("ext:precall", "0")
-            set_config("precall_mutual", "0")
-            self._wipe()
+        roles.create_role("丙", "B1", "P2", "M2")
+        a, b, cc = self.a["id"], self.b["id"], roles.get_role_by_name("丙")["id"]
+        self.assertFalse(precall.save_profile(a, "f", "")[0])                          # 照片和介绍至少一样
+        precall.save_profile(a, "f", "喜欢下雨天"); precall.save_profile(b, "m", "夜猫子"); precall.save_profile(cc, "f", "不爱说话")
+        self.assertEqual([x["bio"] for x in precall.candidates(a)], ["夜猫子"])         # 只看异性：丙是女生，翻不到
+        self.assertTrue(precall.candidates(a)[0]["name"].startswith("匿名 #"))            # 选人时匿名
+        set_config("precall_group_mode", "mixed")
+        self.assertEqual(len(precall.candidates(a)), 2)
+        pid_b = precall.profile(b)["pid"]
+        r = precall.like(a, pid_b)                                                      # 单向：选了就接通
+        self.assertTrue(r["ok"] and r["matched"])
+        self.assertEqual(precall.sessions_for(a)[0]["name"], "乙")                       # 接通后公开真名
+        self.assertNotIn("夜猫子", [x["bio"] for x in precall.candidates(a)])           # 选过的、通过话的不再出现
+        self.assertFalse(precall.like(a, pid_b)["ok"])
+        set_config("precall_mutual", "1"); set_config("precall_max_picks", "2")
+        pid_c = precall.profile(cc)["pid"]
+        r = precall.like(a, pid_c)
+        self.assertTrue(r["ok"]); self.assertFalse(r["matched"])                        # 双向：等对方也选
+        self.assertEqual(r["left"], 0)
+        r = precall.like(cc, precall.profile(a)["pid"])
+        self.assertTrue(r["matched"])
+        precall.new_round()
+        self.assertEqual(precall.left(a), 2)                                            # 新一轮：次数重新算
+        set_config("precall_msg_limit", "1")
+        sid = r["session_id"]
+        self.assertTrue(precall.send(cc, sid, "你好")["ok"])
+        self.assertIn("说完了", precall.send(cc, sid, "还在吗", now=int(time.time()) + 5)["msg"])
+        self.assertFalse(precall.send(b, sid, "插一句")["ok"])                           # 不是这通电话的人
+        self.assertEqual(precall.sessions_for(a)[0]["unread"], 1)
+        self.assertTrue(precall.end(sid, a))
+        self.assertIn("结束", precall.send(a, sid, "喂")["msg"])
+        self._wipe()
 
-    def test_precall_pages(self):
+    def test_pages(self):
         from changri.core import precall
         self._wipe()
         set_config("ext:precall", "0")
-        self.login(phonecodes.code_for_role(self.a["id"]))
-        tok = self.csrf("/p/me/precall")
-        self.assertEqual(self.c.get("/p/me/precall").status_code, 404)           # 默认关
+        self._login(self.a)
+        tok = self.csrf("/p/me/discover")
+        self.assertEqual(self.c.get("/p/me/precall").status_code, 404)               # 默认关
         set_config("ext:precall", "1")
         try:
-            self.assertEqual(self.c.post("/p/me/precall/submit", data={"text": "你好呀", "_csrf": tok}).status_code, 302)
-            no = precall.entry_of(self.a["id"])["no"]
-            self.assertIn("你好呀", self.c.get("/p/me/precall").get_data(True))
-            ob = precall.submit(self.b["id"], "乙的介绍")[2]
-            precall.assign([no, ob], "A组")
-            precall.set_group_open("A组", True)
-            self.assertIn("乙的介绍", self.c.get("/p/me/precall").get_data(True))
-            calls = []
-            self.app.config["PRECALL_DIAL"] = lambda me, n: (lambda r: (calls.append(n), r)[1])(precall.dial(me["id"], n))
-            r = self.c.post("/p/me/precall/dial", data={"no": str(ob), "_csrf": tok})
-            self.assertEqual(r.status_code, 302)
-            self.assertEqual(calls, [ob])
-            rid = precall.calls()[0]["room_id"]
-            self.assertTrue(r.headers["Location"].endswith(f"/p/me/room/{rid}"))
-            self.assertEqual(self.c.get(f"/p/me/room/{rid}").status_code, 200)       # 聊天室页对前置电话也能进
+            self.assertIn("我的资料", self.c.get("/p/me/precall").get_data(True))        # 没填资料：先去填
+            r = self.c.post("/p/me/precall/profile", data={"_csrf": tok, "gender": "f", "bio": "你好呀"}, follow_redirects=True)
+            self.assertIn("资料已保存", r.get_data(True))
+            precall.save_profile(self.b["id"], "m", "乙的介绍")
+            deck = self.c.get("/p/me/precall").get_data(True)
+            pid = precall.profile(self.b["id"])["pid"]
+            self.assertIn(pid, deck); self.assertIn("\\u533f\\u540d #", deck)               # 卡片数据里是「匿名 #编号」，不是真名
+            self.assertEqual(self.c.post("/p/me/precall/swipe", data={"_csrf": tok, "to": pid}).status_code, 400)   # 没确认不算
+            d = self.c.post("/p/me/precall/swipe", data={"_csrf": tok, "to": pid, "confirm": "1"}).get_json()
+            self.assertTrue(d["ok"] and d["matched"])
+            call = self.c.get(d["session"]).get_data(True)
+            self.assertIn("乙", call)                                                   # 接通后公开名字
+            sid = int(d["session"].rstrip("/").split("/")[-1])
+            self.assertTrue(self.c.post(f"/p/me/precall/call/{sid}/send", data={"_csrf": tok, "text": "嗨"}).get_json()["ok"])
+            self.assertIn("嗨", str(self.c.get(f"/p/me/precall/call/{sid}/poll").get_json()["msgs"]))
+            self.assertIn("前置电话", self.c.get("/p/me").get_data(True))                # 消息列表里也有这一行
+            self.assertTrue(self.c.post(f"/p/me/precall/call/{sid}/end", data={"_csrf": tok}).get_json()["ok"])
+            self.assertTrue(self.c.get(f"/p/me/precall/call/{sid}/poll").get_json()["ended"])
         finally:
             set_config("ext:precall", "0")
             self._wipe()
-
-
-if __name__ == "__main__":
-    unittest.main()
-
 
 class PhoneArchive(Phone):
     @staticmethod
@@ -819,5 +800,158 @@ class PhoneAdminHome(Phone):
         self.assertEqual(get_config("phone_paused", "0"), "0")
         r = self.c.post(f"/p/admin/as/{self.a['id']}", data={"_csrf": tok})
         self.assertEqual(self.c.get("/p/me/archive").status_code, 200)            # 已经以甲的身份登录
+        from changri.core import messaging, phoneunread
+        html = self.c.get("/p/me").get_data(as_text=True)
+        self.assertIn("管理员只读查看", html)                                        # 只读：页顶有提示
+        before = messaging.day_count(self.a["id"], "sms")
+        r = self.c.post("/p/me/send", data={"_csrf": tok, "to": self.b["id"], "kind": "sms", "text": "替甲发的"}, follow_redirects=True)
+        self.assertIn("不能替玩家操作", r.get_data(as_text=True))
+        self.assertEqual(messaging.day_count(self.a["id"], "sms"), before)         # 没发出去
+        messaging.queue_message("sms", self.b["id"], self.a["id"], "", "给甲的", "")
+        self.c.get(f"/p/me/{self.b['id']}")
+        self.assertNotIn(f"r:{self.b['id']}", phoneunread._reads(self.a["id"]))       # 管理员看过不算甲已读
+        with get_conn() as c:
+            mid = c.execute("SELECT id FROM messages WHERE content='给甲的'").fetchone()["id"]
+        self.assertIn("admin/msg/%d/delete" % mid, self.c.get(f"/p/me/{self.b['id']}").get_data(as_text=True))
+        self.c.post(f"/p/admin/msg/{mid}/delete", data={"_csrf": tok})                   # 管理员删消息：两边都不再显示
+        self.assertNotIn("给甲的", self.c.get(f"/p/me/{self.b['id']}").get_data(as_text=True))
         set_config("phone_admin:old", str(int(time.time()) - 5))
         self.assertEqual(self.app.test_client().get("/p/admin/enter/old").status_code, 404)
+
+
+class PhoneThreads(Phone):
+    """会话归属（照老系统）：收到的按落款认人；带署名的匿名短信不进真名会话；点歌台、偷盗记录、匿名对话各自一个会话。"""
+
+    def setUp(self):
+        super().setUp()
+        with get_conn() as c:
+            for t in ("phone_aliases", "song_requests", "gift_steals", "gift_unlocks", "gift_shop"):
+                c.execute(f"DELETE FROM {t}")
+
+    def _post(self, path, **data):
+        from unittest import mock
+        sent = []
+
+        async def fake(bot, grp, text, *a, **k):
+            sent.append((grp, text))
+            return "mid"
+        tok = self.csrf("/p/me/new")
+        with mock.patch("changri.core.qqsend.make_send", return_value=fake), mock.patch("changri.core.phonegate.season.phase", return_value="playing"):
+            r = self.c.post(path, data={"_csrf": tok, **data}, follow_redirects=True)
+        return r.get_data(as_text=True), sent
+
+    def test_signed_sms_gets_own_thread(self):
+        from changri.core import messaging
+        roles.create_role("丙", "B1", "P2", "M2")
+        self.cc = roles.get_role_by_name("丙")
+        messaging.queue_message("sms", self.a["id"], self.b["id"], "", "你猜我是谁", "神秘人")      # 甲署名「神秘人」发给乙
+        messaging.queue_message("sms", self.a["id"], self.b["id"], "", "冒充丙的信", "丙")          # 署名正好是丙：并进丙的会话
+        self._login(self.b)
+        inbox = self.c.get("/p/me").get_data(as_text=True)
+        self.assertIn("神秘人", inbox)
+        self.assertNotIn(f'href="/p/me/{self.a["id"]}"', inbox)                                     # 乙的手机里没有甲的真名会话
+        self.assertNotIn("你猜我是谁", self.c.get(f"/p/me/{self.a['id']}").get_data(as_text=True))
+        self.assertIn("冒充丙的信", self.c.get(f"/p/me/{self.cc['id']}").get_data(as_text=True))
+        html = self.c.get("/p/me/s/神秘人").get_data(as_text=True)
+        self.assertIn("你猜我是谁", html); self.assertIn("不能直接回复", html)
+        self._login(self.a)                                                                         # 甲自己那边挂在乙名下
+        self.assertIn("你猜我是谁", self.c.get(f"/p/me/{self.b['id']}").get_data(as_text=True))
+
+    def test_song_and_steal_threads(self):
+        from changri.core import gifts, song
+        set_config("ext:song", "1")
+        song.record(self.a["id"], {"to": "乙", "message": "送你", "signer": "某人"}, {"title": "晴天", "artist": "周杰伦"}, "test")
+        song.record(self.a["id"], {"to": ""}, {"title": "给大家的"}, "test")
+        set_config("gift_catalog", "玫瑰"); set_config("gift_steal_enabled", "1")
+        gifts.unlock(self.a["id"], gifts.items()[0]["id"])
+        self.assertTrue(gifts.steal(self.b["id"], self.a["id"])[0])
+        self._login(self.b)
+        inbox = self.c.get("/p/me").get_data(as_text=True)
+        self.assertIn("点歌台", inbox); self.assertIn("偷盗记录", inbox)
+        html = self.c.get("/p/me/sys/song").get_data(as_text=True)
+        self.assertIn("某人 给你点了一首《晴天》", html); self.assertNotIn("给大家的", html)
+        self.assertIn("你从「甲」的图鉴里偷到了「玫瑰」", self.c.get("/p/me/sys/steal").get_data(as_text=True))
+        self._login(self.a)
+        self.assertIn("有人偷偷抄走了你图鉴里的「玫瑰」", self.c.get("/p/me/sys/steal").get_data(as_text=True))
+
+    def test_alias_chat(self):
+        from changri.core import aliases
+        set_config("sms_cooldown_sec", "0")
+        self._login(self.a)
+        html, _ = self._post("/p/me/alias", to=self.b["id"], alias="乙")
+        self.assertIn("不能用", html)                                                               # 不能用别人的名字当化名
+        html, _ = self._post("/p/me/alias", to=self.b["id"], alias="夜莺")
+        aid = aliases.threads(self.a["id"])[0]["alias_id"]
+        self.assertIn("乙＠夜莺", html)
+        html, sent = self._post(f"/p/me/a/{aid}/send", text="你好呀")
+        self.assertTrue(any("夜莺 给你发来一条短信" in t and "甲" not in t for _g, t in sent), sent)   # QQ 里落款是化名
+        self._login(self.b)
+        inbox = self.c.get("/p/me").get_data(as_text=True)
+        self.assertIn("夜莺", inbox); self.assertNotIn("你好呀</div>", self.c.get(f"/p/me/{self.a['id']}").get_data(as_text=True))
+        html = self.c.get(f"/p/me/a/{aid}").get_data(as_text=True)
+        self.assertIn("你好呀", html); self.assertNotIn("甲", html.split("<header")[1].split("</header>")[0])
+        html, sent = self._post(f"/p/me/a/{aid}/send", text="你是谁")
+        self.assertTrue(any("回你的化名「夜莺」" in t for _g, t in sent), sent)                     # 回给化名主人
+        self._post(f"/p/me/a/{aid}/block")
+        self.assertIn("已经结束", self._post(f"/p/me/a/{aid}/send", text="还在吗")[0])
+        self.assertIn("2 小时", self._post(f"/p/me/a/{aid}/block", action="unblock")[0])
+        self._login(self.a)
+        for n in ("二号", "三号"):
+            self._post("/p/me/alias", to=self.b["id"], alias=n)
+        self.assertIn("最多用 3 个化名", self._post("/p/me/alias", to=self.b["id"], alias="四号")[0])
+
+    def test_unread_badges_and_poll(self):
+        """未读：按会话算；会话列表打开不算读，点进会话才算；匿名短信算在署名会话上，不算到真名会话头上。"""
+        from changri.core import messaging
+        messaging.queue_message("sms", self.a["id"], self.b["id"], "", "在吗", "")
+        messaging.queue_message("sms", self.a["id"], self.b["id"], "", "还在吗", "")
+        messaging.queue_message("sms", self.a["id"], self.b["id"], "", "猜猜我", "神秘人")
+        self._login(self.b)
+        d = self.c.get("/p/me/poll").get_json()
+        self.assertEqual(d["total"], 3)
+        inbox = self.c.get("/p/me").get_data(as_text=True)
+        self.assertIn("未读消息", inbox); self.assertIn('aria-label="2 条未读"', inbox); self.assertIn('aria-label="1 条未读"', inbox)
+        self.assertEqual(self.c.get("/p/me/poll").get_json()["total"], 3)                   # 只看列表不算读
+        self.c.get(f"/p/me/{self.a['id']}")
+        d = self.c.get("/p/me/poll").get_json()
+        self.assertEqual(d["total"], 1); self.assertEqual(d["top"]["name"], "神秘人")
+        self.c.get("/p/me/s/神秘人")
+        self.assertEqual(self.c.get("/p/me/poll").get_json()["total"], 0)
+
+
+class PhonePush(Phone):
+    """网页推送（照老系统）：订阅只认浏览器自家的推送服务；第一次扫只记起点；之后有新东西各推一条，不写是谁、写了什么。"""
+
+    def test_subscribe_and_scan(self):
+        from unittest import mock
+
+        from changri.core import messaging, webpush
+        with get_conn() as c:
+            c.execute("DELETE FROM push_subs")
+        set_config("push_cursor", "")
+        self._login(self.b)
+        self.assertTrue(self.c.get("/p/push/key").get_json()["ok"])
+        tok = self.csrf("/p/me/profile")
+        bad = self.c.post("/p/push/subscribe", data={"_csrf": tok, "endpoint": "https://evil.example.com/x", "p256dh": "a", "auth": "b"})
+        self.assertFalse(bad.get_json()["ok"])
+        ok = self.c.post("/p/push/subscribe", data={"_csrf": tok, "endpoint": "https://fcm.googleapis.com/fcm/send/abc", "p256dh": "BKey", "auth": "auth"})
+        self.assertTrue(ok.get_json()["ok"])
+        sent = []
+        with mock.patch.object(webpush, "send", lambda sub, payload: sent.append(payload) or True):
+            self.assertEqual(webpush.scan_once(), 0)                                 # 第一次：只记起点
+            messaging.queue_message("sms", self.a["id"], self.b["id"], "", "秘密内容", "神秘人")
+            messaging.queue_message("gift", self.a["id"], self.b["id"], "玫瑰", "", "")
+            self.assertEqual(webpush.scan_once(), 1)
+            self.assertEqual(webpush.scan_once(), 0)                                 # 不重复推
+        self.assertEqual(len(sent), 1)
+        self.assertIn("1 条新短信", sent[0]["body"]); self.assertIn("1 份礼物", sent[0]["body"])
+        self.assertNotIn("秘密内容", sent[0]["body"]); self.assertNotIn("甲", sent[0]["body"]); self.assertNotIn("神秘人", sent[0]["body"])
+        self.c.post("/p/push/unsubscribe", data={"_csrf": tok, "endpoint": "https://fcm.googleapis.com/fcm/send/abc"})
+        self.assertEqual(webpush.subs_of(self.b["id"]), [])
+
+    def test_sw_and_manifest(self):
+        r = self.c.get("/p/sw.js")
+        self.assertEqual(r.headers["Service-Worker-Allowed"], "/p/")
+        self.assertIn("showNotification", r.get_data(as_text=True))
+        m = self.c.get("/p/manifest.json").get_json()
+        self.assertEqual((m["start_url"], m["scope"]), ("/p/me", "/p/"))            # 相对地址：跟着机器人自己的公网地址走

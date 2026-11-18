@@ -50,6 +50,14 @@ def register(app, login_required):
         return jsonify({"title": f"{sh['name']}的{sheets_core.KINDS[kind]}", "text": sh["text"], "ts": _fmt_ts(sh["updated_ts"]),
                         "images": [url_for("sheet_img", name=n) for n in sh["images"]]})
 
+    @app.post("/sheets/gongzhi/<int:role_id>/edit")
+    @login_required
+    def sheet_gongzhi_edit(role_id):
+        """管理员改某人的公知文字（照老系统）：图片不动；玩家之后重新提交会覆盖。"""
+        flash("公知文字已改好。玩家之后重新「提交公知」会覆盖。" if sheets_core.set_text(role_id, "gongzhi", request.form.get("text", ""))
+              else "这个人还没交公知。")
+        return redirect(url_for("relations_page", view="sheets"))
+
     @app.route("/sheets/img/<name>")
     @login_required
     def sheet_img(name):

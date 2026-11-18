@@ -8,6 +8,19 @@
   </header>
   <div class="scroll new-message-page">
   <p class="new-intro">{% if gift %}送「{{ gift }}」，选一位收件人{% else %}选择一位收件人，开始对话{% endif %}</p>
+  {% if not gift %}
+  <details class="new-anon" style="margin:0 16px 12px">
+    <summary style="cursor:pointer;color:var(--muted)">用化名匿名聊天</summary>
+    <form method="post" action="{{ url_for('alias_create') }}" style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+      <input type="hidden" name="_csrf" value="{{ csrf() }}">
+      <select name="to" aria-label="收件人" required>{% for o in others %}<option value="{{ o.id }}">{{ o.name }}</option>{% endfor %}</select>
+      <input name="alias" maxlength="10" placeholder="化名（10 字内）" aria-label="化名" required>
+      <p style="font-size:12px;color:var(--muted);margin:0">对方只看到化名，可以来回聊；对同一个人最多用 3 个化名。跟短信共用每天的次数。只有管理员能看到化名背后是谁。</p>
+      <button type="submit" class="profile-item" style="padding:9px">开始匿名对话</button>
+    </form>
+  </details>
+  {% include '_flash.html' %}
+  {% endif %}
   <h2 class="recipient-heading">联系人 <span>{{ others|length }} 位</span></h2>
   <div class="list recipient-list">
     {% for o in others %}

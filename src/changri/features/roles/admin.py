@@ -1,7 +1,6 @@
 """设置平台 · 角色与群。由 changri.admin.create_app 调用 register(app, login_required) 挂上路由（路由名不变，模板里的 url_for 照常用）。"""
 from flask import flash, redirect, request, url_for
 from changri.core import roles as roles_core
-from changri.core.db import get_conn
 
 
 def deleted_text(res: dict | None) -> str:
@@ -22,7 +21,7 @@ def register(app, login_required):
     @app.route("/roles")
     @login_required
     def roles_page():
-        return redirect(url_for("dashboard") + "#roles")           # 角色与群并进总览（折叠）
+        return redirect(url_for("god_page"))                      # 角色与群并进「角色」页（原上帝模式）
 
     @app.post("/roles/<int:role_id>/slot")
     @login_required
@@ -30,17 +29,15 @@ def register(app, login_required):
         ok, res = roles_core.add_slot(role_id, request.form.get("real_gid", "").strip())
         if not ok:
             flash(res)
-            return redirect(url_for("dashboard") + "#roles")
-        with get_conn() as conn:
-            name = conn.execute("SELECT name FROM roles WHERE id=?", (role_id,)).fetchone()["name"]
+            return redirect(url_for("god_page", role=role_id))
         flash("群位已登记，请到那个群里发认群码")
-        return redirect(url_for("dashboard", code=res, role=name) + "#roles")
+        return redirect(url_for("god_page", role=role_id, code=res))
 
     @app.post("/roles/<int:role_id>/delete")
     @login_required
     def delete_role(role_id):
         flash(deleted_text(roles_core.delete_role(role_id)))
-        return redirect(request.form.get("next") if request.form.get("next", "").startswith("/") else url_for("dashboard") + "#roles")
+        return redirect(request.form.get("next") if request.form.get("next", "").startswith("/") else url_for("god_page"))
 
     @app.template_filter("ts")
     def _ts_filter(v):

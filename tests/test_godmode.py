@@ -3,7 +3,7 @@ import tempfile
 import time
 import unittest
 
-os.environ.setdefault("CHANGRI_DB", os.path.join(tempfile.mkdtemp(), "t.db"))
+os.environ["CHANGRI_DB_PATH"] = os.path.join(tempfile.mkdtemp(), "t.db")
 
 from changri.core import godmode, relations, roles, rooms, season
 from changri.core.db import get_conn, init_db, set_config
@@ -95,6 +95,18 @@ class GodModeTest(unittest.TestCase):
         self.assertTrue(forum.vote(f"p{pid}", self.b, 1)[0])
         godmode.set_perm(self.b, "forum", False)                     # 全体开着，个人关了也不行
         self.assertFalse(forum.new_reply(pid, self.b, "乙", "x")[0])
+
+    def test_groupchat_switch_only_when_phone_groupchat_on(self):
+        """群里的「微信」指令已经改成去小手机：小手机多人群聊没开时，上帝模式不列这个开关；开了叫「多人群聊（小手机）」。"""
+        from changri.core import extensions
+        extensions.set_enabled("groupchat", False)
+        self.assertNotIn("微信", godmode.shown_features())
+        self.assertNotIn("微信", "".join(godmode.shown_features().values()))
+        extensions.set_enabled("groupchat", True)
+        self.assertEqual(godmode.shown_features()["微信"], "多人群聊（小手机）")
+        godmode.set_perm(self.a, "微信", False)
+        self.assertIn("「多人群聊」功能被管理员暂时关闭了", godmode.check(self.a, "微信"))
+        extensions.set_enabled("groupchat", False)
 
     def test_clear_rels(self):
         from changri.core.db import get_conn as gc
