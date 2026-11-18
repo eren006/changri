@@ -33,8 +33,9 @@ load_dotenv(LEGACY_ENV)          # 老版本 .env 里的 ADMIN_PASSWORD（只在
 # 设置平台管的项：分组 -> {key: (显示名, 默认值)}。开关类填 1（开）/ 0（关）
 SECTIONS = [
     ("基础", {
-        "hello_text": ("/ping 的回复", "收到。"),
+        "hello_text": ("/ping 的回复（一行一句，可以写好几句，每次随机回一句；空着就回「收到。」）", "收到。"),
         "welcome_text": ("机器人被拉进新群时发的欢迎语（留空用默认）", ""),
+        "msgmon_enabled": ("消息监听（1 开 / 0 关；后台「消息监听」页实时看机器人收到的群消息：官方机器人所在的群，加上 QQ 小号在群号组里听到的。只放在内存里，每个机器人最近 500 条，重启就清空，不存数据库）", "1"),
         "error_report_url": ("报错接收地址（http/https 网址；留空 = 报错只存在本机。程序崩溃或出错、恢复后会自动把报错文字发到这里，不含聊天内容和群号。默认发到主站 system.changri.work）", "https://system.changri.work/api/errors"),
         "usage_report": ("匿名使用情况上报（1 开 / 0 关；每 6 小时跟着检查更新发一次：随机生成的实例编号、版本、系统、几个机器人连着、处理了多少次指令。不带群号、QQ 号、角色和聊天内容，作者用来看装了的人有没有在用）", "1"),
         "season_report": ("季末报告（1 开 / 0 关；开了以后，结束季度时会给每位有互动的玩家的个人群先发一句话、再单独发一张本季结算海报：约会场次、短信礼物心动信、互动最多的人、最常互动的时间、最精彩的一场戏。海报画不出来就改发文字小结。机器人要还在个人群里才发得出去。「季度与出场」页的「季末报告」里也能开关、看样式缩略图、下载每个人的海报）", "0"),
@@ -75,7 +76,7 @@ SECTIONS = [
         "room_expire_enabled": ("到时间强制结群（1 开 / 0 关；开了以后，房间开满下面的「结戏限时」会自动结束，群放回备用群池）", "0"),
         "room_expire_hours": ("结戏限时（小时，从房间开始算；要打开上面的「到时间强制结群」才生效）", "24"),
         "room_expire_warn_hours": ("结戏前提醒（小时，到时间前这么久在房间群里 @ 所有参与者，告诉大家可以收尾了；0 = 不提醒）", "4"),
-        "pool_auto_free": ("房间结束后群自动放回池（1 是 / 0 否，否 = 要管理员确认群里的人清空了才放回；开着时，下次分配前会查一遍群里有没有玩家）", "1"),
+        "pool_auto_free": ("QQ 小号的群：房间结束后自动放回池（1 是 / 0 否，否 = 要管理员确认群里的人清空了才放回；开着时，下次分配前小号会查一遍群里有没有玩家。官方机器人的群查不了成员，不看这一项，结束后一律等管理员确认）", "1"),
     }),
     ("礼品店", {
         "gift_only_preset": ("只能送礼品店里的东西（1 是 / 0 否；开了送礼只能写礼品店的编号，不能自定义）", "0"),
@@ -305,6 +306,9 @@ def _poster_skins() -> list[tuple[str, str]]:
 FIELD_CHOICES = {"season_poster_skin": (_poster_skins, "season_poster_preview")}
 
 
+LINES_FIELDS = {"hello_text"}          # 这些设置是多行文本框（一行一句）
+
+
 def field_view(key: str, label: str, default: str, value: str) -> dict:
     """把「标签（说明）」形式的设置项变成界面要的样子：1/0 的变开关，数字的变数字框（带单位），其余是文本框。"""
     import re
@@ -313,6 +317,9 @@ def field_view(key: str, label: str, default: str, value: str) -> dict:
         i = label.rindex("（")
         main, inner = label[:i], label[i + 1:-1]
     f = {"key": key, "label": main.strip(), "hint": inner, "value": value, "kind": "text", "unit": ""}
+    if key in LINES_FIELDS:                       # 多行：一行一句，随机挑
+        f.update(kind="lines", rows=max(3, value.count("\n") + 2))
+        return f
     if key in FIELD_CHOICES:
         options, preview = FIELD_CHOICES[key]
         opts = options()

@@ -41,7 +41,7 @@ def register(app, login_required):
                                st=st, link_rows=link_rows, multi=multi, has_token=bool(get_config("qqlink_token", "")), skip="\n".join(sorted(qqpool_core.skip_users())),
                                tpl=tpl, presets=presets, is_preset=tpl in {t for t, _ in qqpool_core.ROOM_NAME_PRESETS},
                                preview=qqpool_core.room_name(sample, ["小明", "小红"], tpl), free_name=get_config("qqlink_free_name", qqpool_core.FREE_NAME_DEFAULT),
-                               sets=sets, live=live, live_err=live_err, in_sets=in_sets, names=names,
+                               sets=sets, live=live, live_err=live_err, in_sets=in_sets, names=names, held=qqpool_core.held_by_other_bots(),
                                auth="\n".join(sorted(qqpool_core.auth_qqs())),
                                binds=roles_core.qq_bindings(), role_names=[r["name"] for r in roles_core.list_all()], trpg_binds=qqpool_core.trpg_bindings())
 
@@ -88,8 +88,8 @@ def register(app, login_required):
     @app.post("/qqlink/auth")
     @login_required
     def qqlink_auth():
-        qqpool_core.save_auth(request.form.get("auth", ""))
-        flash("已保存")
+        bad = qqpool_core.save_auth(request.form.get("auth", ""))
+        flash("已保存" + ("；没保存：" + "；".join(bad) if bad else ""))
         return redirect(url_for("qqlink_page"))
 
     @app.post("/qqlink/conf")
@@ -218,3 +218,67 @@ def register(app, login_required):
         err = loopbridge.run(qqmanager_core.rename(current_bot(), gid, request.form.get("name", "")))
         flash(err or "群名已改")
         return redirect(url_for("qqlink_page"))
+
+    # ---------- 一个群在「小号的群号组」和「官方机器人的备用群」之间来回转 ----------
+
+    def _back():
+        return redirect(url_for("backup_pool_page") if request.form.get("back") == "pool" else url_for("qqlink_page"))
+
+    @app.post("/qqlink/handover/<gid>/to-official")
+    @login_required
+    def qqlink_to_official(gid):
+        """转到官方备用群：这个群以前在群里发过「设为备用群」，官方机器人认得它，不用再去群里发一次。"""
+        from changri.core import handover
+        bot = current_bot()
+        o = handover.official_row(bot, gid)
+        if not o:
+            flash("官方机器人还不认得这个群：先在群里发一次「设为备用群 本群群号」")
+            return _back()
+        why = handover.check_to_official(bot, o["group_openid"], gid)
+        if why:
+            flash(why)
+            return _back()
+        a = handover.alt_row(bot, gid)
+        name = qqpool_core.free_name((a["set_name"] if a else "") or o["set_name"])
+        err = loopbridge.run(qqmanager_core.rename(bot, gid, name)) if a and not a["moved"] else "小号不管这个群"
+        ok, why = handover.to_official(bot, o["group_openid"], gid, o["set_name"])
+        if not ok:
+            flash(why)
+            return _back()
+        flash(f"群 {gid} 已转给官方机器人。" + (f"群名已由小号改成「{name}」。" if not err else
+              f"小号没能改群名（{err}）：{handover.RENAME_ASK.format(name=name)}"))
+        return _back()
+
+    @app.post("/qqlink/handover/<gid>/to-qq")
+    @login_required
+    def qqlink_to_qq(gid):
+        """转回小号群：先查小号连着、而且真的在这个群里；官方机器人在群里提醒群主确认小号是管理员。"""
+        from changri.core import handover
+        from changri.core.qqsend import make_send
+        bot = current_bot()
+        why = handover.check_to_qq(bot, gid)
+        if why:
+            flash(why)
+            return _back()
+        seen, errs = False, []
+        for ln in qqpool_core.links():
+            if not qqmanager_core.link_status(bot, ln["id"])["connected"]:
+                continue
+            try:
+                groups = loopbridge.run(qqmanager_core.group_list(bot, ln["id"], max_age=0), timeout=15)
+                seen = seen or any(str(g.get("group_id")) == gid for g in groups)
+            except Exception as e:  # noqa: BLE001
+                errs.append(str(e) or "取群列表失败")
+        if not seen:
+            flash(f"没转：小号现在不在群 {gid} 里" + (f"（{'；'.join(errs)}）" if errs else "（或者小号没连上）") + "。先让小号进群、设为管理员，再点一次。")
+            return _back()
+        o = handover.official_row(bot, gid)
+        note = ""
+        if o and not o["moved"]:
+            try:
+                loopbridge.run(make_send()(bot, o["group_openid"], handover.BACK_NOTICE), timeout=15)
+            except Exception as e:  # noqa: BLE001  提醒发不出去（没开主动发言等）不影响转
+                note = f"（官方机器人没能在群里发提醒：{e}）"
+        ok, why = handover.to_qq(bot, gid)
+        flash((f"群 {gid} 已转回小号的群号组。请确认小号在群里是管理员。" + note) if ok else why)
+        return _back()

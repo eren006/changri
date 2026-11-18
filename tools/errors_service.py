@@ -26,6 +26,7 @@ MAX_ITEMS = 50
 MAX_FILE = 5 * 1024 * 1024
 FIELDS = {"kind": 20, "source": 120, "message": 600, "trace": 1500, "version": 20}
 _SECRET = re.compile(r"[A-Za-z0-9_\-]{24,}")
+_CODE_NAME = re.compile(r"_*[a-z][a-z0-9]*(?:_+[a-z0-9]+)+_*")   # 代码里的函数名（_get_authorization_header 这种 snake_case）不是密钥，不遮
 _DIGITS = re.compile(r"(?<!\d)\d{6,}(?!\d)")
 HITS: dict[str, list[float]] = {}
 _lock = threading.Lock()
@@ -37,8 +38,12 @@ def data_file() -> Path:
     return d / "errors.jsonl"
 
 
+def _mask(m) -> str:
+    return m.group(0) if _CODE_NAME.fullmatch(m.group(0)) else "<…>"
+
+
 def scrub(text) -> str:
-    return _DIGITS.sub("#", _SECRET.sub("<…>", str(text or "")))
+    return _DIGITS.sub("#", _SECRET.sub(_mask, str(text or "")))
 
 
 def rate_ok(ip: str, now: float | None = None) -> bool:
@@ -66,7 +71,7 @@ def clean(payload, ip: str = "") -> list[dict]:
     for e in payload["errors"][-MAX_ITEMS:]:
         if not isinstance(e, dict):
             continue
-        row = {k: scrub(e.get(k))[:n] for k, n in FIELDS.items()}
+        row = {k: (scrub(e.get(k))[-n:] if k == "trace" else scrub(e.get(k))[:n]) for k, n in FIELDS.items()}   # trace 留尾：真正的报错在最后
         try:
             row["ts"] = int(e.get("ts") or 0)
         except (TypeError, ValueError):

@@ -13,14 +13,33 @@ def register(app, login_required):
     @app.route("/backup-pool")
     @login_required
     def backup_pool_page():
-        groups = pool_core.all_groups()
+        groups = [g for g in pool_core.all_groups() if not pool_core.is_qq_only(g)]      # 小号群号组的群在「结合QQ小号模式（双骰）」页管
+        alt = {g["real_gid"]: g for g in pool_core.all_groups() if pool_core.is_qq_only(g)}
+        for g in groups:                                   # 同一个群号也在小号的群号组里：可以来回转
+            a = alt.get(g["real_gid"]) if g["real_gid"] else None
+            g["handover"] = "" if not a else ("to_official" if g["moved"] else ("to_qq" if a["moved"] and g["state"] == "free" else ""))
         sets: dict[str, list] = {}
         blocked = [g for g in groups if g["conflict"]]                 # 个人群/戏群/公告群不能当房间，单独收起来，别和能用的混在一起
         for g in groups:
             if not g["conflict"]:
                 sets.setdefault(g["set_name"] or "（未分组）", []).append(g)
-        return render_template("pool.html", sets=sets, blocked=blocked, counts=pool_core.counts(),
-                               unfilled=sum(1 for g in groups if not g["real_gid"] and not g["conflict"]))
+        usable = [g for g in groups if not g["conflict"]]
+        cleaning = [g for g in usable if g["state"] == "cleaning" and not g["moved"]]
+        from changri.core import qqpool
+        from changri.core.db import get_config
+        return render_template("pool.html", sets=sets, blocked=blocked, counts=pool_core.counts(), cleaning=cleaning, total=len(usable),
+                               free_name=get_config("qqlink_free_name", qqpool.FREE_NAME_DEFAULT))
+
+    @app.post("/backup-pool/free-name")
+    @login_required
+    def backup_pool_free_name():
+        """空闲群名：官方机器人的备用群一直叫这个名字；小号的群房间结束后也改回这个名字（和「结合QQ小号模式」页是同一个设置）。"""
+        from changri.core import qqpool
+        from changri.core.db import set_config
+        name = request.form.get("free_name", "").strip()[:30] or qqpool.FREE_NAME_DEFAULT
+        set_config("qqlink_free_name", name)
+        flash(f"空闲群名改成了「{name}」。已经在用的官方备用群，群名要群主自己去改。")
+        return redirect(url_for("backup_pool_page"))
 
     @app.post("/backup-pool/<int:pid>/save")
     @login_required
@@ -57,17 +76,5 @@ def register(app, login_required):
     def backup_pool_set():
         name, on = request.form.get("set_name", ""), request.form.get("on") == "1"
         ok, skip = pool_core.set_set(name, on)
-        flash(f"组「{name}」已{'开启' if on else '关闭'}：{ok} 个群{('，跳过 %d 个（占用中或已是别的用途）' % skip) if skip else ''}")
-        return redirect(url_for("backup_pool_page"))
-
-    @app.post("/backup-pool/bulk")
-    @login_required
-    def backup_pool_bulk():
-        """把一串群号按顺序填给「还没填群号」的群（按先被机器人看到的顺序）。"""
-        nums = [x.strip() for x in request.form.get("nums", "").replace("，", "\n").replace(",", "\n").split() if x.strip()]
-        set_name = request.form.get("set_name", "").strip()
-        empty = [g for g in pool_core.all_groups() if not g["real_gid"] and not g["conflict"]]
-        for g, n in zip(empty, nums):
-            pool_core.update(g["id"], n, g["label"], set_name or g["set_name"])
-        flash(f"已填 {min(len(empty), len(nums))} 个群号" + (f"；多出 {len(nums) - len(empty)} 个号没有对应的群（机器人还没进那些群）" if len(nums) > len(empty) else ""))
+        flash(f"组「{name}」已{'可以使用' if on else '暂停使用'}：{ok} 个群{('，跳过 %d 个（占用中或已是别的用途）' % skip) if skip else ''}")
         return redirect(url_for("backup_pool_page"))

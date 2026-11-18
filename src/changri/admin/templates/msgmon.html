@@ -1,0 +1,75 @@
+{% extends "base.html" %}{% block title %}消息监听{% endblock %}
+{% block body %}
+<h1>消息监听</h1>
+<p class="lede">机器人收到的群消息，实时往下滚。<b>官方</b> = 官方机器人所在的群（个人群、公告群、房间群……）；<b>小号</b> = 绑定的 QQ 小号在群号组（备用群、房间群）里听到的。只放在内存里，最近 {{ keep }} 条，重启就清空。</p>
+{% if not on %}<p class="note" style="color:var(--warn)">「消息监听」现在是关着的，不会记新消息。到「功能与设置 → 基础」打开。</p>{% endif %}
+
+<div class="monbar">
+  <label class="check"><span class="sw"><input type="checkbox" id="live" checked><i></i></span>保持刷新</label>
+  <select id="src" aria-label="来源"><option value="">全部来源</option><option value="official">只看官方</option><option value="qq">只看小号</option></select>
+  <input type="search" id="q" placeholder="搜群名、人名、内容" aria-label="搜索">
+  <form method="post" action="{{ url_for('msgmon_clear') }}" onsubmit="return confirm('清空这里显示的记录？')">{{ csrf() }}<button class="linkbtn">清空</button></form>
+</div>
+
+<div class="monwrap" id="wrap">
+  <table class="rt mon" id="tbl">
+    <thead><tr><th>时间</th><th>来源</th><th>群</th><th>谁</th><th>内容</th></tr></thead>
+    <tbody id="rows">
+    {% for x in items %}
+      <tr data-src="{{ x.src }}"><td class="tabular">{{ x.time }}</td><td><span class="tag">{{ '官方' if x.src == 'official' else '小号' }}</span></td><td>{{ x.group }}</td><td>{{ x.who }}</td><td class="txt">{{ x.text }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p class="empty" id="none" {% if items %}hidden{% endif %}>还没有收到消息。群里有人说话就会出现在这里。</p>
+</div>
+<button class="btn sm ghost" type="button" id="tobottom" hidden>↓ 有新消息，回到最新</button>
+
+<script>
+(function () {
+  var last = {{ items[-1].id if items else 0 }}, rows = document.getElementById('rows'), wrap = document.getElementById('wrap');
+  var live = document.getElementById('live'), src = document.getElementById('src'), q = document.getElementById('q'), btn = document.getElementById('tobottom');
+  function atBottom() { return wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 40; }
+  function show(tr) {
+    var s = src.value, k = q.value.trim();
+    tr.hidden = (s && tr.dataset.src !== s) || (k && tr.textContent.indexOf(k) < 0);
+  }
+  function filter() { Array.prototype.forEach.call(rows.children, show); }
+  function cell(text, cls) { var td = document.createElement('td'); if (cls) td.className = cls; td.textContent = text; return td; }
+  function add(x) {
+    var tr = document.createElement('tr'); tr.dataset.src = x.src;
+    tr.appendChild(cell(x.time, 'tabular'));
+    var t = document.createElement('td'), sp = document.createElement('span'); sp.className = 'tag'; sp.textContent = x.src === 'official' ? '官方' : '小号'; t.appendChild(sp); tr.appendChild(t);
+    tr.appendChild(cell(x.group)); tr.appendChild(cell(x.who)); tr.appendChild(cell(x.text, 'txt'));
+    show(tr); rows.appendChild(tr);
+    while (rows.children.length > {{ keep }}) rows.removeChild(rows.firstChild);
+  }
+  function poll() {
+    if (!live.checked || document.hidden) return;
+    fetch('{{ url_for("msgmon_feed") }}?after=' + last, {credentials: 'same-origin'}).then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+      if (!d || !d.items.length) return;
+      var stick = atBottom();
+      d.items.forEach(function (x) { add(x); last = x.id; });
+      document.getElementById('none').hidden = true;
+      if (stick) wrap.scrollTop = wrap.scrollHeight; else btn.hidden = false;
+    }).catch(function () {});
+  }
+  wrap.addEventListener('scroll', function () { if (atBottom()) btn.hidden = true; });
+  btn.addEventListener('click', function () { wrap.scrollTop = wrap.scrollHeight; btn.hidden = true; });
+  src.addEventListener('change', filter); q.addEventListener('input', filter);
+  wrap.scrollTop = wrap.scrollHeight;
+  setInterval(poll, 3000);
+})();
+</script>
+<style>
+.ui .monbar{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;margin:0 0 12px}
+.ui .monbar select{width:auto}
+.ui .monbar input[type=search]{flex:1 1 200px;min-width:0;max-width:320px}
+.ui .monwrap{max-height:70vh;overflow:auto;border:1px solid var(--card-line);border-radius:var(--r-card);background:var(--surface)}
+.ui table.mon{margin:0}
+.ui table.mon th{position:sticky;top:0;background:var(--surface);z-index:1}
+.ui table.mon td{vertical-align:top;font-size:14px}
+.ui table.mon td.txt{white-space:pre-wrap;word-break:break-all;min-width:200px}
+.ui table.mon tr[hidden]{display:none}
+.ui #tobottom{margin-top:8px}
+</style>
+{% endblock %}

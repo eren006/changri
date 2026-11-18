@@ -74,6 +74,58 @@ class SocialE2E(unittest.TestCase):
     def tearDown(self):
         nonebot.get_bots().pop("B1", None)
 
+    def test_profile_edit(self):
+        """修改性别/年龄/皮相/签名/简称：单条、多行一起改；默认皮相跟性别走；签名 12 小时冷却；简称不能撞别人的名字。"""
+        self.assertIn("皮相：刘亦菲", self.say("我的角色")[0])
+        out = self.say("修改性别 男")[0]
+        self.assertIn("性别已改为：男", out)
+        self.assertIn("皮相：亨利卡维尔", self.say("我的角色")[0])                 # 没自己填过皮相：跟着性别换默认
+        self.assertIn("只能填", self.say("修改性别 其他")[0])
+        out = self.say("修改年龄 20\n修改皮相 某明星\n修改简称 小甲")[0]
+        self.assertIn("年龄已改为：20", out)
+        self.assertIn("皮相已改为：某明星", out)
+        self.assertIn("简称已设为「小甲」", out)
+        self.assertIn("开头", self.say("修改年龄 21\n随便一行")[0])
+        self.assertIn("签名已改为", self.say("修改签名 你好世界")[0])
+        self.assertIn("12 小时", self.say("修改签名 再改")[0])
+        self.assertIn("别人的名字", self.say("修改简称 乙")[0])
+        self.assertIn("别人的名字", self.say("修改简称 小甲", member="MB", group="GB")[0])
+        self.assertIn("只能是", self.say("修改简称 a b")[0])
+        info = self.say("我的角色")[0]
+        for w in ("男", "20", "某明星", "小甲", "你好世界"):
+            self.assertIn(w, info)
+        # 简称能代替本名：乙用简称给甲发短信
+        out = self.say("短信 小甲 用简称找你", member="MB", group="GB")
+        self.assertTrue(any("[GA]" in o and "用简称找你" in o for o in out), out)
+        self.assertEqual(roles.get_role_by_name("小甲")["name"], "甲")
+        ok, msg = roles.create_role("小甲", "B1", "GC", "MC")                     # 新角色不能用别人的简称当名字
+        self.assertFalse(ok)
+        self.assertIn("简称已清除", self.say("修改简称 甲")[0])
+        self.assertIsNone(roles.get_role_by_name("小甲"))
+
+    def test_ping_random_line(self):
+        """「/ping 的回复」写好几行：每次随机回一行；空着回「收到。」"""
+        set_config("hello_text", "在！\n\n  来了  \n")
+        seen = {self.say("ping")[0] for _ in range(40)}
+        self.assertEqual(seen, {"在！", "来了"})
+        set_config("hello_text", "")
+        self.assertEqual(self.say("ping")[0], "收到。")
+
+    def test_look_wall_and_roster(self):
+        """「查看皮相墙」「玩家名单」随时看最新的；改档案不往公告群发。"""
+        from changri.core import announce
+        announce.set_announce("B1", "ANN")
+        out = self.say("修改皮相 某明星\n修改年龄 30")
+        self.assertFalse(any(o.startswith("[ANN]") for o in out))
+        self.say("修改性别 男\n修改简称 小乙", member="MB", group="GB")
+        wall = self.say("查看皮相墙")[0]
+        self.assertLess(wall.index("男生"), wall.index("乙｜亨利卡维尔"))
+        self.assertLess(wall.index("女生"), wall.index("甲｜某明星"))
+        self.assertIn("⬜ 甲", wall)
+        names = self.say("玩家名单")[0]
+        self.assertIn("小乙（全名：乙）", names)
+        self.assertIn("女 / 30岁 / 皮相：某明星", names)
+
     def say(self, text, member="MA", group="GA"):
         self.n += 1
         ev = GroupMessageCreateEvent.model_validate({

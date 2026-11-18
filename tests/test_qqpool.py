@@ -125,7 +125,8 @@ class Admin(unittest.TestCase):
         c.post("/login", data={"username": "boss", "password": "longenough1", "_csrf": tok("/login")})
         self.assertEqual(c.get("/qqlink").status_code, 200)
         c.post("/qqlink/group", data={"_csrf": tok("/qqlink"), "gid": "123456", "note": "备用", "kind": "listen"})
-        self.assertIn("123456", c.get("/qqlink").get_data(as_text=True))
+        self.assertTrue(qqpool.in_pool("123456"))                    # 跑团群从后台页面拿掉了，接口还在（老数据照常用）
+        self.assertNotIn("跑团群", c.get("/qqlink").get_data(as_text=True))
         r = c.post("/qqlink/group/123456/rename", data={"_csrf": tok("/qqlink"), "name": "新"}, follow_redirects=True)
         self.assertIn("没有连上", r.get_data(as_text=True))
         c.post("/qqlink/group/123456/delete", data={"_csrf": tok("/qqlink")})

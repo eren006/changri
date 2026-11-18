@@ -1,0 +1,178 @@
+"""角色档案：性别、年龄、皮相、签名、简称（照长日系统 / 加百列的写法）。
+
+- 玩家在自己群里发「修改性别 男」「修改年龄 20」「修改皮相 明星名」「修改签名 …」「修改简称 …」，
+  可以一次发多行一起改（每行一条）。
+- 皮相没自己填过时按性别给默认值（男 亨利卡维尔 / 女 刘亦菲），改了性别默认皮相跟着换。
+- 签名 12 小时只能改一次。
+- 简称：数字、英文字母、汉字，1–10 个字，跟所有人的本名、简称都不能重复；短信、约会这些要填名字的地方都能用它代替本名
+  （roles.get_role_by_name 找不到本名时按简称再找一遍，所以各个指令不用单独适配）。填回自己的本名 = 清除简称。
+和小手机里的「微信名」是两回事：微信名只影响显示，简称是填指令用的。
+"""
+import re
+import time
+
+from .db import get_conn
+
+PREFIXES = ("修改性别", "修改年龄", "修改皮相", "修改签名", "修改简称")
+DEFAULT_LOOKS = {"男": "亨利卡维尔", "女": "刘亦菲"}
+BIO_COOLDOWN = 12 * 3600
+LOOK_MAX = 20
+BIO_MAX = 100
+SHORT_RE = re.compile(r"[0-9A-Za-z一-龥]{1,10}")
+
+
+def get(role_id: int) -> dict:
+    """{gender, age, look, bio, bio_ts, short}，没存过就是默认值。look 没自己填过时按性别给默认皮相。"""
+    with get_conn() as c:
+        r = c.execute("SELECT * FROM role_profiles WHERE role_id=?", (role_id,)).fetchone()
+    p = dict(r) if r else {"role_id": role_id, "gender": "女", "age": 18, "look": "", "bio": "", "bio_ts": 0, "short": ""}
+    p["look"] = p["look"] or DEFAULT_LOOKS.get(p["gender"], "")
+    return p
+
+
+def _save(role_id: int, **patch) -> None:
+    with get_conn() as c:
+        c.execute("INSERT OR IGNORE INTO role_profiles(role_id) VALUES(?)", (role_id,))
+        c.execute(f"UPDATE role_profiles SET {', '.join(k + '=?' for k in patch)} WHERE role_id=?", (*patch.values(), role_id))
+
+
+def short_owner(short: str):
+    """这个简称是谁的（roles 行），没有返回 None。"""
+    if not short:
+        return None
+    with get_conn() as c:
+        return c.execute("SELECT r.* FROM role_profiles p JOIN roles r ON r.id=p.role_id WHERE p.short=?", (short,)).fetchone()
+
+
+def name_taken(name: str, except_id: int = 0) -> bool:
+    """本名或简称里有没有别人在用这个名字。"""
+    with get_conn() as c:
+        return bool(c.execute("SELECT 1 FROM roles WHERE name=? AND id!=?", (name, except_id)).fetchone()
+                    or c.execute("SELECT 1 FROM role_profiles WHERE short=? AND role_id!=?", (name, except_id)).fetchone())
+
+
+def set_short(role, val: str) -> str:
+    if not val:
+        return "❌ 请输入简称，例：修改简称 小明"
+    if val == role["name"]:
+        _save(role["id"], short="")
+        return f"✅ 简称已清除，填名字时用本名「{role['name']}」。"
+    if not SHORT_RE.fullmatch(val):
+        return "❌ 简称只能是数字、英文字母、汉字，长度 1–10。"
+    if name_taken(val, role["id"]):
+        return f"❌ 「{val}」已经是别人的名字或简称了，换一个。"
+    _save(role["id"], short=val)
+    return f"✅ 简称已设为「{val}」，以后短信、约会等填名字的地方都能用它代替「{role['name']}」。"
+
+
+def edit_line(role, line: str, now: int | None = None) -> str:
+    """处理一行「修改xx 值」，返回回执。"""
+    line = line.strip()
+    key, val = line[:4], line[4:].strip()
+    if key == "修改性别":
+        if val not in ("男", "女"):
+            return "❌ 性别只能填：男 / 女"
+        _save(role["id"], gender=val)
+        return f"✅ 性别已改为：{val}"
+    if key == "修改年龄":
+        if not re.fullmatch(r"\d{1,5}", val) or int(val) > 10000:
+            return "❌ 年龄要填 0–10000 的整数，例：修改年龄 20"
+        _save(role["id"], age=int(val))
+        return f"✅ 年龄已改为：{int(val)}"
+    if key == "修改皮相":
+        if not val:
+            return "❌ 请输入明星名，例：修改皮相 刘亦菲"
+        if len(val) > LOOK_MAX or "\n" in val:
+            return f"❌ 皮相最多 {LOOK_MAX} 个字。"
+        _save(role["id"], look=val)
+        return f"✅ 皮相已改为：{val}"
+    if key == "修改签名":
+        if not val:
+            return "❌ 请输入签名内容，例：修改签名 愿岁月温柔以待"
+        if len(val) > BIO_MAX:
+            return f"❌ 签名最多 {BIO_MAX} 个字。"
+        now = now or int(time.time())
+        last = get(role["id"])["bio_ts"]
+        if last and now - last < BIO_COOLDOWN:
+            return f"⏳ 签名 12 小时只能改一次，还要等 {-(-(BIO_COOLDOWN - (now - last)) // 60)} 分钟。"
+        _save(role["id"], bio=val, bio_ts=now)
+        return f"✅ 签名已改为：{val}"
+    if key == "修改简称":
+        return set_short(role, val)
+    return f"❌ 认不出这一行：{line}"
+
+
+def edit(role, text: str) -> str:
+    """整条消息：一行一条，每行都要以「修改性别/年龄/皮相/签名/简称」开头。签名只能单独一行写，不跨行。"""
+    lines = [x.strip() for x in text.splitlines() if x.strip()]
+    if len(lines) > 1 and not all(x.startswith(PREFIXES) for x in lines):
+        return "❌ 一次改多项时，每一行都要以「修改性别 / 修改年龄 / 修改皮相 / 修改签名 / 修改简称」开头。"
+    return "\n".join(edit_line(role, x) for x in lines)
+
+
+def summary_lines(role) -> list[str]:
+    """给「我的角色」「创建回执」看的档案几行。"""
+    p = get(role["id"])
+    out = [f"👤 性别：{p['gender']}　年龄：{p['age']}", f"🌸 皮相：{p['look']}"]
+    if p["short"]:
+        out.append(f"🏷 简称：{p['short']}")
+    if p["bio"]:
+        out.append(f"✏️ 签名：{p['bio']}")
+    return out
+
+
+HELP = ("💡 可以发这些修改档案（可以一次发多行一起改，每行一条）：\n"
+        "  修改性别 男/女\n"
+        "  修改年龄 数字\n"
+        "  修改皮相 明星名\n"
+        "  修改签名 你的签名（12 小时能改一次）\n"
+        "  修改简称 简称（名字长的话，短信、约会等填名字的地方都能用简称代替本名）\n"
+        "例：\n  修改年龄 20\n  修改简称 阿明")
+
+
+def _all() -> list[dict]:
+    """所有角色 + 档案 + 有没有交二表，按建角色先后。"""
+    with get_conn() as c:
+        rows = [dict(r) for r in c.execute(
+            "SELECT r.id, r.name, r.is_npc, EXISTS(SELECT 1 FROM sheets s WHERE s.role_id=r.id AND s.kind='erbiao') AS erbiao "
+            "FROM roles r ORDER BY r.id")]
+    for r in rows:
+        r.update({k: v for k, v in get(r["id"]).items() if k != "role_id"})
+    return rows
+
+
+def look_wall() -> str:
+    """皮相墙：男生 / 女生 / NPC 三栏，嘉宾行首标二表交没交。（官方机器人发不了群公告，所以做成「查看皮相墙」指令）"""
+    rows = _all()
+    if not rows:
+        return "还没有角色。"
+    col = {"男": [], "女": []}
+    npcs = []
+    for r in rows:
+        if r["is_npc"]:
+            npcs.append(f"{r['name']}｜{r['look']}")
+        else:
+            col.setdefault(r["gender"], []).append(f"{'✅' if r['erbiao'] else '⬜'} {r['name']}｜{r['look']}")
+    out = ["🌸 皮相墙 🌸", "", "男生", *(col["男"] or ["（暂无）"]), "", "女生", *(col["女"] or ["（暂无）"])]
+    if npcs:
+        out += ["", "NPC", *npcs]
+    return "\n".join(out + ["", "✅ 已提交二表　⬜ 尚未提交"])
+
+
+def roster() -> str:
+    """玩家名单：嘉宾和 NPC 分两栏，每人一段（有简称的先写简称）。"""
+    rows = _all()
+    if not rows:
+        return "还没有角色。"
+    parts = {0: [], 1: []}
+    for r in rows:
+        lst = parts[1 if r["is_npc"] else 0]
+        head = f"{len(lst) + 1}. " + (f"{r['short']}（全名：{r['name']}）" if r["short"] else r["name"])
+        lines = [head, f"    {r['gender']} / {r['age']}岁 / 皮相：{r['look']}"]
+        if r["bio"]:
+            lines.append(f"    签名：{r['bio']}")
+        lst.append("\n".join(lines))
+    out = [f"👥 玩家名单（{len(parts[0])} 人）", *(parts[0] or ["（暂无）"])]
+    if parts[1]:
+        out += [f"🎭 NPC（{len(parts[1])} 人）", *parts[1]]
+    return "\n\n".join(out)

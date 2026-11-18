@@ -19,6 +19,7 @@ KEEP = 200
 DEFAULT_URL = "https://system.changri.work/api/errors"       # 主站（和更新服务同一个域名）；后台「基础」设置里可以改，清空 = 只存本机
 _lock = threading.Lock()
 _SECRET = re.compile(r"[A-Za-z0-9_\-]{24,}")
+_CODE_NAME = re.compile(r"_*[a-z][a-z0-9]*(?:_+[a-z0-9]+)+_*")   # 代码里的函数名（_get_authorization_header 这种 snake_case）不是密钥，不遮
 _DIGITS = re.compile(r"(?<!\d)\d{6,}(?!\d)")          # 群号、QQ 号、AppID 之类的长数字
 
 
@@ -30,8 +31,13 @@ def _marker():
     return db.DB_PATH.parent / ".running"
 
 
+def _mask(m) -> str:
+    return m.group(0) if _CODE_NAME.fullmatch(m.group(0)) else "<…>"
+
+
 def scrub(text: str) -> str:
-    return _DIGITS.sub("#", _SECRET.sub("<…>", text or ""))[:2000]
+    """遮掉密钥样的长串和长数字。不截长度——报错的真正原因在 trace 最后几行，由调用方决定留头还是留尾。"""
+    return _DIGITS.sub("#", _SECRET.sub(_mask, text or ""))
 
 
 def _version() -> str:

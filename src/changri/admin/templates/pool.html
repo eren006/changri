@@ -1,7 +1,8 @@
 {% extends "base.html" %}
-{% block title %}官方机器人的备用群池{% endblock %}
+{% block title %}纯官方模式（单骰）{% endblock %}
 {% block body %}
 {% import "_rpg_icons.html" as ic %}
+{% macro cancel() %}<button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button>{% endmacro %}
 <style>
 .pg{border:1px solid var(--card-line);box-shadow:var(--shadow-sm);border-radius:var(--r-card);background:var(--surface);padding:18px 22px;margin:0 0 14px}
 .pg .row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
@@ -14,62 +15,97 @@
 form.i{display:inline}
 @media(max-width:720px){.pg input[type=text],.pg textarea{font-size:16px;padding:10px 11px}.pg .row>div{flex:1 1 100%}.pg .meta{gap:6px 12px}}
 </style>
-<h1>官方机器人的备用群池（高级）</h1>
-<p class="lede">只有不用「连接群号组」、靠官方机器人被拉进的空群来开房间时才需要这页。用了群号组就不用管。进行中的房间在总览里看。</p>
-<p class="note">约会、电话、官约、心愿约会都要一个群。官方机器人建不了群，所以这里放一批你提前建好、把机器人拉进去的空群：机器人被拉进群、或在群里有人说话后，群会自动出现在下面；你给它填上群号（玩家要靠群号申请入群）、放进池子就行。房间结束后群会「等人退群」，等你确认群里的人都退光了再放回池。</p>
+<h1>纯官方模式（单骰）</h1>
+<p class="callout" style="margin:0 0 14px"><b>注意：这个模式下无法改群名（腾讯限制）。</b>QQ 官方机器人没有改群名的权限，房间开始、结束时群名都不会变；也查不了群里有谁。需要自动改群名，请用<a href="{{ url_for('qqlink_page') }}">结合QQ小号模式（双骰）</a>。</p>
+<p class="lede">约会、电话这些房间用的群，全部交给 QQ 官方机器人一个骰子管。不用另外装程序、不用 QQ 小号；但官方机器人<b>改不了群名、查不了群成员</b>：群名会一直是同一个；房间结束后，群会先停在「等人退群」，要你到群里确认上一场的人都退了，再点一下放回池，免得下一场的人看到他们。</p>
+<p class="note">为什么要人工确认：QQ 的「读取群成员」接口没有对所有官方机器人开放，现在只有少量白名单机器人能用，一般的官方机器人看不到群里有谁，也踢不了人。所以房间结束后只能靠管理员到群里看一眼。群准备得多，等人退群的时候也有空闲群可用；准备得少，可能会遇到「没有空闲群，约会开不成」。</p>
+<p class="note"><a href="https://system.changri.work/#/install#i-modes" target="_blank" rel="noopener">官网教程：选哪种模式、怎么设 →</a></p>
+<p class="note">想让群名跟着房间自动改、自动查谁在群里，用<a href="{{ url_for('qqlink_page') }}">结合QQ小号模式（双骰）</a>。两种可以混着用，但一个群同一时间只归一边。</p>
+
+<details class="callout" {{ 'open' if not sets }}>
+  <summary><b>每个备用群要这样设一次</b></summary>
+  <ol style="margin:12px 0 4px;padding-left:1.4em;line-height:1.8">
+    <li><b>拉官方机器人进群</b>：新建或拿一个空群，把官方机器人拉进来。</li>
+    <li><b>群主打开两个开关</b>：在群设置里点开这个机器人，「机器人可获取的群聊消息范围」选「获取群内全部消息」，打开「机器人主动在群聊内发言」。不开的话，机器人只听得到 @ 它的话，复盘记不全，也没法在群里发通知。只有群主能改；华为（鸿蒙）手机上的 QQ 可能找不到这两项，换一台别的手机试试。
+      <img src="{{ url_for('static', filename='qq-bot-group-permissions.jpg') }}" alt="群里的官方机器人设置：获取群内全部消息、机器人主动在群聊内发言已打开" width="393" height="171" style="display:block;max-width:100%;height:auto;margin:8px 0 4px;border-radius:8px"></li>
+    <li><b>让玩家能自己进群</b>：群设置的「开放设置」里，加群方式选「允许任何人加群」，群搜索方式选「通过群号搜索」。
+      <img src="{{ url_for('static', filename='qq-group-open-settings.png') }}" alt="QQ 群开放设置：允许任何人加群，通过群号搜索" width="312" height="157" style="display:block;max-width:100%;height:auto;margin:8px 0 4px;border-radius:8px"></li>
+    <li><b>群名改成「{{ free_name }}」</b>（空闲群名，可以改）。官方机器人改不了群名，这个群以后会一直叫这个名字，所以别带房间信息。
+      <details class="panel" style="margin:6px 0 2px"><summary class="btn sm ghost">改空闲群名</summary>
+        <form class="form" method="post" action="{{ url_for('backup_pool_free_name') }}">{{ csrf() }}
+          <div class="fields"><div><label for="fn">空闲群名</label><input id="fn" name="free_name" value="{{ free_name }}" maxlength="30"></div></div>
+          <p class="note">和「结合QQ小号模式（双骰）」页的空闲群名是同一个：小号的群房间结束后，小号会把群名改回这个。可以用 {set} 代表组名，比如「{set}·长日备用」。改了以后，已经在用的官方备用群要群主自己改群名。</p>
+          <div class="actions"><button class="btn" type="submit">保存</button>{{ cancel() }}</div>
+        </form></details></li>
+    <li><b>放进群池</b>：在这个群里发 <code>设为备用群 本群群号</code>，比如 <code>设为备用群 123456789</code>。<b style="color:var(--bad)">群号很重要，不要写错！</b>玩家就是靠它搜群、申请入群的，写错了他们就进不来。想分组就在后面加组名。发完这个群就出现在下面。</li>
+  </ol>
+</details>
+
+{% macro grow(g) %}
+<div class="row">
+  <div class="nm">{% if g.real_gid %}<b class="tabular">{{ g.real_gid }}</b>{% else %}<b style="color:var(--mute)">还没填群号</b>{% endif %}
+    {% if g.label %}<span class="muted">{{ g.label }}</span>{% endif %}
+    {% if g.handover == 'to_official' %}<span class="kind">归小号管</span>
+    {% else %}<span class="kind {{ {'free': 'ok', 'cleaning': 'warn'}.get(g.state, '') }}">{{ {'free': '空闲', 'occupied': '占用中', 'cleaning': '等人退群'}[g.state] }}</span>
+    {% if not g.in_pool %}<span class="kind">暂停使用</span>{% endif %}{% endif %}
+    {% if g.room_id %}<span class="muted">房间 <a href="{{ url_for('review_view', rid=g.room_id) }}">R{{ g.room_id }}</a></span>{% endif %}
+    {% if not g.real_gid %}<div class="muted">填上群号玩家才能申请入群：点「编辑」，或者在群里发「设为备用群 本群群号」。</div>{% endif %}
+  </div>
+  <div class="acts">
+    {% if g.state == 'cleaning' %}<form class="i" method="post" action="{{ url_for('backup_pool_clean', pid=g.id) }}">{{ csrf() }}<button class="btn sm">人已退光，放回池</button></form>{% endif %}
+    {% if g.handover == 'to_qq' %}<form class="i" method="post" action="{{ url_for('qqlink_to_qq', gid=g.real_gid) }}" onsubmit="return confirm('把这个群交回小号管？会先查小号在不在群里。')">{{ csrf() }}<input type="hidden" name="back" value="pool"><button class="btn sm ghost">转回小号群</button></form>
+    {% elif g.handover == 'to_official' %}<form class="i" method="post" action="{{ url_for('qqlink_to_official', gid=g.real_gid) }}" onsubmit="return confirm('把这个群交给官方机器人管？小号会先把群名改成空闲名。')">{{ csrf() }}<input type="hidden" name="back" value="pool"><button class="btn sm ghost">转到官方备用群</button></form>{% endif %}
+    {% if g.handover != 'to_official' %}
+    <details class="panel"><summary class="btn sm ghost">编辑</summary>
+      <form class="form" method="post" action="{{ url_for('backup_pool_save', pid=g.id) }}">{{ csrf() }}
+        <div class="fields">
+          <div><label>群号（玩家靠它申请入群）</label><input type="text" name="real_gid" value="{{ g.real_gid }}" placeholder="还没填" inputmode="numeric"></div>
+          <div><label>备注名（自己认得就行）</label><input type="text" name="label" value="{{ g.label }}"></div>
+          <div><label>归入组（可选）</label><input type="text" name="set_name" value="{{ g.set_name }}"></div>
+        </div>
+        <div class="actions"><button class="btn" type="submit">保存</button>{{ cancel() }}</div>
+      </form></details>
+    <form class="i" method="post" action="{{ url_for('backup_pool_toggle', pid=g.id) }}">{{ csrf() }}<input type="hidden" name="on" value="{{ 0 if g.in_pool else 1 }}"><button class="linkbtn" style="color:var(--ink)" title="{{ '暂停后不会再分给新房间，已经在用的不受影响' if g.in_pool else '之后可以分给新房间' }}">{{ '暂停使用该群' if g.in_pool else '成为可用备用群' }}</button></form>
+    {% endif %}
+    <form class="i" method="post" action="{{ url_for('backup_pool_delete', pid=g.id) }}" onsubmit="return confirm('从列表里删掉这个群？机器人下次在群里被看到还会再出现。')">{{ csrf() }}<button class="linkbtn">删除</button></form>
+  </div>
+</div>
+{% endmacro %}
+
 <section>
   <h2>现在的情况</h2>
-  <p>空闲 <b>{{ counts.free }}</b> · 占用 <b>{{ counts.occupied }}</b> · 等人退群 <b>{{ counts.cleaning }}</b> · 
-  {% if not counts.free %}<span style="color:var(--bad)">　没有空闲的群了，新的约会、电话会开不成（不排队）。多拉几个空群进来，或把等人退群的放回池。</span>{% endif %}</p>
-  {% if unfilled %}<p class="note">有 {{ unfilled }} 个群还没填群号。</p>{% endif %}
-  <span class="btns"><details class="panel"><summary class="btn ghost">{{ ic.tray() }}批量填群号</summary>
-    <form class="form" method="post" action="{{ url_for('backup_pool_bulk') }}">{{ csrf() }}
-      <label for="pb-nums">一行一个（或用逗号隔开）</label>
-      <textarea id="pb-nums" name="nums" rows="4" required placeholder="123456789&#10;987654321"></textarea>
-      <div class="fields"><div><label for="pb-set">归入组（可选）</label><input type="text" id="pb-set" name="set_name" placeholder="例如 A组"></div></div>
-      <p class="note">按「机器人先看到哪个群」的顺序，依次填给还没有群号的群；填完再逐个核对。</p>
-      <div class="actions"><button class="btn" type="submit">填入</button><button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
-    </form></details></span>
+  <p>空闲 <b>{{ counts.free }}</b> · 占用 <b>{{ counts.occupied }}</b> · 等人退群 <b>{{ counts.cleaning }}</b>
+  {% if not counts.free %}<span style="color:var(--bad)">　没有空闲的群了，新的约会、电话会开不成（不排队）。多拉几个空群进来，或者把等人退群的放回池。</span>{% endif %}</p>
+  {% if cleaning %}
+  <div class="callout" style="margin-top:10px">
+    <p style="margin:0 0 4px"><b>这些群要你处理：等人退群</b></p>
+    <p class="note" style="margin:0">房间结束后，机器人会在群里请大家退群，也会在后台群提醒你。官方机器人查不了群成员，也踢不了人：到群里看一眼，人都退光了（或者你把人移出去了），就点「人已退光，放回池」。不想上后台的话，管理员在那个群里发 <code>放回备用群</code> 也一样（在别的群发 <code>放回备用群 群号</code>）。</p>
+    <div class="rowlist">{% for g in cleaning %}{{ grow(g) }}{% endfor %}</div>
+  </div>
+  {% endif %}
 </section>
 
+<section>
+  <div class="sec-head keep"><h2>备用群<span class="n">{{ total }} 个</span></h2></div>
+  <p class="note">「暂停使用」的群不会再分给新房间，已经在用的不受影响。点「成为可用备用群」就能再用；整组也可以一起操作。</p>
 {% for set_name, gs in sets.items() %}
-<div class="setbar"><h3>{{ set_name }}</h3>
-  {% if set_name != '（未分组）' %}
-  <form class="i" method="post" action="{{ url_for('backup_pool_set') }}">{{ csrf() }}<input type="hidden" name="set_name" value="{{ set_name }}"><input type="hidden" name="on" value="1"><button class="btn sm ghost">整组放进池</button></form>
-  <form class="i" method="post" action="{{ url_for('backup_pool_set') }}">{{ csrf() }}<input type="hidden" name="set_name" value="{{ set_name }}"><input type="hidden" name="on" value="0"><button class="btn sm ghost">整组移出池</button></form>
-  {% endif %}</div>
-  {% for g in gs %}
-  <div class="pg">
-    <form method="post" action="{{ url_for('backup_pool_save', pid=g.id) }}">{{ csrf() }}
-      <div class="row">
-        <div><label>群号（玩家靠它申请入群）</label><input type="text" name="real_gid" value="{{ g.real_gid }}" placeholder="还没填"></div>
-        <div><label>备注名（自己认得就行）</label><input type="text" name="label" value="{{ g.label }}"></div>
-        <div><label>归入组（可选）</label><input type="text" name="set_name" value="{{ g.set_name }}"></div>
-        <div style="flex:0 0 auto"><button class="btn sm" type="submit">保存</button></div>
-      </div>
-    </form>
-    <div class="meta">
-      <b style="color:var(--ink)">群 {{ g.group_openid[:8] }}…</b>
-        <span class="st {{ g.state }}">{{ {'free':'空闲','occupied':'占用中','cleaning':'等人退群'}[g.state] }}</span>
-        <span>{{ '在池里' if g.in_pool else '不在池里' }}</span>
-        <form class="i" method="post" action="{{ url_for('backup_pool_toggle', pid=g.id) }}">{{ csrf() }}<input type="hidden" name="on" value="{{ 0 if g.in_pool else 1 }}"><button class="linkbtn" style="color:var(--ink)">{{ '移出池' if g.in_pool else '放进池' }}</button></form>
-        {% if g.state == 'cleaning' %}<form class="i" method="post" action="{{ url_for('backup_pool_clean', pid=g.id) }}">{{ csrf() }}<button class="btn sm">人已退光，直接放回池</button></form>{% endif %}
-        {% if g.room_id %}<span>房间 <a href="{{ url_for('review_view', rid=g.room_id) }}">R{{ g.room_id }}</a></span>{% endif %}
-      <form class="i" method="post" action="{{ url_for('backup_pool_delete', pid=g.id) }}" onsubmit="return confirm('从列表里删掉这个群？机器人下次在群里被看到还会再出现。')">{{ csrf() }}<button class="linkbtn">删除</button></form>
-
-    </div>
-  </div>
-  {% endfor %}
+  <div class="sec-head keep" style="margin-top:20px"><h3 style="margin:0;font:600 17px var(--sans)">{{ set_name }} <span class="n">{{ gs|length }} 个群</span></h3>
+    {% if set_name != '（未分组）' %}<div class="acts">
+    <form class="i" method="post" action="{{ url_for('backup_pool_set') }}">{{ csrf() }}<input type="hidden" name="set_name" value="{{ set_name }}"><input type="hidden" name="on" value="1"><button class="btn sm ghost">整组成为可用备用群</button></form>
+    <form class="i" method="post" action="{{ url_for('backup_pool_set') }}">{{ csrf() }}<input type="hidden" name="set_name" value="{{ set_name }}"><input type="hidden" name="on" value="0"><button class="btn sm ghost">整组暂停使用</button></form>
+    </div>{% endif %}</div>
+  <div class="rowlist">{% for g in gs %}{{ grow(g) }}{% endfor %}</div>
 {% else %}
-<p class="empty">还没有群。把机器人拉进一个空群，或在群里说句话，它就会出现在这里。也可以在群里发「设为备用群池 组名 群号」直接放进来。</p>
+  <p class="empty">还没有群。按上面「每个备用群要这样设一次」做，在群里发「设为备用群 本群群号」，群就会出现在这里。</p>
 {% endfor %}
+</section>
 
 {% if blocked %}
 <details class="pg" style="margin-top:20px">
   <summary style="cursor:pointer;font-weight:600">不能当房间的群（{{ blocked|length }} 个）</summary>
   <p class="note" style="margin:8px 0">这些群已经是玩家的个人群、戏群或公告群，不会被分给约会，也不用填群号。点「删除」只是不再在这里列出，机器人下次在群里被看到还会再出现。</p>
   <table class="rt">
-    {% for g in blocked %}<tr><td>群 {{ g.group_openid[:8] }}…</td><td>{{ g.conflict }}{% if g.owner %}：{{ g.owner }}{% endif %}</td>
+    {% for g in blocked %}<tr><td>{{ g.real_gid or ('群 ' ~ g.group_openid[:8] ~ '…') }}</td><td>{{ g.conflict }}{% if g.owner %}：{{ g.owner }}{% endif %}</td>
       <td><form class="i" method="post" action="{{ url_for('backup_pool_delete', pid=g.id) }}" onsubmit="return confirm('从列表里删掉这个群？机器人下次在群里被看到还会再出现。')">{{ csrf() }}<button class="linkbtn">删除</button></form></td></tr>{% endfor %}
   </table>
 </details>

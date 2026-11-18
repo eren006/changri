@@ -146,6 +146,7 @@
         {% else %}
         <div class="srow {{ 'stack' if f.kind != 'number' }}"><label class="sl" for="{{ f.key }}"><b>{{ f.label }}</b>{% if f.hint %}<span class="d">{{ f.hint }}</span>{% endif %}</label>
           {% if f.kind == 'number' %}<div class="sc"><input id="{{ f.key }}" type="number" inputmode="numeric" step="1" name="{{ f.key }}" value="{{ f.value }}">{% if f.unit %}<span class="unit">{{ f.unit }}</span>{% endif %}</div>
+          {% elif f.kind == 'lines' %}<div class="sc"><textarea id="{{ f.key }}" name="{{ f.key }}" rows="{{ f.rows }}" style="width:100%;box-sizing:border-box;resize:vertical;line-height:1.6">{{ f.value }}</textarea></div>
           {% else %}<div class="sc"><input id="{{ f.key }}" type="text" name="{{ f.key }}" value="{{ f.value }}"></div>{% endif %}</div>
         {% endif %}
         {% endfor %}

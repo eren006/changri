@@ -31,7 +31,8 @@ class FieldView(unittest.TestCase):
         self.assertEqual((f["kind"], f["unit"]), ("number", "秒"))
         f = field_view("gift_public_chance", "礼物公开概率（%）", "50", "50")
         self.assertEqual((f["kind"], f["unit"], f["hint"]), ("number", "%", ""))
-        self.assertEqual(field_view("hello_text", "/ping 的回复", "收到。", "收到。")["kind"], "text")
+        self.assertEqual(field_view("hello_text", "/ping 的回复", "收到。", "在！\n来了")["kind"], "lines")      # 多行文本框
+        self.assertEqual(field_view("brand_name", "团名", "", "x")["kind"], "text")
         self.assertEqual(field_view("lovemail_delivery_time", "每天派送时间（HH:MM）", "22:00", "22:00")["kind"], "text")
 
     def test_every_one_zero_setting_is_a_switch(self):

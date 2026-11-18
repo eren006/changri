@@ -166,8 +166,16 @@ class PlayE2E(unittest.TestCase):
         out = self.say("结束约会", member="M1", group="POOL0")
         self.assertTrue(any("已经结束" in o and "请退群" in o for o in out))
         self.assertFalse(any("[P0]" in o and "已结束" in o for o in out))                       # 正常结束不再往个人群发通知
-        self.assertEqual(pool.counts()["cleaning"], 0)                                           # 结束后群直接放回池
+        self.assertTrue(any("管理员确认人都退了" in o for o in out))
+        self.assertEqual(pool.counts()["cleaning"], 1)                                           # 官方机器人的群查不了人：先等人退群
+        self.assertEqual(pool.counts()["free"], 0)
+        set_config("pool_auto_free", "1")                                                        # 这个设置只管小号的群
+        self.assertEqual(pool.counts()["free"], 0)
+        self.assertIn("权限不足", self.say("放回备用群", member="M1", group="POOL0")[0])
+        self.assertIn("不是官方机器人的备用群", self.say("放回备用群 999999", member="ADMIN", group="ADM")[0])
+        self.assertIn("已放回备用群", self.say("放回备用群", member="ADMIN", group="POOL0")[0])       # 管理员确认人退光了
         self.assertEqual(pool.counts()["free"], 1)
+        self.assertIn("已经是空闲的备用群", self.say("放回备用群 1234560", member="ADMIN", group="ADM")[0])
 
     def test_gongzhi_erbiao_submit_and_view(self):
         """提交公知/二表（覆盖）；查看公知出长图；别人看公知要「展示公知」开着；二表只有本人能看。"""
@@ -400,6 +408,104 @@ class PlayE2E(unittest.TestCase):
         self.assertTrue(any("已拒绝" in o for o in self.say("拒绝时间线", member="M1", group="POOL0")))
         self.assertEqual(rooms.get(rid)["start_hm"], "16:00")
 
+    def test_sheet_submit_tells_backstage(self):
+        """提交公知/二表：公告群发「已经上交」一句；后台群收一份带内容的；公知再交是「修改了公知」；二表再交不发。"""
+        from changri.core import announce
+        announce.set_backstage("B1", "BACK")
+        announce.set_announce("B1", "ANN")
+        out = self.say("提交二表 我的二表")
+        self.assertTrue(any(o.startswith("[BACK]") and "甲 已经上交二表" in o and "我的二表" in o for o in out), out)
+        self.assertFalse(any(o.startswith("[BACK]") for o in self.say("提交二表 改过")))
+        self.assertTrue(any(o.startswith("[BACK]") and "甲 已经上交公知" in o for o in self.say("提交公知 公知一")))
+        out = self.say("提交公知 公知二")
+        self.assertTrue(any(o.startswith("[BACK]") and "甲 修改了公知" in o and "公知二" in o for o in out), out)
+        anns = [o for o in SENT if o.startswith("[ANN]")]                     # 公告群只有那一句，不带内容
+        self.assertEqual(len(anns), 3, anns)
+        self.assertTrue(all("我的二表" not in o and "公知一" not in o for o in anns))
+
+    def test_message_monitor(self):
+        """消息监听：官方机器人收到的（认出是谁的个人群、谁说的）+ QQ 小号在群号组听到的（按绑定的 QQ 认人）；关掉就不记。"""
+        from changri.core import msgmon, qqpool
+        from changri.core.qqlink import GroupMsg
+        from changri.plugins import msgmon as mon_plugin
+        msgmon.clear()
+        self.say("今天天气不错")
+        got = msgmon.since()
+        self.assertEqual((got[-1]["src"], got[-1]["group"], got[-1]["who"], got[-1]["text"]), ("official", "甲 的个人群", "甲", "今天天气不错"))
+        qqpool.add_rooms("B1", "100001", "A组")
+        roles.bind_qq(roles.get_role_by_name("乙")["id"], "666666")
+        mon_plugin._on_listened("B1", GroupMsg("9", "100001", "666666", "乙的昵称", "小号听到的", 1, "1"))
+        from changri.core.db import use_bot
+        with use_bot("B1"):                     # 小号那路在机器人自己的工作区里记（线上官方那路也是）
+            x = msgmon.since()[-1]
+        self.assertEqual((x["src"], x["who"], x["text"]), ("qq", "乙（QQ 666666）", "小号听到的"))
+        self.assertIn("100001", x["group"])
+        set_config("msgmon_enabled", "0")
+        n = len(msgmon.since())
+        self.say("关了以后说的")
+        self.assertEqual(len(msgmon.since()), n)
+
+    def test_end_room_no_announce(self):
+        """结束私约（官方机器人的群）：公告群什么都不发；清场提醒只发后台群，没设后台群就不发。"""
+        from changri.core import announce
+        self.add_pool(2)
+        announce.set_announce("B1", "ANN")
+        self.say("约会 1400-1500 咖啡厅 乙")
+        self.say("约会 1600-1700 咖啡厅 乙")
+        r1, r2 = sorted(r["id"] for r in rooms.timeline(roles.get_role_by_name("甲")["id"]))
+        out = self.say(f"结束约会 R{r1}")
+        self.assertTrue(out, out)
+        self.assertFalse(any(o.startswith("[ANN]") for o in out), out)
+        announce.set_backstage("B1", "BACK")
+        out = self.say(f"结束约会 R{r2}")
+        self.assertFalse(any(o.startswith("[ANN]") for o in out), out)
+        self.assertTrue(any(o.startswith("[BACK]") and "在等人退群" in o for o in out), out)
+
+    def test_create_role_receipt(self):
+        """建角色的回执：列出接下来能填/能改的东西，并说明名字写错要找管理员删。"""
+        out = self.say("创建新角色 丁", member="M9", group="P9")[0]
+        for word in ("创建好了", "提交公知", "提交二表", "换绑码", "我的", "找管理员"):
+            self.assertIn(word, out)
+        self.assertNotIn("提交公知", self.say("创建新角色 戊", member="M9", group="P9")[0])   # 失败时只回原因
+
+    def test_admin_delete_role_completely(self):
+        """后台彻底删除角色：TA 发起的房间整场删、群放回池子；别人发起的房间只拿掉 TA；QQ 绑定解除；之后能用同一个号重建。"""
+        self.add_pool(2)
+        self.say("约会 1400-1500 咖啡厅 乙")                                   # 甲发起
+        self.say("约会 1600-1700 公园 甲/丙", member="M1", group="P1")         # 乙发起，甲参加
+        jia = roles.get_role_by_name("甲")["id"]
+        own, other = sorted(r["id"] for r in rooms.timeline(jia))
+        roles.bind_qq(jia, "555555")
+        pid = rooms.get(own)["pool_id"]
+        res = roles.delete_role(jia)
+        self.assertEqual((res["name"], res["rooms"], res["joined"], res["qqs"]), ("甲", 1, 1, 1))
+        self.assertIsNone(rooms.get(own))
+        self.assertIsNotNone(rooms.get(other))
+        self.assertEqual({m["name"] for m in rooms.members(other)}, {"乙", "丙"})
+        with get_conn() as c:
+            self.assertEqual(c.execute("SELECT state FROM pool_groups WHERE id=?", (pid,)).fetchone()[0], "cleaning")
+            self.assertIsNone(c.execute("SELECT 1 FROM person_qq WHERE qq='555555'").fetchone())
+            self.assertIsNone(c.execute("SELECT 1 FROM role_groups WHERE role_id=?", (jia,)).fetchone())
+        self.assertIsNone(roles.delete_role(jia))
+        self.assertIn("创建好了", self.say("创建新角色 甲", member="M0", group="P0")[0])     # 同一个人、同一个群可以重建
+
+    def test_change_timeline_receipts(self):
+        """回执写清原时间→新时间、还在等谁；拒绝时申请人和其他人都收到通知。"""
+        self.add_pool(1)
+        self.say("约会 1400-1500 咖啡厅 乙/丙")
+        rid = rooms.timeline(roles.get_role_by_name("甲")["id"])[0]["id"]
+        out = self.say("修改时间线 D1 1600-1700", member="M0", group="POOL0")
+        self.assertIn("原来 D1 14:00-15:00", out[0])
+        self.assertIn("乙、丙", out[0])
+        out = self.say("同意时间线", member="M1", group="POOL0")
+        self.assertTrue(any("还在等：丙" in o for o in out), out)
+        out = self.say("拒绝时间线", member="M2", group="POOL0")
+        self.assertTrue(any("时间线保持 D1 14:00-15:00" in o and "已拒绝 甲 的申请" in o for o in out), out)
+        self.assertTrue(any(o.startswith("[P0]") and "拒绝了你" in o for o in out), out)       # 申请人
+        self.assertTrue(any(o.startswith("[P1]") and "拒绝了 甲 " in o for o in out), out)     # 同意过的人也知道作废了
+        self.assertEqual(rooms.get(rid)["start_hm"], "14:00")
+        self.assertIn("没有待处理", self.say("同意时间线", member="M1", group="POOL0")[0])
+
     def test_change_timeline_from_personal_group(self):
         """在个人群带房间号也能改：申请推到对方的个人群，对方在自己的个人群带房间号同意就生效。"""
         self.add_pool(1)
@@ -430,6 +536,82 @@ class PlayE2E(unittest.TestCase):
         self.assertFalse(r[0])
         self.assertIn("已移出", self.say("取消群池", member="ADMIN", group="X1")[0])
 
+    def test_set_backup_takes_group_from_qq(self):
+        """「设为备用群 群号」：群号必填；原来在小号群号组里的群挪到官方机器人名下，小号不再管，也不会再分给房间。"""
+        from changri.core import handover, qqpool
+        with get_conn() as c:
+            c.execute("DELETE FROM qq_groups")
+        self.assertIn("用法", self.say("设为备用群", member="ADMIN", group="X1")[0])
+        self.assertIn("权限不足", self.say("设为备用群 234567", group="X1")[0])
+        self.assertEqual(qqpool.join_set("B1", "234567", "A组"), "")
+        self.assertEqual(handover.owner("B1", "234567"), "qq")
+        out = self.say("设为备用群 234567", member="ADMIN", group="X1")[0]
+        self.assertIn("已设为官方机器人的备用群", out)
+        self.assertIn("已经从那边移出", out)
+        self.assertIn("请群主马上把群名改成「长日备用」", out)          # 测试里小号没连着，改不了名，要提醒群主
+        self.assertEqual(handover.owner("B1", "234567"), "official")
+        self.assertFalse(qqpool.in_pool("234567"))                       # 小号不再听这个群
+        self.assertEqual(pool.is_pool_group("B1", "X1")["set_name"], "A组")  # 沿用原来的组名
+        self.assertIn("现在归官方机器人管", qqpool.join_set("B1", "234567", "B组"))
+        self.assertEqual(pool.counts()["free"], 1)                       # 两行只算一个空群
+        self.say("约会 1400-1500 咖啡厅 乙")
+        self.assertEqual(pool.get(rooms.get(1)["pool_id"])["group_openid"], "X1")
+        self.assertIn("还在用", handover.check_to_qq("B1", "234567"))        # 占用中不能转回去
+
+    def test_official_room_all_here(self):
+        """官方机器人自己的房间群：参与者在群里说话就算到场，人齐了由官方机器人在群里发回执。"""
+        self.add_pool(1)
+        self.say("约会 1400-1500 咖啡厅 乙")
+        rid = rooms.get(1)["id"]
+        self.say("（推门进来）", member="M0", group="POOL0")
+        self.assertFalse(any("人都到齐了" in m for m in SENT))
+        self.say("（坐下）", member="M1", group="POOL0")
+        self.assertTrue(any(m.startswith("[POOL0]") and f"人都到齐了：R{rid}" in m for m in SENT), SENT[-3:])
+
+    def test_official_group_to_qq(self):
+        """「转为小号群」：一开始就是官方备用群的，小号在群里才转；转完以后后台按钮也能来回换。"""
+        from changri.core import handover, qqmanager, qqpool
+        with get_conn() as c:
+            c.execute("DELETE FROM qq_groups"); c.execute("DELETE FROM qq_links")
+        self.say("设为备用群 456789", member="ADMIN", group="X3")
+        self.assertIn("权限不足", self.say("转为小号群", group="X3")[0])
+        self.assertIn("还没有连 QQ 小号", self.say("转为小号群", member="ADMIN", group="X3")[0])
+        lid, _ = qqpool.add_link("小号", "ws://127.0.0.1:3001")
+        def _clean():
+            with get_conn() as c:
+                c.execute("DELETE FROM qq_groups"); c.execute("DELETE FROM qq_links")
+        self.addCleanup(_clean)
+        in_groups, renamed = [], []
+
+        async def fake_list(app_id, link_id, max_age=60):
+            return [{"group_id": g} for g in in_groups]
+
+        async def fake_rename(app_id, gid, name):
+            renamed.append((gid, name))
+            return ""
+        old = (qqmanager.group_list, qqmanager.rename)
+        qqmanager.group_list, qqmanager.rename = fake_list, fake_rename
+        self.addCleanup(lambda: (setattr(qqmanager, "group_list", old[0]), setattr(qqmanager, "rename", old[1])))
+        self.assertIn("小号不在群 456789 里", self.say("转为小号群", member="ADMIN", group="X3")[0])
+        self.assertEqual(handover.owner("B1", "456789"), "official")
+        in_groups.append(456789)
+        out = self.say("转为小号群 B组", member="ADMIN", group="X3")[0]
+        self.assertIn("已交给 QQ 小号管（组「B组」）", out)
+        self.assertIn("小号已把群名改成「长日备用」", out)
+        self.assertEqual(renamed, [("456789", "长日备用")])
+        self.assertEqual(handover.owner("B1", "456789"), "qq")
+        self.assertTrue(qqpool.in_pool("456789"))
+        self.assertTrue(pool.is_pool_group("B1", "X3")["moved"])          # 官方那行留着，以后能一键转回去
+        self.assertIn("不是官方机器人的备用群", self.say("转为小号群", member="ADMIN", group="X3")[0])
+        ok, why = handover.to_official("B1", "X3", "456789")             # 后台「转到官方备用群」
+        self.assertTrue(ok, why)
+        self.assertEqual(handover.owner("B1", "456789"), "official")
+        self.assertIn("已交给 QQ 小号管（组「B组」）", self.say("转为小号群", member="ADMIN", group="X3")[0])   # 沿用原来的组
+
+    def test_old_set_pool_with_gid_goes_through_handover(self):
+        self.assertIn("已设为官方机器人的备用群", self.say("设为备用群池 A组 345678", member="ADMIN", group="X2")[0])
+        self.assertEqual(pool.is_pool_group("B1", "X2")["real_gid"], "345678")
+
     def test_wipe_frees_pool(self):
         self.add_pool(1)
         self.say("约会 1400-1500 咖啡厅 乙")
@@ -459,16 +641,16 @@ class PlayE2E(unittest.TestCase):
         with get_conn() as c:
             c.execute("UPDATE rooms SET created_ts=?", (int(time.time()) - 21 * 3600,))    # 24 小时限时，还剩 3 小时
         self.assertEqual(rooms.expired(), [])
-        said, told = [], []
+        said = []
 
         async def fake_say(app, gid, text, ats):
             said.append((gid, text, ats))
             return ""
 
-        async def fake_announce(text):
-            told.append(text)
-        old_say, old_ann = qqmanager.room_say, play._tell_announce
-        qqmanager.room_say, play._tell_announce = fake_say, fake_announce
+        from changri.core import announce
+        announce.set_announce("B1", "ANN")
+        old_say = qqmanager.room_say
+        qqmanager.room_say = fake_say
         try:
             asyncio.run(play._warn_expiring())
             asyncio.run(play._warn_expiring())                                 # 第二次不再提醒
@@ -478,9 +660,9 @@ class PlayE2E(unittest.TestCase):
             self.assertEqual(said[0][2], ["555555"])                           # @ 绑了 QQ 的参与者
             asyncio.run(play._finish_room(rid, "ended", "", timeout=True))
             self.assertIn("结戏限时已到~请及时离开！", said[-1][1])
-            self.assertEqual(told[-1], f"R{rid}已经到了自动结戏时间，群号 100001 已放回群池，请退群！")
+            self.assertFalse(any(str(o).startswith("[ANN]") for o in SENT))      # 结束房间不往公告群发任何东西
         finally:
-            qqmanager.room_say, play._tell_announce = old_say, old_ann
+            qqmanager.room_say = old_say
 
     def test_qq_outage_moves_rooms_to_phone(self):
         """拉群 QQ 号掉线：通知所有玩家暂停 QQ 群、自动打开小手机并发激活码；掉线的房间在小手机上能写、记进同一份复盘；

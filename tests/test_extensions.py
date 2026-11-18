@@ -357,7 +357,13 @@ class ExtensionAdminTests(_PatchedDir):
         gid = pool.is_pool_group("B1", "OPENID_ABC")["id"]
         self.c.post(f"/backup-pool/{gid}/save", data={"real_gid": "777", "label": "一号", "set_name": "B组", "_csrf": token(self.c, "/backup-pool")})
         self.assertEqual(pool.get(gid)["real_gid"], "777")
-        self.c.post("/backup-pool/bulk", data={"nums": "1\n2", "set_name": "", "_csrf": token(self.c, "/backup-pool")})
+        self.assertIn("群名改成「长日备用」", self.c.get("/backup-pool").get_data(as_text=True))
+        self.c.post("/backup-pool/free-name", data={"free_name": "候场室", "_csrf": token(self.c, "/backup-pool")})
+        self.assertIn("群名改成「候场室」", self.c.get("/backup-pool").get_data(as_text=True))
+        from changri.core import qqpool
+        self.assertEqual(qqpool.free_name(), "候场室")                          # 小号的群也用同一个名字
+        self.c.post("/backup-pool/free-name", data={"free_name": "", "_csrf": token(self.c, "/backup-pool")})
+        self.assertEqual(qqpool.free_name(), "长日备用")                        # 清空就回到默认
         self.c.post(f"/backup-pool/{gid}/toggle", data={"on": "0", "_csrf": token(self.c, "/backup-pool")})
         self.assertEqual(pool.get(gid)["in_pool"], 0)
         self.c.post(f"/backup-pool/{gid}/delete", data={"_csrf": token(self.c, "/backup-pool")})

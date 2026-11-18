@@ -127,6 +127,56 @@ def claim_owner(gid: str, link_id: int) -> None:
         conn.execute("UPDATE qq_groups SET link_id=? WHERE gid=? AND link_id=0", (link_id, str(gid)))
 
 
+ALREADY = "这个群已经在池子里了"     # 在本机器人自己的池里；调用方按这句判断「已在池里，改成房间群」
+
+
+def _other_bots():
+    """逐个进入别的（启用中的）机器人的工作区，产出 (名字, 它启用着的 QQ 号连接编号)。
+    只有一个机器人（或旧的单机器人部署）时什么也不产出。"""
+    from . import botconf
+    from .db import current_bot, list_bot_ids, use_bot, workspace_path
+    me = current_bot()
+    if not me:
+        return
+    for b in list_bot_ids(only_enabled=True):
+        if not b or b == me or not workspace_path(b).exists():
+            continue
+        name = ((botconf.get_account(b) or {}).get("note") or "").strip() or b
+        with use_bot(b):
+            yield name, {ln["id"] for ln in links() if ln["enabled"]}
+
+
+def held_by_other_bots() -> dict[str, str]:
+    """别的机器人池子里的 QQ 群：{群号: 那个机器人的名字}。同一个 QQ 小号可以给几个机器人用，但一个群只能归一个机器人，
+    不然两边会同时领这个群开房、互相改群名。
+    只算那边还连着的：群所属的 QQ 号连接被删了或关了（小号已经从那个机器人解绑），这个群就不算占着。
+    官方机器人的备用群（在群里发过「设为备用群 群号」、还在池里的）不看小号连没连着，一直算。"""
+    out: dict[str, str] = {}
+    for name, on in _other_bots():
+        with get_conn() as conn:
+            for r in conn.execute(
+                    "SELECT real_gid FROM pool_groups WHERE group_openid NOT LIKE 'qq:%' AND real_gid!='' AND in_pool=1 AND moved=0"):
+                out.setdefault(r[0], name)
+            if not on:
+                continue
+            for r in conn.execute("SELECT q.gid, q.link_id FROM qq_groups q WHERE NOT EXISTS ("
+                                  "SELECT 1 FROM pool_groups p WHERE p.group_openid='qq:' || q.gid AND p.moved=1)"):
+                if r["link_id"] in on or not r["link_id"]:      # 手动贴的群没记是哪个号，那边有连着的号就算
+                    out.setdefault(r["gid"], name)
+    return out
+
+
+def auth_held_by_other_bots() -> dict[str, str]:
+    """别的机器人「授权的 QQ 号」：{QQ 号: 机器人名字}。同一个号在两边都授权，群里发一次「加入群号组」两边都会收，所以也不许重。"""
+    out: dict[str, str] = {}
+    for name, on in _other_bots():
+        if not on:                                              # 那边一个 QQ 号都没连着，指令根本收不到
+            continue
+        for q in auth_qqs():
+            out.setdefault(q, name)
+    return out
+
+
 def add_group(gid: str, note: str = "", kind: str = "listen", link_id: int = 0) -> str:
     gid = gid.strip()
     if not re.fullmatch(r"\d{5,12}", gid):
@@ -134,8 +184,17 @@ def add_group(gid: str, note: str = "", kind: str = "listen", link_id: int = 0) 
     if kind not in KINDS:
         return "类型不对"
     with get_conn() as conn:
+        mine = conn.execute("SELECT 1 FROM pool_groups WHERE real_gid=? AND group_openid NOT LIKE 'qq:%' AND in_pool=1 AND moved=0",
+                            (gid,)).fetchone()
+    if mine:
+        return f"群 {gid} 现在归官方机器人管（在群里发过「设为备用群」）。要交回小号，到「群池」页点「转回小号群」"
+    other = held_by_other_bots().get(gid)
+    if other:
+        return (f"群 {gid} 已经绑在机器人「{other}」上了。要在这里用它，先到「{other}」的后台把这个群从群号组移出，"
+                f"或者在那边把这个 QQ 小号的连接删掉（解绑）")
+    with get_conn() as conn:
         if conn.execute("SELECT 1 FROM qq_groups WHERE gid=?", (gid,)).fetchone():
-            return "这个群已经在池子里了"
+            return ALREADY
         conn.execute("INSERT INTO qq_groups(gid, note, kind, link_id, created_ts) VALUES(?,?,?,?,?)", (gid, note.strip()[:40], kind, link_id, int(time.time())))
     return ""
 
@@ -159,8 +218,10 @@ def list_groups() -> list[dict]:
 
 
 def in_pool(gid: str) -> bool:
+    """小号要不要管这个群：在 qq_groups 里，并且没有转给官方机器人（pool_groups 里 qq:群号 那一行 moved=1 就是转走了）。"""
     with get_conn() as conn:
-        return bool(conn.execute("SELECT 1 FROM qq_groups WHERE gid=?", (str(gid),)).fetchone())
+        return bool(conn.execute("SELECT 1 FROM qq_groups q WHERE q.gid=? AND NOT EXISTS ("
+                                 "SELECT 1 FROM pool_groups p WHERE p.group_openid='qq:' || q.gid AND p.moved=1)", (str(gid),)).fetchone())
 
 
 def openid_of(gid: str) -> str:
@@ -260,13 +321,14 @@ def add_rooms(bot_id: str, text: str, set_name: str = "", link_id: int = 0) -> t
         if not gid:
             continue
         err = add_group(gid, "", "room", link_id)
-        if err and "已经" not in err:
+        if err and err != ALREADY:
             bad.append(f"{gid}：{err}")
             continue
         if err:                                   # 已在池里：升成房间群
             update_group(gid, "", "room", "")
-        pool.register_qq(bot_id, gid, set_name)
-        pool.set_in_pool(pool.is_pool_group(bot_id, pool.QQ_PREFIX + gid)["id"], True)
+        pid = pool.register_qq(bot_id, gid, set_name)
+        _unmove(pid)                              # 走到这里说明官方机器人那边没在用这个群：小号这一行重新算数
+        pool.set_in_pool(pid, True)
         ok += 1
     return ok, bad
 
@@ -346,8 +408,24 @@ def auth_qqs() -> set[str]:
     return {x.strip() for x in get_config("qqlink_auth", "").splitlines() if x.strip()}
 
 
-def save_auth(text: str) -> None:
-    set_config("qqlink_auth", "\n".join(x.strip() for x in re.split(r"[\s,，]+", text) if x.strip()))
+def save_auth(text: str) -> list[str]:
+    """保存授权的 QQ 号。已经在别的机器人那边授权的号不保存，返回没保存的原因（一个号一条）。"""
+    others = auth_held_by_other_bots()
+    keep, bad = [], []
+    for q in (x.strip() for x in re.split(r"[\s,，]+", text)):
+        if not q or q in keep:
+            continue
+        if q in others:
+            bad.append(f"QQ {q} 已经是机器人「{others[q]}」的授权号了。要在这里授权，先到「{others[q]}」的后台把它从授权名单里删掉")
+            continue
+        keep.append(q)
+    set_config("qqlink_auth", "\n".join(keep))
+    return bad
+
+
+def _unmove(pool_id: int) -> None:
+    with get_conn() as conn:
+        conn.execute("UPDATE pool_groups SET moved=0 WHERE id=?", (pool_id,))
 
 
 def join_set(bot_id: str, gid: str, set_name: str, link_id: int = 0) -> str:
@@ -357,7 +435,7 @@ def join_set(bot_id: str, gid: str, set_name: str, link_id: int = 0) -> str:
     if not set_name or len(set_name) > 20:
         return "群号组名字要 1 到 20 个字"
     err = add_group(gid, "", "room", link_id)
-    if err and "已经" not in err:
+    if err and err != ALREADY:
         return err
     if err:
         update_group(gid, "", "room", "")
@@ -367,6 +445,7 @@ def join_set(bot_id: str, gid: str, set_name: str, link_id: int = 0) -> str:
     existing = [x for x in sets(bot_id) if x["name"] == set_name]
     keep_off = bool(existing) and not existing[0]["enabled"]            # 这个组已关着，新加的群也先关着
     pid = pool.register_qq(bot_id, gid, set_name)
+    _unmove(pid)                                                          # 官方机器人那边没在用（不然上面 add_group 就拦了）
     pool.update(pid, gid, pool.get(pid)["label"], set_name)               # 已在别的组时，改到这个组
     if keep_off:
         ok, why = pool.set_in_pool(pid, False)
@@ -395,7 +474,13 @@ def sets(bot_id: str) -> list[dict]:
     for g in pool.all_groups():
         if g["bot_id"] == bot_id and pool.is_qq_only(g):
             out.setdefault(g["set_name"] or "（未分组）", []).append(g)
-    return [{"name": k, "groups": v, "enabled": any(g["in_pool"] for g in v),
+    official = {g["real_gid"]: g for g in pool.all_groups()
+                if g["bot_id"] == bot_id and not pool.is_qq_only(g) and g["real_gid"]}
+    for v in out.values():
+        for g in v:
+            o = official.get(g["real_gid"])
+            g["official_id"] = o["id"] if o else 0          # 这个群也登记过官方机器人备用群：可以一键转过去 / 转回来
+    return [{"name": k, "groups": v, "enabled": any(g["in_pool"] for g in v if not g["moved"]) or (all(g["moved"] for g in v) and any(g["in_pool"] for g in v)),
              "busy": sum(1 for g in v if g["state"] != "free")} for k, v in out.items()]
 
 

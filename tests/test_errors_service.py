@@ -44,6 +44,23 @@ class ErrorsService(unittest.TestCase):
         self.assertEqual(code, 200); self.assertEqual(len(rows), 1)
         self.assertNotIn("123456789", rows[0]["message"]); self.assertNotIn("AbCdEf", rows[0]["message"])
 
+    def test_trace_keeps_tail_and_code_names(self):
+        """长 trace 留最后（真正的报错在最后一行）；snake_case 的函数名不当密钥遮掉，真密钥照遮。"""
+        from changri.core import errlog, db
+        old = db.DB_PATH
+        db.DB_PATH = Path(self.tmp.name) / "y.db"
+        self.addCleanup(setattr, db, "DB_PATH", old)
+        trace = "  File x.py, line 1\n" * 200 + "    await self._get_authorization_header()\nNetworkError: 连不上 bots.qq.com AbCdEfGhIjKlMnOpQrStUvWxYz"
+        errlog.record("error", "t.py:1", "Failed to get gateway info.", trace)
+        row = errlog.read_all()[-1]
+        self.assertTrue(row["trace"].endswith("连不上 bots.qq.com <…>"), row["trace"][-80:])
+        self.assertIn("_get_authorization_header", row["trace"])
+        ok = {"app": "changri_bot", "version": "0.21.8", "errors": [
+            {"ts": 1, "kind": "error", "source": "x", "message": "m", "trace": "开头" + "x" * 3000 + "结尾的报错", "version": "0.21.8"}]}
+        self.assertEqual(self.post(ok), 200)
+        rows = self.get("tok-for-test")[1]
+        self.assertTrue(any(r["trace"].endswith("结尾的报错") for r in rows), [r["trace"][-10:] for r in rows])
+
     def test_bad_input(self):
         self.assertEqual(self.post(b"not json", raw=True), 400)
         self.assertEqual(self.post({"errors": "x"}), 400)

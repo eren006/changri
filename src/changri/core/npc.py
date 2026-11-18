@@ -42,7 +42,7 @@ def create(name: str) -> tuple[bool, str]:
     if not _valid_name(name):
         return False, f"角色名要在 {NAME_MAX} 字以内，且不能带空格。"
     with get_conn() as c:
-        if c.execute("SELECT 1 FROM roles WHERE name=?", (name,)).fetchone():
-            return False, f"「{name}」已经有人用了，换一个名字。"
+        if c.execute("SELECT 1 FROM roles WHERE name=?", (name,)).fetchone() or c.execute("SELECT 1 FROM role_profiles WHERE short=?", (name,)).fetchone():
+            return False, f"「{name}」已经有人用了（本名或简称），换一个名字。"
         c.execute("INSERT INTO roles(name, member_openid, created_ts, is_npc) VALUES(?,?,?,1)", (name, "", int(time.time())))
     return True, f"已创建 NPC「{name}」（没有个人群，要进房间时由管理员安排）。"

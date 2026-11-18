@@ -48,7 +48,9 @@ async def _(bot: Bot, event: GroupMessageCreateEvent):
     if await _send_png(card, rpgcard.render_card, me["id"]):
         return
     info = rpgcard.data(me["id"])
-    lines = [f"🪪 {info['name']} 的角色卡"]
+    pf = info["profile"]
+    lines = [f"🪪 {info['name']} 的角色卡" + (f"（简称：{pf['short']}）" if pf["short"] else ""),
+             f"{pf['gender']} · {pf['age']} 岁 · 皮相 {pf['look']}"] + ([f"✏️ {pf['bio']}"] if pf["bio"] else [])
     if info["attrs"]:
         lines.append("属性：" + "、".join(f"{a['name']} {a['value']}" for a in info["attrs"]))
     if info["money"]:

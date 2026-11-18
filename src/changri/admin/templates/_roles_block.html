@@ -10,7 +10,7 @@
 {% for it in items %}
 <section>
   <div class="sec-head keep"><h3>{{ it.role.name }}<span class="n">{{ it.groups|length }} 个群</span></h3>
-    <form method="post" action="{{ url_for('delete_role', role_id=it.role.id) }}" onsubmit="return confirm('删除角色「{{ it.role.name }}」及其群、消息和关系线？这不能撤销。')">{{ csrf() }}<button class="linkbtn">删除角色</button></form>
+    <form method="post" action="{{ url_for('delete_role', role_id=it.role.id) }}" onsubmit="return confirm('彻底删除角色「{{ it.role.name }}」？TA 的群、短信、关系线、背包、朋友圈、时间线都会删掉，不能撤销。')">{{ csrf() }}<button class="linkbtn">删除角色</button></form>
   </div>
   <div class="rowlist">
     {% for g in it.groups %}

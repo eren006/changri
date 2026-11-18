@@ -11,7 +11,7 @@ from nonebot.params import CommandArg
 from nonebot.typing import T_State
 
 from changri.core.qqsend import download_images, make_send, recall_group_message, reply_buttons, reply_long, send_to_group  # noqa: E402
-from changri.core import admins, blocks, formats, forms, gifts, messaging, msgimages, roles, season, sendmsg, windows
+from changri.core import admins, blocks, charprofile, formats, forms, gifts, messaging, msgimages, roles, season, sendmsg, windows
 from changri.core.buttons import Btn
 from changri.core.db import get_config, get_conn, get_int, per_bot
 
@@ -54,7 +54,40 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
     if not season.running():           # 没有进行中的季度（筹备期也算进行中）就不能建角色
         await create_role.finish("现在没有进行中的季度，暂时不能创建新角色。等管理员开了季度（筹备期就可以）再来。")
     ok, msg = roles.create_role(parts[0], _bid(), event.group_openid, _sender(event), parts[1] if len(parts) == 2 else "")
-    await create_role.finish(msg)
+    await create_role.finish(formats.welcome(roles.get_role_by_name(parts[0])) if ok else msg)
+
+
+def _make_profile_cmd(prefix: str):
+    """修改性别 / 年龄 / 皮相 / 签名 / 简称：五个指令共用。一条消息可以写多行一起改（每行一条）。"""
+    m = _cmd(prefix)
+
+    @m.handle()
+    async def _(event: GroupMessageCreateEvent, args=CommandArg()):
+        role = _sender_role(event)
+        if not role:
+            await m.finish("你还没有角色。在你的个人群里发「创建新角色 名字」。")
+        await m.finish(charprofile.edit(role, prefix + " " + args.extract_plain_text().strip()))
+    return m
+
+
+for _p in charprofile.PREFIXES:
+    _make_profile_cmd(_p)
+
+
+look_wall = _cmd("查看皮相墙", {"皮相墙"})
+
+
+@look_wall.handle()
+async def _():
+    await reply_long(look_wall, charprofile.look_wall())
+
+
+roster_cmd = _cmd("玩家名单", {"角色名单"})
+
+
+@roster_cmd.handle()
+async def _():
+    await reply_long(roster_cmd, charprofile.roster())
 
 
 my_role = _cmd("我的角色", {"我的群"})
@@ -65,7 +98,7 @@ async def _(event: GroupMessageCreateEvent):
     role = _sender_role(event)
     if not role:
         await my_role.finish("你还没有角色。在你的个人群里发「创建新角色 名字」。")
-    lines = [f"角色：{role['name']}"]
+    lines = [f"角色：{role['name']}", *charprofile.summary_lines(role)]
     for i, g in enumerate(roles.list_groups(role["id"]), 1):
         kind = "个人群"
         tag = f"群号 {g['real_gid']}" if g["real_gid"] else "未登记群号"

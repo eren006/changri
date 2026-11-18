@@ -12,7 +12,7 @@ from nonebot.params import CommandArg
 
 from changri.core.qqsend import make_send, reply_buttons, reply_long, send_to_group  # noqa: E402
 from changri.core.buttons import Btn
-from changri.core import admins, announce, messaging, pending, pool, qqmanager, qqpool, roles, rooms, season, storycal, windows, wishes
+from changri.core import admins, announce, handover, messaging, pending, pool, qqmanager, qqpool, roles, rooms, season, storycal, windows, wishes
 from changri.core.db import get_config, get_conn, get_int, per_bot, set_config
 
 nonebot.require("nonebot_plugin_apscheduler")
@@ -57,19 +57,22 @@ async def _push_group(role_id: int, room) -> bool:
     return await _push(role_id, _group_line(room), at=False)
 
 
-async def _to_group(bot_id: str, group_openid: str, text: str) -> None:
+async def _to_group(bot_id: str, group_openid: str, text: str) -> bool:
+    """往房间群里说一句。返回是否发出去了。"""
     if group_openid.startswith(pool.QQ_PREFIX):          # 只有群号的房间群：卡拉不在里面，由监听的 QQ 号在群里说
         err = await qqmanager.room_say(bot_id, group_openid[len(pool.QQ_PREFIX):], text, [])
         if err:
             logger.warning(f"[房间] 群里发话失败：{err}")
-        return
+        return not err
     bot = nonebot.get_bots().get(bot_id)
     if bot is None:
-        return
+        return False
     try:
         await send_to_group(bot, group_openid, text)
+        return True
     except Exception as e:  # noqa: BLE001
         logger.warning(f"[房间] 发群失败：{e}")
+        return False
 
 
 from changri.core.overview import group_line as _group_line, slot_text as _slot  # noqa: E402
@@ -111,12 +114,6 @@ async def _announce_in_room(room_id: int) -> None:
     await _to_group(gi[0], gi[1], f"📌 R{room_id} {r['kind']}\n{_slot(r)}\n参与者：{mem}\n参与者请进群后在这里聊；聊完发「结束{r['kind']}」。群里没有的人，进群后随便说一句就算到场。")
 
 
-async def _tell_announce(text: str) -> None:
-    a = announce.get_announce()
-    if a:
-        await _to_group(a[0], a[1], text)
-
-
 # ================= 群池管理（管理员） =================
 
 @on_message(priority=1, block=False).handle()
@@ -124,12 +121,9 @@ async def _track_entered(bot: Bot, event: GroupMessageCreateEvent):
     """房间群里有人说话 = 到场。顺手把这个群登记进池子（机器人只能在有人说话时才知道群的 openid）。"""
     if not roles.find_group_binding(bot.self_id, event.group_openid):
         pool.note_group(bot.self_id, event.group_openid)
-    room = rooms.room_of_group(bot.self_id, event.group_openid)
-    if not room:
-        return
-    me = _me(bot, event)
-    if me:
-        rooms.mark_entered(room["id"], me["id"])
+    res = rooms.note_official_speech(bot.self_id, event.group_openid, event.author.member_openid)
+    if res and res["complete"]:                         # 最后一个人到了：官方机器人在群里发人齐回执
+        await _receipt_all_here(rooms.get(res["room_id"]))
 
 
 @nonebot.on_type(GroupAddRobotEvent, priority=9, block=False).handle()
@@ -137,22 +131,121 @@ async def _added(bot: Bot, event: GroupAddRobotEvent):
     pool.note_group(bot.self_id, event.group_openid)
 
 
-set_pool = _cmd("设为备用群池", {"设为群池"})
+set_pool = _cmd("设为备用群池", {"设为群池"})          # 老写法：设为备用群池 组名 群号（群号可以以后在后台补）
+set_backup = _cmd("设为备用群")                        # 新写法：设为备用群 群号 [组名]，群号必填
+
+
+def _pool_args(text: str) -> tuple[str, str]:
+    """参数里 5-12 位数字的是群号，其余的是组名（两种写法顺序不同，都认）。"""
+    gid, rest = "", []
+    for p in text.split():
+        if not gid and handover.GID_RE.fullmatch(p):
+            gid = p
+        else:
+            rest.append(p)
+    return gid, " ".join(rest)[:20]
+
+
+async def _take_over(bot: Bot, event: GroupMessageCreateEvent, gid: str, set_name: str) -> str:
+    """把这个群交给官方机器人。小号也管着这个群（在线）时，先让小号把群名改回空闲名。返回回复文字。"""
+    from changri.core.db import use_bot
+    why = handover.check_to_official(bot.self_id, event.group_openid, gid)
+    if why:
+        return f"❌ {why}"
+    a = handover.alt_row(bot.self_id, gid)
+    from_qq = bool(a and not a["moved"])
+    name = qqpool.free_name(set_name or (a["set_name"] if a else ""))
+    renamed = False
+    if from_qq:
+        with use_bot(bot.self_id):
+            renamed = not await qqmanager.rename(bot.self_id, gid, name)
+    ok, why = handover.to_official(bot.self_id, event.group_openid, gid, set_name)
+    if not ok:
+        return f"❌ {why}"
+    g = pool.is_pool_group(bot.self_id, event.group_openid)
+    head = (f"✅ 群 {gid} 已设为官方机器人的备用群" + (f"（组「{g['set_name']}」）" if g["set_name"] else "") +
+            f"。请核对一下 {gid} 是不是这个群的群号，写错了玩家会进不来（发错了就再发一次正确的）。")
+    if from_qq:
+        head += "它原来在 QQ 小号的群号组里，已经从那边移出，以后由官方机器人在这个群里记复盘、处理指令。"
+    tail = (f"\n群名已经由小号改成「{name}」。官方机器人改不了群名，以后会一直保持这个名字。" if renamed
+            else "\n" + handover.RENAME_ASK.format(name=name))
+    return head + tail + "\n请群主在群设置里给官方机器人打开「获取群内全部消息」和「主动在群聊内发言」。"
+
+
+@set_backup.handle()
+async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
+    if not _is_admin(bot, event):
+        await set_backup.finish(NOT_ADMIN)
+    gid, set_name = _pool_args(args.extract_plain_text())
+    if not gid:
+        await set_backup.finish("用法：在要当备用群的这个群里发「设为备用群 本群群号」，比如「设为备用群 123456789」。群号一定不要写错，玩家靠它申请入群。想分组就在后面加组名。")
+    await set_backup.finish(await _take_over(bot, event, gid, set_name))
 
 
 @set_pool.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     if not _is_admin(bot, event):
         await set_pool.finish(NOT_ADMIN)
-    parts = args.extract_plain_text().split()
-    set_name = parts[0] if parts else ""
-    real = parts[1] if len(parts) > 1 else ""
-    d = pool.is_pool_group(bot.self_id, event.group_openid)
-    pool.register(bot.self_id, event.group_openid, real_gid=real, set_name=set_name)
+    real, set_name = _pool_args(args.extract_plain_text())
+    if real:                                           # 带了群号：跟「设为备用群」一样（会从小号那边转过来）
+        await set_pool.finish(await _take_over(bot, event, real, set_name))
+    pool.register(bot.self_id, event.group_openid, real_gid="", set_name=set_name)
     ok, why = pool.set_in_pool(pool.is_pool_group(bot.self_id, event.group_openid)["id"], True)
     if not ok:
         await set_pool.finish(f"❌ {why}。")
-    await set_pool.finish("✅ 这个群已放进备用群池" + (f"（组「{set_name}」）" if set_name else "") + ("" if real else "。群号还没填，请在设置平台「群池」页补上，玩家要靠它申请入群。"))
+    await set_pool.finish("✅ 这个群已放进备用群池" + (f"（组「{set_name}」）" if set_name else "") + "。群号还没填，请在设置平台「群池」页补上，玩家要靠它申请入群。")
+
+
+to_qq_cmd = _cmd("转为小号群", {"设为小号群"})
+
+
+@to_qq_cmd.handle()
+async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
+    """官方机器人的备用群交给 QQ 小号：先确认小号此刻真在这个群里，再转；小号顺手把群名改成空闲名（改成了说明它是管理员）。"""
+    if not _is_admin(bot, event):
+        await to_qq_cmd.finish(NOT_ADMIN)
+    gid, why = handover.check_new_qq(bot.self_id, event.group_openid)
+    if why:
+        await to_qq_cmd.finish(f"❌ {why}。")
+    lid, why = await handover.alt_link_in_group(bot.self_id, gid)
+    if not lid:
+        await to_qq_cmd.finish(f"❌ 没转：{why}。")
+    ok, why, set_name = handover.to_new_qq(bot.self_id, event.group_openid, args.extract_plain_text().strip(), lid)
+    if not ok:
+        await to_qq_cmd.finish(f"❌ {why}。")
+    name = qqpool.free_name(set_name)
+    err = await qqmanager.rename(bot.self_id, gid, name)
+    tail = (f"小号已把群名改成「{name}」。" if not err else
+            f"小号没能改群名，多半还不是管理员：请群主把小号设为管理员（{err}）。")
+    await to_qq_cmd.finish(f"✅ 群 {gid} 已交给 QQ 小号管（组「{set_name}」），以后由小号改群名、查人、记复盘。{tail}\n"
+                           "想再交回官方机器人：发「设为备用群 本群群号」，或者在后台点「转到官方备用群」。")
+
+
+release_pool = _cmd("放回备用群", {"放回群池"})
+
+
+@release_pool.handle()
+async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
+    """管理员确认群里人都退光了：在这个群里发「放回备用群」，或者在别的群发「放回备用群 群号」，群就回到可用的备用群里。"""
+    if not _is_admin(bot, event):
+        await release_pool.finish(NOT_ADMIN)
+    gid = args.extract_plain_text().strip()
+    if gid:
+        with get_conn() as c:
+            g = c.execute("SELECT * FROM pool_groups WHERE bot_id=? AND real_gid=? AND group_openid NOT LIKE 'qq:%' AND moved=0",
+                          (bot.self_id, gid)).fetchone()
+        where = f"群 {gid}"
+    else:
+        g = pool.is_pool_group(bot.self_id, event.group_openid)
+        where = "这个群" + (f"（{g['real_gid']}）" if g and g["real_gid"] else "")
+    if not g:
+        await release_pool.finish(f"{where}不是官方机器人的备用群。" + ("" if gid else "要放回别的群，发「放回备用群 群号」。"))
+    if g["state"] == "occupied":
+        await release_pool.finish(f"{where}还在用（R{g['room_id']}），房间结束后再放回。")
+    if g["state"] == "free":
+        await release_pool.finish(f"{where}已经是空闲的备用群了，不用放回。")
+    pool.release(g["id"], "free")
+    await release_pool.finish(f"✅ {where}已放回备用群，可以分给下一场了。")
 
 
 unset_pool = _cmd("取消备用群池", {"取消群池"})
@@ -441,15 +534,20 @@ async def _finish_room(room_id: int, status: str, why: str, timeout: bool = Fals
                     await _push(rid, rewards.message(room_id, items))
             except Exception as e:  # noqa: BLE001
                 logger.warning(f"[结戏奖励] R{room_id} 结算失败：{e}")
-    if gi and gi[1].startswith(pool.QQ_PREFIX):                          # 房间群：群名改回「长日备用」（可在连接群号组页改）
+    if gi and gi[1].startswith(pool.QQ_PREFIX):                          # 房间群：群名改回「长日备用」（可在「结合QQ小号模式（双骰）」页改）
         await qqmanager.room_rename(gi[0], pool.get(room["pool_id"]), qqpool.free_name(pool.get(room["pool_id"])["set_name"]))
-    if gi:
+    if gi and gi[1].startswith(pool.QQ_PREFIX):                          # 小号的群：小号会自己查人，直接放回池
         if timeout:
             await _to_group(gi[0], gi[1], "结戏限时已到~请及时离开！")
-            await _tell_announce(f"R{room_id}已经到了自动结戏时间，{gi[2]} 已放回群池，请退群！")       # gi[2] 本身是「群号 xxx」
         else:
             await _to_group(gi[0], gi[1], f"{room['kind']}{verb}{why}，请退群！")
-            await _tell_announce(f"🧹 R{room_id} {room['kind']}{'已结束' if status == 'ended' else '已取消'}，{gi[2]} 已放回群池（下次分配前会查群里有没有玩家）。")
+    elif gi:                                                             # 官方机器人的群：查不了人，等管理员确认退光了再放回
+        head = "结戏限时已到~" if timeout else f"{room['kind']}{verb}{why}，"
+        await _to_group(gi[0], gi[1], head + "请退群！管理员确认人都退了，这个群才会给下一场用。")
+        staff = announce.get_backstage()                                 # 房间结束不往公告群发任何东西（Erin 要求）；清场提醒只发后台群，没设就不发
+        if staff:
+            await _to_group(staff[0], staff[1], f"🧹 {gi[2]}（R{room_id} 用过）在等人退群：到群里看一眼，人都退光了，"
+                                                f"在那个群里发「放回备用群」（或者在这里发「放回备用群 群号」），也可以到后台「纯官方模式」点「人已退光，放回池」，它才会分给下一场。")
 
 
 async def _warn_expiring() -> None:
@@ -568,7 +666,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     QQ 会把被引用的记录作为文字带过来（只有发送者和内容，没有时间），已有的跳过，缺的按顺序插进复盘。"""
     from changri.core import roomlog
     if get_config("qq_backfill_enabled", "1") != "1":
-        await backfill_cmd.finish("补录没有打开（管理员在设置平台「连接群号组」页打开）。")
+        await backfill_cmd.finish("补录没有打开（管理员在设置平台「结合QQ小号模式（双骰）」页打开）。")
     if not season.running():
         await backfill_cmd.finish("现在没有进行中的季度，补录只能补进进行中的季度。")
     arg = _room_arg(args.extract_plain_text())
@@ -765,6 +863,10 @@ async def _(bot: Bot, event: GroupMessageCreateEvent):
 chg = _cmd("修改时间线")
 
 
+def _when(room) -> str:
+    return f"D{room['day']} {room['start_hm']}-{room['end_hm']}"
+
+
 CHG_USAGE = "用法：修改时间线 [R房间号] [D几] 时间（在房间群里发可以不写房间号；在个人群发要带上）\n例：修改时间线 R12 D1 {t}"
 
 
@@ -791,16 +893,54 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     if not ok:
         await chg.finish(f"❌ {why}")
     r = room["id"]
+    old, new = _when(room), f"D{day} {hm[0]}-{hm[1]}"
     vote_btns = [Btn("同意", f"同意时间线 R{r}"), Btn("拒绝", f"拒绝时间线 R{r}", style="danger")]
+    others = [m for m in rooms.members(r) if m["role_id"] != me["id"]]
     if here and here["id"] == r:            # 在房间群里：大家都看得到，直接在群里挂按钮
-        await reply_buttons(chg, f"📝 {me['name']} 申请把时间线改成 D{day} {hm[0]}-{hm[1]}。其他人发「同意时间线」，全部同意后生效；不同意发「拒绝时间线」。",
+        await reply_buttons(chg, _propose_in_room(me, room, others, day, hm),
                             [Btn("同意时间线", "同意时间线"), Btn("拒绝时间线", "拒绝时间线", style="danger")], per_row=2)
         await chg.finish()
-    others = [m for m in rooms.members(r) if m["role_id"] != me["id"]]   # 在个人群发的：房间里的人看不到，推到他们各自的个人群
-    for m in others:
-        await _push(m["role_id"], f"📝 {me['name']} 申请把 R{r} {room['kind']}的时间线改成 D{day} {hm[0]}-{hm[1]}。\n"
+    for m in others:                        # 在个人群发的：房间里的人看不到，推到他们各自的个人群
+        await _push(m["role_id"], f"📝 {me['name']} 申请把 R{r} {room['kind']}的时间线改成 {new}（原来 {old}）。\n"
                                   f"同意发「同意时间线 R{r}」，不同意发「拒绝时间线 R{r}」。全部同意后生效。", buttons=vote_btns)
-    await chg.finish(f"📝 已申请把 R{r} 的时间线改成 D{day} {hm[0]}-{hm[1]}，已通知" + "、".join(m["name"] for m in others) + "，全部同意后生效。")
+    await chg.finish(f"📝 已申请把 R{r} 的时间线从 {old} 改成 {new}，已通知" + "、".join(m["name"] for m in others) + "，全部同意后生效。\n"
+                     f"在那之前时间线还是 {old}。")
+
+
+async def _vote_result(room, me, agree: bool, in_room: bool) -> str:
+    """同意/拒绝时间线：记票、通知相关的人、生效时改房间群名，返回给投票人的回执。卡拉在群里和 QQ 号听到的两条路共用。"""
+    rid, old = room["id"], _when(room)
+    st, ch = rooms.vote_change(rid, me["id"], agree)
+    if st == "none":
+        return f"R{rid} 现在没有待处理的时间线申请（可能已经生效或被拒绝了）。发「时间线」看当前安排。"
+    new = f"D{ch['day']} {ch['a']}-{ch['b']}"
+    by = roles.get_role(ch["by"])
+    by_name = by["name"] if by else "对方"
+    if st == "rejected":
+        for m in rooms.members(rid):        # 申请人和其他收到申请的人都告诉一声，免得还在等
+            if m["role_id"] != me["id"]:
+                mine = m["role_id"] == ch["by"]
+                await _push(m["role_id"], f"❌ {me['name']} 拒绝了{'你' if mine else ' ' + by_name + ' '}把 R{rid} 改到 {new} 的申请，"
+                                          f"时间线保持 {old}。")
+        return f"已拒绝 {by_name} 的申请（改到 {new}），R{rid} 的时间线保持 {old}。" + ("" if in_room else "已通知其他参与者。")
+    if st == "waiting":
+        wait = [m["name"] for m in rooms.members(rid) if not m["agree"]]
+        return f"已记下你同意改到 {new}。还在等：{'、'.join(wait)}。全部同意后生效。"
+    for m in rooms.members(rid):
+        await _push(m["role_id"], f"✅ R{rid} {room['kind']}的时间线已从 {old} 改为 {new}，所有人的时间线都已更新。")
+    r2 = rooms.get(rid)
+    gi = rooms.group_info(r2) if r2 else None
+    if gi and gi[1].startswith(pool.QQ_PREFIX):             # 房间群群名里带着时间，改了要跟着改
+        try:
+            await qqmanager.room_rename(gi[0], pool.get(r2["pool_id"]), qqpool.room_name(r2, [m["name"] for m in rooms.members(rid)]))
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[房间] 改时间后改群名失败：{e}")
+    return f"✅ 全部同意，时间线已改为 {new}（原来 {old}）。"
+
+
+def _propose_in_room(me, room, others, day: int, hm) -> str:
+    return (f"📝 {me['name']} 申请把时间线改成 D{day} {hm[0]}-{hm[1]}（原来 {_when(room)}）。\n"
+            f"要 {'、'.join(m['name'] for m in others)} 都发「同意时间线」才生效；不同意发「拒绝时间线」，申请作废、时间不变。")
 
 
 async def _vote(matcher, bot: Bot, event: GroupMessageCreateEvent, args, agree: bool):
@@ -813,17 +953,7 @@ async def _vote(matcher, bot: Bot, event: GroupMessageCreateEvent, args, agree: 
         await matcher.finish("请在约会房间的群里发（或带上房间号：拒绝时间线 R12）。")
     if not any(m["role_id"] == me["id"] for m in rooms.members(room["id"])):
         await matcher.finish("你不是这个房间的参与者。")
-    st, ch = rooms.vote_change(room["id"], me["id"], agree)
-    if st == "none":
-        await matcher.finish("现在没有待处理的时间线申请。")
-    if st == "rejected":
-        await _push(ch["by"], f"❌ {me['name']} 拒绝了 R{room['id']} 的时间线修改。")
-        await matcher.finish("已拒绝，申请作废。")
-    if st == "waiting":
-        await matcher.finish("已记下你同意，等其他人。")
-    for m in rooms.members(room["id"]):
-        await _push(m["role_id"], f"✅ R{room['id']} 时间线已改为 D{ch['day']} {ch['a']}-{ch['b']}。")
-    await matcher.finish(f"✅ 全部同意，时间线已改为 D{ch['day']} {ch['a']}-{ch['b']}。")
+    await matcher.finish(await _vote_result(room, me, agree, rooms.room_of_group(bot.self_id, event.group_openid) is not None))
 
 
 agree_tl = _cmd("同意时间线")
@@ -936,6 +1066,13 @@ async def _receipt_all_here(room) -> None:
         if not err:
             return
         logger.warning(f"[房间] R{room['id']} 群里发人齐提示失败，改发各人自己的群：{err}")
+    elif gi:                                          # 官方机器人的房间群：由它在群里说（要群主开了「主动在群聊内发言」）
+        names = "、".join(m["name"] for m in mem)
+        text = (f"✅ 人都到齐了：R{room['id']} {room['kind']}\n时间地点：{_slot(room)}\n参与者：{names}\n"
+                f"聊完了，直接在这个群里发「结束{room['kind']}」就行。")
+        if await _to_group(gi[0], gi[1], text):
+            return
+        logger.warning(f"[房间] R{room['id']} 官方机器人在群里发人齐提示失败，改发各人自己的群")
     for m in mem:
         await _push(m["role_id"], f"✅ R{room['id']} {room['kind']}：人都到齐了。\n{_slot(room)}\n聊完了发「结束{room['kind']} R{room['id']}」。")
 
@@ -996,20 +1133,10 @@ async def _listen_cmd(app_id, msg) -> bool:
             await say(f"用法：修改时间线 [D几] 时间\n例：修改时间线 D1 {storycal.example_time()}")
             return True
         ok, why = rooms.propose_change(room["id"], me["id"], day, *hm)
-        await say(f"📝 {me['name']} 申请把时间线改成 D{day} {hm[0]}-{hm[1]}。其他人发「同意时间线」，全部同意后生效；不同意发「拒绝时间线」。" if ok else f"❌ {why}")
+        others = [x for x in rooms.members(room["id"]) if x["role_id"] != me["id"]]
+        await say(_propose_in_room(me, room, others, day, hm) if ok else f"❌ {why}")
     else:
-        st, ch = rooms.vote_change(room["id"], me["id"], cmd == "同意时间线")
-        if st == "none":
-            await say("现在没有待处理的时间线申请。")
-        elif st == "rejected":
-            await _push(ch["by"], f"❌ {me['name']} 拒绝了 R{room['id']} 的时间线修改。")
-            await say("已拒绝，申请作废。")
-        elif st == "waiting":
-            await say("已记下你同意，等其他人。")
-        else:
-            for x in rooms.members(room["id"]):
-                await _push(x["role_id"], f"✅ R{room['id']} 时间线已改为 D{ch['day']} {ch['a']}-{ch['b']}。")
-            await say(f"✅ 全部同意，时间线已改为 D{ch['day']} {ch['a']}-{ch['b']}。")
+        await say(await _vote_result(room, me, cmd == "同意时间线", True))
     return True
 
 

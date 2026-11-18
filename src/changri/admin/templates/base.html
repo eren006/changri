@@ -300,9 +300,10 @@ tr:last-child td{border-bottom:0}
     <nav aria-label="主导航">
       {% set groups = [
         ('', [('dashboard','总览')]),
-        ('通用', [('autoreply_page','自定义回复'),('extensions_page','功能与设置'),('admins_page','QQ 管理员'),('qqlink_page','连接群号组'),('images_page','图片管理'),('tools_page','小工具')]),
+        ('模式', [('backup_pool_page','纯官方模式（单骰）'),('qqlink_page','结合QQ小号模式（双骰）')]),
+        ('通用', [('autoreply_page','自定义回复'),('extensions_page','功能与设置'),('admins_page','QQ 管理员'),('images_page','图片管理'),('msgmon_page','消息监听'),('tools_page','小工具')]),
         ('恋综', [('rpg_attrs_page','属性与货币'),('season_page','季度与出场'),('lovemail_page','心动信'),('relations_page','公知、二表与关系线'),('collect_page','官约 · 收集 · 复盘'),('god_page','上帝模式')]),
-        ('跑团', [('trpg_page','角色库'),('trpglog_page','日志')]),
+        ('跑团', [('trpg_page','角色库'),('trpglog_page','日志'),('dice_lines_page','台词')]),
       ] if in_bot else [] %}
       {% set extras = [('forum_page','论坛'),('rpg_page','物品与商城'),('rpg_places_page','地点'),('rewards_page','结戏奖励'),('alarm_page','群体闹钟'),('phone_page','小手机'),('giftshop_page','礼品店'),('gacha_page','抽取池'),('sighting_page','目击'),('precall_admin','前置电话')] %}
       {% for title, items in groups %}

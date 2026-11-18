@@ -114,3 +114,24 @@ MINE: list[tuple[str, str, Callable[[], bool]]] = [
 
 def mine() -> list[tuple[str, str]]:
     return [(label, cmd) for label, cmd, on in MINE if on()]
+
+
+def welcome(role) -> str:
+    """「创建新角色」成功后的回执：初始档案 + 能改的档案 + 接下来能填什么。只列开着的功能。
+    名字建好后玩家自己改不了（写错了找管理员在后台删掉重建），所以这里提一句。"""
+    from . import charprofile, extensions
+    from .db import get_config
+    lines = [f"✅ 角色「{role['name']}」创建好了，这个群就是你的个人群。", "", "你的初始档案：", *charprofile.summary_lines(role),
+             "", charprofile.HELP, "", "📎 其他可以填的："]
+    lines.append("  提交公知 内容（可以带图，重复提交会覆盖）")
+    lines.append("  提交二表 内容（同上）")
+    if get_config("dice_enabled", "1") == "1":
+        lines.append("  录属性 力量60 敏捷70（跑团检定用，可以一次写多项）")
+    if extensions.is_enabled("phone"):
+        lines.append("  手机码：打开小手机，在「我的」里改微信名、换头像")
+    lines.append("  换绑码：以后要换个人群时用")
+    lines += ["", "📋 发「我的」随时查看时间线、待回、数量这些自查。",
+              "👥 发「玩家名单」看所有角色，「查看皮相墙」看大家的皮相。",
+              "📝 发「格式」看短信、约会等指令怎么写。",
+              "", "名字建好后自己改不了，写错了请找管理员在后台删掉重建。"]
+    return "\n".join(lines)

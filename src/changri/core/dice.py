@@ -7,6 +7,7 @@
 """
 from __future__ import annotations
 
+import json
 import random
 import re
 from typing import Callable
@@ -299,8 +300,45 @@ DND_REMARKS = {
 }
 
 
+# 后台「跑团 → 台词」可以改上面每一组的句子（一组可以写好几句，掷骰时随机挑一句；清空 = 恢复成这里的默认）。
+# 改过的存在设置 dice_lines（JSON：{"coc.大成功": ["…", "…"], …}），没改过的照旧用上面的默认。
+POOLS = {"coc": LEVEL_REMARKS, "upset": UPSET, "rd": RD_REMARKS, "multi": MULTI_ROLL, "dnd": DND_REMARKS}
+_POOL_OF = {id(v): k for k, v in POOLS.items()}
+LINE_GROUPS = [
+    ("COC / 绿色三角洲 检定（/ra）", "coc", [("大成功", "大成功"), ("极难成功", "极难成功"), ("困难成功", "困难成功"),
+                                        ("成功", "成功"), ("失败", "失败"), ("大失败", "大失败")]),
+    ("意外结果（COC 检定，有六成机会替换上面那句）", "upset", [("high_fail", "数值 ≥70 却失败"), ("low_success", "数值 ≤30 却成功")]),
+    ("通用掷骰（/rd）", "rd", [("max", "掷出最大值"), ("high", "偏高"), ("mid", "中间"), ("low", "偏低"), ("min", "掷出最小值")]),
+    ("连掷几轮（/rd 3#…）", "multi", [("all_same", "每轮一样"), ("spread_big", "起伏大"), ("spread_small", "很接近")]),
+    ("DND 检定 / 攻击", "dnd", [("nat20", "自然 20"), ("nat1", "自然 1"), ("pass", "通过 DC"), ("fail", "没通过 / 没命中")]),
+]
+LINES_KEY = "dice_lines"
+
+
+def custom_lines() -> dict[str, list[str]]:
+    """后台改过的台词 {"coc.大成功": [...]}；读不出来当没改过。"""
+    from .db import get_config
+    try:
+        data = json.loads(get_config(LINES_KEY, "") or "{}")
+    except ValueError:
+        return {}
+    return {k: [str(x) for x in v] for k, v in data.items() if isinstance(v, list)} if isinstance(data, dict) else {}
+
+
+def save_custom_lines(data: dict[str, list[str]]) -> None:
+    """只存和默认不一样的；整组和默认一样、或者清空了，就当没改过（用默认）。"""
+    from .db import set_config
+    out = {}
+    for k, lines in data.items():
+        pool, _, key = k.partition(".")
+        if pool in POOLS and key in POOLS[pool] and lines and lines != POOLS[pool][key]:      # 空的 = 用默认
+            out[k] = lines
+    set_config(LINES_KEY, json.dumps(out, ensure_ascii=False) if out else "")
+
+
 def _pick(pool: dict, key: str) -> str:
-    return random.choice(pool[key])
+    lines = custom_lines().get(f"{_POOL_OF.get(id(pool), '')}.{key}") or pool[key]
+    return random.choice(lines) if lines else ""
 
 
 def _rd_remark(node, total: int) -> str:

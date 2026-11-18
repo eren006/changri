@@ -172,6 +172,71 @@ class AdminMultiBot(unittest.TestCase):
         i = html.index("空闲的房间群")
         self.assertIn('<span class="v">1</span>', html[i - 200:i])          # 只有 G2 空着
 
+    def test_msgmon_page(self):
+        from changri.core import msgmon
+        base = "/b/111111"
+        with db.use_bot("111111"):
+            msgmon.clear()
+            msgmon.record("official", "甲 的个人群", "甲", "<b>你好</b>")
+        page = self.c.get(f"{base}/monitor").get_data(as_text=True)
+        self.assertIn("甲 的个人群", page)
+        self.assertIn("&lt;b&gt;你好", page)                                # 内容要转义
+        with db.use_bot("111111"):
+            msgmon.record("qq", "备用群 123", "QQ 1", "第二条")
+            first = msgmon.since()[0]["id"]
+        items = self.c.get(f"{base}/monitor/feed?after={first}").get_json()["items"]
+        self.assertEqual([x["text"] for x in items], ["第二条"])
+
+    def test_dice_lines_page(self):
+        """跑团台词：框里预填默认；改了的档按自己的句子随机说；清空保存 = 用默认；恢复默认回到原样。"""
+        from changri.core import dice
+        base = "/b/111111"
+        page = self.c.get(f"{base}/dice/lines").get_data(as_text=True)
+        self.assertIn("漂亮，干净利落。", page)
+        tok = self._csrf(f"{base}/dice/lines")
+        form = {"_csrf": tok}
+        for _t, pool, keys in dice.LINE_GROUPS:
+            for key, _l in keys:
+                form[f"{pool}.{key}"] = "\n".join(dice.POOLS[pool][key])
+        form["coc.大成功"] = "神了！\n\n天选之人。"
+        form["coc.失败"] = "差一点点"
+        self.c.post(f"{base}/dice/lines", data=form)
+        with db.use_bot("111111"):
+            self.assertEqual(dice.custom_lines(), {"coc.大成功": ["神了！", "天选之人。"], "coc.失败": ["差一点点"]})
+            self.assertIn(dice._pick(dice.LEVEL_REMARKS, "大成功"), ("神了！", "天选之人。"))
+        form["coc.失败"] = ""                                                    # 清空保存：回到默认
+        self.c.post(f"{base}/dice/lines", data=form)
+        with db.use_bot("111111"):
+            self.assertNotIn("coc.失败", dice.custom_lines())
+            self.assertIn(dice._pick(dice.LEVEL_REMARKS, "失败"), dice.LEVEL_REMARKS["失败"])
+        form["coc.失败"] = "差一点点"
+        self.c.post(f"{base}/dice/lines", data=form)
+        with db.use_bot("111111"):
+            self.assertIn(dice._pick(dice.LEVEL_REMARKS, "成功"), dice.LEVEL_REMARKS["成功"])     # 没改的照旧
+        self.assertIn("已改", self.c.get(f"{base}/dice/lines").get_data(as_text=True))
+        self.c.post(f"{base}/dice/lines/reset", data={"k": "coc.失败", "_csrf": tok})
+        with db.use_bot("111111"):
+            self.assertEqual(list(dice.custom_lines()), ["coc.大成功"])
+        self.c.post(f"{base}/dice/lines/reset", data={"k": "*", "_csrf": tok})
+        with db.use_bot("111111"):
+            self.assertEqual(dice.custom_lines(), {})
+
+    def test_god_erase_role(self):
+        """上帝模式里彻底删除角色：要输对角色名才删。"""
+        base = "/b/111111"
+        roles.create_role("录错", "B1", "P0", "M0")
+        with db.get_conn() as c:
+            rid = c.execute("SELECT id FROM roles WHERE name='录错'").fetchone()["id"]
+        page = self.c.get(f"{base}/god?role={rid}").get_data(as_text=True)
+        self.assertIn("彻底删除这个角色", page)
+        tok = self._csrf(f"{base}/god?role={rid}")
+        r = self.c.post(f"{base}/god/{rid}/erase", data={"confirm": "录", "_csrf": tok}, follow_redirects=True)
+        self.assertIn("角色名没对上", r.get_data(as_text=True))
+        self.assertIsNotNone(roles.get_role(rid))
+        r = self.c.post(f"{base}/god/{rid}/erase", data={"confirm": "录错", "_csrf": tok}, follow_redirects=True)
+        self.assertIn("已彻底删除角色「录错」", r.get_data(as_text=True))
+        self.assertIsNone(roles.get_role(rid))
+
     def test_god_mode_page(self):
         base = "/b/111111"
         from changri.core import roles as roles_c

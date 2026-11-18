@@ -97,6 +97,21 @@ def register(app, login_required):
         flash(msg)
         return _god_back(role_id)
 
+    @app.post("/god/<int:role_id>/erase")
+    @login_required
+    def god_erase(role_id):
+        from changri.core import roles as roles_core
+        from changri.features.roles.admin import deleted_text
+        role = roles_core.get_role(role_id)
+        if not role:
+            flash("这个角色已经不在了。")
+            return redirect(url_for("god_page"))
+        if request.form.get("confirm", "").strip() != role["name"]:
+            flash("角色名没对上，没有删除。")
+            return _god_back(role_id)
+        flash(deleted_text(roles_core.delete_role(role_id)))
+        return redirect(url_for("god_page"))
+
     @app.post("/god/<int:role_id>/reset")
     @login_required
     def god_reset(role_id):

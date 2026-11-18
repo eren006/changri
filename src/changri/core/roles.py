@@ -41,6 +41,8 @@ def create_role(name: str, bot_id: str, group_openid: str, member_openid: str, r
         ).fetchone()
         if row:
             return False, f"你已经有角色「{row['name']}」了。"
+        if conn.execute("SELECT 1 FROM role_profiles WHERE short=?", (name,)).fetchone():
+            return False, f"「{name}」已经是别人的简称了，换一个名字。"
         try:
             cur = conn.execute("INSERT INTO roles(name, member_openid, created_ts) VALUES(?,?,?)", (name, member_openid, now))
         except sqlite3.IntegrityError:
@@ -130,8 +132,12 @@ def list_all() -> list:
 
 
 def get_role_by_name(name: str):
+    """按本名找角色；找不到再按简称找（玩家「修改简称」设的，见 charprofile）。指令里填名字的地方都走这里，简称就处处能用。"""
     with get_conn() as conn:
-        return conn.execute("SELECT * FROM roles WHERE name=?", (name,)).fetchone()
+        row = conn.execute("SELECT * FROM roles WHERE name=?", (name,)).fetchone()
+        if row or not name:
+            return row
+        return conn.execute("SELECT r.* FROM role_profiles p JOIN roles r ON r.id=p.role_id WHERE p.short=?", (name,)).fetchone()
 
 
 def list_groups(role_id: int) -> list:
@@ -208,8 +214,43 @@ def consume_bind_code(code: str, bot_id: str, group_openid: str, member_openid: 
     return True, f"已把这个群绑为「{role['name']}」的个人群。"
 
 
-def delete_role(role_id: int) -> None:
+def delete_role(role_id: int) -> dict | None:
+    """彻底删除一个角色（录错了的那种）：不可恢复。
+    挂了外键的表（群、短信、关系线、背包、朋友圈、公知……）随 roles 一起级联删；
+    没挂外键的表（假面舞会、发言记录、奖励、次数重置、混乱寄信误投、心愿接单）这里手动清。
+    TA 发起的房间整场删掉（还开着的，占着的群放回池子等清理）；TA 只是参加的房间，把 TA 从里面拿掉，别人的时间线不动。
+    这个人名下没有别的角色了，绑过的 QQ 号也一起解除。返回删了什么（给后台提示用）；没有这个角色返回 None。"""
     from . import sheets
-    sheets.remove_files(role_id)                       # 公知/二表的图片文件跟着删
     with get_conn() as conn:
+        role = conn.execute("SELECT * FROM roles WHERE id=?", (role_id,)).fetchone()
+        if not role:
+            return None
+    sheets.remove_files(role_id)                       # 公知/二表的图片文件跟着删（库里的行随外键删）
+    with get_conn() as conn:
+        own_rooms = conn.execute("SELECT id, status, pool_id FROM rooms WHERE creator_id=?", (role_id,)).fetchall()
+        for r in own_rooms:
+            if r["status"] == "open" and r["pool_id"]:
+                conn.execute("UPDATE pool_groups SET state='cleaning', room_id=NULL WHERE id=?", (r["pool_id"],))
+            for t in ("room_lines", "room_members", "join_requests", "reward_log", "reward_adjust"):
+                conn.execute(f"DELETE FROM {t} WHERE room_id=?", (r["id"],))
+            conn.execute("DELETE FROM rooms WHERE id=?", (r["id"],))
+        joined = conn.execute("SELECT COUNT(*) FROM room_members WHERE role_id=?", (role_id,)).fetchone()[0]
+        for (iid,) in conn.execute("SELECT id FROM masq_invites WHERE from_id=? OR to_id=?", (role_id, role_id)).fetchall():
+            conn.execute("DELETE FROM masq_dance_msgs WHERE invite_id=?", (iid,))
+            conn.execute("DELETE FROM masq_invites WHERE id=?", (iid,))
+        for sql in ("DELETE FROM room_lines WHERE role_id=?",
+                    "DELETE FROM masq_reacts WHERE role_id=?",
+                    "DELETE FROM masq_dance_msgs WHERE role_id=?",
+                    "DELETE FROM masq_msgs WHERE role_id=?",
+                    "UPDATE masq_msgs SET mention_id=0 WHERE mention_id=?",
+                    "DELETE FROM count_resets WHERE role_id=?",
+                    "DELETE FROM reward_log WHERE role_id=?",
+                    "DELETE FROM reward_adjust WHERE role_id=?",
+                    "DELETE FROM chaos_letters WHERE true_to_id=?",
+                    "UPDATE wishes SET taker_id=NULL WHERE taker_id=?"):
+            conn.execute(sql, (role_id,))
         conn.execute("DELETE FROM roles WHERE id=?", (role_id,))
+        qqs = 0
+        if role["member_openid"] and not conn.execute("SELECT 1 FROM roles WHERE member_openid=?", (role["member_openid"],)).fetchone():
+            qqs = conn.execute("DELETE FROM person_qq WHERE member_openid=?", (role["member_openid"],)).rowcount
+    return {"name": role["name"], "rooms": len(own_rooms), "joined": joined, "qqs": qqs}

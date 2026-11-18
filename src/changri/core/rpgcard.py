@@ -31,7 +31,8 @@ def data(role_id: int) -> dict | None:
     if extensions.is_enabled("gacha"):
         from . import gacha
         tix = gacha.tickets(role_id)
-    return {"tickets": tix, "name": role["name"], "attrs": attrs, "money": [x for x in inv if x["kind"] == "currency"],
+    from . import charprofile
+    return {"profile": charprofile.get(role_id), "tickets": tix, "name": role["name"], "attrs": attrs, "money": [x for x in inv if x["kind"] == "currency"],
             "items": [x for x in inv if x["kind"] != "currency"], "rels": rels, "dates": dates}
 
 
@@ -90,11 +91,23 @@ def render_card(role_id: int) -> bytes | None:
     info = data(role_id)
     if not info:
         return None
-    p = _Pen(560 + 60 * (len(info["attrs"]) + len(info["money"]) + len(info["items"]) + len(info["tickets"])))
+    pf = info["profile"]
+    p = _Pen(860 + 60 * (len(info["attrs"]) + len(info["money"]) + len(info["items"]) + len(info["tickets"])))
     p.bd.rectangle((0, 0, W, 150), fill=(29, 31, 51))
     p.d.text((PAD, 34), F.clean(info["name"]), font=p.f_big, fill=(230, 231, 242))
     p.d.text((PAD, 98), f"{_title()} · 角色卡", font=p.f_s, fill=(147, 150, 179))
     p.y = 176
+    top = p.y - 12
+    p.heading("档案")
+    p.row("性别 · 年龄", f"{pf['gender']} · {pf['age']} 岁")
+    p.row("皮相", F.clean(pf["look"])[:14])
+    if pf["short"]:
+        p.row("简称", F.clean(pf["short"]))
+    if pf["bio"]:
+        bio = F.clean(pf["bio"])
+        p.note(bio[:26] + ("…" if len(bio) > 26 else ""))
+    p.card(top, p.y + 8)
+    p.y += 30
     if info["attrs"]:
         top = p.y - 12
         p.heading("属性", f"{len(info['attrs'])} 项")

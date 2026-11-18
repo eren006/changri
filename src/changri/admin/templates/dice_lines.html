@@ -1,0 +1,40 @@
+{% extends "base.html" %}{% block title %}跑团台词{% endblock %}
+{% block body %}
+<h1>跑团台词</h1>
+<p class="lede">掷骰、检定出结果后，机器人跟在后面说的那句话。每一档可以写好几句，<b>一行一句</b>，掷的时候随机挑一句。框里已经填好了默认台词，直接在上面改就行；整档清空保存，会自动填回默认台词。</p>
+
+<form method="post" action="{{ url_for('dice_lines_save') }}" class="form">{{ csrf() }}
+{% for title, rows in line_groups %}
+<section>
+  <div class="sec-head keep"><h2>{{ title }}</h2></div>
+  <div class="lines">
+  {% for r in rows %}
+    <div class="lineslot" id="{{ r.k }}">
+      <label for="t-{{ r.k }}">{{ r.label }}{% if r.custom %} <span class="tag">已改</span>{% endif %}<span class="muted"> · {{ r.lines|length }} 句</span></label>
+      <textarea id="t-{{ r.k }}" name="{{ r.k }}" rows="{{ [r.lines|length + 1, 3]|max }}" placeholder="（空着保存 = 用默认台词）">{{ r.lines|join('\n') }}</textarea>
+      {% if r.custom %}<button class="linkbtn" type="submit" form="reset-{{ r.k }}">恢复默认</button>{% endif %}
+    </div>
+  {% endfor %}
+  </div>
+</section>
+{% endfor %}
+<p class="note">每句 {{ line_max }} 字以内，每档最多 {{ lines_max }} 句。</p>
+<div class="actions"><button class="btn" type="submit">保存全部</button></div>
+</form>
+
+{% for title, rows in line_groups %}{% for r in rows %}{% if r.custom %}
+<form id="reset-{{ r.k }}" method="post" action="{{ url_for('dice_lines_reset') }}" hidden>{{ csrf() }}<input type="hidden" name="k" value="{{ r.k }}"></form>
+{% endif %}{% endfor %}{% endfor %}
+{% if any_custom %}
+<form method="post" action="{{ url_for('dice_lines_reset') }}" onsubmit="return confirm('把所有台词恢复成默认？改过的都会丢掉。')" style="margin-top:18px">{{ csrf() }}<input type="hidden" name="k" value="*"><button class="linkbtn">全部恢复默认</button></form>
+{% endif %}
+
+<style>
+.ui .lines{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px 20px}
+.ui .lineslot{display:flex;flex-direction:column;gap:6px;min-width:0}
+.ui .lineslot label{font-weight:600}
+.ui .lineslot label .muted{font-weight:400}
+.ui .lineslot textarea{width:100%;box-sizing:border-box;resize:vertical;line-height:1.6}
+.ui .lineslot .linkbtn{align-self:flex-start}
+</style>
+{% endblock %}

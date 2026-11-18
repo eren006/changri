@@ -26,7 +26,7 @@ def note_group(bot_id: str, group_openid: str) -> bool:
 
 
 def register(bot_id: str, group_openid: str, real_gid: str = "", set_name: str = "", label: str = "") -> int:
-    """直接放进池（管理员在群里发「设为群池」）。"""
+    """直接放进池（管理员在群里发「设为备用群 群号」）。"""
     note_group(bot_id, group_openid)
     with get_conn() as c:
         c.execute("UPDATE pool_groups SET in_pool=1, real_gid=CASE WHEN ?!='' THEN ? ELSE real_gid END, "
@@ -74,6 +74,8 @@ def set_in_pool(pool_id: int, on: bool) -> tuple[bool, str]:
     if not g:
         return False, "没有这个群"
     if on:
+        if g["moved"]:
+            return False, "这个群现在归另一边管（QQ 小号 / 官方机器人），要用就先转过来"
         d = [x for x in all_groups() if x["id"] == pool_id][0]
         if d["conflict"]:
             return False, f"这个群已经是{d['conflict']}，不能放进群池"
@@ -129,7 +131,7 @@ def allocate(room_id: int):
     """领一个空群给房间。池里没有空群返回 None（调用方会撤掉这个房间，不排队）。
     QQ 号没登录（没连上）的群不分：登记在哪个 QQ 号名下，就跟着那个号走。"""
     with get_conn() as c:
-        g = next((x for x in c.execute("SELECT * FROM pool_groups WHERE in_pool=1 AND state='free' ORDER BY RANDOM()") if link_ready(x)), None)
+        g = next((x for x in c.execute("SELECT * FROM pool_groups WHERE in_pool=1 AND moved=0 AND state='free' ORDER BY RANDOM()") if link_ready(x)), None)
         if not g:
             return None
         c.execute("UPDATE pool_groups SET state='occupied', room_id=? WHERE id=?", (room_id, g["id"]))
@@ -145,7 +147,7 @@ def release(pool_id: int, to: str = "cleaning") -> None:
 def counts() -> dict:
     with get_conn() as c:
         r = {k: 0 for k in ("free", "occupied", "cleaning")}
-        for row in c.execute("SELECT state, COUNT(*) n FROM pool_groups WHERE in_pool=1 GROUP BY state"):
+        for row in c.execute("SELECT state, COUNT(*) n FROM pool_groups WHERE in_pool=1 AND moved=0 GROUP BY state"):
             r[row["state"]] = row["n"]
         r["waiting"] = c.execute("SELECT COUNT(*) FROM rooms WHERE status='open' AND pool_id IS NULL").fetchone()[0]
         return r

@@ -241,6 +241,21 @@ async def _show(matcher, sh: dict | list, kind: str) -> None:
         await matcher.send("\n\n".join(f"【{x['name']} 的{label}】\n{x['text'] or '（只有图片，图片没发出来）'}" for x in many))
 
 
+async def _tell_group(which: str, text: str) -> None:
+    """往公告群（announce）或后台群（backstage，带内容给管理员备份）发一条普通消息。
+    没设那个群就不发——后台群不能退回公告群，二表内容不能让大家看到。"""
+    from changri.core import announce
+    from changri.core.qqsend import send_to_group
+    a = announce.get_announce() if which == "announce" else announce.get_backstage()
+    bot = nonebot.get_bots().get(a[0]) if a else None
+    if bot is None:
+        return
+    try:
+        await send_to_group(bot, a[1], text)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[公知/二表] {which} 群发不出去：{e}")
+
+
 def _make_submit(kind: str):
     label = sheets.KINDS[kind]
     cmd = _cmd("提交" + label)
@@ -252,9 +267,16 @@ def _make_submit(kind: str):
             await cmd.finish(NEED_ROLE)
         text = args.extract_plain_text().strip()
         images = await download_images(args, limit=sheets.IMG_MAX)
+        first = sheets.get(me["id"], kind) is None
         ok, info = sheets.submit(me["id"], kind, text, images)
         if not ok:
             await cmd.finish(f"❌ {info}\n用法：提交{label} 你的内容（可以同时发图片）。重复提交会覆盖上一次。")
+        if first or kind == "gongzhi":            # 第一次交「已经上交」，公知再交「修改了公知」；二表重交不发
+            head = f"📮 {me['name']} 已经上交{label}" if first else f"✏️ {me['name']} 修改了{label}"
+            await _tell_group("announce", head)                       # 公告群：只发这一句
+            n_img = len(images or [])
+            await _tell_group("backstage", head + (f"\n\n{text}" if text else "") +
+                                  (f"\n\n（附 {n_img} 张图，发「查看{label} {me['name']}」看）" if n_img else ""))
         extra = "；别人要等管理员开启「展示公知」才能看" if kind == "gongzhi" and not sheets.public() else ""
         await cmd.finish(f"✅ 「{me['name']}」的{label}已提交（{info}）。发「查看{label}」可以看到做成的长图{extra}。")
     return cmd

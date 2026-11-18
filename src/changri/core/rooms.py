@@ -250,6 +250,19 @@ def note_qq_speech(bot_id: str, gid: str, qq: str) -> dict | None:
     return _mark_here(room, [m["role_id"] for m in members(room["id"]) if m["role_id"] in mine])
 
 
+def note_official_speech(bot_id: str, group_openid: str, member_openid: str) -> dict | None:
+    """官方机器人在它自己的房间群里收到有人说话（群主开了「获取群内全部消息」）：按官方编号认出角色，是参与者就算到场。
+    返回值同 note_qq_speech。"""
+    from . import roles
+    room = room_of_group(bot_id, group_openid)
+    if not room:
+        return None
+    r = roles.find_role_for_sender(bot_id, group_openid, member_openid)
+    if not r:
+        return None
+    return _mark_here(room, [m["role_id"] for m in members(room["id"]) if m["role_id"] == r["id"]])
+
+
 def note_presence(room, qqs: set[str]) -> dict | None:
     """房间群的成员名单（QQ 号集合）：名单里认过角色的参与者都算到场，不用等他们发言。返回值同 note_qq_speech。"""
     from . import roles
@@ -271,14 +284,18 @@ def group_info(room) -> tuple[str, str, str] | None:
 
 
 def end(room_id: int, status: str = "ended") -> dict | None:
-    """结束房间：群直接放回池里（下次分配时再查群里有没有玩家）。成功给占用的群返回信息，没群返回 None。"""
+    """结束房间。小号的群：按设置直接放回池里（下次分配时小号会查群里有没有玩家）；
+    官方机器人的群：一律先「等人退群」，因为官方机器人查不了群成员，要管理员确认人退光了才放回。
+    成功给占用的群返回信息，没群返回 None。"""
     r = get(room_id)
     if not r or r["status"] != "open":
         return None
     with get_conn() as c:
         c.execute("UPDATE rooms SET status=?, ended_ts=?, pending_change='' WHERE id=?", (status, int(time.time()), room_id))
     if r["pool_id"]:
-        pool.release(r["pool_id"], "free" if get_config("pool_auto_free", "1") == "1" else "cleaning")
+        g = pool.get(r["pool_id"])
+        auto = g is not None and pool.is_qq_only(g) and get_config("pool_auto_free", "1") == "1"
+        pool.release(r["pool_id"], "free" if auto else "cleaning")
         return dict(pool.get(r["pool_id"]))
     return None
 
