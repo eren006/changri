@@ -99,7 +99,7 @@ footer a{color:inherit}
 <section>
 <h2>装好以后</h2>
 <ol>
-<li>到云服务商控制台的「安全组 / 防火墙」放行 TCP <code>5091</code>（设置平台）；以后开小手机再放行 <code>5092</code>。</li>
+<li>到云服务商控制台的「安全组 / 防火墙」放行 TCP <code>5091</code>（设置平台）和 <code>5092</code>（玩家的小手机，默认开着）。</li>
 <li>浏览器打开 <code>http://服务器公网IP:5091</code>，输入安装时显示的验证码，建管理账号。</li>
 <li>跟着安装向导：填 AppID / AppSecret → 把服务器 IP 加进 QQ 开放平台的 IP 白名单 → 设 QQ 管理员 → 建第一个角色。</li>
 </ol>

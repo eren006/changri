@@ -1,6 +1,7 @@
 # 长日bot 修复工具（Windows）：长日bot 打不开时双击 Fix-Changri.bat 运行它。
 # 由 launcher.ps1 调用：先从官网拉最新的这份（带签名，验过才用），拉不到就用压缩包里自带的。
 # 只修「打不开」这一类：已经在运行 → 打开设置平台；卡死 → 全部关掉重新打开；位置被别的软件占了 → 问过再关；没在运行 → 启动它。
+# 每次都顺便看 Windows 防火墙有没有放行长日bot 的端口，没有就放行（规则名 ChangriBot，和开机自启建的是同一条）。
 # 要兼容 Windows 自带的 PowerShell 5.1：不用 ?? / 三元运算符这类新语法。
 param([string]$ToolDir = $PSScriptRoot)
 
@@ -79,6 +80,36 @@ function Get-Port([string]$root) {
         if ($m.Success) { return [int]$m.Groups[1].Value }
     }
     return $DefaultPort
+}
+
+# ---------- Windows 防火墙 ----------
+
+function Get-FwPorts([string]$root, [int]$port) {
+    # 长日bot（新版本）启动时把当前端口写在 data\firewall_ports；没有就用设置平台端口 + 小手机默认 5092
+    $ports = New-Object System.Collections.Generic.List[int]
+    $ports.Add($port)
+    $f = Join-Path $root 'data\firewall_ports'
+    $found = @()
+    if (Test-Path $f) { $found = @([regex]::Matches((Get-Content $f -Raw), '\d+') | ForEach-Object { [int]$_.Value }) }
+    if ($found.Count -eq 0) { $found = @(5092) }
+    foreach ($p in $found) { if (-not $ports.Contains($p)) { $ports.Add($p) } }
+    return $ports
+}
+
+function Fix-Firewall([string]$root, [int]$port) {
+    $ports = @(Get-FwPorts $root $port)
+    $shown = ($ports -join ',')
+    $have = @()
+    $rule = Get-NetFirewallRule -DisplayName $TaskName -ErrorAction SilentlyContinue | Where-Object { "$($_.Enabled)" -eq 'True' -and "$($_.Direction)" -eq 'Inbound' -and "$($_.Action)" -eq 'Allow' }
+    foreach ($r in @($rule)) {
+        foreach ($pf in @($r | Get-NetFirewallPortFilter -ErrorAction SilentlyContinue)) { $have += @($pf.LocalPort | ForEach-Object { "$_" }) }
+    }
+    $missing = @($ports | Where-Object { $have -notcontains "$_" })
+    if ($rule -and $missing.Count -eq 0) { Ok "Windows 防火墙已经放行了 $shown 端口"; return }
+    & netsh.exe advfirewall firewall delete rule name=$TaskName *> $null
+    & netsh.exe advfirewall firewall add rule name=$TaskName dir=in action=allow protocol=TCP localport=$shown *> $null
+    if ($LASTEXITCODE -eq 0) { Ok "已经在 Windows 防火墙放行 $shown 端口" }
+    else { Warn "没能在 Windows 防火墙放行 $shown 端口（要管理员权限）。可以用管理员身份打开命令提示符运行：netsh advfirewall firewall add rule name=$TaskName dir=in action=allow protocol=TCP localport=$shown" }
 }
 
 # ---------- 看状态 ----------
@@ -193,6 +224,7 @@ $port = Get-Port $root
 Say "  长日bot 装在：$root"
 Say "  设置平台的端口：$port"
 Say ''
+Fix-Firewall $root $port
 
 if (Test-Healthy $port) {
     Ok '长日bot 正在正常运行，没有问题。'

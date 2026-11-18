@@ -79,7 +79,8 @@ class MigrateTests(unittest.TestCase):
             M.migrate(p)
 
     def test_real_database_copy_if_present(self):
-        """本机有测试服务器的库副本（data/，不进 git）就拿来升一遍，行数不能变。"""
+        """本机有测试服务器的库副本（data/，不进 git）就拿来升一遍，不能丢数据：行数不能变。
+        设置表（config）例外，只要不变少：迁移可能补上新的默认设置（比如 0023 打开小手机）。"""
         root = Path(__file__).resolve().parent.parent / "data"
         dbs = [p for p in [root / "changri.db", *root.glob("bots/*/changri.db")] if p.exists()]
         if not dbs:
@@ -92,7 +93,10 @@ class MigrateTests(unittest.TestCase):
             M.migrate(p, legacy=db._migrate)
             after = tables(p)
             for t, n in before.items():
-                self.assertEqual(after.get(t), n, f"{src}：表 {t} 行数变了")
+                if t == "config":
+                    self.assertGreaterEqual(after.get(t, 0), n, f"{src}：设置表少了")
+                else:
+                    self.assertEqual(after.get(t), n, f"{src}：表 {t} 行数变了")
 
 
 if __name__ == "__main__":

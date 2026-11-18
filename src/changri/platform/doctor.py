@@ -67,6 +67,8 @@ def checks() -> list[tuple[bool | None, str, str]]:
             out.append((None, "开机自启", service.status()))
         except Exception as e:  # noqa: BLE001
             out.append((None, "开机自启", f"查不了（{type(e).__name__}）"))
+        hint = service.firewall_hint()
+        out.append((False if hint else None, "本机防火墙", hint or "没有拦着长日bot 的端口（云服务商的安全组要另外放行）"))
     return out
 
 

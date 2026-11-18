@@ -122,8 +122,10 @@ class AdminTests(unittest.TestCase):
         from changri.core.db import get_config
         roles.create_role("甲", "B1", "P0", "M0")
         self.login()
-        self.assertEqual(self.c.get("/phone").status_code, 404)           # 小手机是可选的「额外」，默认没开
         from changri.core import extensions
+        self.assertEqual(self.c.get("/phone").status_code, 200)           # 0.22.4 起小手机默认开
+        extensions.set_enabled("phone", False)
+        self.assertEqual(self.c.get("/phone").status_code, 404)           # 扩展卡片关了，管理页也进不去
         extensions.set_enabled("phone", True)
         html = self.c.get("/phone").get_data(as_text=True)
         self.assertIn("开启小手机", html)                                # 没开过：先走初始化

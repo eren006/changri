@@ -48,6 +48,7 @@ def fix_version() -> str:
     h = hashlib.sha256()
     for name in ("fix.ps1", "fix.sh", "launcher.ps1.in", "Fix-Changri.bat"):
         h.update((FIX / name).read_bytes())
+    h.update((ROOT / "src" / "changri" / "platform" / "firewall_helper.sh").read_bytes())     # 嵌进 fix.sh 的放行脚本
     return time.strftime("%Y%m%d") + "-" + h.hexdigest()[:8]
 
 
@@ -107,7 +108,8 @@ def build_site(key, base: str, out: Path) -> dict[str, Path]:
     launcher = utf8_bom_crlf(build.fill((FIX / "launcher.ps1.in").read_text(encoding="utf-8"), BASE=base, FIX_PUBKEY_XML=pubkey_xml(key)))
     bat = build.crlf((FIX / "Fix-Changri.bat").read_text(encoding="utf-8"))           # .bat 不能带 BOM：第一行 @echo off 会被读坏
     readme = utf8_bom_crlf(build.fill((FIX / "README.txt").read_text(encoding="utf-8"), BASE=base))
-    sh = build.fill((FIX / "fix.sh").read_text(encoding="utf-8"), BASE=base, FIX_VERSION=ver).encode("utf-8")
+    helper = (ROOT / "src" / "changri" / "platform" / "firewall_helper.sh").read_text(encoding="utf-8").rstrip("\n")
+    sh = build.fill((FIX / "fix.sh").read_text(encoding="utf-8"), BASE=base, FIX_VERSION=ver, FW_HELPER_SCRIPT=helper).encode("utf-8")
     files = {"Fix-Changri.bat": bat, "launcher.ps1": launcher, "fix.ps1": ps1, "README.txt": readme, "fix.sh": sh}
     build.check_no_secrets(files)
 

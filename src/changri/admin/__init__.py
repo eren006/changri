@@ -559,7 +559,9 @@ def create_app() -> Flask:
         except httpsproxy.CaddyError as e:
             flash(f"没能开通：{e}")
             return redirect(url_for("https_page"))
-        flash(f"已交给 Caddy，正在为 {subj} 申请证书，一般半分钟内好")
+        from changri.platform import service
+        fw = service.open_firewall() or service.firewall_hint()
+        flash(f"已交给 Caddy，正在为 {subj} 申请证书，一般半分钟内好" + (f"。{fw}" if fw else ""))
         return redirect(url_for("https_page", wait=1))
 
     @app.post("/https/disable")
@@ -633,6 +635,15 @@ def create_app() -> Flask:
         if ext_id not in known:
             abort(404)
         ext_core.set_enabled(ext_id, on)
+        if ext_id == "phone":                          # 小手机：扩展卡片和「小手机」页的开关是同一个，网页立刻启停（「手机码」指令要重启后才有/才没）
+            from changri.core import phoneserver
+            set_config("phone_enabled", "1" if on else "0")
+            res = phoneserver.start()
+            if on:
+                from changri.platform import service
+                service.open_firewall_async()
+            flash(("已打开" if on else "已关闭") + f"小手机：{res}。群里的「手机码」指令重启后生效（点右上角「重启并生效」）")
+            return redirect(url_for("extensions_page"))
         flash(("已打开" if on else "已关闭") + "，重启后生效（点右上角「重启并生效」）")
         return redirect(url_for("extensions_page"))
 

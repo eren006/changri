@@ -5,6 +5,12 @@ from changri.core import extensions as ext_core, netcheck, phonecodes, roles as 
 from changri.core.db import current_bot, get_config, set_config
 
 
+def _sync_ext(on: bool) -> None:
+    """「扩展」页的小手机卡片跟着这里变。只在真的变了时才改（改了会提示「重启后生效」，因为「手机码」指令要重启才加载）。"""
+    if ext_core.is_enabled("phone") != on:
+        ext_core.set_enabled("phone", on)
+
+
 def register(app, login_required):
     @app.route("/phone")
     @login_required
@@ -89,12 +95,16 @@ def register(app, login_required):
         set_config("phone_base_url", base or (f"http://{ip}:{port}" if ip else ""))
         set_config("phone_https", "1" if base.startswith("https://") else "0")
         set_config("phone_enabled", "1")
+        _sync_ext(True)                                      # 扩展卡片和这里是同一个开关
         res = phoneserver.start()
         if "没能" in res:
             set_config("phone_enabled", "0")
+            _sync_ext(False)
             flash(res)
         else:
-            flash(f"{res}。最后一步：到云服务商控制台的安全组放行 {port} 端口，再点下面的「检查玩家能不能打开」。")
+            from changri.platform import service
+            fw = service.open_firewall() or service.firewall_hint()
+            flash(f"{res}。" + (f"{fw}。" if fw else "") + f"最后一步：到云服务商控制台的安全组放行 {port} 端口，再点下面的「检查玩家能不能打开」。")
             from changri.core import httpsproxy
             if err := httpsproxy.sync():
                 flash(err)
@@ -117,6 +127,7 @@ def register(app, login_required):
         phoneserver.set_port(int(port))          # 所有机器人共用这个端口
         set_config("phone_base_url", base)
         set_config("phone_enabled", "1" if f.get("phone_enabled") else "0")
+        _sync_ext(bool(f.get("phone_enabled")))                          # 扩展卡片和这里是同一个开关
         set_config("phone_paused", "1" if f.get("phone_paused") else "0")
         set_config("phone_https", "1" if base.startswith("https://") else "0")
         theme = {"visual": f.get("visual", "modern"), "copy": f.get("copy", "modern")}
@@ -124,7 +135,11 @@ def register(app, login_required):
         msg = "已保存"
         if old_port != port or old_on != get_config("phone_enabled"):
             from changri.core import phoneserver
-            msg += "。" + phoneserver.start() + (f"。别忘了到云服务商的安全组放行 {port} 端口，然后点下面的「检查玩家能不能打开」" if get_config("phone_enabled") == "1" else "")
+            msg += "。" + phoneserver.start()
+            if get_config("phone_enabled") == "1":
+                from changri.platform import service
+                fw = service.open_firewall() or service.firewall_hint()
+                msg += (f"。{fw}" if fw else "") + f"。别忘了到云服务商的安全组放行 {port} 端口，然后点下面的「检查玩家能不能打开」"
             from changri.core import httpsproxy
             if err := httpsproxy.sync():
                 msg += "。" + err

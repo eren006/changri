@@ -24,7 +24,7 @@ curl -fsSL https://system.changri.work/get.sh | sudo sh
 
 ## 第一次使用
 
-1. 云服务商控制台的「安全组 / 防火墙」放行 TCP **5091**（设置平台）；以后开小手机再放行 **5092**。
+1. 云服务商控制台的「安全组 / 防火墙」放行 TCP **5091**（设置平台）和 **5092**（玩家的小手机，默认开着）。
 2. 浏览器打开 `http://服务器公网IP:5091`，输入安装时显示的验证码，建管理账号。
 3. 跟着安装向导：填 AppID / AppSecret → 把服务器 IP 加进 QQ 开放平台的 IP 白名单 → 设 QQ 管理员 → 建第一个角色 → （可选）开小手机。
 
@@ -34,7 +34,7 @@ curl -fsSL https://system.changri.work/get.sh | sudo sh
 |---|---|
 | 管理角色、群、季度、心动信、论坛、群池 | 后台各页面 |
 | 开关功能、调规则 | 后台「功能与设置」「扩展」 |
-| 玩家的网页小手机 | 后台「小手机」页开启；所有机器人共用一个端口（默认 5092），玩家用激活码登录会自动进到自己的机器人 |
+| 玩家的网页小手机 | 默认开着（不用的话在后台「小手机」页关掉）；所有机器人共用一个端口（默认 5092），玩家用激活码登录会自动进到自己的机器人 |
 | 升级 | 后台「更新」一键升级（Linux 也可以 `sudo /opt/changri-bot/changri update`）。会先备份所有数据库；新版本起不来会自动退回旧版本 |
 | 开 HTTPS（不用域名） | 后台「HTTPS」：先装 Caddy（Linux 粘贴页面上的命令；Windows 右键 `Install-HTTPS.bat` 以管理员身份运行），再点「开通」 |
 | 自检 | Linux `sudo /opt/changri-bot/changri doctor`；Windows 双击 `Doctor.bat` |

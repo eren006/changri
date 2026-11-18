@@ -131,7 +131,7 @@ class ExtensionCoreTests(_PatchedDir):
         self.assertFalse(E.delete_user("../x"))
 
     def test_nav_and_groups_follow_switches(self):
-        self.assertEqual(E.disabled_nav(), {"rewards_page", "alarm_page", "phone_page", "giftshop_page", "gacha_page", "sighting_page", "bottles_page", "precall_admin", "decks_page"})      # 结戏奖励、加百列闹钟、小手机默认关
+        self.assertEqual(E.disabled_nav(), {"rewards_page", "alarm_page", "giftshop_page", "gacha_page", "sighting_page", "bottles_page", "precall_admin", "decks_page"})      # 结戏奖励、加百列闹钟默认关（小手机 0.22.4 起默认开）
         E.set_enabled("rewards", True)
         E.set_enabled("alarm", True)
         E.set_enabled("phone", True)

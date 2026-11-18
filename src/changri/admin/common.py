@@ -270,6 +270,29 @@ def _public_ip_cached() -> str:
     return _ip_cache["ip"]
 
 
+def _phone_todo() -> list[tuple]:
+    """小手机开着却没跑起来 / 还没确认玩家能打开时，总览上提醒一条。关着不提醒（那是管理员自己关的）。"""
+    from changri.core import extensions as _ext, phoneserver as _ps
+    if get_config("phone_enabled", "0") != "1" or not _ext.is_enabled("phone"):
+        return []
+    p = _ps.port()
+    if not _ps.running():
+        from changri.platform import portcheck
+        busy = not portcheck.can_bind("0.0.0.0", p)
+        who = portcheck.who_listens(p) if busy else ""
+        why = f"{p} 端口被 {who} 占着" if who else (f"{p} 端口被别的程序占着" if busy else "没有在运行（可能刚改过设置）")
+        return [("bad", "小手机开着，但没能启动", url_for("phone_page"),
+                 f"{why}。到「小手机」页换一个端口保存，或者关掉占着它的程序后重启长日bot；也可以运行一次修复工具")]
+    try:
+        last = json.loads(get_config("phone_net_last", "") or "null")
+    except ValueError:
+        last = None
+    if not last or last.get("state") != "ok":
+        return [("warn", "还没确认玩家能打开小手机", url_for("phone_page"),
+                 f"到云服务商控制台的安全组放行 TCP {p}，再到「小手机」页点「检查玩家能不能打开」")]
+    return []
+
+
 def _dashboard() -> dict:
     """总览页要的数据：今日通告 + 需要处理的事 + 概况。"""
     now = time.localtime()
@@ -316,6 +339,7 @@ def _dashboard() -> dict:
     from changri.core import httpsproxy
     if httpsproxy.active() and not httpsproxy.cert_ok(httpsproxy.subject(), timeout=2):
         todo.append(("bad", "HTTPS 证书失效了", url_for("https_page"), "玩家的小手机网址是 https，现在打不开；多半是 80 端口被关了，证书续不上"))
+    todo += _phone_todo()
     if not enabled:
         todo.append(("warn", "心动信开关是关的", url_for("settings"), "玩家现在不能投信"))
     if not announce:

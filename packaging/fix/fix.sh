@@ -3,6 +3,7 @@
 #   curl -fsSL @BASE@/fix.sh | sudo bash
 # 只修「打不开」这一类：正常运行 → 告诉你地址；卡死 / 没在运行 → 重新启动；位置（端口）被别的程序占了 → 问过再关；
 # 没装开机自启的，问你要不要顺便装上（装上以后崩了、重启机器都会自己起来）。
+# 每次都顺便在本机防火墙（ufw / firewalld，开着的话）放行长日bot 的端口，并装上让长日bot 以后改端口能自己放行的小脚本。
 # 每次运行的都是官网上最新的这份，作者改了修复办法大家马上就用上。
 FIX_VERSION='@FIX_VERSION@'
 UNIT=changri-bot
@@ -63,6 +64,43 @@ PORT="${PORT:-${DEFAULT_PORT}}"
 say "  长日bot 装在：${ROOT}"
 say "  设置平台的端口：${PORT}"
 say ""
+
+# ---------- 本机防火墙 ----------
+FW_HELPER="${CHANGRI_FW_HELPER:-/usr/local/sbin/changri-firewall}"     # 测试时可以换成别的路径
+SUDOERS="${CHANGRI_SUDOERS:-/etc/sudoers.d/changri-bot}"
+write_fw_helper() {                          # 和长日bot 里的 platform/firewall_helper.sh 是同一份（打包时嵌进来）
+cat > "$1" <<'CHANGRI_FW_EOF'
+@FW_HELPER_SCRIPT@
+CHANGRI_FW_EOF
+}
+fw_ports() {                                 # 长日bot（新版本）启动时把当前端口写在 data/firewall_ports；没有就用设置平台端口 + 小手机默认 5092
+  local ps=""
+  [ -r "${ROOT}/data/firewall_ports" ] && ps="$(tr -cs '0-9' ' ' < "${ROOT}/data/firewall_ports")"
+  [ -n "$(printf '%s' "${ps}" | tr -d ' ')" ] || ps="5092"
+  case " ${ps} " in *" ${PORT} "*) ;; *) ps="${PORT} ${ps}" ;; esac
+  echo ${ps}
+}
+fix_firewall() {
+  local ports tmp done user
+  ports="$(fw_ports)"
+  tmp="$(mktemp)"
+  write_fw_helper "${tmp}"
+  done="$(sh "${tmp}" ${ports})"
+  user="$(sed -n 's/^User=//p' "${UNIT_FILE}" 2>/dev/null | head -n1)"
+  if [ -n "${user}" ] && [ "${user}" != root ] && command -v visudo >/dev/null 2>&1; then
+    # 长日bot 以普通用户运行：装上 root 所有的放行脚本，只允许它免密运行这一个，以后改端口它自己就能放行
+    install -m 755 "${tmp}" "${FW_HELPER}" 2>/dev/null && chown 0:0 "${FW_HELPER}" 2>/dev/null
+    printf 'Defaults:%s !requiretty\n%s ALL=(root) NOPASSWD: %s\n' "${user}" "${user}" "${FW_HELPER}" > "${SUDOERS}.tmp" \
+      && chmod 440 "${SUDOERS}.tmp" && { visudo -cf "${SUDOERS}.tmp" >/dev/null 2>&1 && mv "${SUDOERS}.tmp" "${SUDOERS}" || rm -f "${SUDOERS}.tmp"; }
+  fi
+  rm -f "${tmp}"
+  if [ -n "${done}" ]; then
+    ok "本机防火墙（$(echo ${done} | tr ' ' '/')）已放行端口：${ports}"
+  else
+    ok "这台服务器没开本机防火墙（ufw / firewalld），不用放行"
+  fi
+}
+fix_firewall
 
 healthy() { [ "$(curl -fsS -m 3 "http://127.0.0.1:${PORT}/healthz" 2>/dev/null)" = ok ]; }
 listener_pid() {

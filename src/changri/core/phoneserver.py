@@ -276,5 +276,22 @@ def _start() -> str:
     return f"小手机已在 {p} 端口运行"
 
 
+def player_url() -> str:
+    """玩家打开小手机的网址（…/p）。还没填网址时（0.22.4 起默认打开，没人去后台点过「开启」）按这台机器的公网 IP 和端口补上，存下来以后不再查。"""
+    base = get_config("phone_base_url", "").rstrip("/")
+    if not base:
+        from . import netcheck
+        base = netcheck.default_base_url().rstrip("/")
+        if base:
+            set_config("phone_base_url", base)
+    return f"{base}/p" if base else ""
+
+
+def running() -> bool:
+    """小手机的网页现在是不是由这个进程在跑（不看端口上是谁：别的程序占着 5092 时这里是 False）。"""
+    with _lock:
+        return bool(_server) and _server["thread"].is_alive() and _server["port"] == port()
+
+
 def start_all() -> None:
     start()

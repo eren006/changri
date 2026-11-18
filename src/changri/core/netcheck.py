@@ -48,6 +48,10 @@ def probe_outside(port: int) -> dict:
         "timeout": "外网连接超时：多半是云服务商的安全组没放行这个端口。",
         "not_phone": "端口通了，但打开的不是小手机，可能被别的程序占用了，换一个端口试试。",
     }.get(state, data.get("msg", "没有得到结果"))
+    if state in ("closed", "timeout"):
+        from ..platform import service
+        if hint := service.firewall_hint():
+            msg += hint
     return {"state": state, "msg": msg}
 
 

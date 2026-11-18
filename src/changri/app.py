@@ -83,6 +83,14 @@ def _start_errlog() -> None:
 driver.on_startup(_start_errlog)
 
 
+def _open_firewall() -> None:
+    from changri.platform import service
+    service.open_firewall_async()                        # 按当前端口在本机防火墙放行（改过端口、开过 HTTPS 的也跟上）
+
+
+driver.on_startup(_open_firewall)
+
+
 def _mark_clean_exit() -> None:
     # systemctl restart 发的是 SIGTERM，uvicorn 收尾后会用同一个信号再杀自己，atexit 来不及跑，
     # 结果每次重启都被记成「崩溃」。所以在 NoneBot 收尾的这一步就把「正常退出」标记写好。

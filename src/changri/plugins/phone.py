@@ -7,8 +7,8 @@ from changri.core.db import get_config
 
 
 def phone_url() -> str:
-    base = get_config("phone_base_url", "").rstrip("/")
-    return f"{base}/p" if base else ""
+    from changri.core import phoneserver
+    return phoneserver.player_url()
 
 
 cmd = on_command("手机码", aliases={"我的手机", "小手机"}, priority=10, block=True)

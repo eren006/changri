@@ -136,6 +136,39 @@ class LinuxScriptTests(unittest.TestCase):
         self.assertIn("被「PID 4321」", out.replace("（PID 4321）", ""))
         self.assertNotIn("kill", calls)
 
+    def test_firewall_off_says_so(self):
+        (self.state / "health").write_text("up")
+        code, out, calls = self.run_fix(unit=True)
+        self.assertIn("没开本机防火墙", out)
+
+    def test_ufw_active_opens_ports_from_file(self):
+        (self.state / "health").write_text("up")
+        (self.root / "data" / "firewall_ports").write_text("6091 7092\n")
+        self.make(self.bin / "ufw", 'echo "ufw $*" >> "$STATE/calls"; [ "$1" = status ] && echo "Status: active"; exit 0')
+        code, out, calls = self.run_fix(unit=True)
+        self.assertEqual(code, 0, out)
+        self.assertIn("ufw allow 6091/tcp", calls)
+        self.assertIn("ufw allow 7092/tcp", calls)
+        self.assertIn("已放行端口：6091 7092", out)
+
+    def test_ufw_old_version_falls_back_to_default_phone_port(self):
+        (self.state / "health").write_text("up")
+        self.make(self.bin / "ufw", 'echo "ufw $*" >> "$STATE/calls"; [ "$1" = status ] && echo "Status: active"; exit 0')
+        code, out, calls = self.run_fix(unit=True)
+        self.assertIn("ufw allow 6091/tcp", calls)                   # 设置平台端口读的是 config.toml
+        self.assertIn("ufw allow 5092/tcp", calls)
+
+    def test_installs_sudo_helper_for_service_user(self):
+        (self.state / "health").write_text("up")
+        self.make(self.bin / "visudo", 'echo "visudo $*" >> "$STATE/calls"; exit 0')
+        (self.tmp / "unit.service").write_text(f"[Service]\nUser=changri\nWorkingDirectory={self.root}\n")
+        helper, sudoers = self.tmp / "changri-firewall", self.tmp / "sudoers"
+        env = {**os.environ, "PATH": f"{self.bin}:{os.environ['PATH']}", "STATE": str(self.state), "CHANGRI_DIR": "",
+               "CHANGRI_UNIT_FILE": str(self.tmp / "unit.service"), "CHANGRI_FW_HELPER": str(helper), "CHANGRI_SUDOERS": str(sudoers)}
+        subprocess.run(["bash", str(self.script)], capture_output=True, text=True, env=env, stdin=subprocess.DEVNULL, timeout=60, start_new_session=True)
+        self.assertEqual(helper.read_text(), (Path(__file__).resolve().parent.parent / "src/changri/platform/firewall_helper.sh").read_text())
+        self.assertIn(f"changri ALL=(root) NOPASSWD: {helper}", sudoers.read_text())
+
     def test_not_root(self):
         self.make(self.bin / "id", 'echo 1000')
         code, out, _ = self.run_fix(unit=True)
