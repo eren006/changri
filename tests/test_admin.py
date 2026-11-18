@@ -42,6 +42,44 @@ class AdminTests(unittest.TestCase):
     def post(self, path, **data):
         return self.c.post(path, data={**data, "_csrf": token(self.c, "/accounts")}, follow_redirects=True)
 
+    def test_contact_qq_prompt(self):
+        """没填联系 QQ：主账号打开总览弹一次；保存或「不用了」以后不再弹；QQ 号不对不保存、还会再问。"""
+        from changri.core import errlog
+        from changri.core.db import get_global_conn
+        with get_global_conn() as c:
+            c.execute("DELETE FROM config WHERE key='update_contact_prompt_done'")
+        self.login()
+        self.assertIn('id="cq"', self.c.get("/").get_data(as_text=True))
+        tok = token(self.c, "/accounts")
+        html = self.c.post("/contact-prompt", data={"action": "save", "qq": "12ab", "_csrf": tok}, follow_redirects=True).get_data(as_text=True)
+        self.assertIn("5 到 12 位数字", html)
+        self.assertIn('id="cq"', html)                                              # 没保存：还在问
+        html = self.c.post("/contact-prompt", data={"action": "save", "qq": "123456789", "_csrf": tok}, follow_redirects=True).get_data(as_text=True)
+        self.assertIn("已保存联系 QQ 123456789", html)
+        self.assertNotIn('id="cq"', html)
+        self.assertEqual(errlog.contact_qq(), "123456789")
+
+    def test_contact_qq_prompt_dismiss_and_skip(self):
+        """「不用了」：不再弹，也不填。报错不往外发、非主账号：都不弹。"""
+        from changri.core.db import get_global_conn, set_config
+        with get_global_conn() as c:
+            c.execute("DELETE FROM config WHERE key='update_contact_prompt_done'")
+        self.login()
+        set_config("error_report_url", "")
+        self.assertNotIn('id="cq"', self.c.get("/").get_data(as_text=True))       # 报错只存本机：问了也没用
+        set_config("error_report_url", "https://example.test/in")
+        self.assertIn('id="cq"', self.c.get("/").get_data(as_text=True))
+        html = self.c.post("/contact-prompt", data={"action": "no", "_csrf": token(self.c, "/accounts")}, follow_redirects=True).get_data(as_text=True)
+        self.assertIn("好的，不填", html)
+        self.assertNotIn('id="cq"', html)
+        webusers.create_user("helper", "longenough2", "admin")
+        self.c.post("/logout", data={"_csrf": token(self.c, "/accounts")})
+        with get_global_conn() as c:
+            c.execute("DELETE FROM config WHERE key='update_contact_prompt_done'")
+        self.login("helper", "longenough2")
+        self.assertNotIn('id="cq"', self.c.get("/").get_data(as_text=True))       # 不是主账号：不弹
+        self.assertEqual(self.c.post("/contact-prompt", data={"action": "no", "_csrf": token(self.c, "/accounts")}).status_code, 403)
+
     def test_theme_switch(self):
         """后台外观：睡莲 / 芭蕾 / 圣诞 / 默认，记在 cookie 里，回到刚才的页面；圣诞会飘雪。"""
         self.login()

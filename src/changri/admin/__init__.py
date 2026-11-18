@@ -220,7 +220,36 @@ def create_app() -> Flask:
                        "grp": (pool_core.get(r["pool_id"]) if r["pool_id"] else None)} for r in live]
         return render_template("dashboard.html", d=_dashboard(), errors=errlog.recent(30), err_url=errlog.report_url(),
                                cal=season_core.month_grid(request.args.get("cal", "")), cal_line=season_core.upcoming_line(),
-                               live_rooms=live_rooms, waiting_rooms=sum(1 for r in live_rooms if not r["grp"]))
+                               live_rooms=live_rooms, waiting_rooms=sum(1 for r in live_rooms if not r["grp"]),
+                               ask_contact=_should_ask_contact())
+
+    CONTACT_PROMPT_DONE = "update_contact_prompt_done"      # update_ 开头 = 全局库，所有机器人共用一个「问过了」
+
+    def _should_ask_contact() -> bool:
+        """总览上弹一次「建议填联系 QQ」：主账号、报错会发出去、哪个机器人都没填、也没点过「不用了」。"""
+        from changri.core import errlog
+        try:
+            return (bool(session.get("owner")) and get_config(CONTACT_PROMPT_DONE, "") != "1"
+                    and errlog.report_url().lower().startswith(("http://", "https://")) and not errlog.contact_qq())
+        except Exception:  # noqa: BLE001  弹窗只是建议，判断出错就不弹，不能把总览弄挂
+            return False
+
+    @app.post("/contact-prompt")
+    @owner_required
+    def contact_prompt():
+        """弹窗的两个按钮：保存（填进当前机器人的「联系 QQ」）/ 不用了。两种都不再弹；以后想填或改去「基础」设置。"""
+        from changri.core import errlog
+        if request.form.get("action") == "save":
+            qq = request.form.get("qq", "").strip()
+            if not errlog._QQ.fullmatch(qq):
+                flash("QQ 号要是 5 到 12 位数字。没保存，下次打开总览还会问你。")
+                return redirect(url_for("dashboard"))
+            set_config("contact_qq", qq)
+            flash(f"已保存联系 QQ {qq}。以后报错发给作者时会带上它；想改或删，去「基础」设置里的「联系 QQ」。")
+        else:
+            flash("好的，不填。以后想填，去「基础」设置里的「联系 QQ」。")
+        set_config(CONTACT_PROMPT_DONE, "1")
+        return redirect(url_for("dashboard"))
 
     @app.post("/rooms/notify")
     @login_required

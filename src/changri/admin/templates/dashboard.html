@@ -175,4 +175,35 @@ a.tile:active{transform:scale(.97)}
   </div>
 </details>
 </div>
+{% if ask_contact %}
+<dialog class="cq" id="cq" aria-labelledby="cq-t">
+  <form method="post" action="{{ url_for('contact_prompt') }}">{{ csrf() }}
+    <h2 id="cq-t">留一个联系 QQ？</h2>
+    <p>机器人出错时，报错会自动发给作者。留了 QQ，作者看到报错后可以加你，帮你一起看问题。</p>
+    <p class="cq-note">选填。只在发报错时附带，不会用在别处。以后可以在「基础」设置里改或删。</p>
+    <label for="cq-qq">QQ 号</label>
+    <input id="cq-qq" name="qq" inputmode="numeric" pattern="[0-9]{5,12}" maxlength="12" autocomplete="off" placeholder="例如 12345678">
+    <div class="cq-act">
+      <button class="btn" name="action" value="save">保存</button>
+      <button class="btn ghost" name="action" value="no" formnovalidate>不用了</button>
+    </div>
+  </form>
+</dialog>
+<style>
+.cq{border:1px solid var(--card-line);border-radius:14px;background:var(--surface);color:var(--ink);padding:26px 26px 22px;width:min(440px,calc(100vw - 32px));box-shadow:0 24px 60px -20px rgb(0 0 0 / .45)}
+.cq::backdrop{background:rgb(10 10 25 / .45)}
+.cq h2{font:700 21px/1.35 var(--sans);margin:0 0 10px}
+.cq p{margin:0 0 10px}
+.cq .cq-note{color:var(--mute);font-size:13.5px;margin-bottom:18px}
+.cq label{display:block;font-weight:600;font-size:14px;margin-bottom:6px}
+.cq-act{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+</style>
+<script>
+/* 每次打开总览都弹，直到点了「保存」或「不用了」。按 Esc 只是这次先关掉，这个浏览器标签页里不再弹 */
+(function(){var d=document.getElementById('cq');if(!d||!d.showModal)return;
+  try{if(sessionStorage.getItem('cq-later'))return}catch(e){}
+  d.addEventListener('cancel',function(){try{sessionStorage.setItem('cq-later','1')}catch(e){}});
+  d.showModal();})();
+</script>
+{% endif %}
 {% endblock %}
