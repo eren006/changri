@@ -150,7 +150,7 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
     first = rid is not None and not roles.has_group(rid)          # 第一次有个人群（后台建的 NPC）：接着引导绑 QQ、发回执
     ok, msg = roles.consume_bind_code(code, _bid(), event.group_openid, _sender(event))
     if ok and first:
-        await claim.finish(formats.setup_step(roles.get_role(rid), "✅ " + msg))
+        await claim.finish(formats.setup_step(roles.get_role(rid), "✅ 第 1 步完成：" + msg))
     await claim.finish(msg)
 
 
@@ -330,6 +330,19 @@ async def _webpush():
             logger.info(f"[网页推送] 推给了 {n} 个人")
     except Exception as e:  # noqa: BLE001
         logger.warning(f"[网页推送] 出错：{e}")
+
+
+@scheduler.scheduled_job("interval", seconds=15, id="record_announce", max_instances=1, coalesce=True)
+@per_bot
+async def _record_announce():
+    """「第 N 次记录」公告：规则代码里排好的话，在这里发到公告群。"""
+    if not nonebot.get_bots():
+        return
+    try:
+        from changri.core import milestone
+        await milestone.flush(_make_send())
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[第N次记录] 出错：{e}")
 
 
 @scheduler.scheduled_job("interval", seconds=60, id="messaging_retry", max_instances=1, coalesce=True)

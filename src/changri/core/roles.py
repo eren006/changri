@@ -236,12 +236,20 @@ def consume_bind_code(code: str, bot_id: str, group_openid: str, member_openid: 
         row = conn.execute("SELECT * FROM bind_codes WHERE code=? AND expires_ts>=?", (code, now)).fetchone()
         if not row:
             return False, "认群码不对或已过期。"
-        exist = conn.execute(
-            "SELECT r.name FROM role_groups g JOIN roles r ON r.id=g.role_id WHERE g.bot_id=? AND g.group_openid=?", (bot_id, group_openid)
-        ).fetchone()
-        if exist:
-            return False, f"这个群已经绑给「{exist['name']}」了。"
-        role = conn.execute("SELECT name FROM roles WHERE id=?", (row["role_id"],)).fetchone()
+        role = conn.execute("SELECT name, is_npc FROM roles WHERE id=?", (row["role_id"],)).fetchone()
+        here = conn.execute(
+            "SELECT r.id, r.name, r.is_npc FROM role_groups g JOIN roles r ON r.id=g.role_id WHERE g.bot_id=? AND g.group_openid=? ORDER BY g.id",
+            (bot_id, group_openid)).fetchall()
+        here = [x for x in here if x["id"] != row["role_id"]]
+        if here:
+            # 玩家一人一个群；NPC 可以几个绑在同一个群里（扮 NPC 的人通常都在一个群，互相看得到）——前提是群里绑着的全是 NPC
+            if not role["is_npc"] or not all(x["is_npc"] for x in here):
+                who = next((x for x in here if not x["is_npc"]), here[0])
+                return False, f"这个群已经绑给「{who['name']}」了。" + ("" if role["is_npc"] else "玩家要一人一个群。")
+            mine = conn.execute("SELECT r.name FROM role_groups g JOIN roles r ON r.id=g.role_id WHERE g.bot_id=? AND g.group_openid=? AND g.member_openid=? AND r.id!=?",
+                                (bot_id, group_openid, member_openid, row["role_id"])).fetchone()
+            if mine:      # 同一个人在同一个群里扮两个 NPC：群里发指令时分不清是哪一个在说话
+                return False, f"你在这个群里已经扮着「{mine['name']}」了。同一个人在同一个群里只能认一个 NPC，另一个请换个群认。"
         # 后台建的 NPC 本来没有主人：谁来认群，谁就是它的主人（绑 QQ、认人都按主人走）
         conn.execute("UPDATE roles SET member_openid=? WHERE id=? AND member_openid=''", (member_openid, row["role_id"]))
         if row["slot_id"]:  # 后台登记的群位：补上 openid，换上登记的新群号

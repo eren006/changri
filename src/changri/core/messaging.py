@@ -122,7 +122,13 @@ def mark_blocked(msg_id: int, silent: bool) -> None:
                      ("被拉黑（静默，发件人以为已送达）" if silent else "被拉黑（已告知发件人）", msg_id))
 
 
-async def _maybe_broadcast(m, send: Send) -> None:
+def mark_lost(msg_id: int) -> None:
+    """礼物在路上丢了（混乱短信的「礼物丢失」）：不投递，记成 failed 并写明原因。"""
+    with get_conn() as conn:
+        conn.execute("UPDATE messages SET status='failed', error='礼物丢失（发件人以为已送达）' WHERE id=?", (msg_id,))
+
+
+async def _maybe_broadcast(m, send: Send, shown_to: int = 0) -> None:
     """礼物送到后，按设置的概率公开到公告群（图个热闹）。公开失败不影响送达。"""
     import random
 
@@ -135,7 +141,7 @@ async def _maybe_broadcast(m, send: Send) -> None:
     if not ann:
         return
     with get_conn() as conn:
-        to = conn.execute("SELECT name FROM roles WHERE id=?", (m["to_role_id"],)).fetchone()
+        to = conn.execute("SELECT name FROM roles WHERE id=?", (shown_to or m["to_role_id"],)).fetchone()
     who = (m["sign"] or m["from_name"]) 
     target = "某人" if get_config("drop_hide_receiver", "0") == "1" or not to else to["name"]
     try:
@@ -147,8 +153,9 @@ async def _maybe_broadcast(m, send: Send) -> None:
         pass
 
 
-async def deliver(msg_id: int, send: Send) -> bool:
-    """投递一条消息：发到个人群。返回是否送达。"""
+async def deliver(msg_id: int, send: Send, shown_to: int = 0) -> bool:
+    """投递一条消息：发到个人群。返回是否送达。
+    shown_to：礼物送错了人时，公开播报里照旧写原本想送的那个人（写真正收到的人等于把送错这件事说出去了）。"""
     with get_conn() as conn:
         m = conn.execute(
             "SELECT m.*, f.name AS from_name FROM messages m JOIN roles f ON f.id=m.from_role_id WHERE m.id=?",
@@ -175,7 +182,7 @@ async def deliver(msg_id: int, send: Send) -> bool:
                 (info, int(time.time()), bot_id, mid, msg_id),
             )
         if m["kind"] == "gift":
-            await _maybe_broadcast(m, send)
+            await _maybe_broadcast(m, send, shown_to)
         return True
     attempts = m["attempts"] + 1
     status = "failed" if attempts >= MAX_ATTEMPTS else "pending"

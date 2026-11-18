@@ -346,6 +346,8 @@ def clear_prep_records() -> dict[str, int]:
         out["关系线"] = conn.execute("DELETE FROM relations").rowcount
         out["心愿"] = conn.execute("DELETE FROM wishes").rowcount
         out["已结束的房间"] = conn.execute("DELETE FROM rooms WHERE status!='open'").rowcount      # 连带成员、发言、加入申请（外键级联）
+    from . import milestone
+    milestone.reset()                                                         # 「第 N 次记录」也从正式季第一天重新数
     return out
 
 
@@ -433,6 +435,8 @@ def wipe() -> None:
             conn.execute(f"DELETE FROM {t}")
         conn.execute("DELETE FROM sqlite_sequence WHERE name='rooms'")        # 新季度的 R 号从 1 重新开始
         conn.execute("UPDATE pool_groups SET state='free', room_id=NULL")
+    from . import milestone
+    milestone.reset()                                                         # 「第 N 次记录」的计数跟着季度清零
     set_config("season_wiped", "1")
     set_config("game_day", "")
     set_config("entrance_active", "0")

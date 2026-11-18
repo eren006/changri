@@ -37,9 +37,11 @@ SECTIONS = [
         "welcome_text": ("机器人被拉进新群时发的欢迎语（留空用默认）", ""),
         "msgmon_enabled": ("消息监听（1 开 / 0 关；后台「消息监听」页实时看机器人收到的群消息：官方机器人所在的群，加上 QQ 小号在群号组里听到的。只放在内存里，每个机器人最近 500 条，重启就清空，不存数据库）", "1"),
         "error_report_url": ("报错接收地址（http/https 网址；留空 = 报错只存在本机。程序崩溃或出错、恢复后会自动把报错文字发到这里，不含聊天内容和群号。默认发到主站 system.changri.work）", "https://system.changri.work/api/errors"),
+        "contact_qq": ("联系 QQ（选填。填了以后，这台机器的报错发给作者时会带上这个 QQ 号，作者在后台看到报错、需要的话可以加你帮你看；不填就不带，报错照常发）", ""),
         "usage_report": ("匿名使用情况上报（1 开 / 0 关；每 6 小时跟着检查更新发一次：随机生成的实例编号、版本、系统、几个机器人连着、处理了多少次指令。不带群号、QQ 号、角色和聊天内容，作者用来看装了的人有没有在用）", "1"),
         "season_report": ("季末报告（1 开 / 0 关；开了以后，结束季度时会给每位有互动的玩家的个人群先发一句话、再单独发一张本季结算海报：约会场次、短信礼物心动信、互动最多的人、最常互动的时间、最精彩的一场戏。海报画不出来就改发文字小结。机器人要还在个人群里才发得出去。「季度与出场」页的「季末报告」里也能开关、看样式缩略图、下载每个人的海报）", "0"),
         "season_poster_skin": ("季末海报的样式（第一次用某款时从主站下载花边素材，下载不了就用素色纸）", "antique"),
+        "announce_frequency": ("「第 N 次记录」公告的触发频率：电话、约会、官约、心愿、短信、礼物、心动信、拉线各自计数，每满这么多次往公告群发一句「【第 N 次××记录】」（0 = 不发）", "2"),
         "block_undo_hours": ("拉黑满几小时才能解除", "2"),
         "brand_name": ("系统名称（画在长图左上角，留空用默认）", ""),
         "long_as_image": ("长内容发图片（1 开 / 0 关；开着时，一条消息发不完、要拆成好几条的才画成图，一条发得完的照样发文字；关了就全拆成文字）", "1"),
@@ -64,7 +66,9 @@ SECTIONS = [
     }),
     ("约会房间", {
         "window_date": ("约会/电话/微信开放时段（写成 10-23 或 20:00-02:00，留空 = 全天开放）", ""),
-        "room_dedup_similarity": ("复盘里同一个人 30 分钟内发的、和自己上一条相似度达到多少 % 的发言，只留后一条（8 字以上才算；0 = 不处理）", "90"),
+        "min_minutes_约会": ("约会最短时长（分钟，约的时间段比这短就约不成；0 = 不限）", "59"),
+        "min_minutes_电话": ("电话最短时长（分钟，0 = 不限）", "29"),
+        "room_redo_similarity": ("复盘里同一个人 10 分钟内发的、和自己上一条相似度达到多少 % 的发言，算撤回重发：只留后一条，字数按后一条算（8 字以上才算；0 = 不处理）", "60"),
         "arc_max_hours": ("最长弧长（小时）：房间里谁回得比这更慢，或正在等的回复已经超过它，「弧长与复盘」页顶上标红；0 = 不标", "12"),
         "window_forum": ("论坛开放时段（写成 10-23 或 20:00-02:00，留空 = 全天开放）", ""),
         "limit_约会": ("每人每天最多发起几次约会（0 = 不限）", "0"),
@@ -78,6 +82,7 @@ SECTIONS = [
     }),
     ("踩点", {
         "limit_踩点": ("每人每天最多发起几次踩点（0 = 不限）", "0"),
+        "min_minutes_踩点": ("踩点最短时长（分钟，0 = 不限）", "59"),
     }),
     ("复盘网页", {
         "season_view_sms": ("复盘网页里放短信（1 开 / 0 关）", "1"),
@@ -143,6 +148,8 @@ SECTIONS = [
         "chaos_reverse": ("句子乱序概率（%）", "5"),
         "chaos_sign": ("落款写错概率（%）", "5"),
         "chaos_mis": ("误投给别人的概率（%）", "5"),
+        "chaos_gift_lost": ("礼物在路上丢失的概率（%；丢了谁也收不到，送的人不知道）", "0"),
+        "chaos_gift_mis": ("礼物送错人的概率（%，随机送到另一位嘉宾手里）", "0"),
         "chaos_torn": ("短信被撕成两半的概率（%，后半截飘到第三个人手里）", "5"),
     }),
     ("晚餐", {
@@ -243,6 +250,21 @@ def _fmt_ts(v) -> str:
     return time.strftime("%m-%d %H:%M", time.localtime(v)) if v else "—"
 
 
+_ip_cache = {"ts": 0.0, "ip": ""}
+
+
+def _public_ip_cached() -> str:
+    """这台服务器的公网 IP（问外面的服务，慢，所以 10 分钟内只问一次；问不到返回空串）。"""
+    if time.time() - _ip_cache["ts"] > 600:
+        from changri.core import botconf
+        try:
+            _ip_cache["ip"] = botconf.public_ip()
+        except Exception:  # noqa: BLE001
+            _ip_cache["ip"] = ""
+        _ip_cache["ts"] = time.time()
+    return _ip_cache["ip"]
+
+
 def _dashboard() -> dict:
     """总览页要的数据：今日通告 + 需要处理的事 + 概况。"""
     now = time.localtime()
@@ -279,6 +301,13 @@ def _dashboard() -> dict:
     offline = [{**b, "seen_txt": _fmt_ts(b["seen"]) if b["seen"] else "从没连上过", "mine": b["id"] == current_bot()}
                for b in _bot_status() if not b["online"]]
     offline.sort(key=lambda b: not b["mine"])           # 当前这个机器人排最前；其他机器人掉线也一起提醒
+    from changri.core import errlog
+    wl = errlog.whitelist_issue()
+    if wl:                                              # 机器人回不了话：排在最前面
+        ip = _public_ip_cached()
+        todo.append(("bad", "IP 白名单没加对，机器人现在回不了话", url_for("bots_page"),
+                     f"{_fmt_ts(wl['ts'])} QQ 拒绝了机器人发消息。到 QQ 开放平台「开发管理 → 开发设置 → IP 白名单」加上这台服务器的公网 IP"
+                     + (f"：{ip}" if ip else "（点进来按「检查连接」能看到是多少）") + "；加好以后这条提醒半小时内自己消失"))
     from changri.core import httpsproxy
     if httpsproxy.active() and not httpsproxy.cert_ok(httpsproxy.subject(), timeout=2):
         todo.append(("bad", "HTTPS 证书失效了", url_for("https_page"), "玩家的小手机网址是 https，现在打不开；多半是 80 端口被关了，证书续不上"))

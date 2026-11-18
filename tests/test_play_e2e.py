@@ -592,11 +592,49 @@ class PlayE2E(unittest.TestCase):
         self.assertFalse(any(o.startswith("[ANN]") for o in out), out)
         self.assertTrue(any(o.startswith("[BACK]") and "在等人退群" in o for o in out), out)
 
+    def test_end_command_every_kind(self):
+        """结束约会 / 结束电话 / 结束官约 / 结束心愿：四种叫法都能结束房间；在房间群里不用带房间号，在自己的群里带房间号；结束后还占着时间线。"""
+        self.add_pool(5)                                                   # 官方机器人的群结束后要等清场，不会马上空出来
+        me = roles.get_role_by_name("甲")["id"]
+
+        def latest():
+            return max(r["id"] for r in rooms.my_open(me))
+
+        self.say("约会 1000-1100 咖啡厅 乙")
+        r1 = latest()
+        self.say("电话 1200-1300 乙")
+        r2 = latest()
+        self.say("发起官约 1400-1500 后山 甲/乙", member="ADMIN", group="ADM")
+        r3 = latest()
+        self.say("挂心愿 1600-1700 花园 一起散步")
+        from changri.core.db import get_conn as _gc
+        with _gc() as c:
+            wid = c.execute("SELECT MAX(id) FROM wishes").fetchone()[0]
+        self.say(f"摘心愿 {wid}", member="M1", group="P1")
+        r4 = latest()
+        self.assertEqual(len({r1, r2, r3, r4}), 4)
+        self.assertEqual([rooms.get(r)["kind"] for r in (r1, r2, r3, r4)], ["约会", "电话", "官约", "心愿"])
+        for rid, word in ((r1, "结束约会"), (r2, "结束电话"), (r3, "结束官约"), (r4, "结束心愿")):
+            self.assertEqual(rooms.get(rid)["status"], "open")
+            self.say(f"{word} R{rid}")                                    # 在自己的群里发，带房间号
+            self.assertEqual(rooms.get(rid)["status"], "ended", word)
+        self.assertEqual(len(rooms.timeline(me)), 4)                       # 结束了还记在时间线上
+        self.assertIn("撞了", self.say("约会 1030-1130 咖啡厅 乙")[0])
+        self.say("电话 1800-1900 乙")                                      # 在房间群里发，不用带房间号
+        r5 = latest()
+        from changri.core import pool as _pool
+        grp = _pool.get(rooms.get(r5)["pool_id"])["group_openid"]
+        self.say("结束电话", group=grp)
+        self.assertEqual(rooms.get(r5)["status"], "ended")
+
     def test_create_role_receipt(self):
         """建角色的回执：列出接下来能填/能改的东西，名字写错可以自己「修改名字」。"""
-        out = self.say("创建新角色 丁", member="M9", group="P9")[0]
-        for word in ("创建好了", "提交公知", "提交二表", "换绑码", "我的", "修改名字"):
+        out = self.say("创建新角色 丁", member="M9", group="P9")[0]          # 第 1 步：只提示绑 QQ，回执等三步走完再发
+        self.assertIn("创建好了", out); self.assertIn("第 2 步", out); self.assertNotIn("提交公知", out)
+        out = self.say("绑定QQ 123456789", member="M9", group="P9")[0]
+        for word in ("第 3 步", "提交公知", "提交二表", "换绑码", "我的", "修改名字"):
             self.assertIn(word, out)
+        self.assertNotIn("提交公知", self.say("绑定QQ 123456789", member="M9", group="P9")[0])   # 再绑一次不重复发回执
         self.assertNotIn("提交公知", self.say("创建新角色 戊", member="M9", group="P9")[0])   # 失败时只回原因
 
     def test_admin_delete_role_completely(self):

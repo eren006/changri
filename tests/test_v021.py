@@ -45,7 +45,7 @@ class V021(unittest.TestCase):
             for m in members:
                 c.execute("INSERT INTO room_members(room_id, role_id) VALUES(?,?)", (rid, self.r[m]["id"]))
             for who, ago in lines:
-                c.execute("INSERT INTO room_lines(room_id, ts, role_id, name, text) VALUES(?,?,?,?,'x')", (rid, now - ago, self.r[who]["id"], who))
+                c.execute("INSERT INTO room_lines(room_id, ts, role_id, name, text, is_rp) VALUES(?,?,?,?,'x',1)", (rid, now - ago, self.r[who]["id"], who))
         return rid
 
     def test_arc_report(self):

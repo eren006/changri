@@ -153,6 +153,8 @@ async def deliver_all(send: Send, announce: tuple[str, str] | None = None) -> di
             continue
         success += len(mails)
         max_recv = max(max_recv, len(mails))
+        from . import milestone
+        milestone.bump("心动信", len(mails))
         now = int(time.time())
         with get_conn() as conn:
             conn.execute(f"UPDATE lovemails SET status='sent', sent_ts=? WHERE id IN ({','.join('?' * len(mails))})",

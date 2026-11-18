@@ -146,10 +146,12 @@ def qq_needed() -> bool:
 
 
 def setup_step(role, head: str) -> str:
-    """建角色 / NPC 认群之后的下一步：要绑 QQ 又还没绑 → 只提示第 2 步（绑好才发回执，免得玩家看完回执就漏了）；否则直接发完整回执。"""
+    """建角色 / 认群之后的下一步。三步走完才发完整回执：① 建角色或认群 ② 绑定QQ ③ 回执。
+    还没绑 QQ → 只提示第 2 步（不管用没用 QQ 小号都一样；绑好才发回执，免得回执发两遍，或者玩家看完回执就漏了绑 QQ）；已经绑过的直接发完整回执。"""
     from . import roles
-    if qq_needed() and not roles.qqs_of_role(role["id"]):
-        return (f"{head}\n\n第 2 步：在这个群里发「绑定QQ 你的QQ号」（填你自己正在用的 QQ 号，房间群里说话要靠它认出你，不绑不算到场）。\n"
+    if not roles.qqs_of_role(role["id"]):
+        why = "房间群里说话要靠它认出你，不绑不算到场" if qq_needed() else "之后认人、记戏都靠它"
+        return (f"{head}\n\n第 2 步：在这个群里发「绑定QQ 你的QQ号」（填你自己正在用的 QQ 号，{why}）。\n"
                 "绑好以后发给你完整的角色回执。")
     return welcome(role, head)
 

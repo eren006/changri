@@ -1,6 +1,6 @@
 """设置平台 · 物品、属性、地点与商城。由 changri.admin.create_app 调用 register(app, login_required) 挂上路由（路由名不变，模板里的 url_for 照常用）。"""
 from flask import flash, redirect, render_template, request, url_for
-from changri.core import rpg as rpg_core
+from changri.core import rpg as rpg_core, unilib
 from changri.core.db import get_conn
 
 
@@ -22,7 +22,8 @@ def register(app, login_required):
             x["chips"] = [{"text": f"{k} {v:+d}" if isinstance(v, int) else f"{k} {v}", "dir": "up" if isinstance(v, int) and v > 0 else "down" if isinstance(v, int) and v < 0 else ""} for k, v in eff.items()]
             x["eff_text"] = " ".join(f"{k}{v:+d}" if isinstance(v, int) else f"{k}{v}" for k, v in eff.items())
         return render_template("rpg.html", items=items, plain_items=[x for x in items if x["kind"] != "currency"],
-                               currencies=[x for x in items if x["kind"] == "currency"], shop=rpg_core.listings(), roles=_role_rows(), exchanges=rpg_core.exchanges(), recipes=rpg_core.recipes())
+                               currencies=[x for x in items if x["kind"] == "currency"], shop=rpg_core.listings(), roles=_role_rows(), exchanges=rpg_core.exchanges(), recipes=rpg_core.recipes(),
+                               uni=unilib.items(), uni_cand=unilib.candidates(), uni_max=unilib.MAX_ITEMS)
 
     @app.route("/attrs")
     @login_required
@@ -63,6 +64,27 @@ def register(app, login_required):
     def rpg_items_bulk():
         flash(rpg_core.bulk_summary(*rpg_core.bulk_items(request.form.get("text", ""))))
         return redirect(url_for("rpg_page"))
+
+    @app.post("/rpg/universal/add")
+    @login_required
+    def rpg_universal_add():
+        added, skipped, msg = unilib.add_from_bot(request.form.getlist("code"))
+        flash(msg or (f"已存入通用库 {added} 件" + (f"，跳过 {skipped} 件（同名或系统自带）" if skipped else "")))
+        return redirect(url_for("rpg_page") + "#universal")
+
+    @app.post("/rpg/universal/import")
+    @login_required
+    def rpg_universal_import():
+        added, notes = unilib.import_to_bot([int(x) for x in request.form.getlist("id") if x.isdigit()])
+        flash(f"已导入 {added} 件" + ("；没导入的：" + "；".join(notes) if notes else ""))
+        return redirect(url_for("rpg_page") + "#universal")
+
+    @app.post("/rpg/universal/<int:item_id>/delete")
+    @login_required
+    def rpg_universal_delete(item_id):
+        unilib.delete(item_id)
+        flash("已从通用库删除")
+        return redirect(url_for("rpg_page") + "#universal")
 
     @app.post("/rpg/inventory")
     @login_required

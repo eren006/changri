@@ -53,18 +53,28 @@ async def send(me, target, kind: str, gift: str, content: str, sign: str, send_f
     if chaos:
         content, to_id = chaos["shown"], chaos["true_to"]
         sign = chaos["sign"] if chaos["sign"] != me["name"] else sign
+    lost = False
+    if kind == "gift":
+        lost, to_id = _gift_chaos(me, target)
     mid = messaging.queue_message(kind, me["id"], to_id, gift, content, sign)
     for data in images:
         msgimages.save(mid, data)
     tail = f"（今天 {used + 1}/{lim}）" if lim > 0 else ""
     ok_text = f"已送达「{target['name']}」。{tail}发错了 2 分钟内可以撤回。"
-    blk = blocks.get_block(target["id"], me["id"])   # 对方有没有拉黑我
+    blk = blocks.get_block(to_id, me["id"])          # 看的是最后真正会收到的人有没有拉黑我（送错了人就看那个人）
     if blk:
         messaging.mark_blocked(mid, bool(blk["silent"]))
         if blk["silent"]:    # 静默：发件人看到和正常送达一模一样的提示
             return True, ok_text
-        return False, f"❌ {target['name']} 已拒绝你的联络。"
-    if await messaging.deliver(mid, send_fn):
+        from . import roles
+        got = roles.get_role(to_id)
+        return False, f"❌ {got['name'] if got else target['name']} 已拒绝你的联络。"
+    from . import milestone
+    milestone.bump(KIND_NAME[kind])                          # 「第 N 次记录」公告
+    if lost:                 # 礼物在路上丢了：谁也没收到，送的人看到的和正常送达一样，次数和冷却照算
+        messaging.mark_lost(mid)
+        return True, ok_text
+    if await messaging.deliver(mid, send_fn, shown_to=target["id"] if to_id != target["id"] and kind == "gift" else 0):
         if kind == "sms":                                     # 截信器（发件人身上）、回音壁（收件人身上）
             from . import roles, specials
             got = roles.get_role(to_id)
@@ -76,6 +86,24 @@ async def send(me, target, kind: str, gift: str, content: str, sign: str, send_f
 
 
 # ---------- 混乱短信（额外）：开着时短信可能出岔子 ----------
+
+def _gift_chaos(me, target, rng=None) -> tuple[bool, int]:
+    """开了「混乱短信」时礼物也可能出岔子：先掷「丢失」，没丢再掷「送错人」（随机换成另一位嘉宾）。
+    返回 (丢了没有, 真正收到的人)。两个概率默认都是 0。"""
+    import random
+
+    from . import chaosletter, extensions
+    rng = rng or random
+    if not extensions.is_enabled("chaos_letter"):
+        return False, target["id"]
+    if rng.random() * 100 < chaosletter.pct("chaos_gift_lost", 0):
+        return True, target["id"]
+    if rng.random() * 100 < chaosletter.pct("chaos_gift_mis", 0):
+        other = chaosletter.pick_others({me["id"], target["id"]}, rng)
+        if other:
+            return False, other
+    return False, target["id"]
+
 
 def _chaos(me, target, kind: str, content: str, sign: str):
     """开了「混乱短信」就按概率改这条短信；没出岔子（或没开、不是短信、只有图片）返回 None。"""

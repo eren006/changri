@@ -46,10 +46,13 @@ def register(app, login_required):
         people = _people()
         rid = request.args.get("role", type=int)
         role = next((p for p in people if p["id"] == rid), None)
-        any_global = bool(god_core.global_locks() or any(god_core.global_off(k) for k in god_core.FEATURES))
+        from changri.core import rooms as rooms_core
+        blocked = rooms_core.blocked_hours()
+        any_global = bool(god_core.global_locks() or blocked or any(god_core.global_off(k) for k in god_core.FEATURES))
         if request.args.get("role") == "all":                 # 全体：对所有人一起生效的开关和时间锁定
             return render_template("god.html", people=people, role=None, everyone=True, tab="", god=god_core,
-                                   g_off={k for k in god_core.FEATURES if god_core.global_off(k)}, g_locks=god_core.global_locks())
+                                   g_off={k for k in god_core.FEATURES if god_core.global_off(k)}, g_locks=god_core.global_locks(),
+                                   blocked=sorted(blocked.items()), edit_day=request.args.get("day", type=int))
         tab = request.args.get("tab", "info")
         tab = tab if tab in TABS else "info"
         ctx = {}
@@ -100,6 +103,22 @@ def register(app, login_required):
         f = request.form
         ok, info = god_core.add_global_lock(f.get("day", type=int), f.get("time", ""), f.get("note", ""))
         flash("已对所有人锁定这段时间" if ok else info)
+        return redirect(url_for("god_page", role="all"))
+
+    @app.post("/god/all/hours")
+    @login_required
+    def god_all_hours():
+        """禁约时段：某一天勾了哪几个钟点不能约（全不勾 = 这一天不限了）。"""
+        from changri.core import rooms as rooms_core
+        day = request.form.get("day", type=int)
+        if day is None or day < 0:
+            flash("要写是第几天（0 或更大的数字）。")
+            return redirect(url_for("god_page", role="all"))
+        data = rooms_core.blocked_hours()
+        hours = sorted({int(h) for h in request.form.getlist("h") if h.isdigit() and 0 <= int(h) <= 23})
+        data[day] = hours
+        rooms_core.save_blocked_hours(data)
+        flash(f"D{day} 的禁约时段已保存" if hours else f"D{day} 不再有禁约时段")
         return redirect(url_for("god_page", role="all"))
 
     @app.post("/god/all/unlock/<int:lock_id>")

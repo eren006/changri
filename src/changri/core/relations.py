@@ -72,6 +72,8 @@ def add_detail(from_id: int, to_id: int, to_name: str, text: str) -> tuple[bool,
         if used_chars + len(text) > max_total_chars:
             return False, f"⚠️ 添加后将超过总字数上限（{max_total_chars} 字，当前已有 {used_chars} 字），请精简内容。"
         conn.execute("INSERT INTO rel_details(rel_id, from_role_id, text, created_ts) VALUES(?,?,?,?)", (rel_id, from_id, text, now))
+    from . import milestone
+    milestone.bump("拉线")
     hint = f"（本条 {len(text)} 字 · 累计 {used_chars + len(text)}/{max_total_chars} 字 · {used_count + 1}/{max_count} 段）"
     return True, ("✨ 关系线已建立。\n" if new else "") + hint
 

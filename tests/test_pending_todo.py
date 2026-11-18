@@ -33,7 +33,7 @@ class TodoTests(unittest.TestCase):
 
     def _say(self, room_id, role, ts):
         with get_conn() as c:
-            c.execute("INSERT INTO room_lines(room_id, ts, role_id, name, text) VALUES(?,?,?,?,?)", (room_id, ts, role["id"], role["name"], "……"))
+            c.execute("INSERT INTO room_lines(room_id, ts, role_id, name, text, is_rp) VALUES(?,?,?,?,?,1)", (room_id, ts, role["id"], role["name"], "……"))
             c.execute("UPDATE room_members SET entered_ts=? WHERE room_id=? AND role_id=?", (ts, room_id, role["id"]))
 
     def test_my_turn_on_top_overdue_first(self):

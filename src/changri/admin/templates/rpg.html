@@ -126,6 +126,43 @@
   </div>
 </section>
 
+<section id="universal">
+  <div class="sec-head"><h2>通用物品库<span class="n">{{ uni|length }} / {{ uni_max }} 件</span></h2>
+    <span class="btns">
+    {% set fresh = uni_cand|rejectattr('in_library')|list %}
+    {% if fresh %}
+    <details class="panel"><summary class="btn ghost">{{ ic.tray() }}把物品存进通用库</summary>
+      <form class="form" method="post" action="{{ url_for('rpg_universal_add') }}">{{ csrf() }}
+        <p class="note" style="margin-top:0">勾上要存的。已经在通用库里的同名物品、系统自带的特殊道具不在这里列出。</p>
+        <div class="unipick">{% for x in fresh %}<label class="check"><input type="checkbox" name="code" value="{{ x.code }}"> {{ x.name }}<span class="kind {{ 'cur' if x.kind == 'currency' }}">{{ '货币' if x.kind == 'currency' else '物品' }}</span></label>{% endfor %}</div>
+        <div class="actions"><button class="btn" type="submit">存进通用库</button><button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
+      </form>
+    </details>
+    {% endif %}
+    </span>
+  </div>
+  <p class="note" style="margin-top:0">常用的物品和货币存一份在这里，换季度、换机器人都还在。要用的时候勾上导入到上面的物品库：物品码重新生成，已经有同名物品的会跳过。</p>
+  {% if uni %}
+  <form method="post" action="{{ url_for('rpg_universal_import') }}" id="uniImport">{{ csrf() }}</form>
+  <div class="tablewrap"><table class="cards">
+    <thead><tr><th></th><th>物品</th><th>类型</th><th>属性效果</th><th>使用 / 赠送</th><th></th></tr></thead>
+    <tbody>
+    {% for x in uni %}
+    <tr>
+      <td><input type="checkbox" name="id" value="{{ x.id }}" form="uniImport" aria-label="选中 {{ x.name }}"></td>
+      <td class="nm"><b>{{ x.name }}</b>{% if x.description %}<div class="muted">{{ x.description }}</div>{% endif %}</td>
+      <td class="kc"><span class="kind {{ 'cur' if x.kind == 'currency' }}">{{ '货币' if x.kind == 'currency' else '物品' }}</span></td>
+      <td>{{ x.eff_text or '—' }}</td>
+      <td class="muted">{{ '不限次数' if x.max_uses < 0 else '用 ' ~ x.max_uses ~ ' 次' }}　{{ '可赠送' if x.can_give else '不可赠送' }}</td>
+      <td class="act"><form method="post" action="{{ url_for('rpg_universal_delete', item_id=x.id) }}" onsubmit="return confirm('从通用库删掉「{{ x.name }}」？已经导入到物品库的不受影响。')">{{ csrf() }}<button class="linkbtn">删除</button></form></td>
+    </tr>
+    {% endfor %}
+    </tbody></table></div>
+  <div class="actions" style="margin-top:12px"><button class="btn" type="submit" form="uniImport">把勾选的导入物品库</button></div>
+  {% else %}<p class="empty">通用库还是空的。先在上面的物品库建好物品，再点「把物品存进通用库」。</p>{% endif %}
+  <style>.unipick{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 16px;margin:8px 0 12px}.unipick .kind{margin-left:6px}@media (max-width:720px){.unipick{grid-template-columns:repeat(2,minmax(0,1fr))}}</style>
+</section>
+
 <section>
   <div class="sec-head"><h2>调整角色背包</h2>
     {% if items and roles %}

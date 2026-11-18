@@ -62,13 +62,14 @@ def todo_entries(role, lingering: list | None = None, now: float | None = None) 
                                "WHERE m.role_id=? AND r.status='open' ORDER BY r.id", (role["id"],)).fetchall()
         names = {x["id"]: x["name"] for x in c.execute("SELECT id, name FROM roles")}
         for r in open_rooms:
-            last = c.execute("SELECT role_id, ts FROM room_lines WHERE room_id=? AND role_id IS NOT NULL ORDER BY ts DESC, id DESC LIMIT 1",
-                             (r["id"],)).fetchone()
+            last = c.execute("SELECT role_id, ts FROM room_lines WHERE room_id=? AND role_id IS NOT NULL AND is_rp=1 ORDER BY ts DESC, id DESC LIMIT 1",
+                             (r["id"],)).fetchone()             # 只看戏文，闲聊不算回复（跟弧长一个口径）
+            since = arclen.waiting(c, r["id"])[0].get(role["id"])     # 两人房从对方说第一句起算，多人房从别人最近一句起算
             head = f"R{r['id']} {r['kind']}（{slot_text(r)}）"
             if not r["pool_id"] and not rooms.web_mode():
                 items.append((f"g:{r['id']}", f"{head}：备用群池没有空群，还在等群"))
             elif last and last["role_id"] != role["id"]:
-                wait = now - last["ts"]
+                wait = now - (since or last["ts"])
                 over = bool(lim_h and wait > lim_h * 3600)
                 tail = "" if r["entered_ts"] else f"\n　⚠️ 你好像还没进这个群，{group_line(r)}"
                 turn.append((over, wait, f"t:{r['id']}:{last['ts']}",

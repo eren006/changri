@@ -83,6 +83,9 @@ def post(poster_id: int, time_text: str, place: str, content: str, sign: str = "
     if lim and day_count(poster_id, "post") >= lim:
         return False, f"今天挂心愿的次数用完了（每天 {lim} 次）。"
     day = season.current_day()
+    closed_h = rooms.blocked_hit(day, hm[0], hm[1])             # 禁约的钟点，心愿也一样不能挂
+    if closed_h:
+        return False, closed_h
     hit = rooms.conflict(poster_id, day, hm[0], hm[1])          # 已有的约会（含已结束的）和自己别的心愿都算
     if hit:
         return False, f"你在 D{day} {hit['start_hm']}-{hit['end_hm']} 已经有安排了（{hit['kind']}）。"

@@ -165,7 +165,7 @@ a.tile:active{transform:scale(.97)}
     <p class="note" style="margin:0 0 12px">程序出错、或上次没有正常退出（崩溃）时自动记在这里，不用你做什么。{% if err_url %}恢复后会自动发到你填的报错接收地址。{% else %}没有填报错接收地址，只存在本机（在「功能与设置」的基础设置里填）。{% endif %}</p>
     {% for e in errors %}
     <div class="errrow">
-      <span class="kind {{ 'bad' if e.kind == 'crash' else 'warn' }}">{{ '崩溃' if e.kind == 'crash' else '出错' }}</span>
+      <span class="kind {{ 'bad' if e.kind == 'crash' else 'warn' }}">{{ {'crash': '崩溃', 'config': '配置'}.get(e.kind, '出错') }}</span>
       <span class="tabular muted">{{ e.ts|ts }}</span>{% if e.reported %} <span class="muted">· 已发送</span>{% endif %}
       <div>{{ e.message }}</div><div class="muted">{{ e.source }}</div>
       {% if e.trace %}<details><summary class="muted">详情</summary><pre style="white-space:pre-wrap;font-size:12px;overflow-wrap:anywhere">{{ e.trace }}</pre></details>{% endif %}

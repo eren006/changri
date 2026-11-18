@@ -288,6 +288,10 @@ async def start_room(kind: str, me, targets: list, time_text: str, place: str = 
     if room_id and not await _ensure_clean(room_id):
         return False, NO_GROUP_TEXT.format(kind=kind), 0
     if not ok:
+        miss = rooms.pop_missed(me["id"])              # 对方那个时间已经有安排：在对方个人群留一句，谁想约、什么时候、没约成
+        if miss:
+            await _push(miss["role_id"], f"📅 {me['name']} 想在 D{miss['day']} {miss['start_hm']}-{miss['end_hm']} 约你（{miss['kind']}），"
+                                         "但这个时间你已经有安排了，没约成。")
         return False, info, 0
     room = rooms.get(room_id)
     for t in targets:

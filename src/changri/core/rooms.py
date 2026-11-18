@@ -49,6 +49,58 @@ def parse_hm(text: str, day: int | None = None) -> tuple[str, str] | None:
     return a, b
 
 
+MIN_MINUTES = {"电话": 29, "约会": 59, "踩点": 59}          # 最短时长的默认值（分钟），设置里能改，0 = 不限
+
+
+def _minutes(hm: str) -> int | None:
+    m = re.fullmatch(r"(\d{2}):(\d{2})", hm or "")
+    return int(m[1]) * 60 + int(m[2]) if m else None
+
+
+def too_short(kind: str, a: str, b: str) -> str:
+    """约的时间够不够长（电话默认至少 29 分钟，约会和踩点 59 分钟）。够了、或这种房间不限，返回空串。"""
+    need = get_int(f"min_minutes_{kind}", MIN_MINUTES[kind]) if kind in MIN_MINUTES else 0
+    x, y = _minutes(a), _minutes(b)
+    if need <= 0 or x is None or y is None or y - x >= need:
+        return ""
+    eg = f"{a.replace(':', '')}-{(x + need) // 60 % 24:02d}{(x + need) % 60:02d}"
+    return f"{kind}的时间至少要 {need} 分钟，请重新写（如 {eg}）。"
+
+
+def blocked_hours() -> dict[int, list[int]]:
+    """禁约时段：{游戏天数: [不能约的钟点, …]}，在后台「季度」页按天勾选。"""
+    try:
+        raw = json.loads(get_config("blocked_hours", "") or "{}")
+        return {int(d): sorted({int(h) for h in hs if 0 <= int(h) <= 23}) for d, hs in raw.items() if hs}
+    except (ValueError, TypeError, AttributeError):
+        return {}
+
+
+def save_blocked_hours(data: dict[int, list[int]]) -> None:
+    from .db import set_config
+    set_config("blocked_hours", json.dumps({str(d): sorted(set(hs)) for d, hs in data.items() if hs}))
+
+
+def blocked_hit(day: int | None, a: str, b: str) -> str:
+    """这段时间有没有碰到禁约的钟点：约会盖到的每一个小时都查，不只看开始那个小时。没碰到返回空串。"""
+    x, y = _minutes(a), _minutes(b)
+    hours = blocked_hours().get(day) if day is not None else None
+    if not hours or x is None or y is None:
+        return ""
+    hit = [h for h in hours if x < (h + 1) * 60 and h * 60 < y]
+    if not hit:
+        return ""
+    return f"D{day} 的 {'、'.join(f'{h}点' for h in hit)} 不开放约会，请换个时间。"
+
+
+_missed: dict[int, dict] = {}
+
+
+def pop_missed(creator_id: int) -> dict | None:
+    """刚才没约成、是因为对方那个时间有安排：取出这次的情况（谁、哪天、几点、什么类型），好给对方留一句。取一次就没了。"""
+    return _missed.pop(creator_id, None)
+
+
 def _overlap(a1: str, a2: str, b1: str, b2: str) -> bool:
     return a1 < b2 and b1 < a2
 
@@ -153,8 +205,13 @@ def create(kind: str, creator_id: int, target_ids: list[int], time_text: str, pl
         if not hm:
             from . import storycal
             return False, (storycal.parse_when(time_text, day)[1] or storycal.format_error(day)), 0
+        if not official and not wish_id:
+            short = too_short(kind, hm[0], hm[1])
+            if short:
+                return False, short, 0
     else:
         hm = ("", "")
+    _missed.pop(creator_id, None)
     ids = list(dict.fromkeys(target_ids))
     if creator_id in ids:
         return False, "不能约自己。", 0
@@ -198,9 +255,15 @@ def create(kind: str, creator_id: int, target_ids: list[int], time_text: str, pl
             if cap and open_phone_count(creator_id) >= cap:
                 return False, f"你有 {cap} 个电话还没结束，先结束几个再打。", 0
     if kind not in NO_TIMELINE:
+        if not official:
+            closed_h = blocked_hit(day, hm[0], hm[1])
+            if closed_h:
+                return False, closed_h, 0
         for rid in [creator_id] + ids:
             hit = conflict(rid, day, hm[0], hm[1], locks=not official, ignore_wish=wish_id)
             if hit:
+                if rid != creator_id and not official and hit["id"]:       # 对方真的有一场安排（不是管理员锁的时间）：记下来，好给对方留一句
+                    _missed[creator_id] = {"role_id": rid, "kind": kind, "day": day, "start_hm": hm[0], "end_hm": hm[1]}
                 # 官约由管理员发起，creator 只是名单上的第一个人：写「你」管理员会以为是自己撞了
                 who = "你" if rid == creator_id and not official else f"「{names.get(rid, '对方')}」"
                 return False, f"{who}在 D{day} {hit['start_hm']}-{hit['end_hm']} 已经有安排（{hit['kind']}），时间撞了。", 0
@@ -217,6 +280,8 @@ def create(kind: str, creator_id: int, target_ids: list[int], time_text: str, pl
                 c.execute("DELETE FROM rooms WHERE id=?", (rid_,))                   # 成员、发言连带删除（外键级联）
             pool.note_exhausted(kind)                                                # 定时任务会提醒后台群
             return False, f"备用群池暂时没有空闲的群，这次{kind}没能开成，请稍后再试，或联系管理员多准备几个备用群。", 0
+    from . import milestone
+    milestone.bump(kind)                                          # 「第 N 次记录」公告（只数电话、约会、官约、心愿）
     try:                                                          # 目击系统（额外扩展）：关着就什么都不做
         from . import sighting
         sighting.detect(rid_)
@@ -377,6 +442,10 @@ def propose_change(room_id: int, by_id: int, day: int, a: str, b: str) -> tuple[
     r = get(room_id)
     if not r or r["status"] != "open" or r["kind"] in NO_TIMELINE:
         return False, "这个房间没有时间线可改。"
+    if r["kind"] != "官约":
+        bad = too_short(r["kind"], a, b) or blocked_hit(day, a, b)
+        if bad:
+            return False, bad
     for m in members(room_id):
         hit = conflict(m["role_id"], day, a, b, ignore_room=room_id)
         if hit:

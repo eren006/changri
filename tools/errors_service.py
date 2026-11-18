@@ -1,6 +1,6 @@
 """接收长日bot 报错日志的服务，部署在主页服务器（system.changri.work）上，由作者部署，不随安装包使用。
 
-收：POST /api/errors，JSON {"app","version","install","errors":[{ts,kind,source,message,trace,version}]}（长日bot 的 core/errlog.py 发的）。
+收：POST /api/errors，JSON {"app","version","install","contact"（选填，装的人自己填的联系 QQ）,"errors":[{ts,kind,source,message,trace,version}]}（长日bot 的 core/errlog.py 发的）。
     每条另记来源 IP 和实例编号（install，机器人本地随机生成的，0.21.6 起才带），监控后台（console_service.py）按这两个分实例。
 看：GET /api/errors（需要请求头 Authorization: Bearer <口令>；口令从环境变量 CHANGRI_ERRORS_TOKEN 读，没设就不开放查看），
     返回最近 100 条。也可以直接 tail 数据文件。
@@ -57,6 +57,7 @@ def rate_ok(ip: str, now: float | None = None) -> bool:
 
 
 _INSTALL = re.compile(r"^[0-9a-f]{16,32}$")
+_CONTACT = re.compile(r"^\d{5,12}$")          # 装的人自己填的联系 QQ（选填，0.22.1 起）；不像 QQ 号的一律丢掉
 
 
 def clean(payload, ip: str = "") -> list[dict]:
@@ -67,6 +68,8 @@ def clean(payload, ip: str = "") -> list[dict]:
     ver = scrub(payload.get("version"))[:20]
     inst = str(payload.get("install") or "")
     inst = inst if _INSTALL.match(inst) else ""
+    contact = str(payload.get("contact") or "")
+    contact = contact if _CONTACT.match(contact) else ""
     out = []
     for e in payload["errors"][-MAX_ITEMS:]:
         if not isinstance(e, dict):
@@ -78,6 +81,8 @@ def clean(payload, ip: str = "") -> list[dict]:
             row["ts"] = 0
         row["app"], row["app_version"] = app, ver
         row["install"], row["ip"] = inst, str(ip)[:45]
+        if contact:
+            row["contact"] = contact
         row["got"] = int(time.time())
         out.append(row)
     return out

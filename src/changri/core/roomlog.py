@@ -2,7 +2,6 @@
 官方机器人在房间群里收到的（record_official，大家默认开了「接收全部消息」）。一个群里只会有其中一个，都按 R 号存。
 戏文格式跟长日系统一致：首行「角色名」+ 换行/空格/冒号（：或:）+ 正文才算戏文（计字数），其余是闲聊，只存不计。
 只记正在进行的房间群；房间被清掉（季度收尾）时发言一起清掉，要留的话先在后台导出文本。"""
-import difflib
 import re
 import time
 
@@ -19,13 +18,60 @@ def body_of(name: str, text: str) -> str:
     return p[1] if p else text
 
 
-def parse_rp(text: str, names: set[str]) -> tuple[str, str] | None:
-    """是戏文返回 (角色名, 正文)；角色名要是已知的角色（或参与者）名，否则算闲聊。"""
+_PAIRS = {"(": ")", "（": "）"}
+
+
+def strip_ooc(text: str) -> str:
+    """去掉最外层括号包着的场外话（半角、全角都认，连里面嵌套的一起）。没打闭合的括号原样保留，免得漏打一个括号把正文删了。"""
+    out, stack, start = [], [], 0
+    for i, ch in enumerate(text):
+        if ch in _PAIRS:
+            if not stack:
+                out.append(text[start:i])
+                start = i
+            stack.append(_PAIRS[ch])
+        elif stack and ch == stack[-1]:
+            stack.pop()
+            if not stack:
+                start = i + 1
+    out.append(text[start:])               # 没闭合的：从那个左括号起原样留下
+    return re.sub(r"[ \t]+\n", "\n", "".join(out)).strip()
+
+
+def parse_rp(text: str, names) -> tuple[str, str] | None:
+    """是戏文返回 (角色本名, 正文)；首行要是已知的角色（或参与者）名，否则算闲聊。
+    names 可以是名字集合，也可以是 {首行能写的名字: 本名}（简称 → 本名）。正文里最外层括号的场外话已经去掉，去完没字了就不算戏文。"""
     m = _RP.match(text)
     if not m:
         return None
-    name, body = m.group(1), m.group(2).strip()
-    return (name, body) if name in names and body else None
+    name, body = m.group(1), strip_ooc(m.group(2))
+    if name not in names or not body:
+        return None
+    return (names[name] if isinstance(names, dict) else name), body
+
+
+def names_of(mem) -> dict[str, str]:
+    """房间参与者首行能写的名字：本名，加上设了的简称（简称只用来认首行，记下来的还是本名）。"""
+    out = {m["name"]: m["name"] for m in mem}
+    ids = [m["role_id"] for m in mem]
+    if ids:
+        with get_conn() as c:
+            for r in c.execute(f"SELECT role_id, short FROM role_profiles WHERE short!='' AND role_id IN ({','.join('?' * len(ids))})", ids):
+                real = next(m["name"] for m in mem if m["role_id"] == r["role_id"])
+                out.setdefault(r["short"], real)
+    return out
+
+
+def clean(text: str, names) -> tuple[str, tuple[str, str] | None]:
+    """要存下来的文字和解析结果。戏文存成「本名 + 原来的分隔 + 去掉场外话的正文」，闲聊原样存。"""
+    rp = parse_rp(text, names)
+    if not rp:
+        return text, None
+    m = _RP.match(text)
+    if rp[0] == m.group(1) and rp[1] == m.group(2).strip():      # 没有场外话、首行就是本名：原样存，不动排版（全角缩进、空行）
+        return text, rp
+    sep = "\n" if "\n" in text[m.end(1):m.start(2)] else "："
+    return f"{rp[0]}{sep}{rp[1]}", rp
 
 
 def record(app_id: str, msg) -> bool:
@@ -40,8 +86,7 @@ def record(app_id: str, msg) -> bool:
     mem = rooms.members(room["id"])
     mine = {r["id"] for r in roles.roles_by_qq(msg.user_id)}
     who = next((m for m in mem if m["role_id"] in mine), None)
-    names = {m["name"] for m in mem}
-    rp = parse_rp(text, names)
+    text, rp = clean(text, names_of(mem))
     name = who["name"] if who else (msg.nickname or msg.user_id)
     ts = msg.time or int(time.time())
     with get_conn() as c:
@@ -75,8 +120,7 @@ def record_official(bot_id: str, group_openid: str, member_openid: str, text: st
     mem = rooms.members(room["id"])
     r = roles.find_role_for_sender(bot_id, group_openid, member_openid)       # 每人同期只有一个活跃角色
     who = {"role_id": r["id"], "name": r["name"]} if r else None
-    names = {m["name"] for m in mem}
-    rp = parse_rp(text, names)
+    text, rp = clean(text, names_of(mem))
     name = who["name"] if who else "群友" + member_openid[-4:]
     key = OFFICIAL + member_openid
     ts = int(ts or time.time())
@@ -90,18 +134,22 @@ def record_official(bot_id: str, group_openid: str, member_openid: str, text: st
     return True
 
 
-DEDUP_WINDOW = 1800       # 同一个人 30 分钟内的相似发言才算「重复发了一遍」
+DEDUP_WINDOW = 600        # 同一个人 10 分钟内的相似发言才算「撤回重发」（跟长日系统一致）
 DEDUP_MIN_LEN = 8         # 太短的（「好」「嗯嗯」）重复是正常说话，不处理
 
 
 def similar(a: str, b: str) -> float:
-    return difflib.SequenceMatcher(None, a, b).ratio()
+    """两段话有多像（0–1）：按相邻两个字一组，看重合的占多少（Jaccard，跟长日系统同一个算法）。"""
+    ga, gb = {a[i:i + 2] for i in range(len(a) - 1)}, {b[i:i + 2] for i in range(len(b) - 1)}
+    if not ga or not gb:
+        return 1.0 if a == b else 0.0
+    return len(ga & gb) / len(ga | gb)
 
 
 def _drop_near_duplicate(c, room_id: int, qq: str, text: str, ts: int) -> None:
-    """同一个人发了和自己上一条几乎一样的话（发错重发、修改后再发）：删掉前一条，只留这一条。
-    相似度阈值在设置「复盘相似发言」里，0 = 不处理。"""
-    pct = get_int("room_dedup_similarity", 90)
+    """同一个人 10 分钟内发了和自己上一条差不多的话（发错重发、修改后再发）：算替换，删掉前一条，只留这一条，字数按新的算。
+    相似度阈值是设置里的 room_redo_similarity（默认 60），0 = 不处理。"""
+    pct = get_int("room_redo_similarity", 60)
     if pct <= 0 or len(text) < DEDUP_MIN_LEN:
         return
     prev = c.execute("SELECT id, text, ts FROM room_lines WHERE room_id=? AND qq=? ORDER BY id DESC LIMIT 1", (room_id, qq)).fetchone()
@@ -122,11 +170,10 @@ def lines(room_id: int) -> list:
         return c.execute("SELECT * FROM room_lines WHERE room_id=? ORDER BY ts, id", (room_id,)).fetchall()      # 按时间：补录的旧消息插回原位
 
 
-def _classify(room_id: int, text: str) -> tuple[int, int]:
-    """按房间参与者名判断是不是戏文：返回 (is_rp, 戏文字数)。"""
-    names = {m["name"] for m in rooms.members(room_id)}
-    rp = parse_rp(text, names)
-    return (1, len(rp[1])) if rp else (0, 0)
+def _classify(room_id: int, text: str) -> tuple[str, int, int]:
+    """按房间参与者名判断是不是戏文：返回 (要存的文字, is_rp, 戏文字数)。"""
+    text, rp = clean(text, names_of(rooms.members(room_id)))
+    return (text, 1, len(rp[1])) if rp else (text, 0, 0)
 
 
 def add_line(room_id: int, role_id: int | None, text: str, ts: int | None = None) -> tuple[bool, str]:
@@ -137,7 +184,7 @@ def add_line(room_id: int, role_id: int | None, text: str, ts: int | None = None
     mem = {m["role_id"]: m["name"] for m in rooms.members(room_id)}
     if role_id not in mem:
         return False, "说话的人要是这个房间的参与者。"
-    is_rp, chars = _classify(room_id, text)
+    text, is_rp, chars = _classify(room_id, text)
     with get_conn() as c:
         c.execute("INSERT INTO room_lines(room_id, ts, qq, role_id, name, text, is_rp, chars) VALUES(?,?,?,?,?,?,?,?)",
                   (room_id, ts or int(time.time()), "", role_id, mem[role_id], text, is_rp, chars))
@@ -159,7 +206,7 @@ def edit_line(room_id: int, line_id: int, text: str, role_id: int | None = None,
         if role_id not in mem:
             return False, "说话的人要是这个房间的参与者。"
         rid, name = role_id, mem[role_id]
-    is_rp, chars = _classify(room_id, text)
+    text, is_rp, chars = _classify(room_id, text)
     with get_conn() as c:
         c.execute("UPDATE room_lines SET text=?, role_id=?, name=?, ts=?, is_rp=?, chars=? WHERE id=?", (text, rid, name, ts or old["ts"], is_rp, chars, line_id))
     return True, "已修改。"
@@ -364,11 +411,13 @@ def backfill_quoted(room_id: int, items: list[dict], now: int | None = None) -> 
     if not room:
         return {"added": 0, "skipped": 0, "empty": 0}
     mem = rooms.members(room_id)
-    names = {m["name"] for m in mem}
+    names = names_of(mem)
     role_of = {m["name"]: m["role_id"] for m in mem}
     have = {}
     for ln in lines(room_id):
         have.setdefault(_norm(ln["text"]), ln["ts"])
+    for it in items:                           # 跟平时记的一样：戏文去掉场外话、首行换成本名，这样才对得上已经存的
+        it["text"] = clean((it.get("text") or "").strip(), names)[0]
     now = int(now or time.time())
     seq = []                                   # [(item, 已有的时间 或 None)]
     empty = 0

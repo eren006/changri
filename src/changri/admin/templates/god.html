@@ -39,6 +39,32 @@
       <form method="post" action="{{ url_for('god_all_unlock', lock_id=l.id) }}">{{ csrf() }}<button class="linkbtn">解封</button></form></div>
   {% else %}<p class="empty">没有封禁。</p>{% endfor %}</div>
 </section>
+<section>
+  <div class="sec-head keep"><h2>禁约时段<span class="n">{{ blocked|length }}</span></h2></div>
+  <p class="note" style="margin-top:0">按游戏里的第几天，勾出不能约的钟点。约会、电话、踩点、心愿只要盖到其中任何一个小时就约不成（14 点勾了，1300-1500 也不行）；官约不受限。</p>
+  {% macro hourform(day, hours) %}
+  <form class="form hourform" method="post" action="{{ url_for('god_all_hours') }}">{{ csrf() }}
+    <div class="fields"><div><label>第几天</label><input type="number" min="0" name="day" value="{{ day if day is not none else '' }}" required {{ 'readonly' if day is not none }}></div></div>
+    <div class="hourgrid">{% for h in range(24) %}<label class="hr"><input type="checkbox" name="h" value="{{ h }}" {{ 'checked' if h in hours }}><span class="tabular">{{ '%02d'|format(h) }}</span></label>{% endfor %}</div>
+    <div class="actions"><button class="btn" type="submit">保存</button>{% if day is not none %}<a class="btn ghost" href="{{ url_for('god_page', role='all') }}">取消</a>{% endif %}</div>
+  </form>
+  {% endmacro %}
+  <div class="rowlist">{% for d, hs in blocked %}
+    {% if edit_day == d %}{{ hourform(d, hs) }}{% else %}
+    <div class="row"><div class="nm"><b class="tabular">D{{ d }}</b><div class="muted tabular">{% for h in hs %}{{ '%02d'|format(h) }}点{{ '、' if not loop.last }}{% endfor %}</div></div>
+      <a class="linkbtn" href="{{ url_for('god_page', role='all', day=d) }}">修改</a></div>{% endif %}
+  {% else %}<p class="empty">没有禁约时段。</p>{% endfor %}</div>
+  <details class="panel" style="margin-top:12px"><summary class="btn">给某一天设禁约时段</summary>{{ hourform(none, []) }}</details>
+  <style>
+    .hourgrid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:6px;margin:12px 0}
+    .hourgrid .hr{position:relative;display:block;cursor:pointer}
+    .hourgrid .hr input{position:absolute;opacity:0;inset:0;width:100%;height:100%;margin:0;cursor:pointer}
+    .hourgrid .hr span{display:block;text-align:center;padding:8px 0;border:1px solid var(--line,#e5e7eb);border-radius:8px;font-size:13px}
+    .hourgrid .hr input:checked+span{background:var(--bad,#dc2626);border-color:var(--bad,#dc2626);color:#fff}
+    .hourgrid .hr input:focus-visible+span{outline:2px solid var(--accent,#2563eb);outline-offset:2px}
+    @media (max-width:720px){.hourgrid{grid-template-columns:repeat(6,minmax(0,1fr))}}
+  </style>
+</section>
 
 {% elif not role %}
 <div class="rolehead">

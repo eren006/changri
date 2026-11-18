@@ -83,6 +83,9 @@ class Extras(unittest.TestCase):
         self.assertFalse(roles.has_group(rid))
         roles.consume_bind_code(code, "B", "GN", "MNPC")
         self.assertTrue(roles.has_group(rid))
+        step = formats.setup_step(roles.get_role(rid), "head")              # 没开 QQ 小号也一样：没绑 QQ 只提示第 2 步，不发回执
+        self.assertIn("第 2 步", step)
+        self.assertNotIn("初始档案", step)
         set_config("qqlink_on", "1")
         self.assertIn("第 2 步", formats.setup_step(roles.get_role(rid), "head"))
         self.assertEqual(roles.bind_qq(rid, "123456"), "")
@@ -180,7 +183,7 @@ class Extras(unittest.TestCase):
         with get_conn() as c:
             c.execute("UPDATE rooms SET status='open' WHERE id=?", (rid,))
             for who, name, ts in (("甲", "甲", now - 10 * 3600), ("乙", "乙", now - 9 * 3600), ("甲", "甲", now - 8 * 3600 + 600)):
-                c.execute("INSERT INTO room_lines(room_id, ts, role_id, name, text) VALUES(?,?,?,?,?)", (rid, ts, self.r[who]["id"], name, "x"))
+                c.execute("INSERT INTO room_lines(room_id, ts, role_id, name, text, is_rp) VALUES(?,?,?,?,?,1)", (rid, ts, self.r[who]["id"], name, "x"))
         st = arclen.stats(now)
         by = {p["name"]: p for p in st["people"]}
         self.assertAlmostEqual(by["乙"]["avg"], 1.0, places=1)             # 乙隔 1 小时回的
@@ -244,7 +247,7 @@ class Extras(unittest.TestCase):
         self.assertEqual([x["msg_id"] for x in roomlog.lines(rid)], ["m2", "m3", "m4", "m5", "m6"])
         put("1", "我们去河边走走吧，晚风很舒服", "m7", now + 4000)    # 隔了 30 分钟以上：不算重复
         self.assertEqual(len(roomlog.lines(rid)), 6)
-        set_config("room_dedup_similarity", "0")
+        set_config("room_redo_similarity", "0")
         put("1", "我们去河边走走吧，晚风很舒服", "m8", now + 4010)    # 关掉：不处理
         self.assertEqual(len(roomlog.lines(rid)), 7)
         self.assertEqual(roomlog.recall("m4"), 1)                    # QQ 里撤回：复盘同步删

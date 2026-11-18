@@ -39,6 +39,11 @@ def set_flag(name: str, on: bool) -> tuple[bool, str]:
             return False, f"找不到角色「{name}」。"
         if bool(r["is_npc"]) == on:
             return False, f"「{name}」本来就{'是' if on else '不是'} NPC。"
+        if not on:                 # 改回普通角色：玩家要一人一个群，还跟别的 NPC 共用着群就先换绑
+            shared = c.execute("SELECT r2.name FROM role_groups g JOIN role_groups g2 ON g2.bot_id=g.bot_id AND g2.group_openid=g.group_openid AND g2.role_id!=g.role_id "
+                               "JOIN roles r2 ON r2.id=g2.role_id WHERE g.role_id=? AND COALESCE(g.group_openid,'')!='' LIMIT 1", (r["id"],)).fetchone()
+            if shared:
+                return False, f"「{name}」现在和「{shared['name']}」共用一个群。玩家要一人一个群：先给「{name}」换绑到自己的群，再改回普通角色。"
         c.execute("UPDATE roles SET is_npc=? WHERE id=?", (1 if on else 0, r["id"]))
     return True, f"「{name}」{'已设为 NPC' if on else '已改回普通角色'}。"
 
