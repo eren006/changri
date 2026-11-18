@@ -419,6 +419,45 @@ def rd(text: str) -> str:
     return Rolled("\n".join(lines), dicecard.rd_multi_card(reason, et, rounds, tail))
 
 
+# ======================== rt：难度骰（自定面数 + 成功线） ========================
+# /rt 12 7 = 掷 D12，≤7 成功。面数越大越难：同样成功线 7，D12 约 58%，D16 约 44%。
+
+HELP_RT_USAGE = ("用法：/rt 面数 成功线 [原因]，例如 /rt 12 7、/rt 16 7 撬锁。掷出的点数 ≤ 成功线算成功。\n"
+                 "成功线也可以写技能名，取角色卡上的数值：/rt 12 侦查")
+
+
+def rt(text: str, lookup: Lookup | None = None) -> str:
+    parts = text.translate(FULLWIDTH).split()
+    if not parts or not re.fullmatch(r"[dD]?\d+", parts[0]):
+        return HELP_RT_USAGE
+    sides = int(parts.pop(0).lstrip("dD"))
+    if not 1 <= sides <= MAX_SIDES:
+        return f"面数要在 1~{MAX_SIDES} 之间。"
+    if not parts:
+        return HELP_RT_USAGE
+    first = parts.pop(0)
+    if first.isdigit():
+        target, reason = int(first), " ".join(parts)
+    else:                                   # 技能名：/rt 12 侦查，成功线取角色卡上的数值
+        if lookup is None:
+            return HELP_RT_USAGE
+        got = lookup(first)
+        if isinstance(got, str):
+            return got
+        target = got[1]
+        reason = f"{got[0]}的{first}" + (f"（{got[2].lstrip('，')}）" if len(got) > 2 and got[2] else "")
+        if parts:
+            reason += " " + " ".join(parts)
+    if target < 1:
+        return "成功线至少是 1。"
+    roll = random.randint(1, sides)
+    verdict = "成功" if roll <= target else "失败"
+    head = f"{reason}：" if reason else ""
+    plain = f"{head}D{sides}={roll}/{target} —— {verdict}。"
+    card = dicecard.rt_card(reason, sides, roll, target, verdict)
+    return Rolled(plain, card, roll=roll, target=target, sides=sides, verdict=verdict)
+
+
 # ======================== COC7 ========================
 
 LEVEL_RANK = {"大失败": 0, "失败": 1, "成功": 2, "困难成功": 3, "极难成功": 4, "大成功": 5}
@@ -1108,7 +1147,9 @@ HELP_RD = (
     "/rd 3d6+2d4-1　加减、常数；/rd 2d6×3、(1d6+2)×2　乘法、括号\n"
     "/rd 4d6k3　取最高3颗；/rd 2d20kl1　取最低1颗；/rd 3d6!　爆骰\n"
     "/rd 5#2d6　连掷5轮；/rd 伤害 2d6+3　带原因；不写表达式就是 D100\n"
-    "/rh 表达式　暗骰：结果私聊给你，群里只说一声（要先把你加进机器人白名单）"
+    "/rh 表达式　暗骰：结果私聊给你，群里只说一声（要先把你加进机器人白名单）\n"
+    "/rt 12 7　难度骰：掷 D12，≤7 成功；面数越大越难（/rt 16 7 更难）；也叫 /难度骰\n"
+    "/rt 12 侦查　成功线取角色卡上的侦查数值"
 )
 HELP_COC = (
     "【COC7 · 检定】\n"

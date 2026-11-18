@@ -101,16 +101,51 @@ async def reply_long(matcher, text: str, as_image: bool = True) -> None:
 
 
 BTN_MD_MAX = 1200      # 正文再长就按原来的方式发（长图 / 拆文字），按钮另发一条短的
+# QQ 拒绝带按钮的消息：这一条改发纯文字。连续被拒 BTN_FAIL_LIMIT 次才暂停 BTN_COOLDOWN 秒，中间发成功一次就清零。
+# 以前被拒一次就全体停一小时：一条偶然被拒（某种消息的按钮不合 QQ 要求、QQ 临时出错）就让所有按钮消失一小时，用户以为按钮坏了。
+# 真没有权限时每条都被拒，照样很快进入暂停，不会一直刷。
+BTN_FAIL_LIMIT = 3
+BTN_COOLDOWN = 600
 _btn_off_until = 0.0
+_btn_fails = 0
+
+
+def _btn_rejected() -> bool:
+    """记一次被拒。连续到 BTN_FAIL_LIMIT 次就暂停按钮 BTN_COOLDOWN 秒并清零计数，返回这次是否进入了暂停。"""
+    global _btn_off_until, _btn_fails
+    _btn_fails += 1
+    if _btn_fails < BTN_FAIL_LIMIT:
+        return False
+    _btn_fails = 0
+    _btn_off_until = time.time() + BTN_COOLDOWN
+    return True
+
+
+def _btn_sent() -> None:
+    global _btn_fails
+    _btn_fails = 0
+
+
+def _btn_reject_note(paused: bool) -> str:
+    return (f"连续 {BTN_FAIL_LIMIT} 次被拒，{BTN_COOLDOWN // 60} 分钟内改发纯文字" if paused
+            else f"这一条改发纯文字（第 {_btn_fails} 次连续被拒，到 {BTN_FAIL_LIMIT} 次暂停 {BTN_COOLDOWN // 60} 分钟）")
+
+
+def _note_btn_rejected(where: str, e: Exception) -> None:
+    """按钮被拒的原因记进后台「报错日志」（没有窗口的开机自启也能看到）。记不下来不影响发消息。"""
+    try:
+        from changri.core import errlog
+        errlog.note_button_rejected(where, str(e))
+    except Exception as err:  # noqa: BLE001
+        logger.warning(f"[按钮] 记报错日志失败：{err}")
 
 
 async def reply_buttons(matcher, text: str, btns, per_row: int = 3, tail: str = "👇 点下面的按钮", fallback: bool = True) -> bool:
     """回复一段文字并在下面挂按钮（见 core/buttons.py）。
-    · 关了按钮、没有按钮、QQ 拒绝过（多半没 Markdown 权限，一小时内不再试）：原样走 reply_long，玩家照文字提示手打指令；
+    · 关了按钮、没有按钮、连续被拒正在暂停（见 BTN_FAIL_LIMIT）：原样走 reply_long，玩家照文字提示手打指令；
     · QQ 明确拒绝：消息一定没发出去，退回纯文字；其他异常（超时、回包出错）可能已经发出去了，不补发，免得重复；
     · 正文太长：先照原来的方式发正文，再另发一条短的「tail」挂按钮（这条失败了就算了，正文里有手打的提示）。
     返回按钮是否（可能）发出去了。fallback=False：发不了按钮时什么都不发，由调用方换别的办法（比如公知改发长图）。"""
-    global _btn_off_until
     from nonebot.adapters.qq import Message
     from nonebot.adapters.qq.exception import ActionFailed
     from nonebot.adapters.qq.models import MessageKeyboard
@@ -129,14 +164,16 @@ async def reply_buttons(matcher, text: str, btns, per_row: int = 3, tail: str = 
     try:
         await matcher.send(Message([MessageSegment.markdown(md), MessageSegment.keyboard(MessageKeyboard.model_validate(kb))]))
     except ActionFailed as e:
-        _btn_off_until = time.time() + 3600
-        logger.warning("[按钮] 被 QQ 拒绝（多半是机器人没有群 Markdown / 按钮权限），一小时内改发纯文字：" + ascii(str(e))[:200])
+        paused = _btn_rejected()
+        logger.warning("[按钮] 被 QQ 拒绝，" + _btn_reject_note(paused) + "：" + ascii(str(e))[:200])
+        _note_btn_rejected("回复指令时", e)
         if fallback and not too_long:
             await reply_long(matcher, text)
         return False
     except Exception as e:  # noqa: BLE001
         logger.warning("[按钮] 发送出现异常（可能已发出，不再补发纯文字）：" + type(e).__name__ + " " + ascii(str(e))[:200])
         return True
+    _btn_sent()
     if not too_long:
         try:
             from changri.plugins._logtap import tap_reply
@@ -172,8 +209,7 @@ async def send_at(bot, group_openid: str, member_openid: str, name: str, text: s
 
 async def _send_with_buttons(bot, group_openid: str, text: str, btns) -> str | None:
     """主动发到群、下面挂按钮（短信、礼物、关系线通知的「回复」）。文本开头的 {{AT:…}} 变成 Markdown 里的真 @。
-    发不了（没开按钮、QQ 拒绝过、内容太长）返回 None，调用方照原来的方式发；QQ 明确拒绝时一小时内不再试（和 reply_buttons 共用）。"""
-    global _btn_off_until
+    发不了（没开按钮、QQ 拒绝过、内容太长）返回 None，调用方照原来的方式发；QQ 连续拒绝时暂停一会儿（和 reply_buttons 共用计数）。"""
     from nonebot.adapters.qq import Message
     from nonebot.adapters.qq.exception import ActionFailed
     from nonebot.adapters.qq.models import MessageKeyboard
@@ -191,9 +227,11 @@ async def _send_with_buttons(bot, group_openid: str, text: str, btns) -> str | N
         r = await bot.send_to_group(group_openid=group_openid,
                                     message=Message([MessageSegment.markdown(md), MessageSegment.keyboard(MessageKeyboard.model_validate(kb))]))
     except ActionFailed as e:
-        _btn_off_until = time.time() + 3600
-        logger.warning("[按钮] 主动消息带按钮被 QQ 拒绝，一小时内改发纯文字：" + ascii(str(e))[:200])
+        paused = _btn_rejected()
+        logger.warning("[按钮] 主动消息带按钮被 QQ 拒绝，" + _btn_reject_note(paused) + "：" + ascii(str(e))[:200])
+        _note_btn_rejected("主动推送通知（短信、礼物、关系线等）时", e)
         return None
+    _btn_sent()
     return getattr(r, "id", "") or ""
 
 

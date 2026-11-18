@@ -89,6 +89,27 @@ a.tile:active{transform:scale(.97)}
 </section>
 {% endfor %}
 
+{% if noat_tip %}
+<section class="card noat" aria-labelledby="noat-t">
+  <form method="post" action="{{ url_for('noat_dismiss') }}" class="noat-x">{{ csrf() }}<button type="submit" aria-label="已经设好了，不再显示" title="已经设好了，不再显示">×</button></form>
+  <span class="ico c-blue" aria-hidden="true">{{ icon('chat') }}</span>
+  <div>
+    <h2 id="noat-t">玩家不 @ 机器人，机器人就没反应？</h2>
+    <p>每个群的群主要打开两个开关：群设置 → 群机器人 → 管理 → 点机器人 → 「获取群内全部消息」和「机器人主动在群聊内发言」。</p>
+    <a class="btn sm" href="{{ url_for('noat_page') }}">看详细步骤和发给群主的话</a>
+  </div>
+</section>
+<style>
+.ios .noat{position:relative;display:flex;gap:14px;align-items:flex-start;padding:18px 44px 18px 18px;margin:0 0 24px;border-color:var(--dusk)}
+.ios .noat .ico{flex:none}
+.ios .noat h2{font:700 17px/1.4 var(--sans);margin:0 0 6px}
+.ios .noat p{margin:0 0 12px;color:var(--mute);font-size:14px;line-height:1.7}
+.ios .noat-x{position:absolute;top:6px;right:6px;margin:0}
+.ios .noat-x button{width:36px;height:36px;border:0;border-radius:50%;background:transparent;color:var(--mute);font-size:22px;line-height:1;cursor:pointer}
+.ios .noat-x button:hover,.ios .noat-x button:focus-visible{background:var(--soft);color:var(--ink)}
+</style>
+{% endif %}
+
 <div class="card hero">
   <div class="k">现在</div>
   <div class="big">{{ d.now }}</div>
@@ -109,7 +130,7 @@ a.tile:active{transform:scale(.97)}
   {% endfor %}
   <a class="card tile" href="#todo"><span class="ico {{ 'c-red' if d.todo else 'c-green' }}" aria-hidden="true">{{ icon('alert' if d.todo else 'check') }}</span><span class="v">{{ d.todo|length }}</span><span class="n">需要处理</span></a>
   <a class="card tile" href="#rooms"><span class="ico c-teal" aria-hidden="true">{{ icon('door') }}</span><span class="v">{{ live_rooms|length }}</span><span class="n">进行中的房间</span></a>
-  <a class="card tile" href="#errors"><span class="ico {{ 'c-red' if errors else 'c-gray' }}" aria-hidden="true">{{ icon('bell') }}</span><span class="v">{{ errors|length }}</span><span class="n">报错日志</span></a>
+  <a class="card tile" href="#errors"><span class="ico {{ 'c-red' if err_serious else 'c-gray' }}" aria-hidden="true">{{ icon('bell') }}</span><span class="v">{{ err_serious }}</span><span class="n">报错日志</span></a>
 </div>
 
 <div class="cols">
@@ -162,14 +183,14 @@ a.tile:active{transform:scale(.97)}
 </details>
 
 <details class="card dcard" id="errors">
-  <summary><span class="ico {{ 'c-red' if errors else 'c-gray' }}" aria-hidden="true">{{ icon('bell') }}</span>
-    <div class="tx"><b>报错日志</b><span>{% if errors %}最近 {{ errors|length }} 条{% else %}一切正常{% endif %}</span></div>
-    <span class="badge{{ ' bad' if errors }}">{{ errors|length }}</span><i class="chev" aria-hidden="true"></i></summary>
+  <summary><span class="ico {{ 'c-red' if err_serious else 'c-gray' }}" aria-hidden="true">{{ icon('bell') }}</span>
+    <div class="tx"><b>报错日志</b><span>{% if err_serious %}{{ err_serious }} 条报错{% if err_notices %}，{{ err_notices }} 条提醒{% endif %}{% elif err_notices %}一切正常，{{ err_notices }} 条提醒{% else %}一切正常{% endif %}</span></div>
+    <span class="badge{{ ' bad' if err_serious }}">{{ err_serious }}</span><i class="chev" aria-hidden="true"></i></summary>
   <div class="body">
-    <p class="note" style="margin:0 0 12px">程序出错、或上次没有正常退出（崩溃）时自动记在这里，不用你做什么。{% if err_url %}恢复后会自动发到你填的报错接收地址。{% else %}没有填报错接收地址，只存在本机（在「功能与设置」的基础设置里填）。{% endif %}</p>
+    <p class="note" style="margin:0 0 12px">程序出错、或上次没有正常退出（崩溃）时自动记在这里，不用你做什么。「提醒」是出了小岔子但程序自己兜住了（比如连接断了一下、发图失败改发文字），偶尔有几条不用管。超过一天的会自动清掉。{% if err_url %}每小时自动发到你填的报错接收地址。{% else %}没有填报错接收地址，只存在本机（在「功能与设置」的基础设置里填）。{% endif %}</p>
     {% for e in errors %}
     <div class="errrow">
-      <span class="kind {{ 'bad' if e.kind == 'crash' else 'warn' }}">{{ {'crash': '崩溃', 'config': '配置'}.get(e.kind, '出错') }}</span>
+      <span class="kind {{ {'crash': 'bad', 'notice': ''}.get(e.kind, 'warn') }}">{{ {'crash': '崩溃', 'config': '配置', 'notice': '提醒'}.get(e.kind, '出错') }}</span>
       <span class="tabular muted">{{ e.ts|ts }}</span>{% if e.reported %} <span class="muted">· 已发送</span>{% endif %}
       <div>{{ e.message }}</div><div class="muted">{{ e.source }}</div>
       {% if e.trace %}<details><summary class="muted">详情</summary><pre style="white-space:pre-wrap;font-size:12px;overflow-wrap:anywhere">{{ e.trace }}</pre></details>{% endif %}

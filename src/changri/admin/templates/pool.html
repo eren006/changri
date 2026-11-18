@@ -26,7 +26,7 @@ form.i{display:inline}
   <summary><b>每个备用群要这样设一次</b></summary>
   <ol style="margin:12px 0 4px;padding-left:1.4em;line-height:1.8">
     <li><b>拉官方机器人进群</b>：新建或拿一个空群，把官方机器人拉进来。</li>
-    <li><b>群主打开两个开关</b>：在群设置里点开这个机器人，「机器人可获取的群聊消息范围」选「获取群内全部消息」，打开「机器人主动在群聊内发言」。不开的话，机器人只听得到 @ 它的话，复盘记不全，也没法在群里发通知。只有群主能改；华为（鸿蒙）手机上的 QQ 可能找不到这两项，换一台别的手机试试。
+    <li><b>群主打开两个开关</b>：在群设置里点开这个机器人，「机器人可获取的群聊消息范围」选「获取群内全部消息」，打开「机器人主动在群聊内发言」。不开的话，机器人只听得到 @ 它的话，复盘记不全，也没法在群里发通知。只有群主能改；华为（鸿蒙）手机上的 QQ 可能找不到这两项，换一台别的手机试试。<a href="{{ url_for('noat_page') }}">在哪里打开、发给群主的话 →</a>
       <img src="{{ url_for('static', filename='qq-bot-group-permissions.jpg') }}" alt="群里的官方机器人设置：获取群内全部消息、机器人主动在群聊内发言已打开" width="393" height="171" style="display:block;max-width:100%;height:auto;margin:8px 0 4px;border-radius:8px"></li>
     <li><b>让玩家能自己进群</b>：群设置的「开放设置」里，加群方式选「允许任何人加群」，群搜索方式选「通过群号搜索」。
       <img src="{{ url_for('static', filename='qq-group-open-settings.png') }}" alt="QQ 群开放设置：允许任何人加群，通过群号搜索" width="312" height="157" style="display:block;max-width:100%;height:auto;margin:8px 0 4px;border-radius:8px"></li>

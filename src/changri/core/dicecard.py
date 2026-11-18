@@ -88,6 +88,12 @@ def rd_card(reason: str, expr: str, detail: str, total: int, remark: str, simple
     return _card(title, [row], [], remark)
 
 
+def rt_card(reason: str, sides: int, roll: int, target: int, verdict: str) -> str:
+    """/rt 难度骰：自定面数，≤ 成功线算成功"""
+    title = (md_escape(reason) + " " if reason else "") + "难度骰"
+    return _card(f"{mark_for(verdict)} {title}　{verdict}", [f"**D{sides}**　掷出 **{roll}**　目标 ≤ {target}"], [], "")
+
+
 def rd_multi_card(reason: str, expr: str, rounds: list[tuple[str, int]], tail: str) -> str:
     """/rd N#表达式：rounds 是每轮的（过程, 点数）"""
     title = (md_escape(reason) + "　" if reason else "") + f"{md_escape(expr)} × {len(rounds)} 轮"

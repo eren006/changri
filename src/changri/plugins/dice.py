@@ -212,6 +212,14 @@ async def _(event: MessageEvent, args=CommandArg()):
     await _reply(rd_cmd, dice.rd(args.extract_plain_text()))
 
 
+rt_cmd = _cmd("rt", {"难度骰"}, short=True)
+
+
+@rt_cmd.handle()
+async def _(event: MessageEvent, args=CommandArg()):
+    await _reply(rt_cmd, dice.rt(args.extract_plain_text(), _lookup(event)))
+
+
 def _check_text(event: MessageEvent, raw: str, extra: int) -> str:
     if _rule(event) == "dnd":
         return dice.dnd_check(raw, (extra > 0) - (extra < 0), _lookup(event))

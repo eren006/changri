@@ -145,6 +145,32 @@ class FixRegressionTests(unittest.TestCase):
     def setUp(self):
         random.seed(11)
 
+    def test_rt_difficulty_dice(self):
+        for _ in range(200):
+            res = dice.rt("12 7")
+            self.assertTrue(1 <= res.roll <= 12)
+            self.assertEqual(res.verdict, "成功" if res.roll <= 7 else "失败")
+            self.assertIn(f"D12={res.roll}/7", res)
+            self.assertIn("难度骰", res.card)
+        self.assertEqual(dice.rt("1 1").verdict, "成功")                   # D1 永远掷 1
+        self.assertEqual(dice.rt("16 0 x"), "成功线至少是 1。")
+        self.assertIn("撬锁：D16=", dice.rt("d16 7 撬锁"))                 # 面数前可以带 d，后面是原因
+        self.assertIn("D16=", dice.rt("１６ ７"))                          # 全角数字
+        self.assertIn("用法", dice.rt(""))
+        self.assertIn("用法", dice.rt("12"))
+        self.assertIn("用法", dice.rt("12 撬锁"))
+        self.assertIn("面数要在", dice.rt("0 7"))
+        self.assertIn("面数要在", dice.rt("5000 7"))
+
+    def test_rt_skill_from_card(self):
+        look = lambda name: ("小明", 7) if name == "侦查" else "没有这个属性"
+        for _ in range(100):
+            res = dice.rt("12 侦查 找线索", look)
+            self.assertIn(f"小明的侦查 找线索：D12={res.roll}/7", res)
+            self.assertEqual(res.verdict, "成功" if res.roll <= 7 else "失败")
+        self.assertEqual(dice.rt("12 潜行", look), "没有这个属性")
+        self.assertIn("初始值", dice.rt("12 侦查", lambda n: ("小明", 25, "，初始值")))
+
     def test_rd_reason_before_expression(self):
         out = dice.rd("伤害 2d6+3")
         self.assertIn("伤害：2D6+3 =", out)

@@ -63,8 +63,23 @@ class Specials(unittest.TestCase):
         self.assertIn("不能对自己用", self.use("甲", "截信器", "甲")[1])
         self.assertEqual(self.left("甲", "截信器"), 1)                     # 没成功不扣
 
+    def test_fixed_uses_and_counts(self):
+        """每件特殊道具用一次（物品库里显示「用 1 次」，后台也改不了）；窃听器 10 条，截信器、回音壁各 5 条。"""
+        for code in S.CODES:
+            self.assertEqual(rpg.find_item(code)["max_uses"], 1, code)
+        self.assertTrue(rpg.save_item("SPEC_006", "窃听器", "item", "改说明", max_uses=-1)[0])
+        self.assertEqual(rpg.find_item("SPEC_006")["max_uses"], 1)              # 想改成不限：不认
+        self.give("丙", "窃听器"); self.give("丙", "截信器"); self.give("丙", "回音壁")
+        self.assertIn("最多 10 条", self.use("丙", "窃听器", "甲")[1])
+        self.assertIn("最多 5 条", self.use("丙", "截信器", "甲")[1])
+        self.assertIn("最多 5 条", self.use("丙", "回音壁", "乙")[1])
+        for code in ("SPEC_006", "SPEC_007", "SPEC_008"):
+            self.assertEqual(self.left("丙", rpg.find_item(code)["name"]), 0)    # 用一次就没了
+
     def test_sms_taps_and_echo_wall(self):
-        set_config("tap_count", "1")
+        from unittest import mock
+        mock.patch.dict(S.TAP_COUNT, {"SPEC_007": 1, "SPEC_008": 1}).start()
+        self.addCleanup(mock.patch.stopall)
         self.give("丙", "截信器"); self.give("丙", "回音壁")
         self.assertTrue(self.use("丙", "截信器", "甲")[0])
         self.assertTrue(self.use("丙", "回音壁", "乙")[0])
@@ -155,6 +170,30 @@ class Specials(unittest.TestCase):
         season.wipe()
         with get_conn() as c:
             self.assertEqual(c.execute("SELECT COUNT(*) FROM item_taps").fetchone()[0], 0)
+
+
+class OldLibraryMigration(unittest.TestCase):
+    def test_0024_sets_specials_to_one_use(self):
+        """老库里特殊道具是 -1（显示「不限次数」）：升级后物品库和背包里都变成用 1 次，别的物品不动。"""
+        import sqlite3
+        from changri.storage import migrate
+        path = Path(tempfile.mkdtemp()) / "old.db"
+        conn = sqlite3.connect(path, isolation_level=None)
+        for num, p in migrate.available():
+            if num > 23:
+                break
+            migrate._apply(conn, num, p)
+        conn.execute("INSERT INTO rpg_items(code, name, max_uses, created_ts) VALUES('SPEC_007', '截信器', -1, 0), ('ITEM_001', '苹果', -1, 0)")
+        conn.execute("INSERT INTO roles(id, name, member_openid, created_ts) VALUES(1, '甲', 'M0', 0)")
+        conn.execute("INSERT INTO rpg_inventory(role_id, item_code, count, remaining_uses) VALUES(1, 'SPEC_007', 2, -1)")
+        conn.close()
+        migrate.migrate(path)
+        conn = sqlite3.connect(path)
+        got = dict(conn.execute("SELECT code, max_uses FROM rpg_items").fetchall())
+        inv = conn.execute("SELECT count, remaining_uses FROM rpg_inventory").fetchone()
+        conn.close()
+        self.assertEqual(got, {"SPEC_007": 1, "ITEM_001": -1})
+        self.assertEqual(inv, (2, 1))
 
 
 if __name__ == "__main__":

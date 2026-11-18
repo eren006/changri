@@ -124,6 +124,9 @@ def save_item(code: str, name: str, kind="item", description="", effects=None, m
         max_uses = int(max_uses)
     except (TypeError, ValueError):
         return False, "使用次数要写整数，-1 表示不消耗。"
+    from .specials import CODES as _SPECIALS
+    if code in _SPECIALS:
+        max_uses = 1                                   # 特殊道具每件用一次，定死（后台编辑时这一栏是锁着的）
     parsed: dict[str, int] = {}
     if isinstance(effects, str):
         for part in re.split(r"[,，\s]+", effects.strip()):

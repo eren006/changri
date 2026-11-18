@@ -138,6 +138,7 @@ class ButtonsE2E(unittest.TestCase):
                     pass
         import changri.core.qqsend as qs
         qs._btn_off_until = 0.0
+        qs._btn_fails = 0
         SENT.clear(); PUSHED.clear()
         self.bot = BtnBot(nonebot.get_adapter(Adapter), "B1", BotInfo(id="B1", token="", secret="x" * 16))
         self.bot.reject = False
@@ -291,14 +292,40 @@ class ButtonsE2E(unittest.TestCase):
         self.bot.reject = True
         self.assertEqual(self.say("查看公知"), [("<图>", [])])              # 发不了按钮：照旧拼成一张长图
 
-    def test_rejected_falls_back_to_text_and_pauses(self):
+    def test_rejected_once_falls_back_then_retries(self):
+        """偶然被拒一次：这一条改发纯文字，下一条照样试按钮（以前会全体停一小时，用户以为按钮坏了）。"""
         self.bot.reject = True
         out = self.say("格式")
         self.assertEqual(len(out), 1)
         self.assertFalse(out[0][0].startswith("[MD]"))
         self.assertIn("格式短信", out[0][0])
         self.bot.reject = False
-        self.assertFalse(self.say("格式")[0][0].startswith("[MD]"))         # 一小时内不再试
+        self.assertTrue(self.say("格式")[0][0].startswith("[MD]"))
+
+    def test_rejected_in_a_row_pauses(self):
+        import changri.core.qqsend as qs
+        self.bot.reject = True
+        for _ in range(qs.BTN_FAIL_LIMIT - 1):
+            self.say("格式")
+        self.assertEqual(qs._btn_off_until, 0.0)                            # 还没到次数，不暂停
+        self.say("格式")
+        self.assertGreater(qs._btn_off_until, 0)
+        self.assertLessEqual(qs._btn_off_until - __import__("time").time(), qs.BTN_COOLDOWN)
+        self.bot.reject = False
+        self.assertFalse(self.say("格式")[0][0].startswith("[MD]"))         # 暂停期内不再试
+        qs._btn_off_until = 0.0
+        self.assertTrue(self.say("格式")[0][0].startswith("[MD]"))          # 暂停过了又会试
+
+    def test_success_resets_reject_count(self):
+        import changri.core.qqsend as qs
+        for _ in range(qs.BTN_FAIL_LIMIT - 1):
+            self.bot.reject = True
+            self.say("格式")
+            self.bot.reject = False
+            self.assertTrue(self.say("格式")[0][0].startswith("[MD]"))      # 中间成功一次就清零
+        self.bot.reject = True
+        self.say("格式")
+        self.assertEqual(qs._btn_off_until, 0.0)                            # 不是连续的，不暂停
 
     def test_switch_off(self):
         set_config("qq_buttons", "0")

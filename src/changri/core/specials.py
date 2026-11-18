@@ -6,8 +6,9 @@
 - 万能钥匙 地点名：直接拿到这个地点的钥匙（地点系统里上锁的地方）。
 - 望远镜 / 羽毛笔 角色名：写信综的道具，要开着「写信综」（core/letters.py）。
 - 捕鼠器 角色名 钟点：TA 今天这个钟点的一小时被锁住，不能约会、打电话（记成上帝模式的时间锁定）。会告诉 TA。
-- 窃听器 角色名：TA 之后在电话房间里说的话，抄给你（条数、干扰率在设置里）。
-- 截信器 角色名：TA 之后发出的短信抄给你。回音壁 角色名：TA 之后收到的短信抄给你。
+- 窃听器 角色名：TA 之后在电话房间里说的话，抄给你 10 条（干扰率在设置里）。
+- 截信器 角色名：TA 之后发出的短信抄给你 5 条。回音壁 角色名：TA 之后收到的短信抄给你 5 条。
+每件道具都只能用一次（用掉就从背包扣一件），次数和条数定死，后台改不了（作者定的）。
 - 拆信刀 角色名：偷看 TA 信箱里的一封心动信（已收到的或今晚待派送的），对方不知道；信箱空的不扣道具。
 抄录先写进 tap_outbox，plugins/play.py 的定时任务每 30 秒发一次（记录发言的地方是同步的，发不了消息）。"""
 import random
@@ -41,7 +42,7 @@ def ensure(force: bool = False) -> list[str]:
     made = []
     for code, name, desc in SPECIALS:
         if not rpg.find_item(code) and not rpg.find_item(name):
-            if rpg.save_item(code, name, "item", desc)[0]:
+            if rpg.save_item(code, name, "item", desc, max_uses=1)[0]:
                 made.append(name)
     return made
 
@@ -173,6 +174,7 @@ def _mousetrap(me, t, when: str) -> tuple[bool, str]:
 
 
 TAP_KIND = {"SPEC_006": "phone", "SPEC_007": "sms_out", "SPEC_008": "sms_in"}
+TAP_COUNT = {"SPEC_006": 10, "SPEC_007": 5, "SPEC_008": 5}      # 窃听器听 10 条，截信器、回音壁各截 5 条（定死）
 TAP_WORD = {"phone": ("📡", "截听", "电话"), "sms_out": ("📱", "截下", "发出的短信"), "sms_in": ("🪞", "看到", "收到的短信")}
 
 
@@ -180,7 +182,7 @@ def _tap(me, t, code: str, name: str) -> tuple[bool, str]:
     why = _take(me["id"], code, name)
     if why:
         return False, why
-    n = max(1, get_int("tap_count", 10))
+    n = TAP_COUNT[code]
     pct = min(100, max(0, get_int("tap_blur", 30)))
     kind = TAP_KIND[code]
     with get_conn() as c:

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}不用 @ 也能回{% endblock %}
+{% block body %}
+<style>
+.ui .na-steps{margin:0 0 28px;padding:0;list-style:none;counter-reset:s;max-width:62ch}
+.ui .na-steps>li{position:relative;padding:0 0 18px 44px;line-height:1.8;counter-increment:s}
+.ui .na-steps>li::before{content:counter(s);position:absolute;left:0;top:0;width:30px;height:30px;border-radius:50%;
+  display:grid;place-items:center;font:700 15px/1 var(--sans);color:var(--dusk-ink);background:var(--dusk)}
+.ui .na-path{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:6px 0 2px}
+.ui .na-path b{display:inline-block;padding:3px 10px;border-radius:999px;background:var(--soft);font-weight:600;font-size:14px}
+.ui .na-path i{font-style:normal;color:var(--mute)}
+.ui .na-copy{border:1px solid var(--card-line);border-radius:var(--r-card);background:var(--surface);padding:14px 16px;margin:8px 0 28px;max-width:62ch}
+.ui .na-copy textarea{width:100%;min-height:9.5em;resize:vertical;font:inherit;line-height:1.7;border:0;background:transparent;color:var(--ink);padding:0}
+.ui .na-copy .actions{margin-top:8px}
+</style>
+<h1>不用 @ 也能回</h1>
+<p class="lede">QQ 官方机器人默认<b>只收得到 @ 它的话</b>：玩家直接发「格式」「短信 …」，机器人看不见，所以没反应。要让大家不用 @ 就能用，<b>每个群的群主</b>要在群设置里给机器人打开两个开关。</p>
+
+<h2>群主这样设（每个群一次）</h2>
+<ol class="na-steps">
+  <li><b>进入群机器人管理</b>：打开这个群的聊天窗口，按下面的顺序点：
+    <div class="na-path"><b>右上角 ≡（群设置）</b><i>→</i><b>群机器人</b><i>→</i><b>管理</b><i>→</i><b>点这个机器人</b></div></li>
+  <li><b>「机器人可获取的群聊消息范围」选「获取群内全部消息」</b>。不选的话，机器人只听得到 @ 它的话，复盘也记不全。</li>
+  <li><b>打开「机器人主动在群聊内发言」</b>。不开的话，机器人没法在群里发通知（短信、礼物、提醒）。
+    <img src="{{ url_for('static', filename='qq-bot-group-permissions.jpg') }}" alt="群机器人管理里：获取群内全部消息、机器人主动在群聊内发言已打开" width="393" height="171" style="display:block;max-width:100%;height:auto;margin:10px 0 4px;border-radius:8px"></li>
+  <li><b>试一下</b>：在群里<b>不 @</b> 直接发「格式」，机器人回了就设好了。</li>
+</ol>
+
+<h2>要注意</h2>
+<ul class="note" style="margin:0 0 28px;padding-left:1.2em;font-size:14px">
+  <li><b>只有群主能改</b>，管理员改不了。</li>
+  <li><b>每个群都要设</b>：每个玩家的个人群、约会房间用的群（备用群池里的）、公告群。新拉机器人进的群也要再设一次。</li>
+  <li>华为（鸿蒙）手机上的 QQ 可能找不到这两项，换一台别的手机试试。</li>
+</ul>
+
+<h2>发给群主的话</h2>
+<p class="note" style="margin:0 0 4px">可以直接复制，发到群里或私聊给群主。</p>
+<div class="na-copy">
+  <textarea id="na-text" readonly aria-label="发给群主的设置说明">想让机器人不用 @ 也能回，请群主这样设一下（只有群主能改）：
+1. 打开这个群 → 右上角 ≡（群设置）→ 群机器人 → 管理 → 点机器人
+2. 「机器人可获取的群聊消息范围」选「获取群内全部消息」
+3. 打开「机器人主动在群聊内发言」
+设好后不 @ 直接发「格式」，机器人回了就好了。</textarea>
+  <div class="actions"><button class="btn" type="button" id="na-cp">复制</button></div>
+</div>
+<script>
+(function(){var b=document.getElementById('na-cp'),t=document.getElementById('na-text');if(!b||!t)return;
+  b.onclick=function(){function done(){b.textContent='已复制';setTimeout(function(){b.textContent='复制'},1500)}
+    if(navigator.clipboard){navigator.clipboard.writeText(t.value).then(done,function(){t.select()})}else{t.select()}};})();
+</script>
+{% endblock %}

@@ -223,10 +223,31 @@ def create_app() -> Flask:
         live_rooms = [{**dict(r), "slot": ("不占时间线" if r["kind"] == "微信" else f"D{r['day']} {hm_text(r['start_hm'], r['end_hm'])}"),
                        "who": "、".join(m["name"] for m in rooms_core.members(r["id"])),
                        "grp": (pool_core.get(r["pool_id"]) if r["pool_id"] else None)} for r in live]
-        return render_template("dashboard.html", d=_dashboard(), errors=errlog.recent(30), err_url=errlog.report_url(),
+        err_rows = errlog.recent(errlog.KEEP)
+        serious = [e for e in err_rows if e.get("kind") != "notice"]       # 提醒不让总览变红
+        errors = (serious + [e for e in err_rows if e.get("kind") == "notice"])[:50]
+        errors.sort(key=lambda e: e.get("ts", 0), reverse=True)
+        return render_template("dashboard.html", d=_dashboard(), errors=errors, err_serious=len(serious),
+                               err_notices=len(err_rows) - len(serious), err_url=errlog.report_url(),
                                cal=season_core.month_grid(request.args.get("cal", "")), cal_line=season_core.upcoming_line(),
                                live_rooms=live_rooms, waiting_rooms=sum(1 for r in live_rooms if not r["grp"]),
-                               ask_contact=_should_ask_contact())
+                               ask_contact=_should_ask_contact(), noat_tip=get_config(NOAT_TIP_DONE, "") != "1")
+
+    NOAT_TIP_DONE = "noat_tip_done"         # 总览上「不用 @ 也能回」卡片叉掉了（每个机器人各记各的）
+
+    @app.route("/no-at")
+    @login_required
+    def noat_page():
+        """怎么让官方机器人不用 @ 也能回：群主在群机器人管理里打开两个开关。说明以前只藏在备用群池页的折叠框里，很多人找不到。"""
+        return render_template("noat.html")
+
+    @app.post("/no-at/dismiss")
+    @login_required
+    def noat_dismiss():
+        """叉掉总览上的卡片：设好了就不占位置。说明页还在左侧「通用」里。"""
+        set_config(NOAT_TIP_DONE, "1")
+        flash("好的，总览上不再显示。以后要看，在左侧「通用」里点「不用 @ 也能回」。")
+        return redirect(url_for("dashboard"))
 
     CONTACT_PROMPT_DONE = "update_contact_prompt_done"      # update_ 开头 = 全局库，所有机器人共用一个「问过了」
 
