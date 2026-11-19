@@ -150,7 +150,7 @@ def reserved_commands() -> set[str]:
     global _RESERVED
     if _RESERVED is None:
         names: set[str] = set()
-        for f in (PKG_DIR / "plugins").glob("*.py"):
+        for f in (PKG_DIR / "plugins").rglob("*.py"):      # rglob：plugins/play/ 是拆成多个文件的包
             try:
                 tree = ast.parse(f.read_text(encoding="utf-8"))
             except Exception:  # noqa: BLE001

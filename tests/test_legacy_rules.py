@@ -182,6 +182,20 @@ class Milestone(Base):
         self.assertEqual(sent, [("ANN", "☎️ 【第6次电话记录】")])
         self.assertEqual(asyncio.run(milestone.flush(send)), 0)
 
+    def test_per_kind_frequency(self):
+        set_config("announce_frequency", "2")
+        set_config("announce_frequency_sms", "100")                                    # 短信单独：每 100 次
+        set_config("announce_frequency_gift", "0")                                     # 礼物单独：不发
+        set_config("announce_frequency_phone", "")                                     # 留空：跟总频率
+        self.assertEqual(milestone.frequency("短信"), 100)
+        self.assertEqual(milestone.frequency("礼物"), 0)
+        self.assertEqual(milestone.frequency("电话"), 2)
+        self.assertEqual(milestone.frequency(), 2)
+        self.assertEqual(milestone.bump("短信", 2), "")
+        self.assertEqual(milestone.bump("礼物", 5), "")
+        self.assertEqual(milestone.bump("电话", 2), "☎️ 【第2次电话记录】")
+        self.assertEqual(milestone.bump("短信", 98), "📮 【第100次短信记录】")
+
     def test_hooks(self):
         set_config("announce_frequency", "1")
         self.assertTrue(self.room("约会", "甲乙", "1400-1500")[0])

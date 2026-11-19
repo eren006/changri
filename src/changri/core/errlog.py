@@ -320,6 +320,16 @@ def is_proactor_noise(text: str, trace: str = "", exc: BaseException | None = No
     return any(f"{c.__name__}:" in (trace or "") for c in _PROACTOR_NOISE)
 
 
+# 另一种：接连接时对方已经走了（WinError 64「指定的网络名不再可用」，有时写成 OSError(22, ..., None, 64)），
+# 上面那个只认 _call_connection_lost，这个按错误号认（也兜 10054 / 10053 的其他报法）。
+# 只认 asyncio 自己报的（来源是 asyncio:…），长日bot 自己代码里的连接错误照常记。
+_WIN_SOCK_NOISE = re.compile(r"WinError\s*(?:64|10053|10054)\]|OSError\(22,[^)]*None,\s*64\s*[,)]")
+
+
+def is_win_socket_noise(src: str, text: str, trace: str = "") -> bool:
+    return (src or "").startswith("asyncio") and bool(_WIN_SOCK_NOISE.search(f"{text}\n{trace}"))
+
+
 _PKG_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))    # .../changri
 
 
@@ -344,6 +354,8 @@ def _loguru_sink(message) -> None:
     text = str(rec["message"])
     if is_proactor_noise(text, trace, exc.value if exc else None):
         return                                     # Windows 关连接时的噪音，见 is_proactor_noise
+    if is_win_socket_noise(src, text, trace):
+        return                                     # Windows asyncio 的连接噪音：对方断开而已，程序没事
     if is_whitelist_error(text) or is_whitelist_error(trace):
         note_whitelist()                           # 配置问题：不记成「出错」，也不带一大段堆栈
         return

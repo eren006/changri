@@ -159,6 +159,8 @@ a.tile:active{transform:scale(.97)}
         <div class="tx"><b>{{ s.name }}</b><span>{{ s.desc }}</span></div>
         {% if s.state == 'next' %}<span class="pill">下一项</span>{% endif %}
       </div>
+      {% else %}
+      <div class="okrow"><span class="ico c-gray" aria-hidden="true">{{ icon('mail') }}</span>心动信现在是关的，今天没有提醒和派送。</div>
       {% endfor %}
     </div>
     <p class="foot">时间来自「设置 → 心动信 → 每天派送时间」。</p>

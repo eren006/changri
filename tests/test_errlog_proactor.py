@@ -39,6 +39,19 @@ class Proactor(unittest.TestCase):
         errlog._loguru_sink(Msg("Exception in callback foo()", _exc(ConnectionResetError())))   # 断连但不是关连接那一步
         self.assertEqual(len(errlog.read_all()), 2)
 
+    def test_accept_side_winerror_dropped(self):
+        # 接连接时对方已经走了：WinError 64，有时只露出 OSError(22, ..., None, 64)；10054 的其他报法也认
+        errlog._loguru_sink(Msg("Accept failed on a socket\nOSError: [WinError 64] 指定的网络名不再可用。"))
+        errlog._loguru_sink(Msg("Task exception was never retrieved\nOSError(22, '指定的网络名不再可用。', None, 64, None)"))
+        errlog._loguru_sink(Msg("Error on reading from the event loop self pipe\nConnectionResetError: [WinError 10054] 远程主机强迫关闭了一个现有的连接。"))
+        self.assertEqual(errlog.read_all(), [])
+
+    def test_winerror_from_own_code_kept(self):
+        m = Msg("连 QQ 时出错：[WinError 64] 指定的网络名不再可用。")
+        m.record.update(name="changri.core.qqsend", function="send")       # 不是 asyncio 自己报的：照记
+        errlog._loguru_sink(m)
+        self.assertEqual(len(errlog.read_all()), 1)
+
     def test_bridge_downgrades(self):
         seen = []
         from loguru import logger

@@ -41,7 +41,16 @@ SECTIONS = [
         "season_report": ("季末报告（1 开 / 0 关；开了以后，结束季度时会给每位有互动的玩家的个人群先发一句话、再单独发一张本季结算海报：约会场次、短信礼物心动信、互动最多的人、最常互动的时间、最精彩的一场戏。海报画不出来就改发文字小结。机器人要还在个人群里才发得出去。「季度与出场」页的「季末报告」里也能开关、看样式缩略图、下载每个人的海报）", "0"),
         "season_save_reminder": ("收尾前存档提醒（1 开 / 0 关；开了以后，结束季度时提醒每位玩家趁收尾前用「复盘 R12」存喜欢的戏、看「时间线」，收尾后角色、时间线、小手机都会清空。开着季末报告时这段话并进报告里，不另发）", "1"),
         "season_poster_skin": ("季末海报的样式（第一次用某款时从主站下载花边素材，下载不了就用素色纸）", "antique"),
-        "announce_frequency": ("「第 N 次记录」公告的触发频率：电话、约会、官约、心愿、短信、礼物、心动信、拉线各自计数，每满这么多次往公告群发一句「【第 N 次××记录】」（0 = 不发）", "2"),
+        "announce_frequency": ("「第 N 次记录」公告的触发频率：电话、约会、官约、心愿、短信、礼物、心动信、拉线各自计数，每满这么多次往公告群发一句「【第 N 次××记录】」（0 = 不发；想让每一类不一样，展开下面的「高级」单独填）", "2"),
+        # 「高级」里每一类单独的频率（key 跟 core/milestone.py 的 KIND_KEYS 对应），留空 = 跟上面的总频率
+        "announce_frequency_phone": ("电话（留空 = 跟总频率，0 = 这一类不发）", ""),
+        "announce_frequency_date": ("约会（留空 = 跟总频率，0 = 这一类不发）", ""),
+        "announce_frequency_official": ("官约（留空 = 跟总频率，0 = 这一类不发）", ""),
+        "announce_frequency_wish": ("心愿（留空 = 跟总频率，0 = 这一类不发）", ""),
+        "announce_frequency_sms": ("短信（留空 = 跟总频率，0 = 这一类不发）", ""),
+        "announce_frequency_gift": ("礼物（留空 = 跟总频率，0 = 这一类不发）", ""),
+        "announce_frequency_lovemail": ("心动信派送（留空 = 跟总频率，0 = 这一类不发）", ""),
+        "announce_frequency_relation": ("关系线（留空 = 跟总频率，0 = 这一类不发）", ""),
         "block_undo_hours": ("拉黑满几小时才能解除", "2"),
         "brand_name": ("系统名称（画在长图左上角，留空用默认）", ""),
         "long_as_image": ("长内容发图片（1 开 / 0 关；开着时，一条消息发不完、要拆成好几条的才画成图，一条发得完的照样发文字；关了就全拆成文字）", "1"),
@@ -176,6 +185,8 @@ SECTIONS = [
         "lovemail_day_limits": ("按天特殊上限（写成 D0:3 D1:5，没写到的天用上面的默认上限；D 后面是游戏天数，0 = 当天不能投）", ""),
         "window_lovemail": ("心动信投稿开放时段（写成 10-23 或 20:00-02:00，留空 = 全天开放）", ""),
         "lovemail_delivery_time": ("每天派送时间（HH:MM）", "22:00"),
+        "lovemail_notice10": ("派送前 10 分钟提醒各个人群「快截止了」（1 开 / 0 关）", "1"),
+        "lovemail_notice5": ("派送前 5 分钟在公告群提醒「邮差正在整理信箱」（1 开 / 0 关）", "1"),
         "lovemail_max_len": ("单封信最大字数", "500"),
         "lovemail_expose": ("曝光开关（1 开 / 0 关）", "0"),
         "lovemail_expose_chance": ("曝光概率（%）", "10"),
@@ -317,12 +328,12 @@ def _dashboard() -> dict:
         n_undelivered = conn.execute("SELECT COUNT(*) FROM messages WHERE created_ts>=? AND status!='sent' AND error NOT LIKE '被拉黑%' AND error NOT LIKE '礼物丢失%' AND error!='已撤回'", (int(time.time()) - 86400,)).fetchone()[0]
     enabled = get_config("lovemail_enabled", "1") != "0"
     steps = [
-        (target - 10, "截止预告", f"提醒 {n_main} 个个人群：10 分钟后截止收稿"),
-        (target - 5, "公告群提醒", "公告群：邮差正在整理信箱" if announce else "还没设公告群，这条不会发出"),
+        (target - 10, "截止预告", f"提醒 {n_main} 个个人群：10 分钟后截止收稿") if get_config("lovemail_notice10", "1") != "0" else None,
+        (target - 5, "公告群提醒", "公告群：邮差正在整理信箱" if announce else "还没设公告群，这条不会发出") if get_config("lovemail_notice5", "1") != "0" else None,
         (target, "心动信派送", f"信池里 {len(pool)} 封，发给 {len({m['to_role_id'] for m in pool})} 位收信人" if pool else "信池现在是空的"),
     ]
     sheet, found_next = [], False
-    for mins, name, desc in steps:
+    for mins, name, desc in ([x for x in steps if x] if enabled else []):     # 心动信关着（比如季度结束了）就不排今天的提醒和派送
         mins %= 1440
         state = "done" if mins < cur else ("next" if not found_next else "later")
         found_next = found_next or state != "done"
@@ -342,7 +353,7 @@ def _dashboard() -> dict:
     if httpsproxy.active() and not httpsproxy.cert_ok(httpsproxy.subject(), timeout=2):
         todo.append(("bad", "HTTPS 证书失效了", url_for("https_page"), "玩家的小手机网址是 https，现在打不开；多半是 80 端口被关了，证书续不上"))
     todo += _phone_todo()
-    if not enabled:
+    if not enabled and season_core.running():           # 季度结束后心动信本来就该关，不算待处理
         todo.append(("warn", "心动信开关是关的", url_for("settings"), "玩家现在不能投信"))
     if not announce:
         todo.append(("warn", "还没设置公告群", url_for("admins_page"), "管理员在目标群里发「设为公告群」"))
@@ -391,6 +402,8 @@ FIELD_CHOICES = {"season_poster_skin": (_poster_skins, "season_poster_preview"),
 
 
 LINES_FIELDS = {"hello_text"}          # 这些设置是多行文本框（一行一句）
+# 这些设置收在前一项下面的「高级」折叠里：数字框，可以留空（留空 = 跟总设置）
+ADVANCED_FIELDS = {k: "高级：每一类单独设置频率" for k in SETTINGS if k.startswith("announce_frequency_")}
 
 
 def field_view(key: str, label: str, default: str, value: str) -> dict:
@@ -401,6 +414,9 @@ def field_view(key: str, label: str, default: str, value: str) -> dict:
         i = label.rindex("（")
         main, inner = label[:i], label[i + 1:-1]
     f = {"key": key, "label": main.strip(), "hint": inner, "value": value, "kind": "text", "unit": ""}
+    if key in ADVANCED_FIELDS:                    # 「高级」折叠里的数字框，留空 = 跟总设置
+        f.update(kind="number", advanced=ADVANCED_FIELDS[key], placeholder="跟总频率")
+        return f
     if key in LINES_FIELDS:                       # 多行：一行一句，随机挑
         f.update(kind="lines", rows=max(3, value.count("\n") + 2))
         return f

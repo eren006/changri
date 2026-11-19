@@ -377,6 +377,7 @@ def end() -> tuple[bool, str]:
     with get_conn() as conn:
         conn.execute("UPDATE seasons SET status='ended', ended_ts=? WHERE id=?", (int(time.time()), s["id"]))
     set_config("auto_day", "0")
+    set_config("lovemail_enabled", "0")        # 手动结束季度也关心动信：不然每晚的截止预告、公告群提醒照发（档期到期自动结束时本来就会关）
     set_config("season_wiped", "0")
     _archive(s["id"])
     return True, f"⏹️ 「{s['name']}」已结束。核对完存档后发「收尾」清空本季的角色和互动记录（先预览，再「收尾 确认」）。"

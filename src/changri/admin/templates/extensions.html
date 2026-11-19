@@ -136,6 +136,7 @@
       {% if it.fields %}
       <div class="setlist">
         {% for f in it.fields %}
+        {% if f.advanced and not (loop.previtem and loop.previtem.advanced) %}<details class="adv" style="margin:-4px 0 6px;padding:2px 0 2px 12px;border-left:2px solid var(--line)"><summary style="cursor:pointer;color:var(--mute);font-size:13px;padding:4px 0">{{ f.advanced }}</summary>{% endif %}
         {% if f.kind == 'bool' %}
         <div class="srow"><div class="sl"><b>{{ f.label }}</b>{% if f.hint %}<div class="d">{{ f.hint }}</div>{% endif %}</div>
           <label class="sw"><input type="checkbox" name="{{ f.key }}" value="1" {{ 'checked' if f.checked }} aria-label="{{ f.label }}"><input type="hidden" name="{{ f.key }}" value="0"><i></i></label></div>
@@ -145,10 +146,11 @@
           {% if f.preview %}<button class="btn sm ghost" type="button" onclick="window.open('{{ url_for(f.preview) }}?skin='+encodeURIComponent(document.getElementById('{{ f.key }}').value),'_blank')">预览海报</button>{% endif %}</div></div>
         {% else %}
         <div class="srow {{ 'stack' if f.kind != 'number' }}"><label class="sl" for="{{ f.key }}"><b>{{ f.label }}</b>{% if f.hint %}<span class="d">{{ f.hint }}</span>{% endif %}</label>
-          {% if f.kind == 'number' %}<div class="sc"><input id="{{ f.key }}" type="number" inputmode="numeric" step="1" name="{{ f.key }}" value="{{ f.value }}">{% if f.unit %}<span class="unit">{{ f.unit }}</span>{% endif %}</div>
+          {% if f.kind == 'number' %}<div class="sc"><input id="{{ f.key }}" type="number" inputmode="numeric" step="1" name="{{ f.key }}" value="{{ f.value }}"{% if f.placeholder %} placeholder="{{ f.placeholder }}"{% endif %}>{% if f.unit %}<span class="unit">{{ f.unit }}</span>{% endif %}</div>
           {% elif f.kind == 'lines' %}<div class="sc"><textarea id="{{ f.key }}" name="{{ f.key }}" rows="{{ f.rows }}" style="width:100%;box-sizing:border-box;resize:vertical;line-height:1.6">{{ f.value }}</textarea></div>
           {% else %}<div class="sc"><input id="{{ f.key }}" type="text" name="{{ f.key }}" value="{{ f.value }}"></div>{% endif %}</div>
         {% endif %}
+        {% if f.advanced and not (loop.nextitem and loop.nextitem.advanced) %}</details>{% endif %}
         {% endfor %}
       </div>
       {% else %}

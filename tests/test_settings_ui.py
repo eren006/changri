@@ -62,6 +62,16 @@ class SettingsPage(unittest.TestCase):
         self.assertEqual(get_config("wish_public_send"), "1")
         self.assertEqual(get_config("pool_auto_free"), "0")
         self.assertEqual(get_config("room_expire_hours"), "12")
+        # 「基础」里公告频率下面的「高级」折叠：每一类单独的频率，可以留空
+        self.assertEqual(html.count('<details class="adv"'), 1)
+        adv = html[html.index('<details class="adv"'):]
+        adv = adv[:adv.index("</details>")]
+        for key in ("phone", "date", "official", "wish", "sms", "gift", "lovemail", "relation"):
+            self.assertIn(f'name="announce_frequency_{key}"', adv, key)
+        self.assertIn('placeholder="跟总频率"', adv)
+        c.post("/settings/基础", data={"_csrf": t, "announce_frequency_sms": "100", "announce_frequency_gift": ""})
+        self.assertEqual(get_config("announce_frequency_sms"), "100")
+        self.assertEqual(get_config("announce_frequency_gift"), "")
 
 
 if __name__ == "__main__":

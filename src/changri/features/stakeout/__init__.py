@@ -1,7 +1,7 @@
 """踩点。"""
 
 # 功能声明：设置平台「扩展」页的卡片、开关默认值、设置组。由 features/registry.py 收集。
-# 指令「踩点」写在核心的 plugins/play.py 里（和约会共用房间逻辑），所以 module 为空；开关关着时指令直接回「踩点没有开放」，建房间那一层也会拦。
+# 指令「踩点」写在核心的 plugins/play/launch.py 里（和约会共用房间逻辑），所以 module 为空；开关关着时指令直接回「踩点没有开放」，建房间那一层也会拦。
 FEATURE = {'id': 'stakeout',
  'name': '踩点',
  'module': '',

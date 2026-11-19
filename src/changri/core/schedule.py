@@ -34,7 +34,7 @@ async def run_lovemail_tick(send: messaging.Send, now: time.struct_time | None =
     if cur == (target - 10) % 1440 and get_config("lovemail_notice10_day") != day:
         set_config("lovemail_notice10_day", day)
         from . import windows
-        if lovemail.today_limit() <= 0 or windows.check("lovemail"):       # 今天不收信（上限 0 / 不在开放时段）就别催大家投
+        if get_config("lovemail_notice10", "1") == "0" or lovemail.today_limit() <= 0 or windows.check("lovemail"):  # 后台关了这条提醒，或今天不收信       # 今天不收信（上限 0 / 不在开放时段）就别催大家投
             return "notice10-skip"
         with get_conn() as conn:
             gids = [(r[0], r[1]) for r in conn.execute("SELECT bot_id, group_openid FROM role_groups WHERE kind='main' AND group_openid IS NOT NULL")]
@@ -46,6 +46,8 @@ async def run_lovemail_tick(send: messaging.Send, now: time.struct_time | None =
         return "notice10"
     if cur == (target - 5) % 1440 and get_config("lovemail_notice5_day") != day:
         set_config("lovemail_notice5_day", day)
+        if get_config("lovemail_notice5", "1") == "0":       # 后台关了这条提醒
+            return "notice5-skip"
         if announce:
             try:
                 await send(*announce, "📬 邮差正在整理信箱，心动信件即将在 5 分钟后开始派送，请注意查收。")

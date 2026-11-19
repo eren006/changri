@@ -8,3 +8,4 @@ release_out/
 extensions/
 tests/_ext_*/
 src/*.egg-info/
+dsh/

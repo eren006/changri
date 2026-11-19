@@ -178,6 +178,27 @@ class TickTests(Base):
         self.assertEqual(run(run_lovemail_tick(self.sender(), self.at(21, 50))), "notice10-skip")
         self.assertEqual(self.sent, [])
 
+    def test_notices_can_be_turned_off(self):
+        """后台把两条派送前提醒分别关掉：到点不发，派送照常。"""
+        set_config("announce_group", "B1|ANN")
+        set_config("lovemail_notice10", "0"); set_config("lovemail_notice5", "0")
+        lovemail.add_mail(self.a, self.b, "匿名", "信")
+        send = self.sender()
+        self.assertEqual(run(run_lovemail_tick(send, self.at(21, 50))), "notice10-skip")
+        self.assertEqual(run(run_lovemail_tick(send, self.at(21, 55))), "notice5-skip")
+        self.assertEqual(self.sent, [])
+        self.assertEqual(run(run_lovemail_tick(send, self.at(22, 0))), "delivered")
+
+    def test_season_end_turns_off_reminders(self):
+        """手动「结束季度」也会关心动信：之后不再发派送前提醒。"""
+        from changri.core import season
+        season.book("测试季", "2026-11-10", "2026-11-30", "", "")
+        self.assertTrue(season.start("", clear=True, now="2026-11-13")[0])          # 测试里已经有角色，开季要先清
+        self.assertEqual(get_config("lovemail_enabled"), "1")
+        self.assertTrue(season.end()[0])
+        self.assertEqual(run(run_lovemail_tick(self.sender(), self.at(21, 50))), "off")
+        self.assertEqual(self.sent, [])
+
     def test_manual_deliver_while_closed(self):
         """档期结束后心动信自动关了：后台「立即派送」照样把信池剩下的信送出去，标记清掉；没点按钮就不派。"""
         lovemail.add_mail(self.a, self.b, "匿名", "信")
