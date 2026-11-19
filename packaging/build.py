@@ -369,7 +369,7 @@ def app_files(rid: str, pubkey: str | None) -> dict[str, bytes]:
     files: dict[str, bytes] = {}
     for p in package_files():
         if not is_media(p):
-            files[p.relative_to(SRC).as_posix()] = p.read_bytes()
+            files[p.relative_to(SRC).as_posix()] = bat_bytes(p.read_text(encoding="utf-8")) if p.suffix == ".bat" else p.read_bytes()
     files["changri_api.py"] = (SRC / "changri_api.py").read_bytes()
     files["RUNTIME"] = rid.encode()
     if pubkey:      # 测试包：换成临时公钥，好让本机测试用临时私钥签的更新包
@@ -377,8 +377,20 @@ def app_files(rid: str, pubkey: str | None) -> dict[str, bytes]:
     return files
 
 
-def crlf(text: str) -> bytes:
-    return text.replace("\r\n", "\n").replace("\n", "\r\n").encode("utf-8")
+def crlf(text: str, encoding: str = "utf-8") -> bytes:
+    return text.replace("\r\n", "\n").replace("\n", "\r\n").encode(encoding)
+
+
+def bat_bytes(text: str) -> bytes:
+    """.bat 存成 GBK + CRLF，不再 chcp 65001。
+    UTF-8 的 .bat 在 65001 下，cmd 会把含中文的行读错位：「找不到程序文件」被截成「不到程序文件……'is not recognized'」，
+    前面的 call 根本没执行。中文 Windows 的 cmd 默认就是 GBK（936），按它存最稳。源文件仍是 UTF-8，方便编辑。"""
+    if "chcp 65001" in text:
+        sys.exit(".bat 里不要再写 chcp 65001：打包时会存成 GBK，切到 65001 中文反而会乱。")
+    try:
+        return crlf(text, "gbk")
+    except UnicodeEncodeError as e:
+        sys.exit(f".bat 里有 GBK 存不下的字符 {text[e.start:e.end]!r}，换个写法。")
 
 
 def fill(text: str, **kw) -> str:
@@ -400,7 +412,7 @@ def full_package(plat: str, ver: str, rid: str, rt: Path, app: dict[str, bytes],
         if plat.startswith("windows"):
             for f in (HERE / "windows").iterdir():
                 text = fill(f.read_text(encoding="utf-8"), VERSION=ver, BASE=base)
-                data = crlf(text)                                      # .bat 要 CRLF，不然 goto / 标签会出怪问题
+                data = bat_bytes(text) if f.suffix == ".bat" else crlf(text)   # .bat 要 CRLF，不然 goto / 标签会出怪问题
                 if f.suffix == ".txt":
                     data = b"\xef\xbb\xbf" + data                       # 带 BOM，老记事本也不乱码
                 (top / f.name).write_bytes(data)

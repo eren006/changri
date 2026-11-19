@@ -211,6 +211,23 @@ def open_phone_count(role_id: int) -> int:
         return c.execute("SELECT COUNT(*) FROM rooms r JOIN room_members m ON m.room_id=r.id WHERE m.role_id=? AND r.kind='电话' AND r.status='open'", (role_id,)).fetchone()[0]
 
 
+def open_date_count(role_id: int) -> int:
+    """「约会群」占了几个：没结束的私约、心愿房间（参与者都算），加上自己挂着、没过期也没被摘走的心愿。官约不算。"""
+    from . import wishes
+    with get_conn() as c:
+        n = c.execute("SELECT COUNT(*) FROM rooms r JOIN room_members m ON m.room_id=r.id "
+                      "WHERE m.role_id=? AND r.kind IN ('约会','心愿') AND r.status='open'", (role_id,)).fetchone()[0]
+    return n + len(wishes.list_open(role_id))
+
+
+def date_cap_hit(role_id: int) -> str:
+    """私约 + 心愿合计到上限了就返回提示（发私约、挂心愿、摘心愿都查这个），没到返回空串。"""
+    cap = get_int("date_open_cap", 0)
+    if cap and open_date_count(role_id) >= cap:
+        return f"你已经有 {cap} 个没结束的私约 / 心愿了（挂着没人摘的心愿也算），先结束或撤掉几个再来。官约不受影响。"
+    return ""
+
+
 def day_count(role_id: int, kind: str) -> int:
     with get_conn() as c:
         n = c.execute("SELECT COUNT(*) FROM rooms WHERE creator_id=? AND kind=? AND dkey=? AND status!='cancelled'", (role_id, kind, season.day_key())).fetchone()[0]
@@ -250,7 +267,8 @@ def create(kind: str, creator_id: int, target_ids: list[int], time_text: str, pl
     if kind != "微信":
         if season.phase() != "playing":
             return False, "现在不是进行中的季度（筹备期/没有季度时不能约）。", 0
-        hm = tuple(time_text.split("-", 1)) if wish_id else parse_hm(time_text, day)
+        # 心愿传的是存好的「HH:MM-HH:MM」；以前误传过显示用的「23:00-次日01:00」，「次日」只是给人看的，存进库里撞时就查不出来了
+        hm = tuple(x.replace("次日", "") for x in time_text.split("-", 1)) if wish_id else parse_hm(time_text, day)
         if not hm:
             from . import storycal
             return False, (storycal.parse_when(time_text, day)[1] or storycal.format_error(day)), 0
@@ -299,6 +317,14 @@ def create(kind: str, creator_id: int, target_ids: list[int], time_text: str, pl
                     refused.append(names.get(t, "对方"))
         if not ids and kind not in SOLO_KINDS:
             return False, "邀约对象都不可用，请检查名单或稍后再试。", 0
+        if kind == "约会":
+            hit_cap = date_cap_hit(creator_id)
+            if hit_cap:
+                return False, hit_cap, 0
+            full = [t for t in ids if date_cap_hit(t)]                 # 被约的人到了上限也约不了（多人邀约里有一个满了，整场都不发）
+            if full:
+                who = "、".join(f"「{names.get(t, '对方')}」" for t in full)
+                return False, f"{who}没结束的私约 / 心愿已经到上限了（{get_int('date_open_cap', 0)} 个），现在约不了。", 0
         if kind == "电话":
             cap = get_int("phone_open_cap", 5)
             if cap and open_phone_count(creator_id) >= cap:
@@ -352,6 +378,8 @@ def join(room_id: int, role_id: int) -> tuple[bool, str]:
         return False, "这个房间已经结束了。"
     if r["kind"] not in NO_TIMELINE and conflict(role_id, r["day"], r["start_hm"], r["end_hm"]):
         return False, "这个时间你已经有安排了。"
+    if r["kind"] in ("约会", "心愿") and date_cap_hit(role_id):          # 申请加入私约 / 心愿也算进私约 + 心愿上限
+        return False, "申请人没结束的私约 / 心愿已经到上限了，现在加不进来。"
     with get_conn() as c:
         c.execute("INSERT OR IGNORE INTO room_members(room_id, role_id, agree) VALUES(?,?,1)", (room_id, role_id))
     return True, ""
@@ -572,7 +600,7 @@ def vote_change(room_id: int, role_id: int, agree: bool) -> tuple[str, dict | No
     """返回 (状态, 申请内容)：none 没有申请 / rejected / waiting / applied /
     conflict（全员同意了，但等待期间有人在新时间又有了别的安排：申请作废，ch["clash"] 写清是谁、什么安排）"""
     r = get(room_id)
-    if not r or not r["pending_change"]:
+    if not r or r["status"] != "open" or not r["pending_change"]:    # 结束的房间不再改时间线（rooms.end 会清申请，这里兜底）
         return "none", None
     ch = json.loads(r["pending_change"])
     if not agree:
@@ -650,6 +678,10 @@ def request_join(room_id: int, role_id: int) -> tuple[bool, str, int]:
         b = blocks.get_block(m["role_id"], role_id)
         if b:
             return False, ("申请失败，请稍后再试。" if b["silent"] else f"「{m['name']}」已拒绝你的联系。"), 0
+    if r["kind"] in ("约会", "心愿"):
+        hit_cap = date_cap_hit(role_id)
+        if hit_cap:
+            return False, hit_cap, 0
     hit = conflict(role_id, r["day"], r["start_hm"], r["end_hm"])
     if hit:
         return False, f"你在 D{r['day']} {hm_text(hit['start_hm'], hit['end_hm'])} 已经有安排了。", 0

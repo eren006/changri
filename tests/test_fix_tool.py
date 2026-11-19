@@ -47,6 +47,8 @@ class BuildTests(unittest.TestCase):
         self.assertTrue(all(n.isascii() for n in names))                                     # Windows 自带解压认不准 UTF-8 文件名
         bat = z.read("changri-fix/Fix-Changri.bat")
         self.assertTrue(bat.startswith(b"@echo off\r\n"))                                     # 不能带 BOM，要 CRLF
+        self.assertIn("修复工具", bat.decode("gbk"))                                            # 存成 GBK：中文 Windows 的 cmd 默认代码页
+        self.assertNotIn(b"chcp 65001", bat)
         for n in ("changri-fix/fix.ps1", "changri-fix/launcher.ps1"):
             self.assertTrue(z.read(n).startswith(b"\xef\xbb\xbf"), n)                         # PowerShell 5.1 要 BOM 才认 UTF-8
         self.assertEqual(z.read("changri-fix/fix.ps1"), self.files["fix/fix.ps1"].read_bytes())   # 自带的和官网上的同一份

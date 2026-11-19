@@ -98,5 +98,46 @@ class DbTest(unittest.TestCase):
         self.assertIn("D3 的 23点，D4 的 0点", rooms.blocked_hit(3, "23:00", "01:00"))
 
 
+
+    def test_taken_wish_cross_midnight_still_conflicts(self):
+        """跨午夜的心愿被摘后，房间存的是 01:00 而不是显示用的「次日01:00」，后面再约同一时段要撞上。"""
+        from unittest import mock
+
+        from changri.core import season, wishes
+        with mock.patch.object(season, "phase", lambda: "playing"):
+            ok, wid = wishes.post(self.a, "2300-0100", "花园", "夜游")
+            self.assertTrue(ok, wid)
+            ok, info, rid = wishes.take(int(wid), self.b)
+            self.assertTrue(ok, info)
+            with get_conn() as c:
+                r = c.execute("SELECT start_hm, end_hm FROM rooms WHERE id=?", (rid,)).fetchone()
+            self.assertEqual((r["start_hm"], r["end_hm"]), ("23:00", "01:00"))
+            ok, info, _ = rooms.create("约会", self.b, [self.c], "2330-0030", "湖边")
+            self.assertFalse(ok)
+
+    def test_migration_fixes_stored_next_day(self):
+        from pathlib import Path
+
+        from changri.storage import migrate
+        sql = (Path(migrate.MIGRATIONS_DIR) / "0031_wish_room_next_day.sql").read_text(encoding="utf-8")
+        with get_conn() as c:
+            c.execute("INSERT INTO rooms(kind, creator_id, day, start_hm, end_hm, place, created_ts) VALUES('心愿',?,3,'23:00','次日01:00','花园',0)", (self.a,))
+            rid = c.execute("SELECT MAX(id) FROM rooms").fetchone()[0]
+            c.executescript(sql)
+            r = c.execute("SELECT start_hm, end_hm FROM rooms WHERE id=?", (rid,)).fetchone()
+        self.assertEqual((r["start_hm"], r["end_hm"]), ("23:00", "01:00"))
+
+    def test_vote_change_ignored_after_room_closed(self):
+        ok, info, rid = rooms.create("约会", self.a, [self.b], "1400-1500", "花园")
+        self.assertTrue(ok, info)
+        self.assertTrue(rooms.propose_change(rid, self.a, 3, "16:00", "17:00")[0])
+        with get_conn() as c:                                   # 绕过 rooms.end 直接关掉（申请还留着）
+            c.execute("UPDATE rooms SET status='ended' WHERE id=?", (rid,))
+        self.assertEqual(rooms.vote_change(rid, self.b, True), ("none", None))
+        with get_conn() as c:
+            r = c.execute("SELECT start_hm FROM rooms WHERE id=?", (rid,)).fetchone()
+        self.assertEqual(r["start_hm"], "14:00")
+
+
 if __name__ == "__main__":
     unittest.main()

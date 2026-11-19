@@ -106,7 +106,7 @@ def build_site(key, base: str, out: Path) -> dict[str, Path]:
     (site / "fix").mkdir(parents=True, exist_ok=True)
     ps1 = utf8_bom_crlf(build.fill((FIX / "fix.ps1").read_text(encoding="utf-8"), FIX_VERSION=ver))
     launcher = utf8_bom_crlf(build.fill((FIX / "launcher.ps1.in").read_text(encoding="utf-8"), BASE=base, FIX_PUBKEY_XML=pubkey_xml(key)))
-    bat = build.crlf((FIX / "Fix-Changri.bat").read_text(encoding="utf-8"))           # .bat 不能带 BOM：第一行 @echo off 会被读坏
+    bat = build.bat_bytes((FIX / "Fix-Changri.bat").read_text(encoding="utf-8"))      # GBK + CRLF，不能带 BOM：第一行 @echo off 会被读坏
     readme = utf8_bom_crlf(build.fill((FIX / "README.txt").read_text(encoding="utf-8"), BASE=base))
     helper = (ROOT / "src" / "changri" / "platform" / "firewall_helper.sh").read_text(encoding="utf-8").rstrip("\n")
     sh = build.fill((FIX / "fix.sh").read_text(encoding="utf-8"), BASE=base, FIX_VERSION=ver, FW_HELPER_SCRIPT=helper).encode("utf-8")

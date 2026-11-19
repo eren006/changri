@@ -97,11 +97,12 @@ def _allow_insecure() -> bool:
     return os.environ.get("CHANGRI_UPDATE_ALLOW_FILE") == "1"       # 只给测试用
 
 
-def _open(url: str, timeout: float):
+def _open(url: str, timeout: float, headers: dict | None = None):
     scheme = urllib.parse.urlparse(url).scheme
     if scheme != "https" and not (_allow_insecure() and scheme in ("file", "http")):
         raise UpdateError("更新地址必须是 https。")
-    return urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "changri-bot-updater"}), timeout=timeout)
+    req = urllib.request.Request(url, headers={"User-Agent": "changri-bot-updater", **(headers or {})})
+    return urllib.request.urlopen(req, timeout=timeout)
 
 
 def manifest_url() -> str:
@@ -208,42 +209,77 @@ def _direct_url(url: str) -> str | None:
     return None
 
 
-def _fetch_to(url: str, dest: Path, limit: int, h) -> None:
-    size = 0
-    with _open(url, 60) as r, open(dest, "wb") as f:
-        while chunk := r.read(1 << 16):
-            size += len(chunk)
-            if size > limit:
-                raise UpdateError("更新包太大，已拒绝。")
+STALL_TRIES = 3         # 同一个地址连续这么多次一个字节都没多下到，就换下一个地址（GitHub 直连）
+MAX_TRIES = 40          # 一个包总共最多请求这么多次（服务器不认 Range、每次都从头下又断在半路时不至于没完没了）
+
+
+def _sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        while chunk := f.read(1 << 20):
             h.update(chunk)
-            f.write(chunk)
+    return h.hexdigest()
+
+
+def _fetch_to(url: str, dest: Path, limit: int) -> None:
+    """下载到 dest。dest 里已经有一截（上次断了）就用 Range 从断的地方接着下；服务器不认 Range（回 200）就从头下。"""
+    have = dest.stat().st_size if dest.exists() else 0
+    try:
+        r = _open(url, 60, {"Range": f"bytes={have}-"} if have else None)
+    except urllib.error.HTTPError as e:
+        if e.code == 416:              # 要的范围不存在（本地那截比服务器上的文件还长）：丢掉从头来
+            dest.unlink(missing_ok=True)
+        raise
+    with r:
+        resumed = have and getattr(r, "status", 200) == 206 and \
+            (r.headers.get("Content-Range") or "").startswith(f"bytes {have}-")
+        size = have if resumed else 0
+        got, expect = 0, r.headers.get("Content-Length") or ""
+        with open(dest, "ab" if resumed else "wb") as f:
+            while chunk := r.read(1 << 16):
+                size += len(chunk)
+                got += len(chunk)
+                if size > limit:
+                    raise UpdateError("更新包太大，已拒绝。")
+                f.write(chunk)
+        if expect.isdigit() and got < int(expect):    # 对方半路挂断时 read 不报错，只是提前读完
+            raise ConnectionError(f"下载到一半断了（{got}/{expect}）")
 
 
 def _download(item: dict, dest: Path, limit: int, message: bytes | None) -> Path:
-    """网络抖动时重试 2 次，仍失败再试一次 GitHub 直连（镜像不稳时）。校验 sha256 / 签名不变。"""
-    h, last = hashlib.sha256(), None
-    urls = [item["url"], item["url"], None]
-    for i, url in enumerate(urls):
-        if url is None:
-            url = _direct_url(item["url"])
-            if not url:
+    """断了就从断的地方接着下（断点续传），一直有进展就一直续；同一个地址连续 STALL_TRIES 次没进展，
+    再试 GitHub 直连（主页跳转到镜像时），也是接着已经下到的部分。最后校验 sha256 / 签名，对不上就丢掉。"""
+    dest.unlink(missing_ok=True)
+    urls, last = [item["url"]], None
+    direct_tried, tries = False, 0
+    while urls:
+        url, stalls = urls.pop(0), 0
+        while stalls < STALL_TRIES and tries < MAX_TRIES:
+            tries += 1
+            before = dest.stat().st_size if dest.exists() else 0
+            try:
+                _fetch_to(url, dest, limit)
+                last = None
                 break
-        h = hashlib.sha256()
-        try:
-            _fetch_to(url, dest, limit, h)
-            last = None
+            except UpdateError:
+                dest.unlink(missing_ok=True)
+                raise
+            except Exception as e:  # noqa: BLE001
+                last = e
+                now = dest.stat().st_size if dest.exists() else 0
+                stalls = 0 if now > before else stalls + 1
+                if stalls < STALL_TRIES:
+                    time.sleep(2 * max(stalls, 1))
+        if last is None:
             break
-        except UpdateError:
-            dest.unlink(missing_ok=True)
-            raise
-        except Exception as e:  # noqa: BLE001
-            dest.unlink(missing_ok=True)
-            last = e
-            if i < 2:
-                time.sleep(2 * (i + 1))
+        if not direct_tried:
+            direct_tried = True
+            if d := _direct_url(item["url"]):
+                urls.append(d)
     if last is not None:
-        raise UpdateError(f"下载失败（{type(last).__name__}）。已重试并尝试直连，请换个网络再试。") from last
-    if h.hexdigest() != item["sha256"]:
+        dest.unlink(missing_ok=True)
+        raise UpdateError(f"下载失败（{type(last).__name__}）。已重试、断点续传并尝试直连，请换个网络再试。") from last
+    if _sha256_file(dest) != item["sha256"]:
         dest.unlink(missing_ok=True)
         raise UpdateError("下载下来的文件和清单对不上（可能传输出错），已丢弃。")
     if message is not None and not _verify(message, item["signature"]):

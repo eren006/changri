@@ -6,7 +6,7 @@ import time
 import nonebot
 from nonebot import logger
 
-from changri.core import announce, messaging, outage, qqmanager
+from changri.core import admins, announce, messaging, outage, qqmanager
 from changri.core.db import current_bot, get_int, per_bot
 from changri.core.qqsend import make_send, send_to_group
 
@@ -24,6 +24,25 @@ async def _notify(text: str) -> None:
         await send_to_group(bot, ann[1], text)
     except Exception as e:  # noqa: BLE001
         logger.warning(f"[QQ号监听] 提醒发送失败：{e}")
+
+
+async def _dm_admins(text: str) -> int:
+    """用官方机器人私聊这个机器人登记过的每位管理员。官方接口私聊有限制（要对方开过私聊/在白名单），发不出去只记日志。返回送达几个人。"""
+    bid = current_bot()
+    bot = nonebot.get_bots().get(bid)
+    if not bot:
+        logger.warning(f"[QQ号监听] 机器人 {bid} 不在线，没法私聊管理员")
+        return 0
+    n = 0
+    for a in admins.list_admins():
+        if a["bot_id"] != bid:
+            continue
+        try:
+            await bot.send_to_c2c(openid=a["member_openid"], message=text)
+            n += 1
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[QQ号监听] 私聊管理员 {a['note'] or a['member_openid'][:8]} 失败：{e}")
+    return n
 
 
 async def _notify_cmd(app_id: str, text: str) -> None:
@@ -49,7 +68,9 @@ async def _tick():
             kind, reason = res
             st = qqmanager.link_status(current_bot(), ln["id"])
             who = f"QQ {st['self_id']}（{ln['name']}）" if st["self_id"] else f"监听用的 QQ 号「{ln['name']}」"
-            await _notify(f"⚠️ {who} 掉线了：{reason}。听群消息、改群名暂时不能用，管理员请处理。" if kind == "alert" else f"✅ {who} 已恢复连接。")
+            text = f"⚠️ {who} 掉线了：{reason}。听群消息、改群名暂时不能用，管理员请处理。" if kind == "alert" else f"✅ {who} 已恢复连接。"
+            await _notify(text)
+            await _dm_admins(text)                          # 群里有没有发出去，都再私聊每位管理员一份
         # 掉线备案按「现在的状态」做，不只在提醒的那一下做：这一轮没做成（出错、机器人刚好不在线），下一轮（30 秒后）接着做。
         # 做成了 outage 里就记着这个号，不会重复通知。
         try:

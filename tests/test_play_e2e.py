@@ -595,6 +595,29 @@ class PlayE2E(unittest.TestCase):
         self.say("约会 1000-1100 咖啡厅 丙")
         self.assertIn("次数用完", self.say("约会 1200-1300 咖啡厅 丙")[0])
 
+    def test_date_cap_counts_dates_and_wishes(self):
+        """私约 + 心愿合计上限：挂着的心愿、心愿房间、私约房间都算，官约不算；到了就不能发私约、挂心愿、摘心愿。"""
+        self.add_pool(6)
+        set_config("date_open_cap", "2")
+        self.say("约会 1000-1100 咖啡厅 乙")                                        # 甲 1、乙 1
+        self.say("发起官约 1200-1300 后山 甲/乙", member="ADMIN", group="ADM")       # 官约不算
+        self.say("挂心愿 1600-1700 花园 一起散步")                                    # 甲 2（挂着的心愿）
+        self.assertIn("没结束的私约 / 心愿", self.say("约会 1800-1900 咖啡厅 丙")[0])
+        self.assertIn("没结束的私约 / 心愿", self.say("挂心愿 2000-2100 花园 再散一次")[0])
+        wid = get_conn().execute("SELECT MAX(id) FROM wishes").fetchone()[0]
+        self.say(f"摘心愿 {wid}", member="M1", group="P1")                         # 乙摘走：乙 2，甲还是 2
+        self.assertEqual(get_conn().execute("SELECT status FROM wishes WHERE id=?", (wid,)).fetchone()[0], "taken")
+        self.assertIn("没结束的私约 / 心愿", self.say("约会 1800-1900 咖啡厅 丙", member="M1", group="P1")[0])
+        out = self.say("发起官约 1800-1900 后山 甲/乙", member="ADMIN", group="ADM")  # 到上限了官约照样能发
+        self.assertFalse(any("没结束的私约" in o for o in out), out)
+        self.assertIn("「乙」没结束的私约 / 心愿已经到上限了", self.say("约会 1800-1900 咖啡厅 乙", member="M2", group="P2")[0])  # 丙约乙：被约的人满了也拦
+        out = self.say("约会 1800-1900 咖啡厅 甲/乙", member="M2", group="P2")[0]      # 多人邀约里有人满了，整场不发
+        self.assertIn("「甲」、「乙」", out)
+        self.assertEqual(get_conn().execute("SELECT COUNT(*) FROM rooms r JOIN room_members m ON m.room_id=r.id "
+                                            "WHERE m.role_id=? AND r.kind='约会'", (roles.get_role_by_name("丙")["id"],)).fetchone()[0], 0)
+        set_config("date_open_cap", "0")                                            # 0 = 不限
+        self.assertNotIn("没结束的私约", self.say("约会 2000-2100 咖啡厅 丙")[0])
+
     def test_stakeout_solo_room(self):
         self.add_pool(1)
         self.assertIn("没有开放", self.say("踩点 1400-1500 大图书馆")[0])          # 默认关

@@ -112,6 +112,9 @@ def post(poster_id: int, time_text: str, place: str, content: str, sign: str = "
             open_n = c.execute("SELECT COUNT(*) FROM wishes WHERE poster_id=? AND status='open' AND created_ts>=?", (poster_id, alive_since())).fetchone()[0]
         if open_n >= cap:
             return False, f"最多同时挂 {cap} 个心愿，先撤掉或等人摘走一条。"
+    hit_cap = rooms.date_cap_hit(poster_id)                    # 私约 + 心愿合计上限
+    if hit_cap:
+        return False, hit_cap
     lim = get_int("limit_挂心愿", 0)
     if lim and day_count(poster_id, "post") >= lim:
         return False, f"今天挂心愿的次数用完了（每天 {lim} 次）。"
@@ -166,6 +169,9 @@ def take(wish_id: int, taker_id: int) -> tuple[bool, str, int]:
         return False, "不能摘自己挂的心愿，要撤回请发「撤心愿 编号」。", 0
     if blocks.get_block(w["poster_id"], taker_id):
         return False, "这条心愿你摘不了。", 0
+    hit_cap = rooms.date_cap_hit(taker_id)
+    if hit_cap:
+        return False, hit_cap, 0
     lim = get_int("limit_摘心愿", 0)
     if lim and day_count(taker_id, "take") >= lim:
         return False, f"今天摘心愿的次数用完了（每天 {lim} 次）。", 0
@@ -182,7 +188,7 @@ def take(wish_id: int, taker_id: int) -> tuple[bool, str, int]:
     hit = rooms.conflict(w["poster_id"], day, w["start_hm"], w["end_hm"], locks=False, ignore_wish=wish_id)
     if hit:
         return False, f"挂这条心愿的人在 D{day} {hm_text(hit['start_hm'], hit['end_hm'])} 已经有别的安排了，这条心愿暂时摘不了。", 0
-    ok, info, room_id = rooms.create("心愿", w["poster_id"], [taker_id], f"{hm_text(w['start_hm'], w['end_hm'])}", w["place"], w["content"],
+    ok, info, room_id = rooms.create("心愿", w["poster_id"], [taker_id], f"{w['start_hm']}-{w['end_hm']}", w["place"], w["content"],
                                      official=True, day=day, wish_id=wish_id)
     if not ok:
         return False, info, 0

@@ -304,6 +304,22 @@ def note_flap(message: str, trace: str = "", now: float | None = None) -> bool:
     return True
 
 
+# ---------- Windows 上关连接时的噪音：不算出错 ----------
+# Windows 版 Python 的 Proactor 事件循环有个老毛病：对方（QQ 服务器、浏览器、手机网页）已经把连接断了，
+# 我们这边再去关 socket 时 shutdown() 会抛 WinError 10054 / 10053，asyncio 就记一条
+# "Exception in callback ..._call_connection_lost(None)"。连接本来就要关，什么都没坏，只是吵：窗口里降成调试信息，也不进报错日志。
+
+_PROACTOR_NOISE = (ConnectionResetError, ConnectionAbortedError)
+
+
+def is_proactor_noise(text: str, trace: str = "", exc: BaseException | None = None) -> bool:
+    if "_call_connection_lost" not in (text or "") and "_call_connection_lost" not in (trace or ""):
+        return False
+    if exc is not None:
+        return isinstance(exc, _PROACTOR_NOISE)
+    return any(f"{c.__name__}:" in (trace or "") for c in _PROACTOR_NOISE)
+
+
 _PKG_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))    # .../changri
 
 
@@ -326,6 +342,8 @@ def _loguru_sink(message) -> None:
     exc = rec["exception"]
     trace = "".join(traceback.format_exception(exc.type, exc.value, exc.traceback)) if exc else ""
     text = str(rec["message"])
+    if is_proactor_noise(text, trace, exc.value if exc else None):
+        return                                     # Windows 关连接时的噪音，见 is_proactor_noise
     if is_whitelist_error(text) or is_whitelist_error(trace):
         note_whitelist()                           # 配置问题：不记成「出错」，也不带一大段堆栈
         return
@@ -354,6 +372,9 @@ class _StdBridge(logging.Handler):
                 level = logger.level(record.levelname).name
             except ValueError:
                 level = record.levelno
+            exc = record.exc_info[1] if record.exc_info else None
+            if record.name == "asyncio" and is_proactor_noise(record.getMessage(), "", exc):
+                level = "DEBUG"                    # 窗口里不再刷一大段红字（见 is_proactor_noise）
             logger.bind(std_src=f"{record.name}:{record.funcName}:{record.lineno}", std_path=record.pathname) \
                 .opt(exception=record.exc_info).log(level, record.getMessage())
         except Exception:  # noqa: BLE001
