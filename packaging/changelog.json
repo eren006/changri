@@ -1,9 +1,17 @@
 [
   {
-    "version": "0.22.8",
+    "version": "0.22.9",
     "date": "",
     "features": [],
     "fixes": []
+  },
+  {
+    "version": "0.22.8",
+    "date": "2026-11-19",
+    "features": [],
+    "fixes": [
+      "检查更新一直报「连不上更新服务器（URLError）」：阿里云的 Windows 服务器，以及 Alibaba Cloud Linux / CentOS / Rocky 等 Linux 服务器上，自带的运行环境找不到这台机器的根证书，HTTPS 校验不过。现在找不到时会自动改用系统里别处的证书或自带的证书；报错里也会写出具体原因。已经卡在 0.22.7 及以前、更新不了的：Windows 在这台服务器上用浏览器打开一次 https://system.changri.work 再点更新；Linux 先用 root 运行一次 sudo ln -s /etc/pki/tls/certs/ca-bundle.crt /etc/ssl/cert.pem 再点更新"
+    ]
   },
   {
     "version": "0.22.7",

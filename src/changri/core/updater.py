@@ -129,7 +129,8 @@ def fetch_manifest(url: str | None = None) -> dict:
     except UpdateError:
         raise
     except Exception as e:  # noqa: BLE001
-        raise UpdateError(f"连不上更新服务器（{type(e).__name__}）。请稍后再试。") from e
+        why = str(getattr(e, "reason", "") or e)[:200]
+        raise UpdateError(f"连不上更新服务器（{type(e).__name__}：{why}）。请稍后再试。") from e
     if not isinstance(data, dict):
         raise UpdateError("更新信息的格式不对。")
     version, runtime = str(data.get("version", "")), str(data.get("runtime", ""))
