@@ -1,5 +1,11 @@
 [
   {
+    "version": "0.22.7",
+    "date": "",
+    "features": [],
+    "fixes": []
+  },
+  {
     "version": "0.22.6",
     "date": "2026-11-19",
     "features": [
