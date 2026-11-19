@@ -93,7 +93,7 @@ class AdminTests(unittest.TestCase):
         self.assertEqual(self.c.post("/contact-prompt", data={"action": "no", "_csrf": token(self.c, "/accounts")}).status_code, 403)
 
     def test_theme_switch(self):
-        """后台外观：睡莲 / 芭蕾 / 圣诞 / 默认，记在 cookie 里，回到刚才的页面；圣诞会飘雪。"""
+        """后台外观：睡莲 / 芭蕾 / 圣诞 / 樱花 / 默认，记在 cookie 里，回到刚才的页面；圣诞会飘雪。"""
         self.login()
         html = self.c.get("/season").get_data(as_text=True)
         self.assertIn('aria-label="睡莲"', html)
@@ -111,6 +111,17 @@ class AdminTests(unittest.TestCase):
         html = self.c.get("/season").get_data(as_text=True)
         self.assertIn('data-theme="lily"', html)
         self.assertNotIn('id="snow"', html)
+        self.c.post("/theme", data={"theme": "sakura", "_csrf": tok})                  # 樱花：飘花瓣，不飘雪；深浅色两套
+        html = self.c.get("/season").get_data(as_text=True)
+        self.assertIn('data-theme="sakura"', html)
+        self.assertIn('aria-label="樱花" aria-pressed="true"', html)
+        self.assertIn('id="petals"', html)
+        self.assertNotIn('id="snow"', html)
+        self.assertIn('@media (prefers-color-scheme: dark){\n  :root[data-theme="sakura"]', html)
+        self.c.post("/theme", data={"theme": "", "_csrf": tok})                        # 切回原来的样子
+        html = self.c.get("/season").get_data(as_text=True)
+        self.assertIn('<html lang="zh-CN">', html)
+        self.assertNotIn('id="petals"', html)
         self.c.post("/theme", data={"theme": "<script>", "_csrf": tok})                # 不认识的值 = 恢复默认
         self.assertIn('<html lang="zh-CN">', self.c.get("/season").get_data(as_text=True))
         self.c.set_cookie("admin_theme", "ballet")
@@ -148,6 +159,7 @@ class AdminTests(unittest.TestCase):
         html = self.c.get("/phone").get_data(as_text=True)
         self.assertIn("网络体检", html)
         self.assertIn("机器人连上了吗", html)
+        self.assertIn("转到小手机网页聊天室", html)                     # 打开聊天室前弹确认：约会不再走 QQ 群
         r = self.post("/phone/settings", phone_port="80", phone_base_url="x")
         self.assertIn("1024", r.get_data(as_text=True))
         # 用刚才挑的空闲端口，不写死 5092：开发机上的 changri-bot-dev 或并行跑的别的测试占着 5092 时，这里会因为「端口被占用」不保存（以前偶发失败的原因）

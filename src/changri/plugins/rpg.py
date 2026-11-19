@@ -6,6 +6,7 @@ from nonebot.params import CommandArg
 from changri.core import blocks, messaging, roles, rpg, rpgcard
 from changri.core.buttons import Btn
 from changri.core.qqsend import make_send, reply_buttons, reply_long
+from changri.core.textutil import parse_id
 
 NEED_ROLE = "请先在你的个人群里发「创建新角色 名字」绑定角色。"
 
@@ -23,7 +24,6 @@ shop = _cmd("商城", {"道具商城"})
 buy = _cmd("购买")
 use = _cmd("使用")
 give = _cmd("赠送道具", {"赠送物品", "转账", "赠送货币"})
-card = _cmd("角色卡", {"名片", "我的名片", "角色名片"})
 exchange = _cmd("兑换", {"兑换表"})
 craft_cmd = _cmd("合成", {"合成表"})
 
@@ -36,27 +36,8 @@ async def _send_png(matcher, render, role_id: int) -> bool:
             await matcher.send(MessageSegment.file_image(png))
             return True
     except Exception as e:  # noqa: BLE001
-        logger.warning(f"[角色卡] 画图失败，改发文字：{e}")
+        logger.warning(f"[背包] 画图失败，改发文字：{e}")
     return False
-
-
-@card.handle()
-async def _(bot: Bot, event: GroupMessageCreateEvent):
-    me = _me(bot, event)
-    if not me:
-        await card.finish(NEED_ROLE)
-    if await _send_png(card, rpgcard.render_card, me["id"]):
-        return
-    info = rpgcard.data(me["id"])
-    pf = info["profile"]
-    lines = [f"🪪 {info['name']} 的角色卡" + (f"（简称：{pf['short']}）" if pf["short"] else ""),
-             f"{pf['gender']} · {pf['age']} 岁 · 皮相 {pf['look']}"] + ([f"✏️ {pf['bio']}"] if pf["bio"] else [])
-    if info["attrs"]:
-        lines.append("属性：" + "、".join(f"{a['name']} {a['value']}" for a in info["attrs"]))
-    if info["money"]:
-        lines.append("货币：" + "、".join(f"{x['name']} {x['count']}" for x in info["money"]))
-    lines.append("背包：" + ("、".join(f"{x['name']}×{x['count']}" for x in info["items"]) or "空"))
-    await card.finish("\n".join(lines))
 
 
 @bag.handle()
@@ -100,15 +81,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     me = _me(bot, event)
     if not me:
         await buy.finish(NEED_ROLE)
-    raw = args.extract_plain_text().strip()
-    words = raw.split()
-    if words:                                            # 特殊道具：使用 道具名 目标 [参数]
-        from changri.core import specials
-        it = rpg.find_item(words[0])
-        if specials.is_special(it):
-            ok, text = specials.use(me, it, words[1:])
-            await use.finish(text if ok else "❌ " + text)
-    parts = raw.rsplit(maxsplit=1)
+    parts = args.extract_plain_text().strip().rsplit(maxsplit=1)
     has_count = len(parts) == 2 and parts[1].isdigit()
     count = int(parts[1]) if has_count else 1
     name = parts[0] if has_count else " ".join(parts)
@@ -121,7 +94,15 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     me = _me(bot, event)
     if not me:
         await use.finish(NEED_ROLE)
-    parts = args.extract_plain_text().strip().rsplit(maxsplit=1)
+    raw = args.extract_plain_text().strip()
+    words = raw.split()
+    if words:                                            # 特殊道具：使用 道具名 目标 [参数]（以前误放在「购买」里：使用用不了、购买反而用掉）
+        from changri.core import specials
+        it = rpg.find_item(words[0])
+        if specials.is_special(it):
+            ok, text = specials.use(me, it, words[1:])
+            await use.finish(text if ok else "❌ " + text)
+    parts = raw.rsplit(maxsplit=1)
     has_count = len(parts) == 2 and parts[1].isdigit()
     count = int(parts[1]) if has_count else 1
     name = parts[0] if has_count else " ".join(parts)
@@ -163,10 +144,11 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
             await exchange.finish("🔁 现在没有可以兑换的东西。")
         await exchange.finish("🔁 兑换表\n" + "\n".join(f"{x['id']}. {x['from_name']}×{x['from_n']} → {x['to_name']}×{x['to_n']}" for x in rows)
                               + "\n用法：兑换 编号 [次数]")
-    if not parts[0].isdigit():
-        await exchange.finish("用法：兑换 编号 [次数]（发「兑换」看编号）")
+    n = parse_id(parts[0])
+    if not n:
+        await exchange.finish("用法：兑换 编号 [次数]，例：兑换 2（发「兑换」看编号）")
     times = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 1
-    ok, text = rpg.exchange(me["id"], int(parts[0]), times)
+    ok, text = rpg.exchange(me["id"], n, times)
     await exchange.finish(("✅ " if ok else "❌ ") + text)
 
 

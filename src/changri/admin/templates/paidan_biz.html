@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% import "_rpg_icons.html" as ic %}
+{% block title %}排单 · 业务{% endblock %}
+{% block body %}
+<h1>业务</h1>
+<p class="lede">每种业务一个工作群、一个工期、一个默认单口和一份下单格式。单号用业务字母开头，每个业务各自从 1 编号。</p>
+{% include "_paidan_tabs.html" %}
+{% macro biz_form(b=None) %}
+<form class="form" method="post" action="{{ url_for('paidan_biz_save') }}">{{ csrf() }}
+  {% if b %}<input type="hidden" name="id" value="{{ b.id }}">{% endif %}
+  <div class="fields">
+    <div><label for="l{{ b.id if b }}">单号字母</label><input id="l{{ b.id if b }}" name="letter" maxlength="1" required value="{{ b.letter if b }}" placeholder="A"></div>
+    <div><label for="n{{ b.id if b }}">名称</label><input id="n{{ b.id if b }}" name="name" required value="{{ b.name if b }}" placeholder="溶图"></div>
+    <div><label for="d{{ b.id if b }}">工期天数</label><input id="d{{ b.id if b }}" name="days" type="number" min="0" value="{{ b.days if b else 7 }}"></div>
+    <div><label for="s{{ b.id if b }}">默认单口</label><input id="s{{ b.id if b }}" name="slots" type="number" min="1" value="{{ b.default_slots if b else 1 }}"></div>
+  </div>
+  <div class="field"><label for="t{{ b.id if b }}">下单格式</label>
+    <p class="d">一行一栏，写成「名称：」这样。名字里带「选填」的可以不填，其余必填。<b>一定要有「QQ号：」这一栏</b>，客户没写 QQ 号交不了单；漏了会自动补在最后。第一行「【A下单】」和散单的「兑换码：」会自动加，不用写。</p>
+    <textarea id="t{{ b.id if b }}" name="template" rows="5" placeholder="名称：&#10;尺寸：&#10;QQ号：&#10;备注（选填）：">{{ b.template if b }}</textarea></div>
+  <div class="actions"><button class="btn" type="submit">保存业务</button>
+    <button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
+</form>
+{% endmacro %}
+<section>
+  <div class="sec-head"><h2>业务<span class="n">{{ rows|length }} 个</span></h2>
+    <span class="btns"><details class="panel"><summary class="btn">{{ ic.plus() }}新建业务</summary>{{ biz_form() }}</details></span></div>
+  {% if rows %}<div class="rowlist">{% for r in rows %}
+    <div class="row">
+      <div><b>{{ r.b.letter }} · {{ r.b.name }}</b>
+        <div class="muted">工期 {{ r.b.days }} 天 · 默认单口 {{ r.b.default_slots }} · 已编到 {{ r.b.letter }}-{{ '%04d'|format(r.b.seq) }}</div>
+        <div class="muted">{% if r.b.group_openid %}<span class="dot ok"></span>工作群已绑定{% else %}<span class="dot warn"></span>工作群没绑定{% if r.code %}，绑定码 <b>{{ r.code }}</b>{% endif %}{% endif %}</div>
+        {% if r.missing_qq %}<div class="muted"><span class="dot warn"></span>下单格式里没有「QQ号：」，记得加上（现在会自动补在最后）</div>{% endif %}
+      </div>
+      <div class="acts">
+        <details class="panel"><summary class="btn sm ghost">编辑</summary>{{ biz_form(r.b) }}
+          <p class="note">客户点「获取格式」时看到的是：</p><pre class="note">{{ r.fmt }}</pre></details>
+        <form method="post" action="{{ url_for('paidan_biz_code', bid=r.b.id) }}">{{ csrf() }}<button class="btn sm ghost" type="submit">{{ '换绑工作群' if r.b.group_openid else '生成工作群绑定码' }}</button></form>
+        <form method="post" action="{{ url_for('paidan_biz_sync', bid=r.b.id) }}" onsubmit="return confirm('把默认单口 {{ r.b.default_slots }} 同步给所有没单独改过单口的客户？单独改过的不动。')">{{ csrf() }}<button class="linkbtn" type="submit">同步默认单口</button></form>
+      </div>
+    </div>
+  {% endfor %}</div>{% else %}<p class="empty">还没有业务。点「新建业务」开始。</p>{% endif %}
+</section>
+{% endblock %}

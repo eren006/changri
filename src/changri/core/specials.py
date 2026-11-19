@@ -194,7 +194,7 @@ def _tap(me, t, code: str, name: str) -> tuple[bool, str]:
 
 def _letter_knife(me, t) -> tuple[bool, str]:
     with get_conn() as c:
-        rows = c.execute("SELECT * FROM lovemails WHERE to_role_id=?", (t["id"],)).fetchall()
+        rows = c.execute("SELECT * FROM lovemails WHERE to_role_id=? AND status NOT IN ('held','swallowed')", (t["id"],)).fetchall()
     if not rows:
         return False, f"📭 「{t['name']}」的信箱里还没有心动信，拆信刀先留着吧。（没用掉）"
     why = _take(me["id"], "SPEC_009", "拆信刀")

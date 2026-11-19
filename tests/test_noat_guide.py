@@ -55,8 +55,33 @@ class NoAtGuide(unittest.TestCase):
         self.assertIn("('noat_page','不用 @ 也能回')", base)                     # 左侧「通用」里有入口（进了机器人才显示菜单）
 
     def test_pool_links_here(self):
-        self.assertIn('href="/no-at"', self.c.get("/backup-pool").get_data(as_text=True))
+        html = self.c.get("/backup-pool").get_data(as_text=True)          # 一个群都没有：默认打开「教程」
+        self.assertIn('aria-current="page">教程', html)
+        self.assertIn('href="/no-at"', html)
+        # 备用群池的分步说明：开完开关要有人说话群才出现；出现了标「暂停使用」还要绑定一次
+        for s in ("群为什么还没出现", "群里有人说话", "暂停使用", "还没放进群池", "设为备用群 本群群号", "成为可用备用群", "怎么算设好了"):
+            self.assertIn(s, html)
 
+    def test_pool_tabs(self):
+        st = self.c.get("/backup-pool?view=settings").get_data(as_text=True)
+        self.assertIn('aria-current="page">设置', st)
+        self.assertIn("现在的情况", st)
+        self.assertNotIn("怎么算设好了", st)                                  # 教程不挤在设置页里
+        self.assertIn("/backup-pool?view=guide", st)
+        gd = self.c.get("/backup-pool?view=guide").get_data(as_text=True)
+        self.assertNotIn("现在的情况", gd)
+
+    def test_qqlink_tabs(self):
+        gd = self.c.get("/qqlink").get_data(as_text=True)                    # 还没连小号：默认打开「教程」
+        self.assertIn('aria-current="page">教程', gd)
+        for s in ("把小号连上来", "为什么要设管理员", "从群列表加群", "列表里找不到这个群", "暂停使用", "/qqlink?view=settings"):
+            self.assertIn(s, gd)
+        self.assertNotIn("qqlink/link/add", gd)
+        st = self.c.get("/qqlink?view=settings").get_data(as_text=True)
+        self.assertIn('aria-current="page">设置', st)
+        self.assertIn("连一个 QQ 小号", st)
+        self.assertNotIn("为什么要设管理员", st)
+        self.assertIn("/qqlink?view=guide", st)
 
 if __name__ == "__main__":
     unittest.main()

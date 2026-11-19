@@ -201,6 +201,9 @@ async def send_at(bot, group_openid: str, member_openid: str, name: str, text: s
                                         message=MessageSegment.markdown(f'<qqbot-at-user id="{member_openid}" />\n{text}'))
             return getattr(r, "id", "") or ""
         except Exception as e:  # noqa: BLE001
+            if "主动消息失败" in str(e) and "无权限" in str(e):     # 群里没开主动发言：纯文字也一样被拦，不怪 markdown
+                logger.warning(f"[@] 没发出去（群里没打开机器人主动在群聊内发言）：{e}")
+                raise
             _md_off_until = time.time() + 3600
             logger.warning(f"[@] markdown 发送失败（多半是机器人没有群 markdown 权限），一小时内改发纯文字 @：{e}")
     r = await bot.send_to_group(group_openid=group_openid, message=f"@{name} {text}")
@@ -227,6 +230,9 @@ async def _send_with_buttons(bot, group_openid: str, text: str, btns) -> str | N
         r = await bot.send_to_group(group_openid=group_openid,
                                     message=Message([MessageSegment.markdown(md), MessageSegment.keyboard(MessageKeyboard.model_validate(kb))]))
     except ActionFailed as e:
+        if "主动消息失败" in str(e) and "无权限" in str(e):    # 只是这个群没开主动发言，不算按钮被拒，不暂停别的群的按钮
+            logger.warning(f"[主动发言] 没发出去（群里没打开机器人主动在群聊内发言）：{e}")
+            return None
         paused = _btn_rejected()
         logger.warning("[按钮] 主动消息带按钮被 QQ 拒绝，" + _btn_reject_note(paused) + "：" + ascii(str(e))[:200])
         _note_btn_rejected("主动推送通知（短信、礼物、关系线等）时", e)
@@ -261,11 +267,13 @@ def make_send_image():
     """发一张图（bytes）到群，按群所属的机器人选发送者。"""
     import nonebot
 
-    async def send_image(bot_id: str, group_openid: str, data: bytes) -> None:
+    async def send_image(bot_id: str, group_openid: str, data: bytes) -> str:
+        """返回发出去的那条消息 id（撤回要用，拿不到是空串）。"""
         bot = nonebot.get_bots().get(bot_id)
         if bot is None:
             raise RuntimeError(f"机器人 {bot_id} 当前不在线")
-        await bot.send_to_group(group_openid=group_openid, message=MessageSegment.file_image(data))
+        r = await bot.send_to_group(group_openid=group_openid, message=MessageSegment.file_image(data))
+        return getattr(r, "id", "") or ""
 
     return send_image
 

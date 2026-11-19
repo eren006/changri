@@ -177,7 +177,8 @@ def count_since(old: dict, high: dict, role_id: int | None = None) -> dict[int, 
             d = out.setdefault(rid, {})
             d[w] = d.get(w, 0) + n
     with get_conn() as c:
-        for r in c.execute("SELECT kind, from_role_id, to_role_id FROM messages WHERE id>? AND id<=? AND error!='已撤回'", (old["msg"], high["msg"])):
+        from .messaging import NOT_RECEIVED_SQL
+        for r in c.execute(f"SELECT kind, from_role_id, to_role_id FROM messages WHERE id>? AND id<=? AND error!='已撤回' AND {NOT_RECEIVED_SQL}", (old["msg"], high["msg"])):
             if r["to_role_id"] != r["from_role_id"]:
                 add(r["to_role_id"], r["kind"])
         if extensions.is_enabled("lovemail"):

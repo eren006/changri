@@ -67,7 +67,9 @@ def todo_entries(role, lingering: list | None = None, now: float | None = None) 
                              (r["id"],)).fetchone()             # 只看戏文，闲聊不算回复（跟弧长一个口径）
             since = arclen.waiting(c, r["id"])[0].get(role["id"])     # 两人房从对方说第一句起算，多人房从别人最近一句起算
             head = f"R{r['id']} {r['kind']}（{slot_text(r)}）"
-            if not r["pool_id"] and not rooms.web_mode():
+            if rooms.is_deferred(r):                                                      # 提前排的官约：还没到那天
+                items.append((f"d:{r['id']}", f"{head}：管理员提前排的，D{r['day']} {rooms.defer_open_hm(r)} 左右发群号和邀请"))
+            elif not r["pool_id"] and not rooms.web_mode() and r["kind"] != "微信":     # 微信本来就不分 QQ 群
                 items.append((f"g:{r['id']}", f"{head}：备用群池没有空群，还在等群"))
             elif last and last["role_id"] != role["id"]:
                 wait = now - (since or last["ts"])
@@ -83,7 +85,7 @@ def todo_entries(role, lingering: list | None = None, now: float | None = None) 
             else:
                 items.append((f"n:{r['id']}", f"{head}：进行中，还没有人说话，聊完记得「结束{r['kind']}」"))
             if r["pending_change"] and not r["agree"]:
-                items.append((f"c:{r['id']}:{r['pending_change']}", f"R{r['id']} 有人想改时间线，发「同意时间线 R{r['id']}」或「拒绝时间线 R{r['id']}」（在那个房间群里可以不带房间号）"))
+                items.append((f"c:{r['id']}:{r['pending_change']}", f"R{r['id']} 有人想改时间线，同意就发「同意时间线 R{r['id']}」（在那个房间群里可以不带房间号），不同意不用理"))
     for q in rooms.pending_requests(role["id"]):
         items.append((f"j:{q['id']}", f"{q['applicant']} 想加入 R{q['room_id']}，发「同意加入 {q['id']}」或「拒绝加入 {q['id']}」"))
     turn.sort(key=lambda x: (not x[0], -x[1]))

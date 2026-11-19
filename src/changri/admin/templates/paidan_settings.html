@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}排单 · 设置{% endblock %}
+{% block body %}
+<h1>设置</h1>
+<p class="lede">owner 绑定和每天提醒的时间。</p>
+{% include "_paidan_tabs.html" %}
+{% if dm_fail %}<div class="callout bad">私聊 owner 失败（{{ dm_fail }}）：请确认 owner 已经在机器人的白名单里。</div>{% endif %}
+<section>
+  <div class="sec-head"><h2>owner</h2></div>
+  <div class="rowlist"><div class="row">
+    <div><b>{% if owner %}<span class="dot ok"></span>已绑定{% else %}<span class="dot warn"></span>没绑定{% endif %}</b>
+      <div class="muted">{% if code %}绑定码 <b>{{ code }}</b>，owner 本人在机器人在的群里发「绑定 {{ code }}」。{% endif %}新单私聊、工期催单 @ 的都是 owner；只有 owner 能在工作群「发送」。私聊要先把 owner 加进机器人的白名单。</div></div>
+    <div class="acts"><form method="post" action="{{ url_for('paidan_owner_code') }}">{{ csrf() }}<button class="btn sm ghost" type="submit">{{ '换绑 owner' if owner else '生成绑定码' }}</button></form></div>
+  </div></div>
+</section>
+<section>
+  <div class="sec-head"><h2>时间</h2></div>
+  <form class="form" method="post" action="{{ url_for('paidan_settings_save') }}">{{ csrf() }}
+    <div class="fields">
+      <div><label for="rm">每天提醒的时间</label><input id="rm" name="remind" type="time" value="{{ remind }}" required></div>
+      <div><label for="ph">提前设置的暂停，当天通知的时间</label><input id="ph" name="pause_hm" type="time" value="{{ pause_hm }}" required></div>
+    </div>
+    <p class="note">每天提醒：额度到期（发客户群）、工期催单和待扣张数（发工作群）。暂停本身从当天 0 点就生效，这里只改通知什么时候发。</p>
+    <div class="actions"><button class="btn" type="submit">保存</button></div>
+  </form>
+</section>
+{% endblock %}

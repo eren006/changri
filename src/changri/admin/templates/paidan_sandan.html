@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% import "_rpg_icons.html" as ic %}
+{% block title %}排单 · 散单{% endblock %}
+{% block body %}
+<h1>散单</h1>
+<p class="lede">散单的人没有客户档案，在共用的散单群里凭兑换码下单。一个码下一单，生成时定业务和有效期。</p>
+{% include "_paidan_tabs.html" %}
+<section>
+  <div class="sec-head"><h2>散单群</h2>
+    <span class="btns"><details class="panel"><summary class="btn ghost">真实群号</summary>
+      <form class="form" method="post" action="{{ url_for('paidan_sandan_settings') }}">{{ csrf() }}
+        <div class="fields"><div><label for="sg">散单群真实群号（选填）</label><input id="sg" name="real_gid" inputmode="numeric" value="{{ real_gid }}"></div></div>
+        <p class="note">有人发「发送图包」时，私聊里带上这个群号。</p>
+        <div class="actions"><button class="btn" type="submit">保存</button><button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
+      </form></details></span></div>
+  <div class="rowlist"><div class="row">
+    <div><b>{% if group %}<span class="dot ok"></span>已绑定{% else %}<span class="dot warn"></span>没绑定{% endif %}</b>
+      <div class="muted">{% if code %}绑定码 <b>{{ code }}</b>，在散单群里发「绑定 {{ code }}」{% elif not group %}点右边生成绑定码{% endif %}{% if real_gid %} · 群号 {{ real_gid }}{% endif %}</div></div>
+    <div class="acts"><form method="post" action="{{ url_for('paidan_sandan_code') }}">{{ csrf() }}<button class="btn sm ghost" type="submit">{{ '换绑' if group else '生成绑定码' }}</button></form></div>
+  </div></div>
+</section>
+
+{% if fresh %}
+<section>
+  <div class="sec-head keep"><h2>刚生成的兑换码<span class="n">{{ fresh|length }} 个</span></h2>
+    <span class="btns"><button class="btn" type="button" onclick="var t=document.getElementById('fresh');t.select();navigator.clipboard&&navigator.clipboard.writeText(t.value);this.textContent='已复制'">复制全部</button></span></div>
+  <textarea id="fresh" rows="{{ [fresh|length, 10]|min }}" readonly>{{ fresh|join('\n') }}</textarea>
+</section>
+{% endif %}
+
+<section>
+  <div class="sec-head"><h2>兑换码<span class="n">{{ rows|length }} 个</span></h2>
+    {% if bizs %}<span class="btns"><details class="panel"><summary class="btn">{{ ic.plus() }}生成兑换码</summary>
+      <form class="form" method="post" action="{{ url_for('paidan_codes_gen') }}">{{ csrf() }}
+        <div class="fields">
+          <div><label for="gb">业务</label><select id="gb" name="bid">{% for b in bizs %}<option value="{{ b.id }}">{{ b.letter }} · {{ b.name }}</option>{% endfor %}</select></div>
+          <div><label for="gn">数量</label><input id="gn" name="n" type="number" min="1" max="500" value="10" required></div>
+          <div><label for="ge">有效期到</label><input id="ge" name="expires" type="date" min="{{ today }}" required></div>
+        </div>
+        <p class="note">有效期当天还能用。暂停的日子会自动顺延。</p>
+        <div class="actions"><button class="btn" type="submit">生成</button><button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
+      </form></details></span>{% endif %}</div>
+  {% if rows %}<div class="tablewrap"><table class="rt">
+    <thead><tr><th>兑换码</th><th>业务</th><th>有效期</th><th>状态</th></tr></thead>
+    <tbody>{% for x in rows %}<tr>
+      <td><code>{{ x.r.code }}</code></td>
+      <td>{{ x.b.letter if x.b }} · {{ x.b.name if x.b }}</td>
+      <td>{{ x.r.expires }}</td>
+      <td>{% if x.o %}<a href="{{ url_for('paidan_order', oid=x.o.id) }}">{{ x.o.no }}</a>{% if x.state == '已作废' %} · 已作废{% endif %}{% else %}<span class="dot {{ 'ok' if x.state == '未使用' else 'bad' }}"></span>{{ x.state }}{% endif %}</td>
+    </tr>{% endfor %}</tbody></table></div>
+  {% else %}<p class="empty">还没有兑换码。{% if not bizs %}先去「业务」建一个业务。{% endif %}</p>{% endif %}
+</section>
+{% endblock %}

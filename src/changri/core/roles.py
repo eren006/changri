@@ -17,17 +17,51 @@ ADMIN_CODE_TTL = 24 * 3600   # 后台登记群号生成的码：24 小时
 GID_RE = re.compile(r"\d{5,12}")
 
 
+NAME_BAD_CHARS = "/／|｜@＠,，、;；"          # 指令里拿来分隔的符号：发起官约用 / 分名字，心愿用 | 分昵称，@ 是艾特
+NAME_RESERVED = {"大家", "所有人", "全体", "全员", "管理员", "有人", "未知号码", "点歌台", "偷盗记录", "群号通知", "小手机", "我", "你", "自己"}
+
+
+def name_problem(name: str, kind: str = "角色名") -> str:
+    """名字（本名、简称）能不能用；能用返回空串，不能用返回原因。不查重名（重名各处自己查）。
+    除了长度和空格，还不能带指令里的分隔符、不能叫「大家」这类会跟指令撞的词、不能是「R12」「D3」或纯数字（会被当成房间号、天数）、
+    不能和别人正在用的匿名化名重名（落款会被认成你）。"""
+    if not _valid_name(name):
+        return f"{kind}要在 {NAME_MAX} 字以内，且不能带空格。"
+    bad = next((ch for ch in name if ch in NAME_BAD_CHARS), "")
+    if bad:
+        return f"{kind}里不能有「{bad}」（指令里用它来分隔）。"
+    if name in NAME_RESERVED:
+        return f"「{name}」会跟指令里的词撞，换一个{kind}。"
+    if re.fullmatch(r"[RrDd]?\d+", name):
+        return f"「{name}」会被当成房间号或天数，换一个{kind}。"
+    with get_conn() as conn:
+        if conn.execute("SELECT 1 FROM phone_aliases WHERE alias=?", (name,)).fetchone():
+            return f"「{name}」是小手机里有人在用的化名，换一个{kind}。"
+    return ""
+
+
 def _valid_name(name: str) -> bool:
     return 0 < len(name) <= NAME_MAX and not re.search(r"\s", name)
 
 
+ROOM_GROUP_MSG = "这个群是约会用的备用群，不能当个人群。请自己另建一个群，把机器人拉进去再发。"
+
+
 def create_role(name: str, bot_id: str, group_openid: str, member_openid: str, real_gid: str = "") -> tuple[bool, str]:
     """在某个群里创建角色，这个群自动成为主群（个人群）。real_gid 可不填，只是标签。"""
-    if not _valid_name(name):
-        return False, f"角色名要在 {NAME_MAX} 字以内，且不能带空格。"
+    why = name_problem(name)
+    if why:
+        return False, why
     if real_gid and not GID_RE.fullmatch(real_gid):
         return False, "群号要是 5~12 位数字（或者不填）。"
     now = int(time.time())
+    from . import pool
+    if pool.is_room_group(bot_id, group_openid):
+        return False, ROOM_GROUP_MSG
+    from .announce import special_label
+    sp = special_label(bot_id, group_openid)
+    if sp:                                                  # 公告群 / 后台群 / 水群 / 戏群：大家都在，不能当个人群（短信、手机码会发到这里）
+        return False, f"这个群是{sp}，不能当个人群。请自己另建一个群，把机器人拉进去再发。"
     with get_conn() as conn:
         row = conn.execute(
             "SELECT r.name FROM role_groups g JOIN roles r ON r.id=g.role_id WHERE g.bot_id=? AND g.group_openid=?",
@@ -70,13 +104,22 @@ def find_role_for_sender(bot_id: str, group_openid: str, member_openid: str):
         ).fetchone()
 
 
+def is_own_group(role_id: int, bot_id: str, group_openid: str) -> bool:
+    """这个群是不是这个角色自己的个人群。手机码、换绑码只在这里给：在房间群、水群里回出来，群里别人就能拿去登录小手机、抢走角色。"""
+    with get_conn() as conn:
+        return conn.execute("SELECT 1 FROM role_groups WHERE role_id=? AND bot_id=? AND group_openid=?", (role_id, bot_id, group_openid)).fetchone() is not None
+
+
 def find_group_binding(bot_id: str, group_openid: str):
     """这个群是不是已经绑成了某个角色的个人群。"""
     with get_conn() as conn:
         return conn.execute("SELECT 1 FROM role_groups WHERE bot_id=? AND group_openid=?", (bot_id, group_openid)).fetchone()
 
 
-def bind_qq(role_id: int, qq: str) -> str:
+QQ_TAKEN = "这个 QQ 号已经认在别人名下了。如果真是你的号（比如换了个人群、换了号认），请找管理员在后台「QQ 小号与群号组（双骰）」页里先解绑，再来绑。"
+
+
+def bind_qq(role_id: int, qq: str, force: bool = False) -> str:
     """把一个真实 QQ 号认到这个角色的主人名下：按「人」认，之后这个人建的新角色也自动算他的；永久保存，后台可看可删。
     返回空串表示成功。"""
     import re
@@ -90,6 +133,9 @@ def bind_qq(role_id: int, qq: str) -> str:
             return "没有这个角色"
         if not row["member_openid"]:
             return "这个角色还没有认群，先在它的个人群里发「认群 码」再绑 QQ"
+        old = conn.execute("SELECT member_openid FROM person_qq WHERE qq=?", (qq,)).fetchone()
+        if old and old["member_openid"] != row["member_openid"] and not force:     # force：管理员在后台改绑      # 不能把别人认过的号改到自己名下（以前会静默覆盖：对方说话就算成你的）
+            return QQ_TAKEN
         conn.execute("INSERT INTO person_qq(qq, member_openid, created_ts) VALUES(?,?,?) "
                      "ON CONFLICT(qq) DO UPDATE SET member_openid=excluded.member_openid", (qq, row["member_openid"], int(time.time())))
     return ""
@@ -232,11 +278,18 @@ def pending_code(role_id: int):
 def consume_bind_code(code: str, bot_id: str, group_openid: str, member_openid: str) -> tuple[bool, str]:
     """在群里用认群码：把这个群的 openid 绑到对应角色的个人群上（已有就替换）。"""
     now = int(time.time())
+    from . import pool
+    if pool.is_room_group(bot_id, group_openid):
+        return False, ROOM_GROUP_MSG
+    from .announce import special_label
+    sp = special_label(bot_id, group_openid)
     with get_conn() as conn:
         row = conn.execute("SELECT * FROM bind_codes WHERE code=? AND expires_ts>=?", (code, now)).fetchone()
         if not row:
             return False, "认群码不对或已过期。"
         role = conn.execute("SELECT name, is_npc FROM roles WHERE id=?", (row["role_id"],)).fetchone()
+        if sp and not role["is_npc"]:                       # 公告群 / 后台群 / 水群 / 戏群：大家都在，不能当玩家的个人群（短信、手机码会发到这里）；
+            return False, f"这个群是{sp}，不能当个人群。请自己另建一个群，把机器人拉进去再发。"   # NPC 照旧可以（工作人员常在后台群一起扮 NPC）
         here = conn.execute(
             "SELECT r.id, r.name, r.is_npc FROM role_groups g JOIN roles r ON r.id=g.role_id WHERE g.bot_id=? AND g.group_openid=? ORDER BY g.id",
             (bot_id, group_openid)).fetchall()

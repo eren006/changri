@@ -23,7 +23,7 @@ USER_DIR = Path(os.environ.get("CHANGRI_EXT_DIR") or DATA_DIR / "extensions")   
 API_VERSION = 1
 
 # 核心：别的功能的地基，不能关
-CORE_MODULES = ["changri.plugins.ping", "changri.plugins.botsync", "changri.plugins.social", "changri.plugins.core_admin", "changri.plugins.season", "changri.plugins.play", "changri.plugins.autoreply", "changri.plugins.trpg", "changri.plugins.trpglog", "changri.plugins.prefix", "changri.plugins.qqwatch", "changri.plugins.msgmon"]  # 季度与游戏天数是地基：短信礼物、心动信的每日次数都按它算「今天」
+CORE_MODULES = ["changri.plugins.ping", "changri.plugins.botsync", "changri.plugins.social", "changri.plugins.charcard", "changri.plugins.core_admin", "changri.plugins.season", "changri.plugins.play", "changri.plugins.autoreply", "changri.plugins.trpg", "changri.plugins.trpglog", "changri.plugins.prefix", "changri.plugins.qqwatch", "changri.plugins.msgmon", "changri.plugins.decks"]  # 季度与游戏天数是地基：短信礼物、心动信的每日次数都按它算「今天」
 
 # 官方扩展：随包带的可选功能。settings_group = 设置页里属于它的那一组；nav = 左侧菜单里属于它的页面
 OFFICIAL = registry.official()        # 每个功能在 features/<功能>/__init__.py 里写 FEATURE 声明自己

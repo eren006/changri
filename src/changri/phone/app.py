@@ -246,7 +246,7 @@ def create_phone_app(secret_key: str) -> Flask:
         for g in rows:
             g["url"] = {"r": lambda t: url_for("thread", other=t), "s": lambda t: url_for("sign_thread", sign=t),
                         "alias": lambda t: url_for("alias_thread", alias_id=t), "song": lambda t: url_for("sys_thread", kind="song"),
-                        "steal": lambda t: url_for("sys_thread", kind="steal"), "lovemail": lambda t: url_for("lovemail_page"),
+                        "steal": lambda t: url_for("sys_thread", kind="steal"), "torn": lambda t: url_for("sys_thread", kind="torn"), "lovemail": lambda t: url_for("lovemail_page"),
                         "rel": lambda t: url_for("rel_line", other=t), "precall": lambda t: url_for("precall_call", session_id=t)}[g["kind"]](g["target"])
         return rows
 
@@ -297,7 +297,7 @@ def create_phone_app(secret_key: str) -> Flask:
         msgs = phoneview.thread_messages(rid, other)          # 收到的按落款认人：带别的署名的匿名短信不会出现在真名会话里
         pics = msgimages.ids_by_msg([m["id"] for m in msgs])
         favs = {r[0] for r in get_conn().execute("SELECT message_id FROM phone_favs WHERE role_id=?", (rid,))}
-        items = [{"id": m["id"], "fav": m["id"] in favs, "mine": m["from_role_id"] == rid, "kind": m["kind"], "title": m["title"], "text": m["content"], "imgs": pics.get(m["id"], []),
+        items = [{"id": m["id"], "fav": m["id"] in favs, "mine": m["from_role_id"] == rid, "kind": m["kind"], "title": m["title"], "text": phoneview.text_of(m, rid), "imgs": pics.get(m["id"], []),
                   "time": time.strftime("%m-%d %H:%M", time.localtime(m["created_ts"]))} for m in msgs]
         blk = blocks.get_block(role["id"], other)
         return page("thread.html", role=role, me=role["name"], other=who["name"], other_id=other, items=items, mode="thread",
@@ -309,7 +309,8 @@ def create_phone_app(secret_key: str) -> Flask:
 
     def _bubbles(msgs, rid):
         pics = msgimages.ids_by_msg([m["id"] for m in msgs])
-        return [{"id": m["id"], "mine": m["from_role_id"] == rid, "kind": m["kind"], "title": m["title"], "text": m["content"], "imgs": pics.get(m["id"], []),
+        from changri.core.phoneview import text_of
+        return [{"id": m["id"], "mine": m["from_role_id"] == rid, "kind": m["kind"], "title": m["title"], "text": text_of(m, rid), "imgs": pics.get(m["id"], []),
                  "time": time.strftime("%m-%d %H:%M", time.localtime(m["created_ts"]))} for m in msgs]
 
     @app.route("/p/me/s/<path:sign>")
@@ -337,12 +338,14 @@ def create_phone_app(secret_key: str) -> Flask:
         if bad:
             return bad
         from changri.core import phoneview
-        if kind in ("song", "steal"):
+        if kind in ("song", "steal", "torn"):
             _read(role, kind)
         if kind == "song":
             rows, title = phoneview.song_items(role), phoneview.SONG_THREAD
         elif kind == "steal":
             rows, title = phoneview.steal_items(role["id"]), phoneview.STEAL_THREAD
+        elif kind == "torn":
+            rows, title = phoneview.torn_items(role["id"]), phoneview.TORN_THREAD
         else:
             abort(404)
         items = [{"id": 0, "song_id": r.get("song_id", 0), "mine": r["mine"], "kind": "sms", "title": "", "text": r["text"], "imgs": [], "url": r.get("url", ""),
@@ -378,7 +381,7 @@ def create_phone_app(secret_key: str) -> Flask:
         if not who:
             abort(404)
         _read(role, f"a:{alias_id}")
-        return page("special_thread.html", role=role, title=aliases.title_for(a, role["id"]), items=_bubbles(aliases.messages(alias_id), role["id"]),
+        return page("special_thread.html", role=role, title=aliases.title_for(a, role["id"]), items=_bubbles(aliases.messages(alias_id, role["id"]), role["id"]),
                     mode="thread", alias=a, alias_side=who, alias_wait=aliases.wait_minutes(a),
                     note=(("你在用化名「%s」和 %s 聊，对方看不到你的真名。" % (a["alias"], a["target_name"])) if who == "owner"
                           else "这是一段匿名对话，对方用的是化名。")
@@ -479,20 +482,11 @@ def create_phone_app(secret_key: str) -> Flask:
         if not m:
             flash("没有可以撤回的：只能撤回自己 2 分钟内发出的最近一条短信/礼物。")
             return back
-        import nonebot
-        from changri.core.qqsend import recall_group_message
-
-        async def go():
-            bot = nonebot.get_bots().get(m["delivered_bot"])
-            if bot is None:
-                raise RuntimeError("对方群所在的机器人现在不在线")
-            await recall_group_message(bot, m["delivered_group"], m["delivered_msg_id"])
         try:
-            loopbridge.run(go())
+            loopbridge.run(sendmsg.recall(m))
         except Exception as e:  # noqa: BLE001
             flash(loopbridge.friendly_error(e, "撤回失败（可能已超过 2 分钟）"))
             return back
-        messaging.mark_recalled(m["id"])
         flash(f"已撤回发给「{m['to_name']}」的{sendmsg.KIND_NAME[m['kind']]}，今天的次数已返还。")
         return back
 
@@ -664,14 +658,20 @@ def create_phone_app(secret_key: str) -> Flask:
                 ppl = c.execute("SELECT id, name FROM roles WHERE id!=? AND name LIKE ? ORDER BY name LIMIT 8", (rid, like)).fetchall()
                 if ppl:
                     groups.append({"label": "联系人", "items": [{"title": r["name"], "sub": "点击开始对话", "url": url_for("thread", other=r["id"])} for r in ppl]})
-                rows = c.execute("SELECT m.id, m.kind, m.title, m.content, m.created_ts, m.from_role_id, f.name AS fname, t.name AS tname FROM messages m JOIN roles f ON f.id=m.from_role_id JOIN roles t ON t.id=m.to_role_id "
-                                 "WHERE (m.from_role_id=? OR m.to_role_id=?) AND (m.content LIKE ? OR m.title LIKE ?) ORDER BY m.id DESC LIMIT 12", (rid, rid, like, like)).fetchall()
+                from changri.core import phoneview
+                from changri.core.messaging import not_received_sql
+                # 发件人搜的是自己原本写的、挂在原本发给的人名下（混乱短信改过的字和误投只给收件人看）；收件人没真收到的不搜
+                rows = c.execute("SELECT m.*, f.name AS fname, t.name AS tname FROM messages m JOIN roles f ON f.id=m.from_role_id "
+                                 "JOIN roles t ON t.id=CASE WHEN m.from_role_id=?1 THEN COALESCE(NULLIF(m.orig_to, 0), m.to_role_id) ELSE m.to_role_id END "
+                                 f"WHERE (m.from_role_id=?1 OR (m.to_role_id=?1 AND {not_received_sql('m.')})) AND m.alias_id IS NULL AND NOT (m.orig_alias!=0 AND m.from_role_id=?1) AND m.error!='已撤回' "
+                                 "AND (CASE WHEN m.from_role_id=?1 THEN COALESCE(m.orig_content, m.content) ELSE m.content END LIKE ?2 OR m.title LIKE ?2) ORDER BY m.id DESC LIMIT 12",
+                                 (rid, like)).fetchall()
                 if rows:
                     items = []
                     for m in rows:
                         other = m["tname"] if m["from_role_id"] == rid else m["fname"]
                         oid = c.execute("SELECT id FROM roles WHERE name=?", (other,)).fetchone()
-                        body = ((m["title"] + " ") if m["kind"] == "gift" else "") + (m["content"] or "")
+                        body = ((m["title"] + " ") if m["kind"] == "gift" else "") + (phoneview.text_of(m, rid) or "")
                         pre, hit_, post = _snip(body, q) if q.lower() in body.lower() else ("", body[:20], "")
                         items.append({"title": other, "sub": ("我" if m["from_role_id"] == rid else other) + " · " + _fmt(m["created_ts"]), "pre": pre, "hit": hit_, "post": post,
                                       "url": url_for("thread", other=oid["id"]) + f"#m{m['id']}" if oid else ""})
@@ -681,11 +681,13 @@ def create_phone_app(secret_key: str) -> Flask:
                     if ms:
                         groups.append({"label": "朋友圈", "items": [dict(zip(("title", "sub", "pre", "hit", "post", "url"), (r["name"], _fmt(r["created_ts"]), *_snip(r["content"], q), url_for("moments_feed")))) for r in ms]})
             else:
-                for m in c.execute("SELECT m.id, m.kind, m.title, m.content, m.created_ts, m.from_role_id, m.to_role_id, f.name AS fname, t.name AS tname FROM phone_favs v JOIN messages m ON m.id=v.message_id "
-                                   "JOIN roles f ON f.id=m.from_role_id JOIN roles t ON t.id=m.to_role_id WHERE v.role_id=? ORDER BY v.created_ts DESC LIMIT 100", (rid,)):
-                    other_id = m["to_role_id"] if m["from_role_id"] == rid else m["from_role_id"]
+                from changri.core import phoneview
+                for m in c.execute("SELECT m.*, f.name AS fname, t.name AS tname FROM phone_favs v JOIN messages m ON m.id=v.message_id "
+                                   "JOIN roles f ON f.id=m.from_role_id JOIN roles t ON t.id=CASE WHEN m.from_role_id=?1 THEN COALESCE(NULLIF(m.orig_to, 0), m.to_role_id) ELSE m.to_role_id END "
+                                   "WHERE v.role_id=?1 AND m.error!='已撤回' AND m.alias_id IS NULL AND NOT (m.orig_alias!=0 AND m.from_role_id=?1) ORDER BY v.created_ts DESC LIMIT 100", (rid,)):
+                    other_id = (m["orig_to"] or m["to_role_id"]) if m["from_role_id"] == rid else m["from_role_id"]
                     favs.append({"id": m["id"], "who": "我" if m["from_role_id"] == rid else m["fname"], "with": m["tname"] if m["from_role_id"] == rid else m["fname"],
-                                 "text": ("［礼物］" + m["title"] + " " if m["kind"] == "gift" else "") + (m["content"] or ""), "time": _fmt(m["created_ts"]), "url": url_for("thread", other=other_id) + f"#m{m['id']}"})
+                                 "text": ("［礼物］" + m["title"] + " " if m["kind"] == "gift" else "") + (phoneview.text_of(m, rid) or ""), "time": _fmt(m["created_ts"]), "url": url_for("thread", other=other_id) + f"#m{m['id']}"})
         return page("search.html", role=role, mode="discover", q=q, groups=groups, favs=favs)
 
     @app.post("/p/me/fav")

@@ -4,7 +4,7 @@
 import time
 
 from .db import get_conn
-from .roles import NAME_MAX, _valid_name
+from .roles import name_problem
 
 
 def is_npc(role_id: int) -> bool:
@@ -51,8 +51,9 @@ def set_flag(name: str, on: bool) -> tuple[bool, str]:
 def create(name: str) -> tuple[bool, str]:
     """建一个不带群的 NPC（在后台、公告群这些地方建的），回执带认群码。"""
     name = (name or "").strip()
-    if not _valid_name(name):
-        return False, f"角色名要在 {NAME_MAX} 字以内，且不能带空格。"
+    why = name_problem(name)
+    if why:
+        return False, why
     with get_conn() as c:
         if c.execute("SELECT 1 FROM roles WHERE name=?", (name,)).fetchone() or c.execute("SELECT 1 FROM role_profiles WHERE short=?", (name,)).fetchone():
             return False, f"「{name}」已经有人用了（本名或简称），换一个名字。"

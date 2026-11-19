@@ -17,6 +17,7 @@ from changri.paths import DATA_DIR  # noqa: E402
 
 config.ensure()                             # 第一次启动：建 data/config.toml（有老 .env 就从里面导入）
 _cfg = config.load()
+config.apply_timezone(str(_cfg["timezone"]))   # 先定时区再起定时任务：换天、心动信派送都按它（默认北京时间）
 os.environ.setdefault("DRIVER", "~fastapi+~httpx+~websockets")   # QQ 适配器要 HTTP 客户端 + WebSocket
 nonebot.init(_env_file=str(DATA_DIR / "nonebot.env"),          # 不读当前目录的 .env；这个文件一般不存在，高级用户可以放 NoneBot 自己的配置
              host=_cfg["host"], port=_cfg["port"], log_level=_cfg["log_level"],

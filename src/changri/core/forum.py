@@ -82,8 +82,10 @@ def thread(post_id: int) -> tuple | None:
 
 
 def parse_post_ref(text: str) -> int | None:
-    m = re.fullmatch(r"#?0*(\d{1,6})", text.strip())
-    return int(m[1]) if m else None
+    """贴号：001、1、#1、[1] 都认（写法跟全部编号一样，textutil.parse_id）。"""
+    from .textutil import parse_id
+    n = parse_id(text)
+    return n if n and n < 10 ** 6 else None
 
 
 def delete_post(post_id: int) -> bool:

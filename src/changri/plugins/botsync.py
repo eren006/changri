@@ -46,13 +46,49 @@ async def _sync():
             logger.info(f"[机器人] 已连接 {bot_id}")
 
 
-# ---- 在线更新：新版本跑满 90 秒才算成功（否则启动保护会回滚）；每 6 小时悄悄查一次有没有新版本（顺便匿名上报使用情况） ----
+# ---- 在线更新：新版本启动 90 秒后跑升级后检查，过了才算成功（不过就回滚）；每 6 小时悄悄查一次有没有新版本（顺便匿名上报使用情况）；
+#      落后太多时每 10 分钟看一次能不能在空闲时段自动更新 ----
 import datetime  # noqa: E402
+import time  # noqa: E402
 
 from changri.core import updater  # noqa: E402
 from changri.core.db import set_config  # noqa: E402
 
-scheduler.add_job(updater.confirm_healthy, "date", run_date=datetime.datetime.now() + datetime.timedelta(seconds=90), id="update_confirm")
+_BOOT_TS = time.time()
+
+
+async def _post_update_check():
+    """刚更新完（有 update_pending.json）：启动 90 秒后检查设置平台、小手机、数据库、机器人在线、定时任务、报错；不过就回滚。"""
+    from changri.core import autoupdate
+    try:
+        res = await autoupdate.post_check(_BOOT_TS)
+    except Exception as e:  # noqa: BLE001  检查本身出错：不回滚，交给看门进程 15 分钟后兜底确认
+        logger.warning(f"[更新] 升级后检查出错：{e}")
+        return
+    if res != "没有待确认的更新":
+        logger.info(f"[更新] 升级后检查：{res}")
+
+
+scheduler.add_job(_post_update_check, "date", run_date=datetime.datetime.now() + datetime.timedelta(seconds=updater.HEALTHY_AFTER),
+                  id="update_post_check")
+
+
+@scheduler.scheduled_job("interval", minutes=10, id="auto_update", max_instances=1, coalesce=True)
+async def _auto_update():
+    """落后太多时，在空闲时段自动更新（条件见 core/autoupdate.py）。后台定时检查还没发现新版本时什么也不做，不联网。"""
+    from changri.core import autoupdate
+    from changri.core.db import get_config
+    if not get_config("update_latest", "") or updater.read_pending() is not None:
+        return
+    snap = autoupdate.snapshot()
+    try:
+        to = await asyncio.get_running_loop().run_in_executor(None, autoupdate.maybe_update, snap)
+    except Exception as e:  # noqa: BLE001  装的过程出错：原来的版本没动，下个 10 分钟再说
+        logger.warning(f"[更新] 自动更新没装上：{e}")
+        return
+    if to:
+        logger.info(f"[更新] 自动更新到 {to}，马上重启")
+        updater.restart()
 
 
 @scheduler.scheduled_job("interval", hours=6, id="update_check", next_run_time=datetime.datetime.now() + datetime.timedelta(minutes=2))
@@ -62,6 +98,11 @@ async def _update_check():
         set_config("update_latest", info["version"] if info["newer"] else "")
     except Exception as e:  # noqa: BLE001
         logger.debug(f"[更新] 检查失败：{e}")
+    try:                                                   # 顺便拉作者的通知（core/notices.py），管理员打开后台时弹出来
+        from changri.core import notices
+        await asyncio.get_running_loop().run_in_executor(None, notices.fetch)
+    except Exception as e:  # noqa: BLE001
+        logger.debug(f"[通知] 拉取失败：{e}")
     try:                                                   # 顺便匿名上报一次使用情况（后台「基础」里能关，见 core/usage.py）
         from changri.core import usage
         from changri.core.db import list_bot_ids

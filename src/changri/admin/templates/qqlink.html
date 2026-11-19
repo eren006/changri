@@ -3,12 +3,15 @@
 {% import "_rpg_icons.html" as ic %}
 {% macro cancel() %}<button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button>{% endmacro %}
 <h1>QQ 小号与群号组（双骰）</h1>
+{% import "_guide_tabs.html" as gt %}
+{{ gt.tabs('qqlink_page', view, 'QQ 小号与群号组') }}
+{% if view == 'guide' %}
 <p class="lede">官方机器人加一个 QQ 小号，两个一起干活。约会、电话这些房间用的群交给小号管：<b>小号负责改群名、查谁在群里、听发言记复盘</b>；官方机器人可以不进这些群，除非之后这些群也想转到官方名下。</p>
 <p class="note"><a href="https://system.changri.work/#/install#i-modes" target="_blank" rel="noopener">官网教程：选哪种模式、怎么设 →</a></p>
 <p class="note">不想装别的程序、只用官方机器人？用<a href="{{ url_for('backup_pool_page') }}">备用群池（纯官方 · 单骰）</a>（腾讯限制，官方机器人改不了群名）。两种可以混着用，一个群同一时间只归一边。</p>
 
-<details class="callout" {{ 'open' if not link_rows }}>
-  <summary><b>第一次用：把小号连上来（三步）</b></summary>
+<section class="gd">
+  <h2>第一次用：把小号连上来（三步）</h2>
   <p style="margin:12px 0 8px">长日bot 自己登录不了 QQ 号。小号要先登录在一个叫 <b>LLBot</b> 的程序里，长日bot 再连过去。</p>
   <ol style="margin:0 0 10px;padding-left:1.4em;line-height:1.8">
     <li><b>装 LLBot、登录小号</b>：打开 <a href="https://www.llonebot.com/" target="_blank" rel="noopener">LLBot 官网（llonebot.com）</a>，按官网的说明在服务器上下载并安装，用小号扫码登录。别用自己的大号。<b>建议和长日bot 装在同一台服务器上</b>，这样下面的地址直接填 <code>127.0.0.1</code>，不用开放端口，更稳也更安全。</li>
@@ -21,22 +24,29 @@
         <li><b>记下「端口」</b>（比如 3001）和<b>下面的「Token」</b>（就是口令，可以不填，建议设一个），点右下角保存。
           <img src="{{ url_for('static', filename='llbot-ws-server.png') }}" alt="LLBot 的 WebSocket 服务端(正向) 设置：勾上启用，端口 3001，下方是 Token" width="786" height="375" style="display:block;max-width:100%;height:auto;margin:6px 0;border-radius:8px"></li>
       </ol></li>
-    <li><b>回到这里连上</b>：点下面的「连一个 QQ 小号」，地址填 <code>ws://127.0.0.1:端口</code>，口令填刚才的 Token（<b>Token 是空的，口令也空着不填</b>）。显示「已连上 · QQ 小号」就成功了。</li>
+    <li><b>回到这里连上</b>：到<a href="{{ url_for('qqlink_page') }}?view=settings">「设置」</a>里点「连一个 QQ 小号」，地址填 <code>ws://127.0.0.1:端口</code>，口令填刚才的 Token（<b>Token 是空的，口令也空着不填</b>）。显示「已连上 · QQ 小号」就成功了。</li>
   </ol>
-</details>
+</section>
 
-<details class="callout" {{ 'open' if link_rows and not sets }} style="margin-top:14px">
-  <summary><b>每个群要这样设一次</b></summary>
-  <ol style="margin:12px 0 4px;padding-left:1.4em;line-height:1.8">
-    <li><b>小号进群、设为管理员</b>：小号必须在群里；用你的大号（群主）把它设为管理员，不然改不了群名。</li>
+<section class="gd">
+  <h2>每个群要这样设一次</h2>
+  <p style="margin:12px 0 8px">先确认<a href="{{ url_for('qqlink_page') }}?view=settings">「设置」</a>里「连接 QQ 小号」显示<b>「已连上 · QQ 小号」</b>。没连上的话，群列表是空的。</p>
+  <ol class="ps-steps">
+    <li><b>小号进群、设为管理员</b>：小号必须在群里；用你的大号（群主）把它设为管理员。
+      <p class="ps-why"><b>为什么要设管理员？</b>房间开始时小号要把群名改成房间名、结束后改回空闲群名「{{ free_name }}」，不是管理员就改不了。加群这一步不会检查，到开房间时才会改名失败，所以先设好。</p></li>
     <li><b>让玩家能自己进群</b>：群设置的「开放设置」里，加群方式选「允许任何人加群」，群搜索方式选「通过群号搜索」。
       <img src="{{ url_for('static', filename='qq-group-open-settings.png') }}" alt="QQ 群开放设置：允许任何人加群，通过群号搜索" width="312" height="157" style="display:block;max-width:100%;height:auto;margin:8px 0 4px;border-radius:8px"></li>
-    <li><b>加进群号组</b>：在下面「群号组」点「从群列表加群」勾选，或者「手动贴群号」。</li>
-    <li><b>官方机器人可以不进这个群</b>。以后想把这个群转到官方机器人名下，再把它拉进群，群主在群设置里点开它，「机器人可获取的群聊消息范围」选「获取群内全部消息」、打开「机器人主动在群聊内发言」（每个人的个人群也都要这样设）。
+    <li><b>加进群号组</b>：在<a href="{{ url_for('qqlink_page') }}?view=settings">「设置」</a>的「群号组」点<b>「从群列表加群」</b>，勾选这个群，再<b>选一个已有的组</b>或者<b>填一个新组名</b>（一定要选或填一个），点「加进群号组」。
+      <p class="ps-why"><b>列表里找不到这个群？</b>列表是每次打开这一页时，现场向小号要的「它在哪些群」。找不到多半是小号还没进群，或者显示没连上。小号刚进的群，刷新页面就有了。也可以用「手动贴群号」，或者在群里由「授权的 QQ 号」发「加入群号组 组名」。</p>
+      <p class="ps-why"><b>勾不了、灰掉了？</b>后面写着「已在某某组」的已经加过了；写着「归机器人某某」的被另一个机器人用着，要先到那个机器人的后台移出。</p></li>
+    <li><b>看一眼结果</b>：这个群出现在那个组下面，显示群号、群名和「空闲」，组名旁边是<b>「可用」</b>，就设好了，开房间时会自动领用。不用自己改群名，小号会改。
+      <p class="ps-why"><b>组名旁边是「暂停使用」？</b>加进了一个整组暂停的组，新加的群也会先暂停。点那个组的「整组成为可用备用群」就行。</p></li>
+    <li><b>官方机器人可以不进这个群</b>。以后想把这个群转到官方机器人名下，再把它拉进群，群主在群设置里打开两个开关（右上角 ≡（群设置）→ 群机器人 → 管理 → 点机器人：「获取群内全部消息」、「机器人主动在群聊内发言」），然后在群里发「设为备用群 本群群号」。每个人的个人群也都要打开这两个开关。<a href="{{ url_for('noat_page') }}">详细步骤和发给群主的话 →</a>
       <img src="{{ url_for('static', filename='qq-bot-group-permissions.jpg') }}" alt="群里的官方机器人设置：获取群内全部消息、机器人主动在群聊内发言已打开" width="393" height="171" style="display:block;max-width:100%;height:auto;margin:8px 0 4px;border-radius:8px"></li>
   </ol>
-</details>
-
+</section>
+{% else %}
+{{ gt.to_guide('qqlink_page', '第一次连小号、往群号组里加群？') }}
 <section>
   <div class="sec-head keep"><h2>连接 QQ 小号<span class="n">{{ link_rows|length }} 个</span></h2>
     <span class="btns"><details class="panel" {{ 'open' if not link_rows }}><summary class="btn">{{ ic.plus() }}连一个 QQ 小号</summary>
@@ -47,7 +57,7 @@
           <div><label>口令</label><input name="token" type="password" placeholder="没有口令可留空" autocomplete="off"></div>
           <div><label class="check"><span class="sw"><input type="checkbox" name="on" value="1" checked><i></i></span>启用</label></div>
         </div>
-        <p class="note">地址填 <code>ws://127.0.0.1:端口</code>，口令填 LLBot 里的 Token（Token 是空的就留空）。怎么在 LLBot 里打开连接，见上面「第一次用」。用 NapCat / SnowLuma 也一样，开「正向 WebSocket」就行；同一台服务器上再装一个，端口要不一样。</p>
+        <p class="note">地址填 <code>ws://127.0.0.1:端口</code>，口令填 LLBot 里的 Token（Token 是空的就留空）。怎么在 LLBot 里打开连接，见<a href="{{ url_for('qqlink_page') }}?view=guide">「教程」</a>。用 NapCat / SnowLuma 也一样，开「正向 WebSocket」就行；同一台服务器上再装一个，端口要不一样。</p>
         <div class="actions"><button class="btn" type="submit">添加</button>{{ cancel() }}</div>
       </form></details></span></div>
   <p class="note">一个机器人可以连多个 QQ 号（每个号一条连接）。它们所在的群放进同一个群号池，房间领群时不分是哪个号的。某个号名下的群正被房间占用（或等人退群）时，这个号不能删，要等房间结束、清场后才能删。</p>
@@ -76,7 +86,7 @@
           <button class="linkbtn" {{ 'disabled title="名下有群正被房间使用或等人退群，不能删"' if r.used }}>删除</button></form>
       </div>
     </div>
-    {% else %}<p class="empty">还没有连 QQ 小号。点上面的「连一个 QQ 小号」，第一次用先看页面最上面的三步。</p>{% endfor %}
+    {% else %}<p class="empty">还没有连 QQ 小号。点上面的「连一个 QQ 小号」，第一次用先看<a href="{{ url_for('qqlink_page') }}?view=guide">「教程」</a>里的三步。</p>{% endfor %}
   </div>
   <div class="btns" style="margin-top:10px"><details class="panel"><summary class="btn ghost">{{ ic.sliders() }}不记进 log 的发言人</summary>
     <form class="form" method="post" action="{{ url_for('qqlink_skip') }}">{{ csrf() }}
@@ -207,4 +217,5 @@
     {% if not binds and not trpg_binds %}<p class="empty">还没有人绑定。</p>{% endif %}
   </div>
 </section>
+{% endif %}
 {% endblock %}

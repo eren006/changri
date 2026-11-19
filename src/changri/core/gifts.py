@@ -41,8 +41,8 @@ def code(item_id: int) -> str:
 
 def parse_code(text: str) -> int | None:
     """「#003」「＃3」「3」「003」→ 3；不是编号写法返回 None。"""
-    t = (text or "").strip().lstrip("#＃﹟").translate(str.maketrans("０１２３４５６７８９", "0123456789"))
-    return int(t) if t.isdigit() else None
+    from .textutil import parse_id
+    return parse_id(text)
 
 
 def catalog(role_id: int | None = None) -> list[str]:

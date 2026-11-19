@@ -93,9 +93,10 @@ def bind_qq(player_id: int, qq: str) -> str:
     key, now = "qq:" + qq, int(time.time())
     with get_conn() as c:
         row = c.execute("SELECT player_id FROM trpg_identities WHERE member_openid=?", (key,)).fetchone()
-        if row:
-            c.execute("UPDATE trpg_identities SET player_id=? WHERE member_openid=?", (player_id, key))
-        else:
+        if row and row["player_id"] != player_id:           # 别人认过的号不能改到自己名下（以前会静默覆盖）
+            from .roles import QQ_TAKEN
+            return QQ_TAKEN
+        if not row:
             c.execute("INSERT INTO trpg_identities(member_openid,player_id,group_openid,created_ts) VALUES (?,?,?,?)", (key, player_id, "", now))
     return ""
 

@@ -3,34 +3,16 @@
 import re
 
 import nonebot  # noqa: F401
-from nonebot import logger
 from nonebot.adapters.qq import Bot, GroupMessageCreateEvent
 from nonebot.params import CommandArg  # noqa: F401
 
-from changri.core import announce, publicfeed, rooms, storycal, wishes
-from changri.core.db import get_config
+from changri.core import rooms, season, storycal, wishes
 from changri.core.buttons import Btn
 from changri.core.qqsend import make_send, reply_buttons
-from changri.plugins.play import NEED_ROLE, _announce_in_room, _cmd, _group_line, _invite, _me, _push, _room_arg, _slot
+from changri.plugins.play import NEED_ROLE, NO_GROUP_TEXT, _announce_in_room, _cmd, _group_line, _invite, _me, _push, _qq_hint, _slot, settle_wish_room
 
 async def _broadcast(w) -> None:
-    """挂出的心愿：默认发到戏群，让大家都知道（「挂心愿时发到戏群」，没设戏群就不发）；开了「同步发到公告群」也发公告群。
-    都只显示性别符号 + 昵称，不显示真名。同一个群只发一次。"""
-    from changri.core import entrance
-    targets = []
-    if get_config("wish_stage_send", "1") == "1" and entrance.get_stage():
-        targets.append(entrance.get_stage())
-    if get_config("wish_public_send", "0") == "1" and announce.get_announce() and announce.get_announce() not in targets:
-        targets.append(announce.get_announce())
-    if not targets:
-        return
-    text = wishes.broadcast_text(w)
-    for bot_id, gid in targets:
-        try:
-            await make_send()(bot_id, gid, text)
-        except Exception as e:  # noqa: BLE001
-            logger.warning("心愿播报失败：{}", e)
-    publicfeed.record("wish", text)
+    await wishes.broadcast(w, make_send())
 
 
 USAGE = "用法：挂心愿 时间 地点 内容 [| 昵称]\n例：挂心愿 {t} 花园 一起散步 | 神秘人A\n（昵称最多 10 个字；对外只显示性别和昵称，不显示真名）"
@@ -60,7 +42,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     await _broadcast(w)
     from changri.core import letters
     paid = letters.paid_note(me["id"], "wish")
-    await wish_post.finish(wishes.post_ok_text(w) + (f"\n{paid}" if paid else ""))
+    await wish_post.finish(wishes.post_ok_text(w) + (f"\n{paid}" if paid else "") + season.prep_note("心愿"))
 
 
 @wish_list.handle()
@@ -79,17 +61,19 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     me = _me(bot, event)
     if not me:
         await wish_take.finish(NEED_ROLE)
-    n = _room_arg(args.extract_plain_text())
+    n = wishes.parse_id(args.extract_plain_text())
     if not n:
-        await wish_take.finish("用法：摘心愿 编号")
+        await wish_take.finish("用法：摘心愿 编号，例：摘心愿 3（编号在「看心愿」里）")
     ok, info, room_id = wishes.take(n, me["id"])
     if not ok:
         await wish_take.finish(f"❌ {info}")
+    if not await settle_wish_room(n, room_id):
+        await wish_take.finish(f"❌ {NO_GROUP_TEXT.format(kind='心愿')}")
     w, room = wishes.get(n), rooms.get(room_id)
     await _push(w["poster_id"], f"🌠 你的心愿 #{n} 被 {me['name']} 摘走了！")
     await _invite(w["poster_id"], room, fix=("💌 心愿", "💌 心愿约会"))
     await _announce_in_room(room_id)
-    await wish_take.finish(f"✅ 你摘了心愿 #{n}，对方已收到通知。\n{_slot(room)}\n{_group_line(room)}\n房间号 R{room_id}")
+    await wish_take.finish(f"✅ 你摘了心愿 #{n}，对方已收到通知。\n{_slot(room)}\n{_group_line(room)}\n房间号 R{room_id}" + _qq_hint(me["id"], room))
 
 
 @wish_back.handle()
@@ -97,7 +81,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     me = _me(bot, event)
     if not me:
         await wish_back.finish(NEED_ROLE)
-    n = _room_arg(args.extract_plain_text())
+    n = wishes.parse_id(args.extract_plain_text())
     if not n:                                   # 不带编号：列出自己挂着的（照老系统）
         mine = wishes.list_open(me["id"])
         await wish_back.finish(("📜 你发布的心愿：\n" + "\n".join(wishes.line(w) for w in mine) if mine else "你现在没有挂着的心愿。")

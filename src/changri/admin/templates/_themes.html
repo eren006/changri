@@ -1,6 +1,6 @@
 {#- 后台外观主题。base.html 和 auth.html 都在 <style> 里引用 theme_css()，<body> 末尾引用 theme_js()。
     主题只重新定义颜色变量（各页面都用变量，不用改），外加侧栏背景 --rail-bg、侧栏选中色 --rail-accent、页底纹理 --page-bg。
-    选了主题就固定用这一套，不再跟着系统深色模式变；「默认」照旧跟随系统。对比度：正文/次要文字/强调色 ≥4.5:1，输入框边线 ≥3:1。 -#}
+    选了主题就固定用这一套，不再跟着系统深色模式变；「默认」和「樱花」照旧跟随系统（樱花有浅色、深色两套）。对比度：正文/次要文字/强调色 ≥4.5:1，输入框边线 ≥3:1。 -#}
 {% macro theme_css() %}
 /* ---------- 睡莲：莫奈《睡莲》——明亮的蓝紫色池水，倒映着天光；花和叶只在边角轻轻晕开 ---------- */
 /* 侧栏是浅色的蓝紫，和页面柔和地连在一起；字用深色，晕染都放在没有文字的边角，不压字。 */
@@ -61,22 +61,55 @@
     radial-gradient(60% 40% at 50% -10%, rgb(168 35 58 / .06), transparent 70%),
     var(--paper);
 }
+/* ---------- 樱花「墨与樱」：墨色侧栏、和纸米白的页面、紅梅色强调；侧栏底下一枝细樱枝，页面上偶尔飘几片花瓣 ---------- */
+/* 粉色只用在点缀（强调色、樱枝、花瓣），底色不发粉。和别的主题不同：跟着系统深浅色走（浅色「昼」、深色「夜桜」）。侧栏两套都是墨色。 */
+:root[data-theme="sakura"]{
+  --paper:#f7f3ee; --surface:#fffdfa; --ink:#26201f; --mute:#5f5654; --line:#e6ded6; --soft:#efe8e0;
+  --field:#8c817b; --card-line:#e8e0d8; --shadow-sm:0 1px 3px 0 rgb(60 40 40 / .07),0 1px 2px -1px rgb(60 40 40 / .07);
+  --night:#231c20; --night-ink:#f3ece9; --night-mute:#b3a4a9; --night-line:#3b3036;
+  --dusk:#a8355a; --dusk-ink:#fff; --ok:#2a6c54; --warn:#8a5915; --bad:#ae2f3a;
+  --shu:#c8553d;            /* 朱：标题上方的一道短线 */
+  --rail-accent:#f0a3bb; --rail-hover:rgb(255 225 235 / .06); --rail-active:rgb(255 225 235 / .10);
+  --rail-bg:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 220 280'%3E%3Cg fill='none' stroke='%236a5560' stroke-linecap='round'%3E%3Cpath stroke-width='3' d='M222 262C178 238 150 208 124 166C108 140 90 124 62 118'/%3E%3Cpath stroke-width='1.6' d='M124 166C138 146 156 132 176 128'/%3E%3Cpath stroke-width='1.6' d='M92 126C86 108 88 94 98 82'/%3E%3Cpath stroke-width='1.4' d='M160 222C150 210 146 198 148 186'/%3E%3Cpath stroke-width='1.2' d='M62 118C52 124 42 134 36 148'/%3E%3C/g%3E%3Cg fill='%23f3c6d3' fill-opacity='.62'%3E%3Cg transform='translate(62 118) rotate(10) scale(0.45) translate(-50 -50)'%3E%3Cpath transform='rotate(0 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(72 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(144 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(216 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(288 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Ccircle cx='50' cy='50' r='6' fill='%23e48aa6'/%3E%3C/g%3E%3Cg transform='translate(98 82) rotate(-20) scale(0.36) translate(-50 -50)'%3E%3Cpath transform='rotate(0 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(72 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(144 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(216 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(288 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Ccircle cx='50' cy='50' r='6' fill='%23e48aa6'/%3E%3C/g%3E%3Cg transform='translate(172 128) rotate(30) scale(0.39) translate(-50 -50)'%3E%3Cpath transform='rotate(0 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(72 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(144 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(216 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(288 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Ccircle cx='50' cy='50' r='6' fill='%23e48aa6'/%3E%3C/g%3E%3Cg transform='translate(122 166) rotate(0) scale(0.33) translate(-50 -50)'%3E%3Cpath transform='rotate(0 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(72 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(144 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(216 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(288 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Ccircle cx='50' cy='50' r='6' fill='%23e48aa6'/%3E%3C/g%3E%3Cg transform='translate(146 206) rotate(50) scale(0.3) translate(-50 -50)'%3E%3Cpath transform='rotate(0 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(72 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(144 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(216 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(288 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Ccircle cx='50' cy='50' r='6' fill='%23e48aa6'/%3E%3C/g%3E%3Cg transform='translate(36 148) rotate(15) scale(0.24) translate(-50 -50)'%3E%3Cpath transform='rotate(0 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(72 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(144 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(216 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(288 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Ccircle cx='50' cy='50' r='6' fill='%23e48aa6'/%3E%3C/g%3E%3C/g%3E%3Cg fill='%23e48aa6' fill-opacity='.62'%3E%3Cellipse cx='80' cy='100' rx='3.6' ry='5.4'/%3E%3Cellipse cx='156' cy='112' rx='3.6' ry='5.4'/%3E%3Cellipse cx='190' cy='150' rx='3.6' ry='5.4'/%3E%3Cellipse cx='48' cy='128' rx='3.6' ry='5.4'/%3E%3C/g%3E%3C/svg%3E") right -14px bottom 100px / 200px no-repeat,
+    radial-gradient(90% 12% at 100% 100%, rgb(240 163 187 / .10), transparent 100%),
+    linear-gradient(180deg, #2a2226 0%, #231c20 55%, #1d171a 100%);
+  --page-bg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.45 0 0 0 0 0.35 0 0 0 0 0.3 0 0 0 0.07 0'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23n)'/%3E%3C/svg%3E"), var(--paper);
+}
+@media (prefers-color-scheme: dark){
+  :root[data-theme="sakura"]{
+    --paper:#161214; --surface:#1f191c; --ink:#f3ece9; --mute:#bcaeb0; --line:#33292e; --soft:#2a2226;
+    --field:#85777c; --card-line:#33292e; --shadow-sm:0 1px 3px 0 rgb(0 0 0 / .4),0 1px 2px -1px rgb(0 0 0 / .4);
+    --night:#100c0e; --night-ink:#f3ece9; --night-mute:#ad9ea4; --night-line:#2c2328;
+    --dusk:#f09ab4; --dusk-ink:#2a0d17; --ok:#5cc4a3; --warn:#e3ab55; --bad:#ff8f86; --shu:#e07a5f;
+    --rail-bg:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 220 280'%3E%3Cg fill='none' stroke='%234e3f46' stroke-linecap='round'%3E%3Cpath stroke-width='3' d='M222 262C178 238 150 208 124 166C108 140 90 124 62 118'/%3E%3Cpath stroke-width='1.6' d='M124 166C138 146 156 132 176 128'/%3E%3Cpath stroke-width='1.6' d='M92 126C86 108 88 94 98 82'/%3E%3Cpath stroke-width='1.4' d='M160 222C150 210 146 198 148 186'/%3E%3Cpath stroke-width='1.2' d='M62 118C52 124 42 134 36 148'/%3E%3C/g%3E%3Cg fill='%23e9a9bd' fill-opacity='.5'%3E%3Cg transform='translate(62 118) rotate(10) scale(0.45) translate(-50 -50)'%3E%3Cpath transform='rotate(0 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(72 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(144 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(216 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(288 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Ccircle cx='50' cy='50' r='6' fill='%23d77695'/%3E%3C/g%3E%3Cg transform='translate(98 82) rotate(-20) scale(0.36) translate(-50 -50)'%3E%3Cpath transform='rotate(0 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(72 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(144 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(216 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(288 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Ccircle cx='50' cy='50' r='6' fill='%23d77695'/%3E%3C/g%3E%3Cg transform='translate(172 128) rotate(30) scale(0.39) translate(-50 -50)'%3E%3Cpath transform='rotate(0 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(72 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(144 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(216 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(288 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Ccircle cx='50' cy='50' r='6' fill='%23d77695'/%3E%3C/g%3E%3Cg transform='translate(122 166) rotate(0) scale(0.33) translate(-50 -50)'%3E%3Cpath transform='rotate(0 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(72 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(144 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(216 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(288 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Ccircle cx='50' cy='50' r='6' fill='%23d77695'/%3E%3C/g%3E%3Cg transform='translate(146 206) rotate(50) scale(0.3) translate(-50 -50)'%3E%3Cpath transform='rotate(0 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(72 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(144 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(216 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(288 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Ccircle cx='50' cy='50' r='6' fill='%23d77695'/%3E%3C/g%3E%3Cg transform='translate(36 148) rotate(15) scale(0.24) translate(-50 -50)'%3E%3Cpath transform='rotate(0 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(72 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(144 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(216 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(288 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Ccircle cx='50' cy='50' r='6' fill='%23d77695'/%3E%3C/g%3E%3C/g%3E%3Cg fill='%23d77695' fill-opacity='.5'%3E%3Cellipse cx='80' cy='100' rx='3.6' ry='5.4'/%3E%3Cellipse cx='156' cy='112' rx='3.6' ry='5.4'/%3E%3Cellipse cx='190' cy='150' rx='3.6' ry='5.4'/%3E%3Cellipse cx='48' cy='128' rx='3.6' ry='5.4'/%3E%3C/g%3E%3C/svg%3E") right -14px bottom 100px / 200px no-repeat,
+      linear-gradient(180deg, #151013 0%, #100c0e 60%, #0c090b 100%);
+    --page-bg: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 0.9 0 0 0 0 0.92 0 0 0 0.035 0'/%3E%3C/filter%3E%3Crect width='100%' height='100%' filter='url(%23n)'/%3E%3C/svg%3E"), var(--paper);
+  }
+}
+/* 页面大标题上方一道朱色短线 */
+:root[data-theme="sakura"] main h1::before{content:"";display:block;width:28px;height:3px;border-radius:2px;background:var(--shu);margin:0 0 16px}
+/* 总览的大卡片：紅梅到墨色，右上角一朵淡淡的樱花代替圆 */
+:root[data-theme="sakura"] .ios .hero{background:linear-gradient(135deg,#a8355a 0%,#6e2a45 52%,#2a2026 100%);box-shadow:0 12px 28px -12px rgb(110 42 69 / .5)}
+:root[data-theme="sakura"] .ios .hero::after{border-radius:0;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='%23ffffff' fill-opacity='.12'%3E%3Cpath transform='rotate(0 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(72 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(144 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(216 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(288 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3C/g%3E%3C/svg%3E") center / contain no-repeat;transform:rotate(12deg)}
 /* 选主题的小圆点 */
-.themes{margin:18px 8px 0;display:flex;align-items:center;gap:10px;font-size:13px;color:var(--night-mute)}
-.themes form{display:flex;gap:8px;margin:0}
-.themes button{width:22px;height:22px;border-radius:50%;padding:0;cursor:pointer;border:2px solid var(--night-line);background:var(--sw);
+.themes{margin:18px 8px 0;display:flex;align-items:center;gap:8px;white-space:nowrap;font-size:13px;color:var(--night-mute)}
+.themes form{display:flex;gap:6px;margin:0}
+.themes button{width:21px;height:21px;border-radius:50%;padding:0;cursor:pointer;border:2px solid var(--night-line);background:var(--sw);
   transition:transform .12s ease}
 .themes button:hover{transform:scale(1.12)}
 .themes button[aria-pressed="true"]{border-color:var(--night-ink)}
 @media (prefers-reduced-motion: reduce){.themes button{transition:none}.themes button:hover{transform:none}}
-#snow{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:60}
+#snow,#petals{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:60}
 {% endmacro %}
 
 {% macro theme_picker(current) %}
 {%- set opts = [("", "默认", "conic-gradient(#1d1f33 0 50%, #c43a63 0)"),
                 ("lily", "睡莲", "conic-gradient(#d3d9f0 0 33%, #5b4c9e 0 66%, #e2a9bc 0)"),
                 ("ballet", "芭蕾", "conic-gradient(#2b2630 0 33%, #f4ba84 0 66%, #e8a4b4 0)"),
-                ("xmas", "圣诞", "conic-gradient(#15301f 0 33%, #a8233a 0 66%, #d9b44a 0)")] -%}
+                ("xmas", "圣诞", "conic-gradient(#15301f 0 33%, #a8233a 0 66%, #d9b44a 0)"),
+                ("sakura", "樱花", "conic-gradient(#231c20 0 33%, #a8355a 0 66%, #f3c6d3 0)")] -%}
 <div class="themes"><span id="themes-label">外观</span>
   <form method="post" action="{{ url_for('theme_set') }}" aria-labelledby="themes-label">{{ csrf() }}
     {%- for key, name, sw in opts %}
@@ -117,6 +150,50 @@
       g.addColorStop(0, 'rgba(255,255,255,' + f.a + ')');
       g.addColorStop(1, 'rgba(150,175,190,' + (f.a * .55) + ')');      /* 边缘带一点灰蓝：浅色页底上也看得见 */
       cx.fillStyle = g; cx.beginPath(); cx.arc(f.x, f.y, f.r, 0, 6.2832); cx.fill();
+    }
+    requestAnimationFrame(draw);
+  }
+  document.addEventListener('visibilitychange', function(){ var was = run; run = !document.hidden; if (run && !was) requestAnimationFrame(draw); });
+  addEventListener('resize', size);
+  size(); requestAnimationFrame(draw);
+})();
+</script>
+{%- elif current == "sakura" %}
+<canvas id="petals" aria-hidden="true"></canvas>
+<script>
+/* 樱花主题的花瓣：比圣诞的雪稀得多、更慢，斜着飘、慢慢转；系统设了「减少动态效果」就不飘；标签页切走时暂停。 */
+(function(){
+  if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  var cv = document.getElementById('petals'); if (!cv || !cv.getContext) return;
+  var cx = cv.getContext('2d'), ps = [], w = 0, h = 0, dpr = 1, run = true, t = 0;
+  function size(){
+    dpr = Math.min(window.devicePixelRatio || 1, 2); w = innerWidth; h = innerHeight;
+    cv.width = w * dpr; cv.height = h * dpr; cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var want = Math.min(14, Math.round(w * h / 80000));
+    while (ps.length < want) ps.push(make(Math.random() * h));
+    ps.length = want;
+  }
+  function make(y){
+    var r = 4 + Math.random() * 4;
+    return {x: Math.random() * (w + 120) - 60, y: y, r: r, vy: .35 + Math.random() * .45, vx: .15 + Math.random() * .35,
+            rot: Math.random() * 6.28, vr: (Math.random() - .5) * .03, ph: Math.random() * 6.28, a: .35 + Math.random() * .3};
+  }
+  function petal(p){
+    cx.save(); cx.translate(p.x, p.y); cx.rotate(p.rot); cx.scale(1, .55 + .45 * Math.abs(Math.sin(t / 60 + p.ph)));   /* 翻转的样子 */
+    var r = p.r; cx.beginPath();
+    cx.moveTo(0, r); cx.bezierCurveTo(-r, r * .4, -r * .8, -r * .8, -r * .25, -r);
+    cx.lineTo(0, -r * .7); cx.lineTo(r * .25, -r);                       /* 樱花瓣尖上的小缺口 */
+    cx.bezierCurveTo(r * .8, -r * .8, r, r * .4, 0, r); cx.closePath();
+    cx.fillStyle = 'rgba(232,140,170,' + p.a + ')'; cx.fill(); cx.restore();
+  }
+  function draw(){
+    if (!run) return;
+    t += 1; cx.clearRect(0, 0, w, h);
+    for (var i = 0; i < ps.length; i++){
+      var p = ps[i];
+      p.y += p.vy; p.x += p.vx + Math.sin(t / 110 + p.ph) * .35; p.rot += p.vr;
+      if (p.y > h + 10 || p.x > w + 20) { ps[i] = make(-10); continue; }
+      petal(p);
     }
     requestAnimationFrame(draw);
   }

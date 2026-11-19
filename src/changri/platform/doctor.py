@@ -31,6 +31,12 @@ def checks() -> list[tuple[bool | None, str, str]]:
     out: list[tuple[bool | None, str, str]] = []
     out.append((None, "版本", f"{layout.package_version()}（{layout.platform_tag()}，Python {sys.version.split()[0]}）"))
     out.append((None, "程序目录", str(APP_ROOT)))
+    try:
+        import time as _t
+        used = config.apply_timezone()
+        out.append((None, "时间", f"{_t.strftime('%Y-%m-%d %H:%M')}（{used}；每天 23:59 换天、心动信派送都按这个钟点）"))
+    except Exception as e:  # noqa: BLE001
+        out.append((None, "时间", f"查不了（{type(e).__name__}）"))
     writable = os.access(DATA_DIR if DATA_DIR.exists() else DATA_DIR.parent, os.W_OK)
     out.append((writable, "数据目录可写", str(DATA_DIR) if writable else f"{DATA_DIR} 写不进去：看看是不是用别的用户装的"))
     ap = config.admin_port()

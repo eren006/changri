@@ -27,7 +27,8 @@ def register(app, login_required):
         cleaning = [g for g in usable if g["state"] == "cleaning" and not g["moved"]]
         from changri.core import qqpool
         from changri.core.db import get_config
-        return render_template("pool.html", sets=sets, blocked=blocked, counts=pool_core.counts(), cleaning=cleaning, total=len(usable),
+        view = request.args.get("view") or ("settings" if groups else "guide")     # 一个群都还没认得：先看教程
+        return render_template("pool.html", view=view, sets=sets, blocked=blocked, counts=pool_core.counts(), cleaning=cleaning, total=len(usable),
                                free_name=get_config("qqlink_free_name", qqpool.FREE_NAME_DEFAULT))
 
     @app.post("/backup-pool/free-name")

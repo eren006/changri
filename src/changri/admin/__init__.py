@@ -9,12 +9,13 @@ from functools import wraps
 from markupsafe import Markup
 from changri import config as _config
 from changri.core import botconf, extensions as ext_core, loopbridge, netcheck, pool as pool_core, qqmanager as qqmanager_core, roles as roles_core, roomnotify as roomnotify_core, rooms as rooms_core, season as season_core, setupcode, updater, webusers
+from changri.core import notices as author_notices
 from changri.core.db import DB_PATH, current_bot, enter_bot, get_config, get_conn, init_db, leave_bot, list_bot_ids, set_config, use_bot
 from changri.admin.common import GLOBAL_ENDPOINTS, HIDDEN_FIELDS, LOCK_AFTER, LOCK_SECONDS, SECTIONS, SETTINGS, _bot_cards, _bot_label, _bot_status, _csrf_token, _dashboard, _fails, _secret_key, field_view, log
 from changri.core.textutil import hm_text, next_day_mark
 
 THEME_COOKIE = "admin_theme"
-THEMES = {"lily", "ballet", "xmas"}          # 样式在 templates/_themes.html；空 = 默认
+THEMES = {"lily", "ballet", "xmas", "sakura"}          # 样式在 templates/_themes.html；空 = 默认
 
 
 def create_app() -> Flask:
@@ -117,7 +118,7 @@ def create_app() -> Flask:
 
     @app.post("/theme")
     def theme_set():
-        """后台外观（睡莲 / 芭蕾 / 圣诞 / 默认）：记在这个浏览器的 cookie 里，回到刚才的页面。"""
+        """后台外观（睡莲 / 芭蕾 / 圣诞 / 樱花 / 默认）：记在这个浏览器的 cookie 里，回到刚才的页面。"""
         from urllib.parse import urlparse
         theme = request.form.get("theme", "")
         ref = urlparse(request.referrer or "")
@@ -135,14 +136,20 @@ def create_app() -> Flask:
         theme = request.cookies.get(THEME_COOKIE, "")
         ctx = {"admin_theme": theme if theme in THEMES else "", "me": session.get("name", ""), "is_owner": bool(session.get("owner")), "disabled_nav": ext_core.disabled_nav(),
                "in_bot": in_bot, "bot_id": request.environ.get("changri.bot", ""), "bots": [], "bot_label": "",
-               "root_url": lambda ep, **kw: url_for(ep, **kw)[len(request.script_root):], "update_dot": ""}
+               "root_url": lambda ep, **kw: url_for(ep, **kw)[len(request.script_root):], "update_dot": "", "author_notices": [], "auto_note": None}
         if session.get("uid"):
             accs = botconf.list_accounts()
             ctx["bots"] = [(a["app_id"], _bot_label(a)) for a in accs]
             ctx["bot_label"] = next((_bot_label(a) for a in accs if a["app_id"] == ctx["bot_id"]), "")
+            ctx["author_notices"] = author_notices.current()   # 作者的通知：base.html 里弹窗，总览页上列着
             if session.get("owner"):                  # 「更新」页只有主账号能开，小红点也只给主账号看
                 try:
                     ctx["update_dot"] = updater.update_badge()
+                except Exception:  # noqa: BLE001
+                    pass
+                try:
+                    from changri.core import autoupdate
+                    ctx["auto_note"] = autoupdate.note()
                 except Exception:  # noqa: BLE001
                     pass
         return ctx
@@ -228,7 +235,7 @@ def create_app() -> Flask:
         errors = (serious + [e for e in err_rows if e.get("kind") == "notice"])[:50]
         errors.sort(key=lambda e: e.get("ts", 0), reverse=True)
         return render_template("dashboard.html", d=_dashboard(), errors=errors, err_serious=len(serious),
-                               err_notices=len(err_rows) - len(serious), err_url=errlog.report_url(),
+                               err_notices=len(err_rows) - len(serious), err_url=errlog.report_url(), err_contact=errlog.contact_qq(),
                                cal=season_core.month_grid(request.args.get("cal", "")), cal_line=season_core.upcoming_line(),
                                live_rooms=live_rooms, waiting_rooms=sum(1 for r in live_rooms if not r["grp"]),
                                ask_contact=_should_ask_contact(), noat_tip=get_config(NOAT_TIP_DONE, "") != "1")
@@ -271,9 +278,9 @@ def create_app() -> Flask:
                 flash("QQ 号要是 5 到 12 位数字。没保存，下次打开总览还会问你。")
                 return redirect(url_for("dashboard"))
             set_config("contact_qq", qq)
-            flash(f"已保存联系 QQ {qq}。以后报错发给作者时会带上它；想改或删，去「基础」设置里的「联系 QQ」。")
+            flash(f"已保存联系 QQ {qq}。以后报错发给作者时会带上它；想改或删：总览「报错日志」展开后点「联系 QQ」，或者「功能与设置 → 基础 → 进入设置」。")
         else:
-            flash("好的，不填。以后想填，去「基础」设置里的「联系 QQ」。")
+            flash("好的，不填。以后想填：总览「报错日志」展开后点「联系 QQ」，或者「功能与设置 → 基础 → 进入设置」。")
         set_config(CONTACT_PROMPT_DONE, "1")
         return redirect(url_for("dashboard"))
 
@@ -487,8 +494,38 @@ def create_app() -> Flask:
                 set_config("update_latest", info["version"] if info["newer"] else "")
             except updater.UpdateError as e:
                 flash(str(e))
+        from changri.core import autoupdate
         return render_template("update.html", current=updater.current_version(), info=info, done=done,
-                               skipped=get_config("update_skip", ""), failed=failed.read_text(encoding="utf-8") if failed.exists() else "")
+                               skipped=get_config("update_skip", ""), failed=failed.read_text(encoding="utf-8") if failed.exists() else "",
+                               auto=autoupdate.status(info))
+
+    @app.post("/update/auto")
+    @owner_required
+    def update_auto_save():
+        """自动更新的开关和条件（存在主工作区，跟 update_skip 一样）。"""
+        from changri.core import autoupdate
+        set_config("auto_update_enabled", "1" if request.form.get("on") else "0")
+        for key, lo, hi in (("auto_update_behind", 1, 50), ("auto_update_days", 1, 365)):
+            v = request.form.get(key, "").strip()
+            if v.isdigit() and lo <= int(v) <= hi:
+                set_config(key, v)
+        win = request.form.get("window", "").strip()
+        if win and not autoupdate.parse_window(win):
+            flash("时段的格式不对，要写成 04:00-06:00 这样，其他已保存")
+        else:
+            if win:
+                set_config("auto_update_window", autoupdate.window_text(autoupdate.parse_window(win)))
+            flash("已保存")
+        return redirect(url_for("update_page"))
+
+    @app.post("/update/auto/seen")
+    @owner_required
+    def update_auto_seen():
+        """顶上「已自动更新 / 自动更新没成功」的提示点了「知道了」。"""
+        from changri.core import autoupdate
+        autoupdate.mark_seen()
+        nxt = request.form.get("next", "")
+        return redirect(nxt if nxt.startswith("/") and not nxt.startswith("//") else url_for("update_page"))
 
     @app.post("/update/check")
     @owner_required
@@ -515,7 +552,8 @@ def create_app() -> Flask:
     @owner_required
     def update_apply():
         try:
-            res = updater.update_now()
+            from changri.core import autoupdate
+            res = updater.update_now(extra=autoupdate.snapshot())       # 记下更新前的样子，新版本起来后对照检查
         except updater.UpdateError as e:
             flash(str(e))
             return redirect(url_for("update_page"))

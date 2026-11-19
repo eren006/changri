@@ -25,14 +25,15 @@ def data(role_id: int) -> dict | None:
             "SELECT a.name, a.value, d.min_value, d.max_value FROM role_attrs a LEFT JOIN rpg_attr_defs d ON d.name=a.name WHERE a.role_id=? ORDER BY a.name", (role_id,))]
         rels = c.execute("SELECT COUNT(*) FROM relations WHERE role_lo=? OR role_hi=?", (role_id, role_id)).fetchone()[0]
         dates = c.execute("SELECT COUNT(*) FROM room_members m JOIN rooms r ON r.id=m.room_id WHERE m.role_id=? AND r.status='ended'", (role_id,)).fetchone()[0]
-    inv = rpg.inventory(role_id)
     from . import extensions
+    shop = extensions.is_enabled("rpg")                  # 「物品与商城」关着：角色卡照常看，只是不显示货币和背包
+    inv = rpg.inventory(role_id) if shop else []
     tix = []
     if extensions.is_enabled("gacha"):
         from . import gacha
         tix = gacha.tickets(role_id)
     from . import charprofile
-    return {"profile": charprofile.get(role_id), "tickets": tix, "name": role["name"], "attrs": attrs, "money": [x for x in inv if x["kind"] == "currency"],
+    return {"profile": charprofile.get(role_id), "shop": shop, "tickets": tix, "name": role["name"], "attrs": attrs, "money": [x for x in inv if x["kind"] == "currency"],
             "items": [x for x in inv if x["kind"] != "currency"], "rels": rels, "dates": dates}
 
 
@@ -130,6 +131,8 @@ def render_card(role_id: int) -> bytes | None:
             p.row(x["name"], f"{x['tickets']} 次", accent=True)
         p.card(top, p.y + 8)
         p.y += 30
+    if not info["shop"]:
+        return p.png()
     top = p.y - 12
     p.heading("背包", f"{len(info['items'])} 种")
     if info["items"]:

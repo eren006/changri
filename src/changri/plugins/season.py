@@ -1,4 +1,6 @@
 """第 3 步：季度与游戏天数（指令 + 定时）。规则在 core/season.py，这里只解析指令和回话。"""
+import time
+
 import nonebot
 from nonebot import logger, on_command
 from nonebot.adapters.qq import GroupMessageCreateEvent
@@ -6,7 +8,7 @@ from nonebot.matcher import current_bot
 from nonebot.params import CommandArg
 
 from changri.core import admins, npc, season
-from changri.core.announce import get_announce
+from changri.core.announce import get_announce, get_backstage
 from changri.core.db import get_config, per_bot, set_config
 from changri.core.qqsend import make_send, make_send_image
 
@@ -25,6 +27,14 @@ def _is_admin(event: GroupMessageCreateEvent) -> bool:
 
 
 def _status() -> str:
+    text = _status_main()
+    if season.phase() == "ended":
+        return text
+    warns = season.stage_warnings()
+    return text + ("\n\n⚠️ 还没准备好的：\n" + "\n".join(f"· {w}" for w in warns) if warns else "\n\n✅ 公告群、后台群、戏群、备用群池都设好了。")
+
+
+def _status_main() -> str:
     s = season.running()
     p = season.phase()
     if p == "none":
@@ -36,7 +46,8 @@ def _status() -> str:
     label = {"prep": "筹备期（开始日到了自动进 D0）", "playing": f"进行中（{season.day_label()}）", "over": f"档期已过（天数停在 {season.day_label()}）"}[p]
     lines = [f"📆 「{s['name']}」{label}",
              f"档期：{s['start_date']} ~ {s['end_date']}" + (f"，补戏到 {s['supp_end']}" if s["supp_end"] else ""),
-             f"自动天数：{'开' if get_config('auto_day') == '1' else '关'}；心动信：{'开' if get_config('lovemail_enabled', '1') != '0' else '关'}"]
+             f"自动天数：{'开' if get_config('auto_day') == '1' else '关'}；心动信：{'开' if get_config('lovemail_enabled', '1') != '0' else '关'}",
+             f"机器人的时钟：{time.strftime('%m-%d %H:%M')}（每天 23:59 按这个换天；不对的话看 data/config.toml 的 timezone）"]
     from changri.core import npc as npc_core, storycal
     if storycal.now_label():
         lines.append(f"故事里：{storycal.now_label()}（{storycal.stage_line(season.current_day())}）")
@@ -144,7 +155,9 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
         await wipe_cmd.finish("❌ 季度还在进行中，先「结束季度」。")
     if args.extract_plain_text().strip() != "确认":
         pv = "、".join(f"{k}{v}" for k, v in season.wipe_preview().items())
-        await wipe_cmd.finish(f"⚠️ 收尾会清空：{pv}。\n管理员、设置、季度记录会保留。确认请发「收尾 确认」。")
+        await wipe_cmd.finish(f"⚠️ 收尾会清空：{pv}；还有晚餐小游戏和没执行的计划官约。\n"
+                              "房间的戏录会先存进往季档案；论坛帖子、信件、心愿不存档，要留的先自己存。\n"
+                              "管理员、设置、季度记录会保留。确认请发「收尾 确认」。")
     season.wipe()
     await wipe_cmd.finish("✅ 已收尾，本季的角色和互动记录已清空。\n戏录已经存进往季档案：复盘网页的链接照样能打开，后台「季度与出场」的往季里也能看、能下载 TXT。")
 
@@ -273,7 +286,13 @@ async def _season_tick():
     if not nonebot.get_bots():
         return
     try:
-        r = await season.tick(make_send(), get_announce())
+        send, target = make_send(), get_announce()
+        if not target and (target := get_backstage()):             # 没设公告群：开演、换天的播报改发后台群，不再静悄悄丢掉
+            raw = send
+
+            async def send(bot_id, gid, text):
+                await raw(bot_id, gid, "（还没设公告群，这条本该发到公告群）\n" + text)
+        r = await season.tick(send, target)
         if r != "idle":
             logger.info(f"[季度] {r}")
     except Exception as e:  # noqa: BLE001

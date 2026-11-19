@@ -1,7 +1,7 @@
 """程序级配置：data/config.toml（取代以前的 .env）。
 
-只放「启动前就要知道」的几项：监听地址、设置平台端口、日志级别。其余设置都在数据库里，在设置平台改。
-读取顺序：内置默认 < config.toml < 环境变量（HOST / PORT / LOG_LEVEL，方便测试和临时改）。
+只放「启动前就要知道」的几项：监听地址、设置平台端口、日志级别、时区。其余设置都在数据库里，在设置平台改。
+读取顺序：内置默认 < config.toml < 环境变量（HOST / PORT / LOG_LEVEL / CHANGRI_TZ，方便测试和临时改）。
 第一次启动时如果还没有 config.toml，会从老的 .env 里把这几项导入一次。
 """
 from __future__ import annotations
@@ -14,12 +14,13 @@ from dotenv import dotenv_values
 
 from .paths import DATA_DIR, LEGACY_ENV
 
-DEFAULTS: dict[str, object] = {"host": "0.0.0.0", "port": 5091, "log_level": "INFO"}
-_ENV = {"host": "HOST", "port": "PORT", "log_level": "LOG_LEVEL"}
+DEFAULTS: dict[str, object] = {"host": "0.0.0.0", "port": 5091, "log_level": "INFO", "timezone": "Asia/Shanghai"}
+_ENV = {"host": "HOST", "port": "PORT", "log_level": "LOG_LEVEL", "timezone": "CHANGRI_TZ"}
 _COMMENTS = {
     "host": "监听地址。0.0.0.0 = 外网也能打开设置平台；改成 127.0.0.1 就只能在这台机器上打开",
     "port": "设置平台的端口（云服务器要在安全组里放行）",
     "log_level": "日志详细程度：DEBUG / INFO / WARNING",
+    "timezone": "时区：每天 23:59 换天、心动信几点派送都按它算。默认北京时间；写成空字符串 \"\" 就跟着这台机器的系统时区",
 }
 
 
@@ -108,3 +109,27 @@ def get(key: str):
 
 def admin_port() -> int:
     return int(get("port"))
+
+
+# 没有时区数据库的机器上（精简过的 Linux），常用时区退回固定偏移的写法
+_POSIX_FALLBACK = {"Asia/Shanghai": "CST-8", "Asia/Hong_Kong": "HKT-8", "Asia/Taipei": "CST-8", "Asia/Singapore": "SGT-8", "Asia/Tokyo": "JST-9"}
+
+
+def apply_timezone(tz: str | None = None) -> str:
+    """把整个进程的时区设成 config 里的 timezone（默认北京时间），time.localtime() 和定时任务都跟着走。
+    以前直接用服务器的系统时区：UTC 的服务器上「23:59 换天」会变成北京时间早上 7:59。
+    Windows 没有 time.tzset，跟着电脑自己的时区（装在自己电脑上的一般就是北京时间）。返回实际用的说明，给日志和自检看。"""
+    import time
+    tz = (get("timezone") if tz is None else tz).strip()
+    if not tz:
+        return "跟着系统时区"
+    if not hasattr(time, "tzset"):
+        return "跟着系统时区（Windows 不能单独设）"
+    value = tz
+    if "/" in tz and not any((Path(d) / tz).exists() for d in ("/usr/share/zoneinfo", "/usr/lib/zoneinfo", "/usr/share/lib/zoneinfo")):
+        value = _POSIX_FALLBACK.get(tz, "")
+        if not value:
+            return f"跟着系统时区（这台机器没有时区数据，认不出 {tz}）"
+    os.environ["TZ"] = value
+    time.tzset()
+    return tz

@@ -131,7 +131,7 @@ class ExtensionCoreTests(_PatchedDir):
         self.assertFalse(E.delete_user("../x"))
 
     def test_nav_and_groups_follow_switches(self):
-        self.assertEqual(E.disabled_nav(), {"rewards_page", "alarm_page", "giftshop_page", "gacha_page", "sighting_page", "bottles_page", "precall_admin", "decks_page"})      # 结戏奖励、加百列闹钟默认关（小手机 0.22.4 起默认开）
+        self.assertEqual(E.disabled_nav(), {"rewards_page", "alarm_page", "giftshop_page", "gacha_page", "sighting_page", "bottles_page", "precall_admin", "paidan_page"})      # 结戏奖励、加百列闹钟默认关（小手机 0.22.4 起默认开）；排单是个性化模块，默认关
         E.set_enabled("rewards", True)
         E.set_enabled("alarm", True)
         E.set_enabled("phone", True)
@@ -142,7 +142,7 @@ class ExtensionCoreTests(_PatchedDir):
         E.set_enabled("sighting", True)
         E.set_enabled("precall", True)
         E.set_enabled("bottle", True)
-        E.set_enabled("decks", True)
+        E.set_enabled("paidan", True)
         self.assertEqual(E.disabled_nav(), set())
         self.assertEqual(E.disabled_groups(), {"心愿", "混乱短信", "晚餐", "点歌", "写信综", "踩点", "申请加入", "超时提醒"})   # 这些默认关（朋友圈、目击已在上面打开）
         E.set_enabled("lovemail", False)
@@ -152,6 +152,8 @@ class ExtensionCoreTests(_PatchedDir):
         E.set_enabled("entrance", False)
         self.assertNotIn("season_page", E.disabled_nav())                      # 季度是核心，页面一直在
         self.assertNotIn("season", [e["id"] for e in E.OFFICIAL])
+        self.assertNotIn("decks", [e["id"] for e in E.OFFICIAL])               # 牌堆 0.22.6 起是核心，一直开着
+        self.assertIn("changri.plugins.decks", E.CORE_MODULES)
 
     # ---------- 规范检查 / 崩溃保护 / 模板 ----------
     def test_check_code(self):
@@ -359,9 +361,9 @@ class ExtensionAdminTests(_PatchedDir):
         gid = pool.is_pool_group("B1", "OPENID_ABC")["id"]
         self.c.post(f"/backup-pool/{gid}/save", data={"real_gid": "777", "label": "一号", "set_name": "B组", "_csrf": token(self.c, "/backup-pool")})
         self.assertEqual(pool.get(gid)["real_gid"], "777")
-        self.assertIn("群名改成「长日备用」", self.c.get("/backup-pool").get_data(as_text=True))
+        self.assertIn("群名改成「长日备用」", self.c.get("/backup-pool?view=guide").get_data(as_text=True))
         self.c.post("/backup-pool/free-name", data={"free_name": "候场室", "_csrf": token(self.c, "/backup-pool")})
-        self.assertIn("群名改成「候场室」", self.c.get("/backup-pool").get_data(as_text=True))
+        self.assertIn("群名改成「候场室」", self.c.get("/backup-pool?view=guide").get_data(as_text=True))
         from changri.core import qqpool
         self.assertEqual(qqpool.free_name(), "候场室")                          # 小号的群也用同一个名字
         self.c.post("/backup-pool/free-name", data={"free_name": "", "_csrf": token(self.c, "/backup-pool")})

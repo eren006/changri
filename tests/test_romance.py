@@ -68,7 +68,7 @@ class BlockTests(Base):
 
 class LovemailTests(Base):
     def test_parse(self):
-        self.assertEqual(lovemail.parse_post("乙 你好呀"), ("乙", "你好呀", "匿名"))
+        self.assertEqual(lovemail.parse_post("乙 你好呀"), ("乙", "你好呀", ""))             # 简单格式署名留空，插件补真名
         self.assertEqual(lovemail.parse_post("【发送对象】乙\n【内容】想你\n多行\n【署名】小风"), ("乙", "想你\n多行", "小风"))
         self.assertEqual(lovemail.parse_post("乙")[0], "")
 
@@ -107,6 +107,32 @@ class LovemailTests(Base):
         pub = [t for g, t in self.sent if g == "ANN" and "寄给" in t][0]
         self.assertIn("某人", pub); self.assertIn("秘密", pub)
 
+    def test_expose_hide_switch_split(self):
+        """心动信曝光有自己的「隐藏收信人」开关；没单独设过时照老开关 drop_hide_receiver。"""
+        set_config("lovemail_expose", "1"); set_config("lovemail_expose_chance", "100")
+        set_config("drop_hide_receiver", "1"); set_config("lovemail_hide_receiver", "0")
+        lovemail.add_mail(self.a, self.b, "匿名", "秘密")
+        run(lovemail.deliver_all(self.sender(), ("B1", "ANN")))
+        pub = [t for g, t in self.sent if g == "ANN" and "寄给" in t][0]
+        self.assertIn("乙", pub); self.assertNotIn("某人", pub)
+        self.assertTrue(messaging.hide_receiver("gift"))                           # 礼物没单独设：跟老开关
+
+    def test_self_and_block(self):
+        self.assertIn("自己", lovemail.add_mail(self.a, self.a, "匿名", "x")[1])
+        blocks.block(self.b, self.a, silent=False)                                # 乙明着拉黑甲：直接拒
+        ok, msg, _ = lovemail.add_mail(self.a, self.b, "匿名", "x")
+        self.assertFalse(ok); self.assertIn("拒绝", msg)
+        blocks.block(self.b, self.a, silent=True)                                 # 静默：看着投成功了，信不送
+        ok, msg, _ = lovemail.add_mail(self.a, self.b, "匿名", "被吞")
+        self.assertTrue(ok)
+        self.assertEqual(len(lovemail.my_pool(self.a)), 1)                         # 寄信人自己看得到、能撤回
+        self.assertEqual(lovemail.pool_all(), [])                                  # 不进派送
+        run(lovemail.deliver_all(self.sender(), ("B1", "ANN")))
+        self.assertFalse(any("被吞" in t for _, t in self.sent))
+        self.assertEqual(lovemail.my_pool(self.a), [])
+        self.assertEqual([m["content"] for m in lovemail.history(self.a)[1]], ["被吞"])   # 寄信人那边算已送出
+        self.assertEqual(lovemail.history(self.b)[0], [])
+
     def test_chunk(self):
         parts = lovemail.chunk_text("\n".join(["字" * 300] * 5), 700)
         self.assertTrue(all(len(p) <= 700 for p in parts)); self.assertGreater(len(parts), 1)
@@ -129,6 +155,39 @@ class TickTests(Base):
         self.assertEqual(run(run_lovemail_tick(send, self.at(22, 0))), "delivered")
         self.assertEqual(lovemail.pool_all(), [])
         self.assertEqual(run(run_lovemail_tick(send, self.at(22, 1))), "idle")      # 当天不重复派
+
+    def test_after_delivery_counts_next_day(self):
+        """当天的派送跑过以后再投的，算第二天：占第二天的次数、留到第二天派送；撤回退的也是第二天的。"""
+        set_config("lovemail_default_limit", "1")
+        self.assertTrue(lovemail.add_mail(self.a, self.b, "匿名", "今天的")[0])
+        self.assertFalse(lovemail.add_mail(self.a, self.b, "匿名", "超了")[0])
+        self.assertEqual(run(run_lovemail_tick(self.sender(), self.at(22, 0))), "delivered")
+        ok, msg, left = lovemail.add_mail(self.a, self.b, "匿名", "明天的")
+        self.assertTrue(ok); self.assertIn("算明天", msg); self.assertEqual(left, 0)
+        nxt = lovemail.next_key(lovemail.today())
+        self.assertEqual(lovemail.my_pool(self.a)[0]["day"], nxt)
+        self.assertEqual((lovemail.day_count(self.a), lovemail.day_count(self.a, nxt)), (1, 1))
+        self.assertFalse(lovemail.add_mail(self.a, self.b, "匿名", "又一封")[0])           # 明天的也满了
+        self.assertIn(lovemail.day_label(nxt), lovemail.revoke(self.a, 1)[1])
+        self.assertEqual(lovemail.next_key("S3D2.0"), "S3D3.0"); self.assertEqual(lovemail.day_label("S3D2.0"), "D2")
+        self.assertEqual(lovemail.next_key("2026-12-31"), "2027-01-01")
+
+    def test_notice10_skipped_when_closed(self):
+        """今天不收信（上限 0）时，10 分钟预告不发「抓紧投递」。"""
+        set_config("lovemail_default_limit", "0")
+        self.assertEqual(run(run_lovemail_tick(self.sender(), self.at(21, 50))), "notice10-skip")
+        self.assertEqual(self.sent, [])
+
+    def test_manual_deliver_while_closed(self):
+        """档期结束后心动信自动关了：后台「立即派送」照样把信池剩下的信送出去，标记清掉；没点按钮就不派。"""
+        lovemail.add_mail(self.a, self.b, "匿名", "信")
+        set_config("lovemail_enabled", "0")
+        self.assertEqual(run(run_lovemail_tick(self.sender(), self.at(22, 0))), "off")      # 关着时不按点自动派
+        self.assertEqual(len(lovemail.pool_all()), 1)
+        set_config("lovemail_deliver_now", "1")
+        self.assertEqual(run(run_lovemail_tick(self.sender(), self.at(3, 0))), "delivered")
+        self.assertEqual(lovemail.pool_all(), [])
+        self.assertEqual(get_config("lovemail_deliver_now"), "0")
 
     def test_late_catchup_and_manual(self):
         lovemail.add_mail(self.a, self.b, "匿名", "信")

@@ -6,13 +6,16 @@ from changri.core import decks
 
 
 def register(app, login_required):
+    def _page(edit_id=0, draft=None, draft_title=""):
+        edit = decks.get_file(edit_id)
+        name = request.args.get("try", "").strip()
+        return render_template("decks.html", files=decks.files(), edit=edit, tpl_text=decks.TEMPLATE, ai_prompt=decks.AI_PROMPT,
+                               try_name=name, try_text=decks.draw(name) if name else "", draft=draft, draft_title=draft_title)
+
     @app.route("/decks")
     @login_required
     def decks_page():
-        edit = decks.get_file(request.args.get("edit", type=int) or 0)
-        name = request.args.get("try", "").strip()
-        return render_template("decks.html", files=decks.files(), edit=edit, tpl_text=decks.TEMPLATE,
-                               try_name=name, try_text=decks.draw(name) if name else "")
+        return _page(request.args.get("edit", type=int) or 0)
 
     @app.route("/decks/template.txt")
     @login_required
@@ -35,9 +38,12 @@ def register(app, login_required):
         if not raw.strip():
             flash("还没写内容，也没选文件。")
             return redirect(url_for("decks_page", edit=fid) if fid else url_for("decks_page"))
-        ok, msg, _ = decks.save(None, raw, file_id=fid, title=request.form.get("title", "").strip())
+        title = request.form.get("title", "").strip()
+        ok, msg, _ = decks.save(None, raw, file_id=fid, title=title)
         flash(msg)
-        return redirect(url_for("decks_page") if ok else url_for("decks_page", edit=fid) if fid else url_for("decks_page"))
+        if ok:
+            return redirect(url_for("decks_page"))
+        return _page(fid, draft=raw, draft_title=title)        # 没存上：把刚贴的内容留在输入框里，改一改再存，不用重新贴
 
     @app.post("/decks/<int:fid>/delete")
     @login_required

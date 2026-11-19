@@ -79,6 +79,8 @@ input::placeholder{color:var(--mute);opacity:.7}
 .btn.ghost:hover{background:var(--soft);border-color:var(--field);filter:none;box-shadow:var(--shadow-sm)}
 .btn.sm{padding:5px 14px;font-size:12.5px}
 .sw{position:relative;width:38px;height:22px;flex:none}
+.au-note{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:0 0 16px;padding:12px 16px;border:1px solid var(--card-line);border-left:4px solid var(--ok);border-radius:10px;background:var(--surface)}
+.au-note.bad{border-left-color:var(--bad, #c0392b)}.au-note p{margin:0;flex:1 1 260px;overflow-wrap:anywhere}
 .sw input{position:absolute;inset:0;opacity:0;cursor:pointer;margin:0}
 .sw i{position:absolute;inset:0;border-radius:11px;background:var(--field);transition:background .15s}
 .sw i::after{content:"";position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .15s}
@@ -285,7 +287,7 @@ tr:last-child td{border-bottom:0}
 <body>
 <div class="shell">
   <aside class="rail" id="rail">
-    <div class="mbar">
+    <div class="mbar" data-impeccable-ignore="cramped-padding">{# 误报：桌面上 display:contents；手机宽度下有 6px 16px 内边距、56px 高，文字离边 13px 以上 #}
       <a class="brand" href="{{ url_for('dashboard') }}{{ '?pick=1' if not in_bot }}"><b>长日</b><span>控制台</span></a>
       <span class="mtitle">{{ self.title() }}</span>
       <button class="menubtn" id="menubtn" type="button" aria-expanded="false" aria-controls="msheet"><i aria-hidden="true"></i>菜单{% if update_dot %}<span class="reddot" aria-label="有新版本"></span>{% endif %}</button>
@@ -324,6 +326,14 @@ tr:last-child td{border-bottom:0}
         </details>
         {% endif %}
       </div>
+      {# 附属功能：个性化模块的后台页面，只有打开了才显示（关着的不进「更多」） #}
+      {% set subs = [('paidan_page','排单','paidan_')] %}
+      {% if subs|rejectattr(0, 'in', disabled_nav)|list %}
+      <div class="extra">
+        <h3>附属功能</h3>
+        <ul>{% for ep, label, pre in subs if ep not in disabled_nav %}<li><a href="{{ url_for(ep) }}" {% if request.endpoint and request.endpoint.startswith(pre) %}aria-current="page"{% endif %}>{{ label }}</a></li>{% endfor %}</ul>
+      </div>
+      {% endif %}
       {% endif %}
       <div>
         <h3>全部机器人共用</h3>
@@ -338,6 +348,11 @@ tr:last-child td{border-bottom:0}
     </div>
   </aside>
   <main>
+    {% if auto_note %}<form class="au-note{{ ' bad' if auto_note.kind == 'failed' }}" method="post" action="{{ root_url('update_auto_seen') }}" role="status">{{ csrf() }}
+      <input type="hidden" name="next" value="{{ (request.script_root ~ request.full_path) if request.method == 'GET' else '' }}">
+      <p>{% if auto_note.kind == 'done' %}长日bot 已在 {{ auto_note.ts|datetimefmt }} 自动从 {{ auto_note.from }} 更新到 {{ auto_note.to }}，检查都通过了。{% else %}{{ auto_note.message }}{% endif %}
+        <a href="{{ root_url('update_page') }}">去「更新」页看看</a></p>
+      <button class="btn ghost" type="submit">知道了</button></form>{% endif %}
     {% for m in get_flashed_messages() %}<p class="flash" role="status">{{ m }}</p>{% endfor %}
     <div class="ui">{% block body %}{% endblock %}</div>
   </main>
@@ -381,6 +396,45 @@ function tick(){if(document.hidden)return;
   .catch(function(){down++;if(down>=2)show(true)})}
 setInterval(tick,4000);document.addEventListener('visibilitychange',tick);})();
 </script>
+{% if author_notices %}
+<dialog class="an-dlg" id="an-dlg" aria-labelledby="an-h">
+  <p class="an-k">长日bot 作者的通知</p>
+  {% for n in author_notices %}
+  <section class="an-it" data-id="{{ n.id }}">
+    <h2 id="{{ 'an-h' if loop.first else '' }}">{{ n.title }}</h2>
+    {% if n.body %}<p class="an-b">{{ n.body }}</p>{% endif %}
+    {% if n.ts %}<p class="an-t">{{ n.ts|datetimefmt }}</p>{% endif %}
+  </section>
+  {% endfor %}
+  <form method="dialog"><button class="btn" value="ok">知道了</button></form>
+</dialog>
+<style>
+.an-dlg{border:1px solid var(--card-line);border-radius:14px;background:var(--surface);color:var(--ink);padding:24px 26px 22px;width:min(460px,calc(100vw - 32px));max-height:calc(100vh - 48px);overflow:auto;box-shadow:0 24px 60px -20px rgb(0 0 0 / .45)}
+.an-dlg::backdrop{background:rgb(10 10 25 / .45)}
+.an-k{margin:0 0 12px;color:var(--mute);font-size:13px;font-weight:600}
+.an-dlg .an-it{padding:0 0 14px;margin:0 0 14px;border:0;border-bottom:1px solid var(--line)}
+.an-it h2{font:700 19px/1.4 var(--sans);margin:0 0 6px}
+.an-b{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7}
+.an-t{margin:8px 0 0;color:var(--mute);font-size:13px}
+.an-it.seen{display:none}
+</style>
+<script>
+/* 作者的通知：每条在这个浏览器里只弹一次（点「知道了」、按 Esc 都算看过），总览页上一直列着。
+   浏览器不让存东西（无痕、禁了站点数据）就不弹，免得每换一页弹一次 */
+(function(){var d=document.getElementById('an-dlg'),K='changri-notice-seen';if(!d||!d.showModal)return;
+  var seen;try{seen=JSON.parse(localStorage.getItem(K)||'[]');if(!Array.isArray(seen))seen=[]}catch(e){return}
+  var its=[].slice.call(d.querySelectorAll('.an-it')),fresh=its.filter(function(x){return seen.indexOf(+x.dataset.id)<0});
+  if(!fresh.length)return;
+  its.forEach(function(x){if(fresh.indexOf(x)<0)x.classList.add('seen')});
+  var h=fresh[0].querySelector('h2');if(h&&!h.id){var o=document.getElementById('an-h');if(o)o.removeAttribute('id');h.id='an-h'}
+  d.addEventListener('close',function(){var ids=its.map(function(x){return +x.dataset.id});   /* 只留现在还挂着的，不越存越多 */
+    try{localStorage.setItem(K,JSON.stringify(ids))}catch(e){}});
+  function open(){if(!d.open)d.showModal()}
+  var cq=document.getElementById('cq');               /* 总览页「留个联系 QQ」那个弹窗在的时候，等它关了再弹 */
+  if(cq&&cq.open)cq.addEventListener('close',open,{once:true});else open();
+})();
+</script>
+{% endif %}
 {{ th.theme_js(admin_theme) }}
 </body>
 </html>

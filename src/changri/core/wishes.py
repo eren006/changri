@@ -1,6 +1,7 @@
 """心愿：挂一条想约的事，等别人来摘；摘了就开一个「心愿」房间。规则照老长日系统（不含悬赏心愿，作者说不要了）：
 - 挂心愿 时间 地点 内容 [| 昵称]：昵称最多 10 个字；对外只显示 性别符号 + 昵称，不显示真名（没写昵称就只有性别符号）。
 - 有效期 24 小时（现实时间）：过了自动消失，跨了游戏天也还能摘；列表里写「剩几小时」。
+- 心愿只定钟点、不定哪一天：摘走时房间开在摘的那一天（wishes.day 摘走时改成那天；挂着时记的是挂的那天，只用来占挂的人自己的时间线）。
 - 每人同时最多挂 3 条（设置 wish_max_concurrent，0 = 不限）。
 - 挂着没被摘的心愿占时间线（rooms.conflict 也算它）。"""
 import time
@@ -33,13 +34,41 @@ def label(w) -> str:
 
 def line(w, now: int | None = None) -> str:
     """看心愿 / 撤心愿 列表里的一行（照老系统）。"""
-    return f"编号：{w['id']}｜{label(w)}｜D{w['day']} {hm_text(w['start_hm'], w['end_hm'])}｜{w['place']}｜剩{left_hours(w, now)}h｜内容：{w['content']}"
+    return f"编号：{w['id']}｜{label(w)}｜{hm_text(w['start_hm'], w['end_hm'])}（摘的当天）｜{w['place']}｜剩{left_hours(w, now)}h｜内容：{w['content']}"
 
 
 def broadcast_text(w) -> str:
     """挂心愿时发到公告群的那段（开了 wish_public_send 才发）。"""
-    return (f"🌠 新心愿 [{w['id']}]\n{label(w)}\n📅 D{w['day']} {w['start_hm']} ~ {w['end_hm']}\n📍 {w['place']}\n💌 {w['content']}\n"
+    return (f"🌠 新心愿 [{w['id']}]\n{label(w)}\n📅 {w['start_hm']} ~ {w['end_hm']}（谁摘走，就约在摘的那天）\n📍 {w['place']}\n💌 {w['content']}\n"
             f"✨ 摘取：摘心愿 {w['id']}")
+
+
+async def broadcast(w, send) -> None:
+    """挂出的心愿：默认发到戏群（「挂心愿时发到戏群」，没设戏群就不发）；开了「同步发到公告群」也发公告群。
+    QQ 里挂、小手机里挂都走这里（以前小手机只看公告群开关，戏群收不到）。只显示性别符号 + 昵称；同一个群只发一次。"""
+    from . import announce, entrance, publicfeed
+    from .db import get_config
+    targets = []
+    if get_config("wish_stage_send", "1") == "1" and entrance.get_stage():
+        targets.append(entrance.get_stage())
+    if get_config("wish_public_send", "0") == "1" and announce.get_announce() and announce.get_announce() not in targets:
+        targets.append(announce.get_announce())
+    if not targets:
+        return
+    text = broadcast_text(w)
+    for bot_id, gid in targets:
+        try:
+            await send(bot_id, gid, text)
+        except Exception as e:  # noqa: BLE001
+            from nonebot import logger
+            logger.warning("心愿播报失败：{}", e)
+    publicfeed.record("wish", text)
+
+
+def parse_id(text: str) -> int | None:
+    """「摘心愿 / 撤心愿」后面的编号：写法跟全部编号一样（textutil.parse_id）；按钮上写的是「摘 #1」，有人照着打。老写法 R1 也还认。"""
+    from .textutil import parse_id as _p
+    return _p(text, "R")
 
 
 def post_ok_text(w) -> str:
@@ -65,6 +94,9 @@ def post(poster_id: int, time_text: str, place: str, content: str, sign: str = "
     hm = rooms.parse_hm(time_text)
     if not hm:
         return False, storycal.parse_when(time_text)[1] or storycal.format_error()
+    short = rooms.too_short("心愿", hm[0], hm[1])               # 最短时长跟约会一样
+    if short:
+        return False, short
     from . import rpg
     allowed, reason = rpg.check_place(poster_id, place.strip())
     if not allowed:
@@ -137,19 +169,32 @@ def take(wish_id: int, taker_id: int) -> tuple[bool, str, int]:
     lim = get_int("limit_摘心愿", 0)
     if lim and day_count(taker_id, "take") >= lim:
         return False, f"今天摘心愿的次数用完了（每天 {lim} 次）。", 0
-    hit = rooms.conflict(taker_id, w["day"], w["start_hm"], w["end_hm"], ignore_wish=wish_id)
+    # 心愿没过期就能摘，不管挂的是哪一天：房间开在「摘的那一天」，钟点不变（D0 晚上挂的，D1 早上摘，就是 D1 的那个钟点）
+    day = season.current_day()
+    if day is None:
+        return False, "现在不是进行中的季度，不能摘心愿。", 0
+    closed_h = rooms.blocked_hit(day, w["start_hm"], w["end_hm"])
+    if closed_h:
+        return False, closed_h, 0
+    hit = rooms.conflict(taker_id, day, w["start_hm"], w["end_hm"], ignore_wish=wish_id)
     if hit:
-        return False, f"你在 D{w['day']} {hm_text(hit['start_hm'], hit['end_hm'])} 已经有安排了（{hit['kind']}），摘不了这条心愿。", 0
-    hit = rooms.conflict(w["poster_id"], w["day"], w["start_hm"], w["end_hm"], locks=False, ignore_wish=wish_id)
+        return False, f"你在 D{day} {hm_text(hit['start_hm'], hit['end_hm'])} 已经有安排了（{hit['kind']}），摘不了这条心愿。", 0
+    hit = rooms.conflict(w["poster_id"], day, w["start_hm"], w["end_hm"], locks=False, ignore_wish=wish_id)
     if hit:
-        return False, f"挂这条心愿的人在 D{w['day']} {hm_text(hit['start_hm'], hit['end_hm'])} 已经有别的安排了，这条心愿暂时摘不了。", 0
+        return False, f"挂这条心愿的人在 D{day} {hm_text(hit['start_hm'], hit['end_hm'])} 已经有别的安排了，这条心愿暂时摘不了。", 0
     ok, info, room_id = rooms.create("心愿", w["poster_id"], [taker_id], f"{hm_text(w['start_hm'], w['end_hm'])}", w["place"], w["content"],
-                                     official=True, day=w["day"], wish_id=wish_id)
+                                     official=True, day=day, wish_id=wish_id)
     if not ok:
         return False, info, 0
     with get_conn() as c:
-        c.execute("UPDATE wishes SET status='taken', taker_id=?, room_id=?, taken_dkey=? WHERE id=?", (taker_id, room_id, season.day_key(), wish_id))
+        c.execute("UPDATE wishes SET status='taken', taker_id=?, room_id=?, taken_dkey=?, day=? WHERE id=?", (taker_id, room_id, season.day_key(), day, wish_id))
     return True, "", room_id
+
+
+def untake(wish_id: int) -> None:
+    """摘的时候房间没开成（分到的群不干净、又换不到）：心愿退回没被摘的样子，别人还能摘。"""
+    with get_conn() as c:
+        c.execute("UPDATE wishes SET status='open', taker_id=NULL, room_id=NULL, taken_dkey='' WHERE id=? AND status='taken'", (wish_id,))
 
 
 def withdraw(wish_id: int, role_id: int) -> tuple[bool, str]:

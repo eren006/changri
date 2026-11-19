@@ -16,31 +16,9 @@ form.i{display:inline}
 @media(max-width:720px){.pg input[type=text],.pg textarea{font-size:16px;padding:10px 11px}.pg .row>div{flex:1 1 100%}.pg .meta{gap:6px 12px}}
 </style>
 <h1>备用群池（纯官方 · 单骰）</h1>
+{% import "_guide_tabs.html" as gt %}
 <p class="callout" style="margin:0 0 14px"><b>注意：这个模式下无法改群名（腾讯限制）。</b>QQ 官方机器人没有改群名的权限，房间开始、结束时群名都不会变；也查不了群里有谁。需要自动改群名，请用<a href="{{ url_for('qqlink_page') }}">QQ 小号与群号组（双骰）</a>。</p>
-<p class="lede">约会、电话这些房间用的群，全部交给 QQ 官方机器人一个骰子管。不用另外装程序、不用 QQ 小号；但官方机器人<b>改不了群名、查不了群成员</b>：群名会一直是同一个；房间结束后，群会先停在「等人退群」，要你到群里确认上一场的人都退了，再点一下放回池，免得下一场的人看到他们。</p>
-<p class="note">为什么要人工确认：QQ 的「读取群成员」接口没有对所有官方机器人开放，现在只有少量白名单机器人能用，一般的官方机器人看不到群里有谁，也踢不了人。所以房间结束后只能靠管理员到群里看一眼。群准备得多，等人退群的时候也有空闲群可用；准备得少，可能会遇到「没有空闲群，约会开不成」。</p>
-<p class="note"><a href="https://system.changri.work/#/install#i-modes" target="_blank" rel="noopener">官网教程：选哪种模式、怎么设 →</a></p>
-<p class="note">想让群名跟着房间自动改、自动查谁在群里，用<a href="{{ url_for('qqlink_page') }}">QQ 小号与群号组（双骰）</a>。两种可以混着用，但一个群同一时间只归一边。</p>
-
-<details class="callout" {{ 'open' if not sets }}>
-  <summary><b>每个备用群要这样设一次</b></summary>
-  <ol style="margin:12px 0 4px;padding-left:1.4em;line-height:1.8">
-    <li><b>拉官方机器人进群</b>：新建或拿一个空群，把官方机器人拉进来。</li>
-    <li><b>群主打开两个开关</b>：在群设置里点开这个机器人，「机器人可获取的群聊消息范围」选「获取群内全部消息」，打开「机器人主动在群聊内发言」。不开的话，机器人只听得到 @ 它的话，复盘记不全，也没法在群里发通知。只有群主能改；华为（鸿蒙）手机上的 QQ 可能找不到这两项，换一台别的手机试试。<a href="{{ url_for('noat_page') }}">在哪里打开、发给群主的话 →</a>
-      <img src="{{ url_for('static', filename='qq-bot-group-permissions.jpg') }}" alt="群里的官方机器人设置：获取群内全部消息、机器人主动在群聊内发言已打开" width="393" height="171" style="display:block;max-width:100%;height:auto;margin:8px 0 4px;border-radius:8px"></li>
-    <li><b>让玩家能自己进群</b>：群设置的「开放设置」里，加群方式选「允许任何人加群」，群搜索方式选「通过群号搜索」。
-      <img src="{{ url_for('static', filename='qq-group-open-settings.png') }}" alt="QQ 群开放设置：允许任何人加群，通过群号搜索" width="312" height="157" style="display:block;max-width:100%;height:auto;margin:8px 0 4px;border-radius:8px"></li>
-    <li><b>群名改成「{{ free_name }}」</b>（空闲群名，可以改）。官方机器人改不了群名，这个群以后会一直叫这个名字，所以别带房间信息。
-      <details class="panel" style="margin:6px 0 2px"><summary class="btn sm ghost">改空闲群名</summary>
-        <form class="form" method="post" action="{{ url_for('backup_pool_free_name') }}">{{ csrf() }}
-          <div class="fields"><div><label for="fn">空闲群名</label><input id="fn" name="free_name" value="{{ free_name }}" maxlength="30"></div></div>
-          <p class="note">和「QQ 小号与群号组（双骰）」页的空闲群名是同一个：小号的群房间结束后，小号会把群名改回这个。可以用 {set} 代表组名，比如「{set}·长日备用」。改了以后，已经在用的官方备用群要群主自己改群名。</p>
-          <div class="actions"><button class="btn" type="submit">保存</button>{{ cancel() }}</div>
-        </form></details></li>
-    <li><b>放进群池</b>：在这个群里发 <code>设为备用群 本群群号</code>，比如 <code>设为备用群 123456789</code>。<b style="color:var(--bad)">群号很重要，不要写错！</b>玩家就是靠它搜群、申请入群的，写错了他们就进不来。想分组就在后面加组名。发完这个群就出现在下面。</li>
-  </ol>
-</details>
-
+{{ gt.tabs('backup_pool_page', view, '备用群池') }}
 {% macro grow(g) %}
 <div class="row">
   <div class="nm">{% if g.real_gid %}<b class="tabular">{{ g.real_gid }}</b>{% else %}<b style="color:var(--mute)">还没填群号</b>{% endif %}
@@ -71,7 +49,42 @@ form.i{display:inline}
   </div>
 </div>
 {% endmacro %}
+{% if view == 'guide' %}
+<p class="lede">约会、电话这些房间用的群，全部交给 QQ 官方机器人一个骰子管。不用另外装程序、不用 QQ 小号；但官方机器人<b>改不了群名、查不了群成员</b>：群名会一直是同一个；房间结束后，群会先停在「等人退群」，要你到群里确认上一场的人都退了，再点一下放回池，免得下一场的人看到他们。</p>
+<p class="note">为什么要人工确认：QQ 的「读取群成员」接口没有对所有官方机器人开放，现在只有少量白名单机器人能用，一般的官方机器人看不到群里有谁，也踢不了人。所以房间结束后只能靠管理员到群里看一眼。群准备得多，等人退群的时候也有空闲群可用；准备得少，可能会遇到「没有空闲群，约会开不成」。</p>
+<p class="note"><a href="https://system.changri.work/#/install#i-modes" target="_blank" rel="noopener">官网教程：选哪种模式、怎么设 →</a></p>
+<p class="note">想让群名跟着房间自动改、自动查谁在群里，用<a href="{{ url_for('qqlink_page') }}">QQ 小号与群号组（双骰）</a>。两种可以混着用，但一个群同一时间只归一边。</p>
 
+
+<section class="gd">
+  <h2>每个备用群要这样设一次</h2>
+  <ol class="ps-steps">
+    <li><b>拉官方机器人进群</b>：新建或拿一个空群，把官方机器人拉进来。机器人已经在群里的，跳过这一步。</li>
+    <li><b>群主打开两个开关</b>：打开这个群 → 右上角 ≡（群设置）→ 群机器人 → 管理 → 点这个机器人，「机器人可获取的群聊消息范围」选「获取群内全部消息」，打开「机器人主动在群聊内发言」。不开的话，机器人只听得到 @ 它的话，复盘记不全，也没法在群里发通知。只有群主能改；华为（鸿蒙）手机上的 QQ 可能找不到这两项，换一台别的手机试试。<a href="{{ url_for('noat_page') }}">详细步骤和发给群主的话 →</a>
+      <img src="{{ url_for('static', filename='qq-bot-group-permissions.jpg') }}" alt="群里的官方机器人设置：获取群内全部消息、机器人主动在群聊内发言已打开" width="393" height="171" style="display:block;max-width:100%;height:auto;margin:8px 0 4px;border-radius:8px"></li>
+    <li><b>在群里说一句话</b>（随便说什么都行）。
+      <p class="ps-why"><b>开完开关，群为什么还没出现在「设置」的列表里？</b>QQ 不会把机器人在哪些群告诉它，机器人只有在<b>被拉进群的那一刻</b>，或者<b>群里有人说话</b>时才知道有这个群。机器人早就在群里的，开完开关要有人说一句话，再打开<a href="{{ url_for('backup_pool_page') }}?view=settings">「设置」</a>才会看到它。</p>
+      <p class="ps-why"><b>出现了，但标着「还没填群号」「暂停使用」？</b>这是正常的：机器人只是认得这个群了，<b>还没放进群池</b>，不会分给房间。接着做下面两步。</p></li>
+    <li><b>让玩家能自己进群</b>：群设置的「开放设置」里，加群方式选「允许任何人加群」，群搜索方式选「通过群号搜索」。
+      <img src="{{ url_for('static', filename='qq-group-open-settings.png') }}" alt="QQ 群开放设置：允许任何人加群，通过群号搜索" width="312" height="157" style="display:block;max-width:100%;height:auto;margin:8px 0 4px;border-radius:8px"></li>
+    <li><b>群名改成「{{ free_name }}」</b>（空闲群名，可以改）。官方机器人改不了群名，这个群以后会一直叫这个名字，所以别带房间信息。
+      <details class="panel" style="margin:6px 0 2px"><summary class="btn sm ghost">改空闲群名</summary>
+        <form class="form" method="post" action="{{ url_for('backup_pool_free_name') }}">{{ csrf() }}
+          <div class="fields"><div><label for="fn">空闲群名</label><input id="fn" name="free_name" value="{{ free_name }}" maxlength="30"></div></div>
+          <p class="note">和「QQ 小号与群号组（双骰）」页的空闲群名是同一个：小号的群房间结束后，小号会把群名改回这个。可以用 {set} 代表组名，比如「{set}·长日备用」。改了以后，已经在用的官方备用群要群主自己改群名。</p>
+          <div class="actions"><button class="btn" type="submit">保存</button>{{ cancel() }}</div>
+        </form></details></li>
+    <li><b>绑定：放进群池</b>（二选一）
+      <ul class="ps-opts">
+        <li><b>推荐</b>：在这个群里发 <code>设为备用群 本群群号</code>，比如 <code>设为备用群 123456789</code>。发的人要在<a href="{{ url_for('admins_page') }}">「QQ 管理员」</a>名单里。机器人回「✅ 群 123456789 已设为官方机器人的备用群」就成功了，群号和放进群池一步完成。想分组就在后面加组名，比如 <code>设为备用群 123456789 A组</code>。</li>
+        <li>或者在<a href="{{ url_for('backup_pool_page') }}?view=settings">「设置」</a>的列表里找到这个群：点「编辑」填上群号保存，再点「成为可用备用群」。</li>
+      </ul>
+      <b style="color:var(--bad)">群号很重要，不要写错！</b>玩家就是靠它搜群、申请入群的，写错了他们就进不来。
+      <p class="ps-why"><b>怎么算设好了</b>：<a href="{{ url_for('backup_pool_page') }}?view=settings">「设置」</a>的列表里，这个群显示群号和「空闲」，没有「暂停使用」。</p></li>
+  </ol>
+</section>
+{% else %}
+{{ gt.to_guide('backup_pool_page', '第一次设备用群，或者群加进来了却显示「暂停使用」？') }}
 <section>
   <h2>现在的情况</h2>
   <p>空闲 <b>{{ counts.free }}</b> · 占用 <b>{{ counts.occupied }}</b> · 等人退群 <b>{{ counts.cleaning }}</b>
@@ -96,7 +109,7 @@ form.i{display:inline}
     </div>{% endif %}</div>
   <div class="rowlist">{% for g in gs %}{{ grow(g) }}{% endfor %}</div>
 {% else %}
-  <p class="empty">还没有群。按上面「每个备用群要这样设一次」做，在群里发「设为备用群 本群群号」，群就会出现在这里。</p>
+  <p class="empty">还没有群。按<a href="{{ url_for('backup_pool_page') }}?view=guide">「教程」</a>里「每个备用群要这样设一次」做，在群里发「设为备用群 本群群号」，群就会出现在这里。</p>
 {% endfor %}
 </section>
 
@@ -111,4 +124,5 @@ form.i{display:inline}
 </details>
 {% endif %}
 
+{% endif %}
 {% endblock %}

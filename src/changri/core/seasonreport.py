@@ -137,13 +137,13 @@ async def _poster(d: dict, skin_id: str) -> bytes | None:
         return None
 
 
-async def send_one(role_id: int, send: Send, send_image=None, show_name: str = "", skin_id: str = "") -> bool | None:
+async def send_one(role_id: int, send: Send, send_image=None, show_name: str = "", skin_id: str = "", tail: str = "") -> bool | None:
     """给一位玩家发。没有互动返回 None；否则返回是否送达。
     send_image(bot_id, group_openid, data) 给了就发海报：先一句文字、再单独一张图；图发不出去补发文字小结。"""
     d = stats(role_id)
     if not d:
         return None
-    summary = build(role_id, d)
+    summary = build(role_id, d) + (("\n\n" + tail) if tail else "")      # tail：结束季度时「收尾前存档」的提醒，并进同一条，少发一条消息
     png = await _poster(dict(d, show_name=show_name), skin_id or skin()) if send_image else None
     if not png:
         try:
@@ -151,7 +151,7 @@ async def send_one(role_id: int, send: Send, send_image=None, show_name: str = "
         except Exception:  # noqa: BLE001
             ok = False
         return ok
-    intro = (f"🎬 「{show_name}」已落幕\n" if show_name else "🎬 本季已落幕\n") + f"这是你「{d['role_name']}」的本季互动报告："
+    intro = (f"🎬 「{show_name}」已落幕\n" if show_name else "🎬 本季已落幕\n") + f"这是你「{d['role_name']}」的本季互动报告：" + (("\n\n" + tail) if tail else "")
     try:
         ok, gid, bot_id, _ = await push_to_role_ex(role_id, intro, send, True)
     except Exception:  # noqa: BLE001
@@ -170,7 +170,7 @@ async def send_one(role_id: int, send: Send, send_image=None, show_name: str = "
     return True
 
 
-async def send_all(send: Send, send_image=None) -> tuple[int, int]:
+async def send_all(send: Send, send_image=None, tail: str = "") -> tuple[int, int]:
     """给每个有互动的玩家发。返回 (发出几份, 发不出去几份)。"""
     with get_conn() as c:
         ids = [r["id"] for r in c.execute("SELECT id FROM roles WHERE is_npc=0 ORDER BY id")]
@@ -180,7 +180,7 @@ async def send_all(send: Send, send_image=None) -> tuple[int, int]:
         await asyncio.to_thread(season_poster.prefetch, skin_id)      # 第一次用这款皮肤要从主页下载；下载不了就画纯色纸
     ok = bad = 0
     for rid in ids:
-        done = await send_one(rid, send, send_image, show, skin_id)
+        done = await send_one(rid, send, send_image, show, skin_id, tail)
         if done is None:
             continue
         ok, bad = ok + int(done), bad + int(not done)

@@ -7,7 +7,7 @@ from nonebot.params import CommandArg
 
 from changri.core.qqsend import make_send, reply_buttons, reply_long  # noqa: E402
 from changri.core.buttons import Btn
-from changri.core import admins, messaging, relations, roles
+from changri.core import admins, messaging, relations, roles, season
 from changri.core.db import get_config, get_int
 
 NEED_ROLE = "请先在你的个人群里发「创建新角色 名字」绑定角色。"
@@ -72,8 +72,8 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
                                        Btn("看全部", f"查看关系线 {me['name']}", style="secondary")])
     head = (new_line + "\n") if new_line else ""
     if delivered:
-        await add_rel.finish(f"{head}✅ 细节已同步至「{target['name']}」的绑定群\n{stat}")
-    await add_rel.finish(f"{head}✅ 细节已记录，但「{target['name']}」尚未绑定可用的群，无法实时同步。\n{stat}")
+        await add_rel.finish(f"{head}✅ 细节已同步至「{target['name']}」的绑定群\n{stat}" + season.prep_note("关系线"))
+    await add_rel.finish(f"{head}✅ 细节已记录，但「{target['name']}」尚未绑定可用的群，无法实时同步。\n{stat}" + season.prep_note("关系线"))
 
 
 confirm_rel = _cmd("确认关系线")

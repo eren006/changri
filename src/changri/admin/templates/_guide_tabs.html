@@ -1,0 +1,19 @@
+{# 「设置 / 教程」两个标签（样式照「公知、二表与关系线」页）。用法：{% import "_guide_tabs.html" as gt %}{{ gt.tabs('backup_pool_page', view) }} #}
+{% macro tabs(endpoint, view, label) %}
+<nav class="tabs" aria-label="{{ label }}">
+  <a class="tab{{ ' on' if view != 'guide' }}" href="{{ url_for(endpoint) }}?view=settings" {% if view != 'guide' %}aria-current="page"{% endif %}>设置</a>
+  <a class="tab{{ ' on' if view == 'guide' }}" href="{{ url_for(endpoint) }}?view=guide" {% if view == 'guide' %}aria-current="page"{% endif %}>教程</a>
+</nav>
+<style>
+.ui .tab{display:inline-flex;align-items:center;gap:6px;min-height:38px;padding:0 18px;border:1px solid var(--card-line);border-radius:999px;background:var(--surface);color:var(--ink);text-decoration:none;font-size:14.5px}
+.ui .tab.on{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.ui .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 18px}
+.ui section.gd{margin-top:40px}
+.ui .ps-steps{margin:0 0 4px;padding-left:1.4em;line-height:1.8}
+.ui .ps-steps>li{margin:0 0 10px}
+.ui .ps-why{margin:6px 0 0;padding:8px 12px;border-left:3px solid var(--warn);background:color-mix(in srgb,var(--warn) 7%,transparent);border-radius:0 6px 6px 0;font-size:14px;line-height:1.7}
+.ui .ps-opts{margin:6px 0 6px;padding-left:1.2em}
+.ui .ps-opts>li{margin:0 0 6px}
+</style>
+{% endmacro %}
+{% macro to_guide(endpoint, text) %}<p class="note" style="margin:0 0 18px">{{ text }}<a href="{{ url_for(endpoint) }}?view=guide">看「教程」→</a></p>{% endmacro %}

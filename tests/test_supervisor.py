@@ -1,6 +1,7 @@
 """看门进程：重启、换版本、崩溃重拉、新版本起不来回滚。子进程用几行假的 python 代替。"""
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -102,6 +103,70 @@ class SupervisorTests(unittest.TestCase):
         with self.child("raise SystemExit(1)"), mock.patch.object(updater, "rollback_if_failing", fake_rollback):
             self.assertEqual(supervisor.run(), supervisor.RELAUNCH)
         self.assertEqual(self.runs(), 3)
+
+    def test_failed_check_rolls_back_at_once(self):
+        """子进程退出码 4（升级后检查没通过）：马上回滚，让启动脚本按旧版本重新拉起。"""
+        with self.child(f"raise SystemExit({updater.ROLLBACK_CODE})"), \
+                mock.patch.object(updater, "rollback_now", lambda *a: "已自动回到 0.1.0"):
+            self.assertEqual(supervisor.run(), supervisor.RELAUNCH)
+        self.assertEqual(self.runs(), 1)
+
+    def test_old_version_exit_does_not_confirm_update(self):
+        """旧版本跑了很久、装完更新退出：不能替新版本确认（以前会，回滚保护就失效了）。"""
+        confirmed = []
+        cur = str(self.tmp / "current")
+        with self.child(f"Path({cur!r}).write_text('0.2.0'); raise SystemExit(3)"), \
+                mock.patch.object(supervisor, "CONFIRM_FALLBACK", 0), \
+                mock.patch.object(updater, "confirm_healthy", lambda *a: confirmed.append(1)):
+            self.assertEqual(supervisor.run(), supervisor.RELAUNCH)
+        self.assertEqual(confirmed, [])
+
+    def test_new_version_long_run_confirms(self):
+        confirmed = []
+        with self.child("raise SystemExit(0)"), mock.patch.object(supervisor, "CONFIRM_FALLBACK", 0), \
+                mock.patch.object(updater, "confirm_healthy", lambda *a: confirmed.append(1)):
+            self.assertEqual(supervisor.run(), 0)
+        self.assertEqual(confirmed, [1])
+
+    # 人为停止（Windows 关窗口 / Ctrl+C / 停服务）时，子进程可能被直接结束、来不及删「运行中」标记；
+    # 看门进程要替它删掉，不然下次启动记成「崩溃」上报。真崩溃不能删。
+    def marker(self):
+        import signal
+
+        from changri.core import errlog
+        m = self.tmp / ".running"
+        m.write_text("1")
+        p = mock.patch.object(errlog, "_marker", lambda: m)
+        p.start()
+        self.addCleanup(p.stop)
+        old = {s: signal.getsignal(s) for s in (signal.SIGINT, signal.SIGTERM)}
+        self.addCleanup(lambda: [signal.signal(s, h) for s, h in old.items()])
+        return m
+
+    def test_stop_signal_clears_marker_even_if_child_is_killed(self):
+        import os
+        import signal
+        import threading
+        m = self.marker()
+        started = self.tmp / "started"
+
+        def stop_when_started():
+            end = time.monotonic() + 20
+            while not started.exists() and time.monotonic() < end:
+                time.sleep(0.05)
+            os.kill(os.getpid(), signal.SIGTERM)
+        threading.Thread(target=stop_when_started, daemon=True).start()
+        # 子进程不收尾、一直睡，只能被 terminate()：模拟 Windows 上自己的 on_shutdown 跑不到
+        with self.child(f"Path({str(started)!r}).write_text('1'); import time; time.sleep(30)"):
+            self.assertEqual(supervisor.run(), 0)
+        self.assertFalse(m.exists())
+        self.assertEqual(self.runs(), 1)
+
+    def test_real_crash_keeps_marker(self):
+        m = self.marker()
+        with self.child("raise SystemExit(1 if n < 2 else 0)"):
+            self.assertEqual(supervisor.run(), 0)
+        self.assertTrue(m.exists())
 
 
 class AlreadyRunningTests(unittest.TestCase):

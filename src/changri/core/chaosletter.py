@@ -102,7 +102,42 @@ def compose(me, to, content: str, rng=random) -> dict:
     return {"shown": shown, "sign": sign, "true_to": true_to, "torn": torn, "effects": effects}
 
 
-def log(me_id: int, to_id: int, c: dict, original: str) -> None:
+def log(me_id: int, to_id: int, c: dict, original: str) -> int:
     with get_conn() as conn:
-        conn.execute("INSERT INTO chaos_letters(from_id, to_id, true_to_id, content, shown, effects, day, ts) VALUES(?,?,?,?,?,?,?,?)",
-                     (me_id, to_id, c["true_to"], original, c["shown"], "、".join(c["effects"]), season.day_key(), int(time.time())))
+        return conn.execute("INSERT INTO chaos_letters(from_id, to_id, true_to_id, content, shown, effects, day, ts) VALUES(?,?,?,?,?,?,?,?)",
+                     (me_id, to_id, c["true_to"], original, c["shown"], "、".join(c["effects"]), season.day_key(), int(time.time()))).lastrowid
+
+
+def log_torn(log_id: int, third: int, text: str, sign: str) -> None:
+    """撕走的后半截真的送到了第三个人那里：记下来，他的小手机里能看到。"""
+    with get_conn() as conn:
+        conn.execute("UPDATE chaos_letters SET torn_to=?, torn_text=?, torn_sign=? WHERE id=?", (third, text, sign, log_id))
+
+
+def torn_items(role_id: int) -> list[dict]:
+    """飘到这个人这里的半张纸，旧的在前。"""
+    with get_conn() as conn:
+        return [dict(r) for r in conn.execute("SELECT torn_text, torn_sign, ts FROM chaos_letters WHERE torn_to=? ORDER BY id", (role_id,))]
+
+
+def attach(log_id: int, msg_id: int, c: dict, to_shown: str = "") -> None:
+    """把这封出了岔子的短信和 messages 那一行对上，记下送到之后还要做的事（撕走的后半截、公告）。
+    to_shown：公告里写的收件人（匿名短信回给化名主人时写化名，不写真名）；空 = 写收件人真名。"""
+    import json
+    after = json.dumps({"torn": list(c["torn"]) if c.get("torn") else None, "sign": c.get("sign", ""), "effects": c.get("effects", []),
+                        "to_shown": to_shown}, ensure_ascii=False)
+    with get_conn() as conn:
+        conn.execute("UPDATE chaos_letters SET msg_id=?, after=? WHERE id=?", (msg_id, after, log_id))
+
+
+def take_after(msg_id: int) -> dict | None:
+    """取出并清掉这条短信还没做的后续；没有（没出岔子 / 已经做过）返回 None。"""
+    import json
+    with get_conn() as conn:
+        r = conn.execute("SELECT l.id, l.after, r.name AS to_name FROM chaos_letters l JOIN roles r ON r.id=l.to_id WHERE l.msg_id=? AND l.after!=''",
+                         (msg_id,)).fetchone()
+        if not r:
+            return None
+        conn.execute("UPDATE chaos_letters SET after='' WHERE id=?", (r["id"],))
+    d = json.loads(r["after"])
+    return {**d, "log_id": r["id"], "to_name": d.get("to_shown") or r["to_name"]}

@@ -61,6 +61,7 @@ class SeasonReportTest(unittest.TestCase):
             with get_conn() as c:
                 c.execute("UPDATE seasons SET status='running'")
             set_config("season_report", "0")
+            set_config("season_save_reminder", "0")                   # 收尾前存档提醒另有开关，这里只看季末报告
             ok, msg = asyncio.run(season.end_and_report(fake_send))
             self.assertTrue(ok)
             self.assertEqual(sent, [])

@@ -10,7 +10,7 @@ import json
 import re
 import time
 
-from . import arclen
+from . import arclen, rooms
 from .db import get_config, get_conn, set_config
 
 PHONE_KINDS = {"电话", "前置电话"}
@@ -73,7 +73,7 @@ def due(now: float | None = None) -> list[dict]:
     with get_conn() as c:
         npcs = {r["id"] for r in c.execute("SELECT id FROM roles WHERE is_npc=1")}
         names = {r["id"]: r["name"] for r in c.execute("SELECT id, name FROM roles")}
-        for room in c.execute("SELECT id, kind, creator_id, pool_id, created_ts FROM rooms WHERE status='open' ORDER BY id").fetchall():
+        for room in c.execute("SELECT id, kind, creator_id, pool_id, created_ts FROM rooms WHERE status='open' AND " + rooms.NOT_DEFERRED + " ORDER BY id").fetchall():
             if room["kind"] in SKIP_KINDS:
                 continue
             lim = limit_hours(room["kind"])

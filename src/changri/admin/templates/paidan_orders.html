@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% import "_rpg_icons.html" as ic %}
+{% block title %}排单 · 订单{% endblock %}
+{% block body %}
+<h1>订单</h1>
+<p class="lede">客户在群里下的单都在这里。点进去扣张数、打开传图或取消。</p>
+{% include "_paidan_tabs.html" %}
+<nav class="tabs" aria-label="订单状态">
+  {% for k, label in [('open','在排'),('done','已完成'),('cancelled','已取消'),('all','全部')] %}
+  <a href="{{ url_for('paidan_orders', st=k, bid=bid) }}" {% if st == k %}aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}
+</nav>
+{% if bizs|length > 1 %}<p class="note">业务：<a href="{{ url_for('paidan_orders', st=st) }}">全部</a>{% for b in bizs %} · <a href="{{ url_for('paidan_orders', st=st, bid=b.id) }}">{% if bid == b.id %}<b>{{ b.letter }} {{ b.name }}</b>{% else %}{{ b.letter }} {{ b.name }}{% endif %}</a>{% endfor %}</p>{% endif %}
+<section>
+  <div class="sec-head"><h2>订单<span class="n">{{ rows|length }} 单</span></h2>
+    {% if bizs %}<span class="btns"><details class="panel"><summary class="btn ghost">{{ ic.plus() }}手动补录</summary>
+      <form class="form" method="post" action="{{ url_for('paidan_order_new') }}">{{ csrf() }}
+        <div class="fields">
+          <div><label for="ob">业务</label><select id="ob" name="bid">{% for b in bizs %}<option value="{{ b.id }}">{{ b.letter }} · {{ b.name }}</option>{% endfor %}</select></div>
+          <div><label for="oc">客户</label><select id="oc" name="cid"><option value="">散单</option>{% for c in clients %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></div>
+          <div><label for="oo">散单的名字（选填）</label><input id="oo" name="orderer"></div>
+          <div><label for="oq">QQ 号（选填）</label><input id="oq" name="qq" inputmode="numeric"></div>
+        </div>
+        <div class="field"><label for="ot">下单内容</label><textarea id="ot" name="content" rows="4"></textarea></div>
+        <p class="note">补录不管暂停、单口和额度，扣张数时照常扣。</p>
+        <div class="actions"><button class="btn" type="submit">补录</button>
+          <button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
+      </form></details></span>{% endif %}</div>
+  {% if rows %}<div class="tablewrap"><table class="rt">
+    <thead><tr><th>单号</th><th>客户</th><th>下单</th><th>DDL</th><th>图</th><th>状态</th></tr></thead>
+    <tbody>{% for o in rows %}<tr>
+      <td><a href="{{ url_for('paidan_order', oid=o.id) }}"><b>{{ o.no }}</b></a></td>
+      <td>{{ who(o) }}</td>
+      <td>{{ o.created_ts|pd_ts }}</td>
+      <td>{{ o.deadline|pd_md }}{% if o.status == 'open' and o.images_out == 0 and o.deadline < today %} <span class="dot bad"></span>超期{% endif %}</td>
+      <td>补 {{ o.images_in }} · 发 {{ o.images_out }}{% if o.locked %} · 已锁{% endif %}</td>
+      <td>{% if o.status == 'open' %}{% if o.images_out %}<span class="dot warn"></span>待扣张数{% else %}在排{% endif %}{% elif o.status == 'done' %}<span class="dot ok"></span>扣 {{ o.charged }} 张{% if o.shortfall %}（差 {{ o.shortfall }}）{% endif %}{% else %}已取消{% endif %}</td>
+    </tr>{% endfor %}</tbody></table></div>
+  {% else %}<p class="empty">没有这类订单。</p>{% endif %}
+</section>
+{% endblock %}

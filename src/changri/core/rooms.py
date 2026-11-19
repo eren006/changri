@@ -82,8 +82,9 @@ def spans_overlap(d1: int | None, a1: str, b1: str, d2: int | None, a2: str, b2:
 
 
 def too_short(kind: str, a: str, b: str) -> str:
-    """约的时间够不够长（电话默认至少 29 分钟，约会和踩点 59 分钟）。够了、或这种房间不限，返回空串。"""
-    need = get_int(f"min_minutes_{kind}", MIN_MINUTES[kind]) if kind in MIN_MINUTES else 0
+    """约的时间够不够长（电话默认至少 29 分钟，约会和踩点 59 分钟；心愿跟约会用同一个设置，作者定的）。够了、或这种房间不限，返回空串。"""
+    key = "约会" if kind == "心愿" else kind
+    need = get_int(f"min_minutes_{key}", MIN_MINUTES[key]) if key in MIN_MINUTES else 0
     x, y = _minutes(a), _minutes(b)
     if x is not None and y is not None and y <= x:      # 跨午夜
         y += 1440
@@ -228,10 +229,12 @@ def web_mode() -> bool:
 
 
 def create(kind: str, creator_id: int, target_ids: list[int], time_text: str, place: str = "", note: str = "",
-           official: bool = False, day: int | None = None, wish_id: int = 0) -> tuple[bool, str, int]:
+           official: bool = False, day: int | None = None, wish_id: int = 0, defer: bool = False) -> tuple[bool, str, int]:
     """发起一个房间。返回 (成功, 提示或房间号, room_id)。
     wish_id：摘心愿开的房间，传心愿编号——time_text 是挂心愿时已经换算好的「HH:MM-HH:MM」，直接用，不再按故事历重新解析；查时间撞时也不算这条心愿自己。
-    成功时提示是「R房间号」；多人邀约里有人拉黑了发起人，会被悄悄剔掉，提示后面多一行「\n…」告诉发起人谁没加进来（对方设了静默的不提）。"""
+    成功时提示是「R房间号」；多人邀约里有人拉黑了发起人，会被悄悄剔掉，提示后面多一行「\n…」告诉发起人谁没加进来（对方设了静默的不提）。
+    defer=True（提前排到以后几天的官约 / 官电）：先只占时间线，不领群、不计数，dkey 留空当「还没到那天」的记号；
+    到那天由 activate_due 领群、发邀请，开房时间和「今天」的计数都从那时算（见 is_deferred）。"""
     if kind not in KINDS:
         return False, "不认识的类型", 0
     if kind in SOLO_KINDS:
@@ -271,8 +274,8 @@ def create(kind: str, creator_id: int, target_ids: list[int], time_text: str, pl
                 return False, bad.replace("🚫 ", "").replace("暂时关闭", "暂时关闭，不能参与"), 0
     if not ids and kind not in SOLO_KINDS:
         return False, "至少要有一位对象。", 0
-    if day is not None and day < 1:
-        return False, "D几 要写成大于 0 的数字。", 0
+    if day is not None and day < 0:                 # D0 是档期第一天，合法（D0 挂的心愿、D0 发官约都会带 day=0）
+        return False, "D几 不能是负数。", 0
     day = (day if day is not None else season.current_day()) if kind != "微信" else None      # 官约可以指定 D几（预排以后的天）
     with get_conn() as c:
         names = {r["id"]: r["name"] for r in c.execute(f"SELECT id, name FROM roles WHERE id IN ({','.join('?' * (len(ids) + 1))})", ids + [creator_id])}
@@ -315,19 +318,20 @@ def create(kind: str, creator_id: int, target_ids: list[int], time_text: str, pl
                 return False, f"{who}在 D{day} {hm_text(hit['start_hm'], hit['end_hm'])} 已经有安排（{hit['kind']}），时间撞了。", 0
     with get_conn() as c:
         cur = c.execute("INSERT INTO rooms(kind, creator_id, day, start_hm, end_hm, place, note, dkey, created_ts) VALUES(?,?,?,?,?,?,?,?,?)",
-                        (kind, creator_id, day, hm[0], hm[1], place, note, season.day_key(), int(time.time())))
+                        (kind, creator_id, day, hm[0], hm[1], place, note, "" if defer else season.day_key(), int(time.time())))
         rid_ = cur.lastrowid
         c.execute("INSERT INTO room_members(room_id, role_id, agree) VALUES(?,?,1)", (rid_, creator_id))
         for t in ids:
             c.execute("INSERT INTO room_members(room_id, role_id) VALUES(?,?)", (rid_, t))
-    if kind != "微信" and not web_mode():                                            # 聊天室开着：约会在小手机网页里聊，不占 QQ 群
+    if kind != "微信" and not web_mode() and not defer:                              # 聊天室开着：约会在小手机网页里聊，不占 QQ 群
         if not pool.allocate(rid_):                                                  # 备用群池没有空群：不排队，直接告诉玩家没开成
             with get_conn() as c:
                 c.execute("DELETE FROM rooms WHERE id=?", (rid_,))                   # 成员、发言连带删除（外键级联）
             pool.note_exhausted(kind)                                                # 定时任务会提醒后台群
             return False, f"备用群池暂时没有空闲的群，这次{kind}没能开成，请稍后再试，或联系管理员多准备几个备用群。", 0
     from . import milestone
-    milestone.bump(kind)                                          # 「第 N 次记录」公告（只数电话、约会、官约、心愿）
+    if not defer:                                                 # 提前排的到那天开房时再数
+        milestone.bump(kind)                                      # 「第 N 次记录」公告（只数电话、约会、官约、心愿）
     try:                                                          # 目击系统（额外扩展）：关着就什么都不做
         from . import sighting
         sighting.detect(rid_)
@@ -435,6 +439,10 @@ def end(room_id: int, status: str = "ended") -> dict | None:
     return None
 
 
+# SQL 条件：不是「提前排、还没到那天的官约 / 官电」（见 is_deferred）。只看 dkey 会误伤老库里 dkey 为空的老房间。
+NOT_DEFERRED = "NOT (dkey='' AND pool_id IS NULL AND (kind='官约' OR (kind='电话' AND note='官电')))"
+
+
 def assign_waiting() -> list[int]:
     """有空群了：给还没分到群的房间按先后补群。返回拿到群的房间 id。
     新发起的房间领不到群会直接撤掉、告诉玩家，不会排到这里。
@@ -444,7 +452,7 @@ def assign_waiting() -> list[int]:
         return []
     got = []
     with get_conn() as c:
-        wait = [r["id"] for r in c.execute("SELECT id FROM rooms WHERE status='open' AND pool_id IS NULL AND kind != '微信' ORDER BY id")]
+        wait = [r["id"] for r in c.execute("SELECT id FROM rooms WHERE status='open' AND pool_id IS NULL AND kind != '微信' AND " + NOT_DEFERRED + " ORDER BY id")]
     for rid in wait:
         if pool.allocate(rid):
             got.append(rid)
@@ -468,7 +476,7 @@ def expired(now: int | None = None) -> list:
         return []
     now = int(now or time.time())
     with get_conn() as c:
-        return c.execute("SELECT * FROM rooms WHERE status='open' AND created_ts<?", (now - get_int("room_expire_hours", 24) * 3600,)).fetchall()
+        return c.execute("SELECT * FROM rooms WHERE status='open' AND " + NOT_DEFERRED + " AND created_ts<?", (now - get_int("room_expire_hours", 24) * 3600,)).fetchall()
 
 
 def expiring_soon(now: int | None = None) -> list:
@@ -479,7 +487,7 @@ def expiring_soon(now: int | None = None) -> list:
     now = int(now or time.time())
     lead = max(hours - warn, 0) * 3600
     with get_conn() as c:
-        return c.execute("SELECT * FROM rooms WHERE status='open' AND expire_warned=0 AND created_ts<? AND created_ts>=?",
+        return c.execute("SELECT * FROM rooms WHERE status='open' AND " + NOT_DEFERRED + " AND expire_warned=0 AND created_ts<? AND created_ts>=?",
                          (now - lead, now - hours * 3600)).fetchall()
 
 
@@ -488,16 +496,68 @@ def mark_expire_warned(room_id: int) -> None:
         c.execute("UPDATE rooms SET expire_warned=1 WHERE id=?", (room_id,))
 
 
+# ---------- 提前排的官约：到那天再开房 ----------
+
+DEFER_OPEN_HM = "08:00"          # 到了那天，几点开房发邀请（23:59 换天时不发，免得半夜把人叫醒）
+DEFER_LEAD_MIN = 120             # 官约开始得比 8 点还早：提前这么多分钟开房（但不早于那天 0 点）
+
+
+def is_deferred(r) -> bool:
+    """提前排、还没到那天的官约 / 官电：只占时间线，没有群、没有邀请（create 时 dkey 留空）。"""
+    return bool(r and r["status"] == "open" and not r["dkey"] and not r["pool_id"] and is_official(r))
+
+
+def defer_open_hm(r) -> str:
+    """这场在那天几点开房：8 点；官约本身开始得早，就提前 DEFER_LEAD_MIN 分钟（不早于 0 点）。时间不是钟点（故事历）的按 8 点。"""
+    x = _minutes(r["start_hm"])
+    if x is None:
+        return DEFER_OPEN_HM
+    y = max(0, x - DEFER_LEAD_MIN)
+    return min(DEFER_OPEN_HM, f"{y // 60:02d}:{y % 60:02d}")
+
+
+def deferred_due(now: time.struct_time | None = None) -> list:
+    """到了该开房的提前排官约（游戏里已经到了那天、钟点也到了；天数已经过了的直接开）。"""
+    d = season.current_day()
+    if d is None or season.phase() != "playing":
+        return []
+    now = now or time.localtime()
+    hm = f"{now.tm_hour:02d}:{now.tm_min:02d}"
+    with get_conn() as c:
+        rs = c.execute("SELECT * FROM rooms WHERE status='open' AND dkey='' AND day IS NOT NULL AND day<=? ORDER BY day, start_hm, id", (d,)).fetchall()
+    return [r for r in rs if is_deferred(r) and (r["day"] < d or hm >= defer_open_hm(r))]
+
+
+def activate(room_id: int) -> bool:
+    """提前排的官约到那天了：领群（聊天室模式不领），开房时间和「今天」的计数从现在算。领不到群返回 False，房间照旧等着，下一轮再试。"""
+    r = get(room_id)
+    if not is_deferred(r):
+        return False
+    if not web_mode() and not pool.allocate(room_id):
+        return False
+    with get_conn() as c:
+        c.execute("UPDATE rooms SET dkey=?, created_ts=? WHERE id=?", (season.day_key(), int(time.time()), room_id))
+    from . import milestone
+    milestone.bump(r["kind"])
+    return True
+
+
 # ---------- 修改时间线（需要房间里所有人同意）----------
+
+def is_official(r) -> bool:
+    """官约，或者管理员发起的官电（类型是电话、备注写着「官电」）。"""
+    return r["kind"] == "官约" or (r["kind"] == "电话" and (r["note"] or "") == "官电")
+
 
 def propose_change(room_id: int, by_id: int, day: int, a: str, b: str) -> tuple[bool, str]:
     r = get(room_id)
     if not r or r["status"] != "open" or r["kind"] in NO_TIMELINE:
         return False, "这个房间没有时间线可改。"
-    if r["kind"] != "官约":
-        bad = too_short(r["kind"], a, b) or blocked_hit(day, a, b)
-        if bad:
-            return False, bad
+    if is_official(r):                                   # 作者定的：官约 / 官电的时间由管理员定，玩家不能改（也不能取消）
+        return False, f"{'官电' if r['kind'] == '电话' else '官约'}的时间由管理员定，不能改。需要调整请联系管理员。"
+    bad = too_short(r["kind"], a, b) or blocked_hit(day, a, b)
+    if bad:
+        return False, bad
     for m in members(room_id):
         hit = conflict(m["role_id"], day, a, b, ignore_room=room_id)
         if hit:
@@ -509,7 +569,8 @@ def propose_change(room_id: int, by_id: int, day: int, a: str, b: str) -> tuple[
 
 
 def vote_change(room_id: int, role_id: int, agree: bool) -> tuple[str, dict | None]:
-    """返回 (状态, 申请内容)：none 没有申请 / rejected / waiting / applied"""
+    """返回 (状态, 申请内容)：none 没有申请 / rejected / waiting / applied /
+    conflict（全员同意了，但等待期间有人在新时间又有了别的安排：申请作废，ch["clash"] 写清是谁、什么安排）"""
     r = get(room_id)
     if not r or not r["pending_change"]:
         return "none", None
@@ -523,8 +584,42 @@ def vote_change(room_id: int, role_id: int, agree: bool) -> tuple[str, dict | No
         left = c.execute("SELECT COUNT(*) FROM room_members WHERE room_id=? AND agree=0", (room_id,)).fetchone()[0]
         if left:
             return "waiting", ch
+    for m in members(room_id):                     # 申请时查过一遍；等大家同意的这段时间里可能有人又约了别的，生效前再查
+        hit = conflict(m["role_id"], ch["day"], ch["a"], ch["b"], ignore_room=room_id)
+        if hit:
+            with get_conn() as c:
+                c.execute("UPDATE rooms SET pending_change='' WHERE id=?", (room_id,))
+            return "conflict", {**ch, "clash": f"「{m['name']}」在 D{ch['day']} {hm_text(hit['start_hm'], hit['end_hm'])} 已有安排（{hit['kind']}）"}
+    with get_conn() as c:
         c.execute("UPDATE rooms SET day=?, start_hm=?, end_hm=?, pending_change='' WHERE id=?", (ch["day"], ch["a"], ch["b"], room_id))
     return "applied", ch
+
+
+# ---------- 不想参加（老系统「拒绝时间线 群号」）----------
+
+NO_DECLINE_KINDS = {"心愿"}             # 心愿是自己挂、别人摘的，官约 / 官电是节目组排的：都不能单方面拒（老系统一样）
+
+
+def started(room_id: int) -> bool:
+    """这场戏开始写了没有：房间里有一句算进复盘的戏文就算开始。"""
+    with get_conn() as c:
+        return c.execute("SELECT 1 FROM room_lines WHERE room_id=? AND is_rp=1 LIMIT 1", (room_id,)).fetchone() is not None
+
+
+def decline_check(room, role_id: int) -> str:
+    """能不能「拒绝时间线」（不想参加 → 整场取消，作者定：多人房也整场解散、有改时间申请也一次解散）。
+    只能在开始写戏之前；能返回空，不能返回原因。"""
+    if not room or room["status"] != "open":
+        return "这一场已经结束或取消了。"
+    if not any(m["role_id"] == role_id for m in members(room["id"])):
+        return "你不是这个房间的参与者。"
+    if is_official(room):
+        return "官约 / 官电是节目组安排的，不能拒绝；有事请找管理员。"
+    if room["kind"] in NO_DECLINE_KINDS:
+        return f"{room['kind']}不能拒绝；不想去了请「结束{room['kind']}」，或找管理员。"
+    if started(room["id"]):
+        return f"这场戏已经开始写了，不能拒绝了；不想继续请「结束{room['kind']}」。"
+    return ""
 
 
 # ---------- 申请加入别人正在进行的约会 ----------

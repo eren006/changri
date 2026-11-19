@@ -8,13 +8,14 @@ from nonebot.matcher import current_bot
 from nonebot.params import CommandArg
 
 from changri.core.qqsend import make_send, reply_long  # noqa: E402
-from changri.core import admins, lovemail, messaging, roles
+from changri.core import admins, lovemail, messaging, roles, season
 from changri.core.announce import get_announce
 from changri.core.db import get_config, get_int, per_bot, set_config
 from changri.core.schedule import run_lovemail_tick
 
 nonebot.require("nonebot_plugin_apscheduler")
 from nonebot_plugin_apscheduler import scheduler  # noqa: E402
+from changri.core.textutil import parse_id
 
 NEED_ROLE = "请先在你的个人群里发「创建新角色 名字」绑定角色。"
 
@@ -60,17 +61,20 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
         await post_mail.finish("✨ 你还不是本系统的会员，请先使用「创建新角色」来认领你的身份吧。")
     receiver, content, signature = lovemail.parse_post(args.extract_plain_text())
     if not receiver:
-        await post_mail.finish("⚠️ 格式错误！请指定发送对象。\n发送心动信\n【发送对象】角色名\n【内容】想说的话\n【署名】自定义昵称（选填）")
+        await post_mail.finish("⚠️ 格式错误！请指定发送对象。\n简单写法（署名是你的真名）：发送心动信 角色名 想说的话\n"
+                               "想换署名用这种：\n发送心动信\n【发送对象】角色名\n【内容】想说的话\n【署名】自定义昵称（不写就是「匿名」）")
     target = roles.get_role_by_name(receiver)
     if not target:
         await post_mail.finish(f"⚠️ 找不到角色「{receiver}」的投递地址，请确认名字是否正确。")
+    signature = signature or me["name"]
     ok, msg, left = lovemail.add_mail(me["id"], target["id"], signature, content)
     if not ok:
         await post_mail.finish(msg)
     limit = lovemail.today_limit()
     await post_mail.finish(
         f"💌 心动信已成功投递至「{target['name']}」的信箱！\n📝 署名：{signature}\n"
-        f"📅 今日剩余次数：{left}/{limit}\n✨ 提示：管理员统一送出前，你仍可以使用「撤回心动信」取消本次投递。")
+        + (f"{msg}\n📅 明天剩余次数：{left}/{lovemail.limit_for(lovemail.post_key())}" if msg else f"📅 今日剩余次数：{left}/{limit}")
+        + "\n✨ 提示：派送前你仍可以使用「撤回心动信」取消本次投递。" + season.prep_note("还没派送的心动信"))
 
 
 my_mails = _cmd("我的心动信")
@@ -98,9 +102,10 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
     if not me:
         await revoke_mail.finish("✨ 你还不是本系统的会员，请先使用「创建新角色」来认领你的身份吧。")
     parts = _name_args(args)
-    if not parts or not parts[0].isdigit():
+    n = parse_id(parts[0]) if parts else None
+    if not n:
         await revoke_mail.finish("⚠️ 请输入正确的序号，例如：撤回心动信 1")
-    _, msg = lovemail.revoke(me["id"], int(parts[0]))
+    _, msg = lovemail.revoke(me["id"], n)
     await revoke_mail.finish(msg)
 
 

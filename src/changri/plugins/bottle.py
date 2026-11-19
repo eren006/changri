@@ -5,6 +5,7 @@ from nonebot.params import CommandArg
 from changri.core import bottle, godmode, messaging
 from changri.core.qqsend import make_send
 from changri.plugins.play import NEED_ROLE, _cmd, _me
+from changri.core.textutil import parse_id
 
 drift = _cmd("漂流瓶")
 
@@ -21,8 +22,10 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     if not text:
         await drift.finish(usage)
     head, _, rest = text.partition(" ")
-    if head.isdigit() and rest.strip() and bottle.mine(me["id"], int(head)):      # 编号不是自己的瓶子，多半是正文碰巧带数字，按新瓶子处理
-        ok, tip, other, deliver = bottle.reply(me, int(head), rest.strip())
+    bid_ = parse_id(head)
+    if bid_ and rest.strip() and bottle.mine(me["id"], bid_):      # 编号不是自己的瓶子，多半是正文碰巧带数字，按新瓶子处理
+        head = str(bid_)
+        ok, tip, other, deliver = bottle.reply(me, bid_, rest.strip())
         if ok and deliver:
             await messaging.push_to_role(other, f"🍾 漂流瓶（编号{head}）有了新的回信：\n「{rest.strip()}」\n\n想继续回信就发送：漂流瓶 {head} 你想说的话", make_send())
         await drift.finish(tip)

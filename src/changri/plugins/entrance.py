@@ -6,6 +6,7 @@ from nonebot.matcher import current_bot
 from nonebot.params import CommandArg
 
 from changri.core import admins, entrance, roles
+from changri.core.announce import PUSH_HINT
 from changri.core.qqsend import download_images, make_send, make_send_image, reply_long
 
 NO = "❌ 权限不足，仅管理员可用。"
@@ -38,7 +39,7 @@ async def _(event: GroupMessageCreateEvent):
     if not _is_admin(event):
         await set_stage.finish(NO)
     entrance.set_stage(_bid(), event.group_openid)
-    await set_stage.finish("✅ 已把这个群设为戏群：出场会发到这里。")
+    await set_stage.finish("✅ 已把这个群设为戏群：出场会发到这里。" + PUSH_HINT)
 
 
 unset_stage = _cmd("取消戏群")

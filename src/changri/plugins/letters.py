@@ -5,6 +5,7 @@ from nonebot.params import CommandArg
 from changri.core import letters, messaging, roles
 from changri.core.qqsend import make_send
 from changri.plugins.play import NEED_ROLE, _cmd, _is_admin, _me
+from changri.core.textutil import parse_id
 
 send_letter = _cmd("发送信件", {"写信"})
 letter_status = _cmd("信件状态")
@@ -61,9 +62,10 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     if not text:
         await quill_edit.finish(letters.held_list(me["id"]))
     idx, _, content = text.partition(" ")
-    if not idx.isdigit():
-        await quill_edit.finish("用法：羽毛笔修改 序号 新内容（只发「羽毛笔修改」看清单）")
-    ok, reply, letter = letters.quill_edit(me["id"], int(idx), content)
+    n = parse_id(idx)
+    if not n:
+        await quill_edit.finish("用法：羽毛笔修改 序号 新内容，例：羽毛笔修改 2 改好的内容（只发「羽毛笔修改」看清单）")
+    ok, reply, letter = letters.quill_edit(me["id"], n, content)
     if ok and letter:
         await _deliver(*letter)
     await quill_edit.finish(reply if ok else "❌ " + reply)

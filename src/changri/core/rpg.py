@@ -75,9 +75,15 @@ def save_attr_def(name: str, min_value=None, max_value=None, default_value=0, de
     return True, name
 
 
-def delete_attr_def(name: str) -> None:
+def delete_attr_def(name: str) -> tuple[bool, str]:
+    """有物品的效果用到这个属性就不让删：删了以后那些物品照样改这个属性，而且不再受上下限约束。"""
+    n = norm(name)
     with get_conn() as c:
-        c.execute("DELETE FROM rpg_attr_defs WHERE name=?", (norm(name),))
+        users = [r["name"] for r in c.execute("SELECT name, attr_effects FROM rpg_items") if n in json.loads(r["attr_effects"] or "{}")]
+        if users:
+            return False, f"还有物品用到「{n}」：{'、'.join(users)}。先把这些物品的效果改掉再删。"
+        c.execute("DELETE FROM rpg_attr_defs WHERE name=?", (n,))
+    return True, ""
 
 
 def clamp_attr(name: str, value: int, conn=None) -> int:
@@ -186,19 +192,34 @@ def _log(c, role_id: int | None, action: str, code: str, count: int, detail=""):
 
 
 def _change(c, role_id: int, item: dict, delta: int, action: str, detail="") -> tuple[bool, str]:
-    row = c.execute("SELECT * FROM rpg_inventory WHERE role_id=? AND item_code=? AND remaining_uses=? AND expires_ts IS NULL",
-                    (role_id, item["code"], item["max_uses"])).fetchone()
-    have = row["count"] if row else 0
+    """加：放进「全新的」那一叠（剩余次数 = 物品现在的次数上限）。
+    扣：背包里所有没过期的都算（用过几次的、改次数上限以前发的也算），先扣剩余次数最少的，不消耗的（-1）最后扣。
+    以前只认「全新的那一叠」：用过一次的药水、改过次数上限的旧存货背包里看得到，却扣不掉、不能当材料、物品也删不掉。"""
+    if delta > 0:
+        row = c.execute("SELECT * FROM rpg_inventory WHERE role_id=? AND item_code=? AND remaining_uses=? AND expires_ts IS NULL",
+                        (role_id, item["code"], item["max_uses"])).fetchone()
+        if row:
+            c.execute("UPDATE rpg_inventory SET count=count+? WHERE id=?", (delta, row["id"]))
+        else:
+            c.execute("INSERT INTO rpg_inventory(role_id,item_code,count,remaining_uses) VALUES(?,?,?,?)",
+                      (role_id, item["code"], delta, item["max_uses"]))
+        _log(c, role_id, action, item["code"], delta, detail)
+        return True, ""
+    rows = c.execute("SELECT * FROM rpg_inventory WHERE role_id=? AND item_code=? AND (expires_ts IS NULL OR expires_ts>?) "
+                     "ORDER BY remaining_uses=-1, remaining_uses, id", (role_id, item["code"], int(time.time()))).fetchall()
+    have = sum(r["count"] for r in rows)
     if have + delta < 0:
         return False, f"「{item['name']}」只有 {have} 件。"
-    if have + delta == 0:
-        if row:
+    left = -delta
+    for row in rows:
+        if not left:
+            break
+        take = min(left, row["count"])
+        if take == row["count"]:
             c.execute("DELETE FROM rpg_inventory WHERE id=?", (row["id"],))
-    elif row:
-        c.execute("UPDATE rpg_inventory SET count=? WHERE id=?", (have + delta, row["id"]))
-    else:
-        c.execute("INSERT INTO rpg_inventory(role_id,item_code,count,remaining_uses) VALUES(?,?,?,?)",
-                  (role_id, item["code"], delta, item["max_uses"]))
+        else:
+            c.execute("UPDATE rpg_inventory SET count=count-? WHERE id=?", (take, row["id"]))
+        left -= take
     _log(c, role_id, action, item["code"], delta, detail)
     return True, ""
 
@@ -505,8 +526,7 @@ def use_item(role_id: int, item_value: str, count=1) -> tuple[bool, str]:
             c.execute("INSERT INTO role_attrs(role_id,name,value) VALUES(?,?,?) ON CONFLICT(role_id,name) DO UPDATE SET value=excluded.value",
                       (role_id, name, after))
             changes.append(f"{name} {before}→{after}")
-        if item["max_uses"] == -1:
-            _log(c, role_id, "use", item["code"], count, "不消耗")
+        _log(c, role_id, "use", item["code"], count, "、".join(changes))      # 以前只记「不消耗」的，消耗型的用掉了查不到
     return True, f"使用了「{item['name']}」×{count}；" + "、".join(changes) + "。"
 
 

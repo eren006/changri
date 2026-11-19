@@ -49,6 +49,7 @@ async def send(me, target, kind: str, gift: str, content: str, sign: str, send_f
     lim = messaging.daily_limit(kind)
     used = messaging.day_count(me["id"], kind)
     chaos = _chaos(me, target, kind, content, sign)
+    original = content
     to_id = target["id"]
     if chaos:
         content, to_id = chaos["shown"], chaos["true_to"]
@@ -57,8 +58,13 @@ async def send(me, target, kind: str, gift: str, content: str, sign: str, send_f
     if kind == "gift":
         lost, to_id = _gift_chaos(me, target)
     mid = messaging.queue_message(kind, me["id"], to_id, gift, content, sign)
+    if to_id != target["id"] or content != original:          # 出了岔子：发件人的小手机按他原本写的、原本发给谁显示，不穿帮
+        messaging.set_original(mid, target["id"] if to_id != target["id"] else 0, original if content != original else None)
     for data in images:
         msgimages.save(mid, data)
+    if chaos:                                                 # 后续（撕走的半截、公告）等真送到了再做，补送成功的也做
+        from . import chaosletter
+        chaosletter.attach(chaos.get("log_id", 0), mid, chaos)
     tail = f"（今天 {used + 1}/{lim}）" if lim > 0 else ""
     ok_text = f"已送达「{target['name']}」。{tail}发错了 2 分钟内可以撤回。"
     blk = blocks.get_block(to_id, me["id"])          # 看的是最后真正会收到的人有没有拉黑我（送错了人就看那个人）
@@ -75,12 +81,7 @@ async def send(me, target, kind: str, gift: str, content: str, sign: str, send_f
         messaging.mark_lost(mid)
         return True, ok_text
     if await messaging.deliver(mid, send_fn, shown_to=target["id"] if to_id != target["id"] and kind == "gift" else 0):
-        if kind == "sms":                                     # 截信器（发件人身上）、回音壁（收件人身上）
-            from . import roles, specials
-            got = roles.get_role(to_id)
-            specials.on_sms(me["id"], to_id, sign or me["name"], (got["name"] if got else target["name"]), content)
-        if chaos:
-            await _chaos_after(me, target, chaos, sign, send_fn)
+        await after_delivered(mid, send_fn)
         return True, ok_text
     return True, f"「{target['name']}」那边暂时收不到，已记下，稍后会自动重试。"
 
@@ -114,23 +115,62 @@ def _chaos(me, target, kind: str, content: str, sign: str):
     c = chaosletter.compose(shown_from, target, content)
     if not c["effects"]:
         return None
-    chaosletter.log(me["id"], target["id"], c, content)
+    c["log_id"] = chaosletter.log(me["id"], target["id"], c, content)
     return c
 
 
-async def _chaos_after(me, target, c, sign: str, send_fn) -> None:
-    """撕成两半的后半截送到第三个人；按设置公开播报出了什么岔子。都是锦上添花，失败不影响短信本身。"""
+async def after_delivered(mid: int, send_fn) -> None:
+    """短信 / 礼物真送到对方群之后要做的事：截信器（发件人身上）、回音壁（收件人身上）、混乱短信的后续。
+    当场送到的和后来自动重试送到的都走这里（messaging.retry_pending 回调）。匿名短信只做混乱后续，不触发截信器 / 回音壁（会露出化名背后是谁）。"""
+    from .db import get_conn
+    with get_conn() as c:
+        m = c.execute("SELECT m.*, f.name AS from_name, t.name AS to_name FROM messages m JOIN roles f ON f.id=m.from_role_id "
+                      "JOIN roles t ON t.id=m.to_role_id WHERE m.id=?", (mid,)).fetchone()
+    if not m or m["kind"] != "sms":
+        return
+    shown_from = m["sign"] or m["from_name"]
+    if not (m["alias_id"] or m["orig_alias"]):
+        from . import specials
+        specials.on_sms(m["from_role_id"], m["to_role_id"], shown_from, m["to_name"], m["content"] or "")
+    await _chaos_after(mid, shown_from, send_fn)
+
+
+async def _chaos_after(mid: int, shown_from: str, send_fn) -> None:
+    """撕成两半的后半截送到第三个人；按设置公开播报出了什么岔子。都是锦上添花，失败不影响短信本身。只做一次。"""
     import random
 
-    from . import announce
+    from . import announce, chaosletter
+    c = chaosletter.take_after(mid)
+    if not c:
+        return
     try:
         if c["torn"]:
             third, tail = c["torn"]
-            await messaging.push_to_role(third, f"📩 一条撕坏的短信飘到了你这里\n……{tail}\n落款：{c['sign'] or sign or me['name']}", send_fn)
+            chaosletter.log_torn(c["log_id"], third, tail, c["sign"])
+            await messaging.push_to_role(third, f"📩 一条撕坏的短信飘到了你这里\n……{tail}\n落款：{c['sign']}", send_fn)
         if get_config("letter_public_send", "1") == "1" and random.random() * 100 < get_int("letter_public_chance", 50):
             ann = announce.get_announce()
             if ann:
-                await send_fn(ann[0], ann[1], f"📰 信号出了岔子：{sign or me['name']} 发给 {target['name']} 的短信，{'、'.join(c['effects'])}。")
+                await send_fn(ann[0], ann[1], f"📰 信号出了岔子：{shown_from} 发给 {c['to_name']} 的短信，{'、'.join(c['effects'])}。")
     except Exception as e:  # noqa: BLE001
         import logging
         logging.getLogger(__name__).warning("[混乱短信] 后续处理失败：%s", e)
+
+
+async def recall(m) -> None:
+    """撤回 messaging.last_recallable 找到的那一条：先撤文字（失败就抛出去，调用方告诉玩家），再撤跟着发的图片（撤不掉不影响）。"""
+    import nonebot
+
+    from .qqsend import recall_group_message
+    bot = nonebot.get_bots().get(m["delivered_bot"])
+    if bot is None:
+        raise RuntimeError("对方群所在的机器人现在不在线")
+    await recall_group_message(bot, m["delivered_group"], m["delivered_msg_id"])
+    for img in (m["delivered_img_ids"] or "").split(","):
+        if img:
+            try:
+                await recall_group_message(bot, m["delivered_group"], img)
+            except Exception as e:  # noqa: BLE001
+                import logging
+                logging.getLogger(__name__).warning("[撤回] 图片没撤掉：%s", e)
+    messaging.mark_recalled(m["id"])

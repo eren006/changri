@@ -165,6 +165,11 @@ def _next_day(ds: str) -> str:
     return (datetime.date.fromisoformat(ds) + datetime.timedelta(days=1)).isoformat()
 
 
+def _prev_day(ds: str) -> str:
+    import datetime
+    return (datetime.date.fromisoformat(ds) - datetime.timedelta(days=1)).isoformat()
+
+
 def upcoming_line(now: str | None = None) -> str:
     """dashboard 日历上方一句话：现在在哪一季 / 下一季几天后开始。"""
     t = now or today()
@@ -360,7 +365,8 @@ def enter_d0(day: str | None = None, skip_tonight: bool = True) -> None:
     set_config("game_day", "0")
     set_config("day_epoch", str(int(get_config("day_epoch", "0")) + 1))
     set_config("auto_day", "1")
-    set_config("auto_day_last", (day or today()) if skip_tonight else "")
+    d = day or today()
+    set_config("auto_day_last", d if skip_tonight else _prev_day(d))    # auto_day_last = 已经推进过哪一天的 23:59（见 tick）
     set_config("lovemail_enabled", "1")
 
 
@@ -376,14 +382,43 @@ def end() -> tuple[bool, str]:
     return True, f"⏹️ 「{s['name']}」已结束。核对完存档后发「收尾」清空本季的角色和互动记录（先预览，再「收尾 确认」）。"
 
 
+def save_reminder() -> str:
+    """结束季度时发到每位玩家个人群的「收尾前存档」提醒（以前玩家不知道收尾后角色、复盘、时间线、小手机都没了）。"""
+    if get_config("season_save_reminder", "1") != "1":
+        return ""
+    phone = get_config("phone_enabled", "0") == "1"
+    return ("📦 管理员「收尾」以后，本季的角色、时间线" + ("、小手机" if phone else "") + "都会清空。趁现在：\n"
+            "· 复盘 R12：把喜欢的那场戏存成长图（房间号见「时间线」）\n"
+            "· 时间线：回看这一季的每一场" + ("\n· 小手机里想留的聊天、朋友圈，截图存好" if phone else ""))
+
+
+async def remind_players(send) -> tuple[int, int]:
+    """给每位玩家（不含 NPC）的个人群发 save_reminder。返回 (送达, 没送达)。"""
+    from .messaging import push_to_role
+    with get_conn() as c:
+        ids = [r["id"] for r in c.execute("SELECT id FROM roles WHERE is_npc=0 ORDER BY id")]
+    text, ok, bad = save_reminder(), 0, 0
+    for rid in ids:
+        try:
+            done, _ = await push_to_role(rid, text, send, True)
+        except Exception:  # noqa: BLE001
+            done = False
+        ok, bad = ok + int(done), bad + int(not done)
+    return ok, bad
+
+
 async def end_and_report(send, send_image=None) -> tuple[bool, str]:
-    """结束季度；「基础」里开了季末报告就顺带给每个玩家发一份（给了 send_image 就先发一句文字、再单独发结算海报）。"""
+    """结束季度；「基础」里开了季末报告就顺带给每个玩家发一份（给了 send_image 就先发一句文字、再单独发结算海报），
+    「收尾前存档」的提醒并在报告里；没开季末报告就单独发一条提醒到每位玩家的个人群。"""
     ok, msg = end()
     if ok:
         from . import seasonreport
         if seasonreport.enabled():
-            sent, bad = await seasonreport.send_all(send, send_image)
+            sent, bad = await seasonreport.send_all(send, send_image, tail=save_reminder())
             msg += f"\n📖 季末报告：已发给 {sent} 位玩家" + (f"，{bad} 位没发出去（个人群连不上）" if bad else "") + "。"
+        elif save_reminder():
+            sent, bad = await remind_players(send)
+            msg += f"\n📦 已提醒 {sent} 位玩家收尾前存好喜欢的戏" + (f"，{bad} 位没发出去（个人群连不上）" if bad else "") + "。"
         msg += "\n" + await _season_view_to_staff(send)
     return ok, msg
 
@@ -410,9 +445,26 @@ async def _season_view_to_staff(send) -> str:
 
 
 def wipe_preview() -> dict[str, int]:
-    names = {"roles": "角色", "messages": "短信和礼物", "lovemails": "心动信", "relations": "关系线"}
+    """收尾会清掉什么、各有多少。角色一直列；其余有才列（以前只列 4 项，论坛帖子、信件、房间也会被删却没说）。
+    房间的戏录收尾前存进往季档案（复盘网页、后台往季能看）；论坛、信件、心愿不存档。"""
+    items = [("角色", "SELECT COUNT(*) FROM roles"),
+             ("短信和礼物", "SELECT COUNT(*) FROM messages"),
+             ("心动信", "SELECT COUNT(*) FROM lovemails"),
+             ("关系线", "SELECT COUNT(*) FROM relations"),
+             ("房间（戏录已存档）", "SELECT COUNT(*) FROM rooms"),
+             ("论坛帖子", "SELECT COUNT(*) FROM posts"),
+             ("论坛回复", "SELECT COUNT(*) FROM replies"),
+             ("信件", "SELECT COUNT(*) FROM letters"),
+             ("心愿", "SELECT COUNT(*) FROM wishes"),
+             ("出场", "SELECT COUNT(*) FROM entrance"),
+             ("拉黑", "SELECT COUNT(*) FROM blocks")]
+    out = {}
     with get_conn() as conn:
-        return {label: conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] for t, label in names.items()}
+        for label, sql in items:
+            n = conn.execute(sql).fetchone()[0]
+            if n or label == "角色":
+                out[label] = n
+    return out
 
 
 def _archive(season_id: int) -> None:
@@ -422,6 +474,10 @@ def _archive(season_id: int) -> None:
     except Exception:  # noqa: BLE001 存档失败不能拦住结束/收尾
         import logging
         logging.getLogger(__name__).exception("季度档案没存下来")
+
+
+SEASON_CONFIG_KEYS = ("dinner_state", "dessert_game", "ihave_game", "dinner_game", "guard_state", "hunt_scores",
+                      "drink_game", "official_plans")       # 晚餐 / 送甜点 / 我有你没有 / 围猎 / 巡逻 / 狩猎排行 / 喝酒 / 计划官约
 
 
 def wipe() -> None:
@@ -435,11 +491,39 @@ def wipe() -> None:
             conn.execute(f"DELETE FROM {t}")
         conn.execute("DELETE FROM sqlite_sequence WHERE name='rooms'")        # 新季度的 R 号从 1 重新开始
         conn.execute("UPDATE pool_groups SET state='free', room_id=NULL")
+        # 存在设置里、记着本季角色的小游戏和计划：上季没「结束晚餐」等的话，新季的入座表里还是上季的人
+        conn.execute(f"DELETE FROM config WHERE key IN ({','.join('?' * len(SEASON_CONFIG_KEYS))})", SEASON_CONFIG_KEYS)
+        conn.execute("DELETE FROM config WHERE key LIKE 'poke_at:%' OR key LIKE 'alarm_last:%'")
     from . import milestone
     milestone.reset()                                                         # 「第 N 次记录」的计数跟着季度清零
     set_config("season_wiped", "1")
     set_config("game_day", "")
     set_config("entrance_active", "0")
+
+
+def prep_note(what: str) -> str:
+    """筹备期的互动到 D0 会清掉（clear_prep_records）：在回执末尾告诉玩家，免得以为白写了。不是筹备期返回空。"""
+    return f"\n⏳ 现在是筹备期：{what}到 D0（{running()['start_date'][5:]}）会被清掉，正式开季后再写才会留下。" if phase() == "prep" else ""
+
+
+def stage_warnings() -> list[str]:
+    """「季度状态」里的舞台检查：缺了会让某件事静悄悄做不成的设置，一条一句（缺什么、影响什么、怎么补）。都齐了返回空。"""
+    from . import announce, entrance, pool
+    out = []
+    if not announce.get_announce():
+        out.append("没设公告群：D0 开演、每天换天的播报会改发到后台群（也没有后台群就发不出去）。在全员大群发「设为公告群」。")
+    if not announce.get_backstage():
+        out.append("没设后台群：系统提醒、复盘网页链接收不到。在管理员内部群发「设为后台群」。")
+    if not entrance.get_stage():
+        out.append("没设戏群：「开始出场」用不了。在出场用的群发「设为戏群」。")
+    free = pool.counts()["free"]
+    if free == 0:
+        out.append("备用群池没有空群：约会、电话开不了（不会排队）。在空群里发「设为备用群 群号」。")
+    elif free < 3:
+        out.append(f"备用群池只剩 {free} 个空群，约会多的时候可能不够。")
+    if running() and not role_count():
+        out.append("还没有玩家建角色：让玩家在自己的个人群发「创建新角色 名字」。")
+    return out
 
 
 def set_day(n: int) -> None:
@@ -496,8 +580,15 @@ async def tick(send, announce, now: time.struct_time | None = None) -> str:
         set_config("lovemail_enabled", "0")
         await say(f"📅 「{s['name']}」档期（含补戏期）已结束，已自动关闭自动天数和心动信（天数停在 {day_label()}）。\n接下来管理员发「结束季度」→「收尾」。")
         return "closed"
-    if now.tm_hour * 60 + now.tm_min == 1439 and get_config("auto_day") == "1" and get_config("auto_day_last") != t and current_day() is not None:
-        set_config("auto_day_last", t)
+    # 自动天数：每天 23:59 加一天。auto_day_last 记「已经推进过哪一天的 23:59」。
+    # 23:59 那一分钟机器人不在线（更新重启、断网），第二天上线时补推进一次，不会整季少一天。
+    # 停了好几天也只补一天（只看「昨天」）；差得多的让管理员「设置天数」。
+    # 老版本自动进 D0 时把 auto_day_last 记成空：不知道推进到哪天了，只在 23:59 推进，不补。
+    late = now.tm_hour * 60 + now.tm_min == 1439
+    due = t if late else _prev_day(t)
+    last = get_config("auto_day_last", "")
+    if get_config("auto_day") == "1" and current_day() is not None and last < due and (late or last):
+        set_config("auto_day_last", due)
         prev = current_day()
         try:
             counts = "\n" + day_summary_line()          # 换天之前算，换了就是新一天的键了
@@ -507,6 +598,8 @@ async def tick(send, announce, now: time.struct_time | None = None) -> str:
         from . import storycal
         sl = storycal.stage_line(prev + 1)
         counts += f"\n🕰️ {sl}" if sl else ""
-        await say(f"📜 自动天数推进：D{prev} → D{prev + 1}（今天的计数已清空）{counts}")
-        return "advanced"
+        head = (f"📜 自动天数推进：D{prev} → D{prev + 1}（今天的计数已清空）" if late else
+                f"📜 自动天数补推进：昨晚 23:59 机器人不在线，现在补上 D{prev} → D{prev + 1}（今天的计数已清空）")
+        await say(head + counts)
+        return "advanced" if late else "caught_up"
     return "idle"

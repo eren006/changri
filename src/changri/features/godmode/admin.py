@@ -155,7 +155,12 @@ def register(app, login_required):
     @app.post("/god/<int:role_id>/slot/<int:room_id>/delete")
     @login_required
     def god_slot_delete(role_id, room_id):
-        ok, msg = god_core.delete_slot(role_id, room_id)
+        from changri.core import loopbridge
+        from changri.plugins import play
+        try:
+            ok, msg = loopbridge.run(play.remove_room(role_id, room_id))         # 进行中的还要通知参与者、请群里的人退群
+        except Exception as e:  # noqa: BLE001
+            msg = loopbridge.friendly_error(e, "删除失败")
         flash(msg)
         return _god_back(role_id)
 

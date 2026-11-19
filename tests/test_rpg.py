@@ -81,6 +81,43 @@ class RPGTests(unittest.TestCase):
         self.assertTrue(rpg.give(self.a, self.b, "茶", 1)[0])
         self.assertEqual([x["name"] for x in rpg.inventory(self.b)], ["茶"])
 
+    def test_used_and_old_stacks_can_be_taken(self):
+        """用过一次的多次数物品、改次数上限以前发的旧存货：管理员能扣、能当材料、扣光以后物品能删（以前都提示「只有 0 件」）。"""
+        rpg.save_attr_def("体力", 0, 100, 50, "")
+        rpg.save_item("POT", "药水", effects="体力+5", max_uses=3)
+        rpg.adjust(self.a, "POT", 2)
+        self.assertTrue(rpg.use_item(self.a, "药水")[0])                          # 一瓶剩 2 次，一瓶全新
+        self.assertEqual(sorted((x["count"], x["remaining_uses"]) for x in rpg.inventory(self.a)), [(1, 2), (1, 3)])
+        self.assertTrue(rpg.adjust(self.a, "POT", -1)[0])                           # 先扣用过的那瓶
+        self.assertEqual([(x["count"], x["remaining_uses"]) for x in rpg.inventory(self.a)], [(1, 3)])
+        rpg.save_item("POT", "药水", effects="体力+5", max_uses=5)                  # 改了次数上限：旧的那瓶照样能扣
+        self.assertTrue(rpg.save_recipe("熬汤", [("POT", 1)], "GOLD", 1)[0])
+        self.assertTrue(rpg.craft(self.a, "熬汤")[0])
+        self.assertEqual([x["item_code"] for x in rpg.inventory(self.a)], ["GOLD"])
+        self.assertTrue(rpg.delete_item("POT")[0])
+        self.assertFalse(rpg.adjust(self.a, "GOLD", -2)[0])                         # 不够照样拒绝，什么都不动
+        self.assertEqual(rpg.inventory(self.a)[0]["count"], 1)
+
+    def test_use_is_logged(self):
+        """消耗型物品用掉也记一笔（以前只记「不消耗」的）。"""
+        rpg.save_attr_def("体力", 0, 100, 50, "")
+        rpg.save_item("POT", "药水", effects="体力+5", max_uses=1)
+        rpg.adjust(self.a, "POT", 1)
+        rpg.use_item(self.a, "药水")
+        with get_conn() as c:
+            row = c.execute("SELECT * FROM rpg_item_log WHERE action='use'").fetchone()
+        self.assertEqual((row["item_code"], row["count"]), ("POT", 1))
+        self.assertIn("体力 50→55", row["detail"])
+
+    def test_attr_def_in_use_cannot_be_deleted(self):
+        rpg.save_attr_def("体力", 0, 100, 50, "")
+        rpg.save_item("POT", "药水", effects="体力+5")
+        ok, why = rpg.delete_attr_def("体力")
+        self.assertFalse(ok)
+        self.assertIn("药水", why)
+        rpg.save_item("POT", "药水", effects="")
+        self.assertTrue(rpg.delete_attr_def("体力")[0])
+
     def test_places(self):
         rpg.save_place("图书馆", "", True)
         set_config("place_system_enabled", "1")

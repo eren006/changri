@@ -12,7 +12,14 @@ log = logging.getLogger("changri.schedule")
 async def run_lovemail_tick(send: messaging.Send, now: time.struct_time | None = None) -> str:
     """每 30 秒调用一次；返回这一轮做了什么（方便测试）。"""
     if not lovemail.enabled():
-        return "off"
+        # 心动信关着（比如档期结束自动关了）时，后台「立即派送」照样把信池里剩下的信送出去；
+        # 以前这里直接返回，按钮说「30 秒内处理」却什么也没发生，标记一直挂着。
+        if get_config("lovemail_deliver_now", "0") != "1":
+            return "off"
+        set_config("lovemail_deliver_now", "0")
+        res = await lovemail.deliver_all(send, get_announce())
+        log.info(f"[心动信] 关着时手动派送：{res}")
+        return "delivered"
     now = now or time.localtime()
     cur = now.tm_hour * 60 + now.tm_min
     try:
@@ -26,11 +33,14 @@ async def run_lovemail_tick(send: messaging.Send, now: time.struct_time | None =
 
     if cur == (target - 10) % 1440 and get_config("lovemail_notice10_day") != day:
         set_config("lovemail_notice10_day", day)
+        from . import windows
+        if lovemail.today_limit() <= 0 or windows.check("lovemail"):       # 今天不收信（上限 0 / 不在开放时段）就别催大家投
+            return "notice10-skip"
         with get_conn() as conn:
             gids = [(r[0], r[1]) for r in conn.execute("SELECT bot_id, group_openid FROM role_groups WHERE kind='main' AND group_openid IS NOT NULL")]
         for bot_id, gid in gids:
             try:
-                await send(bot_id, gid, "⌛ 投递截止预告：\n心动信箱将于 10 分钟后截止收稿并开始派送，还没投递的小伙伴要抓紧哦～")
+                await send(bot_id, gid, "⌛ 投递截止预告：\n心动信箱将于 10 分钟后截止今天的收稿并开始派送，还没投递的小伙伴要抓紧哦～（之后投的算明天）")
             except Exception as e:  # noqa: BLE001
                 log.warning(f"[心动信] 截止预告发送失败：{e}")
         return "notice10"
@@ -46,6 +56,7 @@ async def run_lovemail_tick(send: messaging.Send, now: time.struct_time | None =
     due = target <= cur < target + 60 and get_config("lovemail_last_run") != day
     if due or manual:
         set_config("lovemail_last_run", day)
+        set_config("lovemail_last_run_key", lovemail.today())      # 这之后投的信算第二天（lovemail.post_key）
         set_config("lovemail_deliver_now", "0")
         res = await lovemail.deliver_all(send, announce)
         tip = get_config("daily_tip", "").strip()

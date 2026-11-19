@@ -25,7 +25,8 @@ def updates(role, song_on: bool = False, steal_on: bool = False, lovemail_on: bo
     by_id, by_name = phoneview._names()
     groups: dict[str, dict] = {}
     with get_conn() as c:
-        rows = c.execute("SELECT * FROM messages WHERE to_role_id=? AND alias_id IS NULL AND error!='已撤回' ORDER BY id", (rid,)).fetchall()
+        from .messaging import NOT_RECEIVED_SQL
+        rows = c.execute(f"SELECT * FROM messages WHERE to_role_id=? AND alias_id IS NULL AND error!='已撤回' AND {NOT_RECEIVED_SQL} ORDER BY id", (rid,)).fetchall()
     for m in rows:
         k = phoneview.key_of(m, rid, by_id, by_name)
         if not k:
@@ -54,6 +55,9 @@ def updates(role, song_on: bool = False, steal_on: bool = False, lovemail_on: bo
         new = [x for x in phoneview.song_items(role) if not x["mine"] and x["ts"] > reads.get("song", 0)]
         if new:
             out.append({"key": "song", "name": phoneview.SONG_THREAD, "label": "点歌", "count": len(new), "ts": new[-1]["ts"], "kind": "song", "target": ""})
+    torn = [x for x in phoneview.torn_items(rid) if x["ts"] > reads.get("torn", 0)]
+    if torn:
+        out.append({"key": "torn", "name": phoneview.TORN_THREAD, "label": "撕坏的短信", "count": len(torn), "ts": torn[-1]["ts"], "kind": "torn", "target": ""})
     if steal_on:
         with get_conn() as c:
             r = c.execute("SELECT COUNT(*) n, MAX(created_ts) ts FROM gift_steals WHERE victim_id=? AND created_ts>?", (rid, reads.get("steal", 0))).fetchone()

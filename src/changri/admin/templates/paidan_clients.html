@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% import "_rpg_icons.html" as ic %}
+{% block title %}排单 · 客户{% endblock %}
+{% block body %}
+<h1>客户</h1>
+<p class="lede">长期客户：有自己的群、自己的额度。建好后把绑定码发给客户本人，让他在自己的群里发「绑定 绑定码」。</p>
+{% include "_paidan_tabs.html" %}
+<section>
+  <div class="sec-head"><h2>客户<span class="n">{{ rows|length }} 个</span></h2>
+    <span class="btns"><details class="panel"><summary class="btn">{{ ic.plus() }}新建客户</summary>
+      <form class="form" method="post" action="{{ url_for('paidan_client_new') }}">{{ csrf() }}
+        <div class="fields">
+          <div><label for="cn">名字</label><input id="cn" name="name" required></div>
+          <div><label for="cq">QQ 号（选填）</label><input id="cq" name="qq" inputmode="numeric"></div>
+          <div><label for="cg">客户群真实群号（选填）</label><input id="cg" name="real_gid" inputmode="numeric"></div>
+          {% for b in bizs %}<div><label for="cs{{ b.id }}">{{ b.letter }} · {{ b.name }} 单口</label><input id="cs{{ b.id }}" name="slots_{{ b.id }}" type="number" min="1" value="{{ b.default_slots }}"></div>{% endfor %}
+        </div>
+        <div class="field"><label for="cnote">备注（选填）</label><input id="cnote" name="note"></div>
+        <p class="note">群号填了，新单私聊里会带上，方便你找到这个群。额度在建好后的客户页里一笔一笔录。</p>
+        <div class="actions"><button class="btn" type="submit">建客户</button>
+          <button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
+      </form></details></span></div>
+  {% if rows %}<div class="tablewrap"><table class="rt">
+    <thead><tr><th>名字</th><th>绑定</th><th>剩余额度</th><th>在排</th><th></th></tr></thead>
+    <tbody>{% for r in rows %}<tr>
+      <td><a href="{{ url_for('paidan_client', cid=r.c.id) }}"><b>{{ r.c.name }}</b></a>{% if r.short %} <span class="chip">{{ r.short }} 单额度不足</span>{% endif %}</td>
+      <td>{% if r.c.group_openid %}<span class="dot ok"></span>已绑定{% else %}<span class="dot warn"></span>没绑定{% endif %}</td>
+      <td>{% for k, v in r.left.items() if v %}<span class="chip">{{ k }} {{ v }} 张</span> {% else %}<span class="muted">没有</span>{% endfor %}</td>
+      <td>{{ r.open }}</td>
+      <td><a class="btn sm ghost" href="{{ url_for('paidan_client', cid=r.c.id) }}">打开</a></td>
+    </tr>{% endfor %}</tbody></table></div>
+  {% else %}<p class="empty">还没有客户。{% if not bizs %}先去「业务」建一个业务。{% endif %}</p>{% endif %}
+</section>
+{% if done %}
+<section>
+  <details><summary class="note">已完结的客户（{{ done|length }} 个）</summary>
+  <div class="rowlist">{% for r in done %}
+    <div class="row"><div><a href="{{ url_for('paidan_client', cid=r.c.id) }}"><b>{{ r.c.name }}</b></a><div class="muted">已完结 · 不能下单、不提醒</div></div></div>
+  {% endfor %}</div></details>
+</section>
+{% endif %}
+{% endblock %}

@@ -1,4 +1,4 @@
-"""短信、送礼、撤回、礼品店、图鉴、欢迎语，走真正的 NoneBot 事件分发。"""
+"""短信、送礼、撤回、礼品店、图鉴、进群不发欢迎语，走真正的 NoneBot 事件分发。"""
 import asyncio
 import os
 import sys
@@ -300,10 +300,11 @@ class SocialE2E(unittest.TestCase):
         self.assertIn("撤回", self.say("格式撤回")[0])
         self.assertIn("格式短信", self.say("格式")[0])
 
-    def test_welcome_and_unclaimed(self):
+    def test_no_welcome_on_join(self):
+        """被拉进新群不发欢迎语（刚进群没有主动发言权限，发了只会被 QQ 拦下报错）。"""
         ev = GroupAddRobotEvent.model_validate({"id": "x", "timestamp": "2026-11-13T00:00:00+08:00", "group_openid": "NEWG", "op_member_openid": "MA"})
         asyncio.new_event_loop().run_until_complete(handle_event(self.bot, ev))
-        self.assertTrue(any("[NEWG]" in o and "创建新角色" in o and "认群" in o for o in SENT))
+        self.assertFalse(any("[NEWG]" in o for o in SENT))
         admins.claim(admins.make_code(), "B1", "ADMIN")
 
 

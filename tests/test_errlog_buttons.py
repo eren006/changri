@@ -38,5 +38,40 @@ class ButtonRejected(unittest.TestCase):
         self.assertEqual(errlog.read_all(), [])
 
 
+NO_PUSH = "<ActionFailed: 400, code=40034, message=主动消息失败, 无权限, trace_id=abc>"
+
+
+class NoPushPermission(unittest.TestCase):
+    """群里没打开「机器人主动在群聊内发言」：记成「配置」，说清去哪打开，不说是按钮 / Markdown 的问题。"""
+    def setUp(self):
+        init_db()
+        errlog.clear()
+
+    def test_button_reject_routed_to_no_push(self):
+        self.assertTrue(errlog.note_button_rejected("主动推送通知时", NO_PUSH))
+        rows = errlog.read_all()
+        self.assertEqual((rows[0]["kind"], rows[0]["source"]), ("config", errlog.NO_PUSH_SOURCE))
+        self.assertIn("机器人主动在群聊内发言", rows[0]["message"])
+        self.assertNotIn("Markdown 权限", rows[0]["message"])
+
+    def test_warning_becomes_config_once(self):
+        from nonebot import logger
+        sink = logger.add(errlog._loguru_sink, level="WARNING")
+        try:
+            logger.warning(f"点歌 #1 没发到公告群：{NO_PUSH}")
+            logger.warning(f"[@] 没发出去（群里没打开机器人主动在群聊内发言）：{NO_PUSH}")
+        finally:
+            logger.remove(sink)
+        rows = errlog.read_all()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual((rows[0]["kind"], rows[0]["source"]), ("config", errlog.NO_PUSH_SOURCE))
+        self.assertIn("点歌 #1 没发到公告群", rows[0]["message"])
+        self.assertNotIn("trace_id", rows[0]["message"])
+
+    def test_other_errors_untouched(self):
+        self.assertFalse(errlog.is_no_push_error(ERR))
+        self.assertTrue(errlog.is_no_push_error(NO_PUSH))
+
+
 if __name__ == "__main__":
     unittest.main()

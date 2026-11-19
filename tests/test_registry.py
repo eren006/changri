@@ -10,7 +10,7 @@ from changri.features import registry  # noqa: E402
 class RegistryTests(unittest.TestCase):
     def test_lists_are_collected_in_order(self):
         core = [f["id"] for f in registry.core_cards()]
-        self.assertEqual(core, ["base", "season", "social", "gift", "play"])
+        self.assertEqual(core, ["base", "season", "social", "gift", "play", "decks"])      # 牌堆 0.22.6 起是核心
         off = registry.official()
         self.assertEqual([f["order"] for f in off], sorted(f["order"] for f in off))
         self.assertEqual(off[0]["id"], "entrance")
@@ -26,7 +26,7 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(g["/sheets"], "relations")
         self.assertEqual(g["/sightings"], "sighting")
         self.assertEqual(g["/moments"], "moments")
-        self.assertEqual(len(g), 18)          # 原来 guard() 里手写的 15 条 + 故事历 + 漂流瓶记录 + 牌堆
+        self.assertEqual(len(g), 18)          # 原来 guard() 里手写的 15 条 + 故事历 + 漂流瓶记录 + 排单（牌堆 0.22.6 起是核心，不再关页面）
 
     def test_pages_have_register(self):
         admin, phone = registry.admin_pages(), registry.phone_pages()

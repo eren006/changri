@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}排单 · {{ o.no }}{% endblock %}
+{% block body %}
+<h1>{{ o.no }}</h1>
+<p class="lede"><a href="{{ url_for('paidan_orders') }}">← 订单列表</a> · {{ b.name if b }} · {{ who(o) }}{% if o.client_id %} · <a href="{{ url_for('paidan_client', cid=o.client_id) }}">客户页</a>{% endif %}</p>
+{% include "_paidan_tabs.html" %}
+<div class="stats">
+  <div class="stat"><b>{{ {'open':'在排','done':'已完成','cancelled':'已取消'}[o.status] }}</b><span>状态</span></div>
+  <div class="stat"><b>{{ o.deadline|pd_md }}</b><span>DDL</span></div>
+  <div class="stat"><b>{{ o.images_in }}</b><span>客户补图{{ '（已锁定）' if o.locked }}</span></div>
+  <div class="stat"><b>{{ o.images_out }}</b><span>已发送</span></div>
+</div>
+<section>
+  <div class="sec-head"><h2>下单内容</h2>
+    {% if o.status == 'open' %}<span class="btns"><details class="panel"><summary class="btn ghost">编辑内容</summary>
+      <form class="form" method="post" action="{{ url_for('paidan_order_edit', oid=o.id) }}">{{ csrf() }}
+        <div class="field"><label for="ec">下单内容</label><textarea id="ec" name="content" rows="6">{{ o.content }}</textarea></div>
+        <p class="note">客户填错了可以在这里改。</p>
+        <div class="actions"><button class="btn" type="submit">保存</button><button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
+      </form></details></span>{% endif %}</div>
+  <div class="rowlist">
+    <div class="row"><div><pre class="note" style="white-space:pre-wrap;margin:0">{{ o.content }}</pre>
+      <div class="muted">{{ o.created_ts|pd_ts }} 下单 · QQ {{ o.qq or '没填' }}{% if o.redeem_code %} · 兑换码 {{ o.redeem_code }}{% endif %}</div></div></div>
+  </div>
+</section>
+
+{% if o.status == 'open' %}
+<section>
+  <div class="sec-head"><h2>完成并扣张数</h2></div>
+  {% if not o.images_out %}<p class="note">这单还没在工作群「发送」过图。确定已经交付了再扣。</p>{% endif %}
+  <form class="form" method="get" action="{{ url_for('paidan_order', oid=o.id) }}">
+    <div class="fields">
+      <div><label for="n">扣几张</label><input id="n" name="n" type="number" min="0" value="{{ preview.n if preview else 1 }}"></div>
+      {% if o.client_id %}<div><label for="q">先扣哪笔额度</label><select id="q" name="q">
+        <option value="">最早到期的（默认）</option>
+        {% for q in usable %}<option value="{{ q.id }}" {{ 'selected' if preview and preview.q == q.id }}>剩 {{ q.total - q.used }} 张 · {{ q.expires|pd_md }} 到期</option>{% endfor %}
+      </select></div>{% endif %}
+    </div>
+    {% if not o.client_id %}<p class="note">散单只记录张数，不扣额度。</p>{% endif %}
+    <div class="actions"><button class="btn ghost" type="submit">看看怎么扣</button></div>
+  </form>
+  {% if preview %}
+    {% if preview.err %}<div class="callout bad">{{ preview.err }}</div>
+    {% else %}
+    <div class="callout{{ ' bad' if preview.short }}">
+      {% if preview.plan %}将{% for q, k in preview.plan %}从 {{ q.expires|pd_md }} 到期那笔扣 {{ k }} 张{% if not loop.last %}、{% endif %}{% endfor %}。{% elif o.client_id %}没有可扣的额度。{% else %}散单记 {{ preview.n }} 张。{% endif %}
+      {% if preview.short %}<br>额度不够：本单要扣 {{ preview.n }} 张，还差 {{ preview.short }} 张。确认后扣到 0、照样完成，差的张数请你跟客户沟通。{% endif %}
+      <form method="post" action="{{ url_for('paidan_order_complete', oid=o.id) }}" style="margin-top:12px">{{ csrf() }}
+        <input type="hidden" name="n" value="{{ preview.n }}"><input type="hidden" name="q" value="{{ preview.q }}">
+        <button class="btn" type="submit">确认完成</button></form>
+    </div>
+    {% endif %}
+  {% endif %}
+</section>
+{% endif %}
+
+{% if o.status == 'done' %}
+<section>
+  <div class="sec-head"><h2>扣了 {{ o.charged }} 张</h2>
+    <span class="btns"><details class="panel"><summary class="btn ghost">改扣法</summary>
+      <form class="form" method="post" action="{{ url_for('paidan_order_complete', oid=o.id) }}" onsubmit="return confirm('原来扣的会先全部退回，再按新的扣。确定？')">{{ csrf() }}
+        <div class="fields"><div><label for="rn">改成扣几张</label><input id="rn" name="n" type="number" min="0" value="{{ o.charged }}"></div></div>
+        <p class="note">默认从最早到期的额度扣。</p>
+        <div class="actions"><button class="btn" type="submit">改</button><button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
+      </form></details></span></div>
+  {% if charged %}<div class="rowlist">{% for q, k in charged %}<div class="row"><div>{{ q.expires|pd_md }} 到期那笔 · {{ k }} 张</div></div>{% endfor %}</div>
+  {% elif o.client_id %}<p class="empty">没扣到额度。</p>{% else %}<p class="note">散单只记录张数。</p>{% endif %}
+  {% if o.shortfall %}<div class="callout bad">额度不足，差 {{ o.shortfall }} 张。</div>{% endif %}
+</section>
+{% endif %}
+
+{% if o.status == 'open' %}
+<section>
+  <div class="sec-head"><h2>其他操作</h2></div>
+  <div class="rowlist">
+    {% if o.locked %}<div class="row"><div><b>打开传图</b><div class="muted">客户已经发了「已上传所有图」。打开后可以继续补，补完让他再发一次。</div></div>
+      <div class="acts"><form method="post" action="{{ url_for('paidan_order_unlock', oid=o.id) }}">{{ csrf() }}<button class="btn sm ghost" type="submit">打开传图</button></form></div></div>{% endif %}
+    <div class="row"><div><b>取消这单</b><div class="muted">{{ '散单的兑换码会直接作废，不退回。' if o.redeem_code else '不扣额度，单口空出来。' }}</div></div>
+      <div class="acts"><form method="post" action="{{ url_for('paidan_order_cancel', oid=o.id) }}" onsubmit="return confirm('取消 {{ o.no }}？取消后不能恢复{{ '，兑换码作废' if o.redeem_code }}。')">{{ csrf() }}<button class="linkbtn" type="submit">取消订单</button></form></div></div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

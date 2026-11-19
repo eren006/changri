@@ -124,7 +124,7 @@ async def _(event: GroupMessageCreateEvent):
     if not admins.is_admin(_bid(), _sender(event)):
         await set_announce.finish(_admin_only("设为公告群"))
     announce_core.set_announce(_bid(), event.group_openid)
-    await set_announce.finish("✅ 已把这个群设为公告群：心动信的提醒、曝光、派送播报都会发到这里。")
+    await set_announce.finish("✅ 已把这个群设为公告群：心动信的提醒、曝光、派送播报都会发到这里。" + announce_core.PUSH_HINT)
 
 
 unset_announce = _cmd("取消公告群")
@@ -153,7 +153,7 @@ async def _(event: GroupMessageCreateEvent):
         await set_backstage.finish(_admin_only("设为后台群"))
     announce_core.set_backstage(_bid(), event.group_openid)
     await set_backstage.finish("✅ 已把这个群设为后台群：QQ 号掉线等给管理组的提醒会发到这里（没设后台群时发公告群）。"
-                               + _also(event, "后台群"))
+                               + _also(event, "后台群") + announce_core.PUSH_HINT)
 
 
 unset_backstage = _cmd("取消后台群")
@@ -175,7 +175,7 @@ async def _(event: GroupMessageCreateEvent):
     if not admins.is_admin(_bid(), _sender(event)):
         await set_water.finish(_admin_only("设为水群"))
     announce_core.set_water(_bid(), event.group_openid)
-    await set_water.finish("✅ 已把这个群设为水群：这个群不会被放进群池当约会房间。" + _also(event, "水群"))
+    await set_water.finish("✅ 已把这个群设为水群：这个群不会被放进群池当约会房间。" + _also(event, "水群") + announce_core.PUSH_HINT)
 
 
 unset_water = _cmd("取消水群")

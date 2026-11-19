@@ -99,6 +99,47 @@ class Store(unittest.TestCase):
         self.assertTrue(decks.save(self.a, "【甲】\n{乙}\n【乙】\n{甲}")[0])
         self.assertTrue(decks.draw("甲").startswith("🃏"))
 
+    def test_fan_out_blocked_on_save(self):
+        # 每张牌 10 个引用、套 4 层：最坏 1 万多次展开，保存就拒绝（以前一抽要卡十几秒）
+        raw = "".join(f"【_{c}】\n" + ("{_%s}" % n) * 10 + "\n" for c, n in zip("abcd", "bcde")) + "【_e】\nx\n【炸】\n{_a}\n"
+        ok, msg, _ = decks.save(None, raw)
+        self.assertFalse(ok)
+        self.assertIn("套得太多", msg)
+        self.assertEqual(decks.files(), [])
+        ok, _msg, _ = decks.save(None, "【_x】\n" + "{_y}" * 3 + "\n【_y】\n" + "{_z}" * 3 + "\n【_z】\n叶子\n【小】\n{_x}\n")
+        self.assertTrue(ok)                                                      # 3×3 正常
+
+    def test_fan_out_capped_at_draw(self):
+        # 保存时各自都不超，后来别的文件把被引用的牌堆改大了：抽的时候也有上限，不会卡住
+        decks.save(None, "【_叶】\n叶\n")
+        decks.save(None, "【根】\n" + "{_枝}" * 50 + "\n【_枝】\n" + "{_叶}" * 3 + "\n")
+        with get_conn() as c:
+            c.execute("UPDATE decks SET cards=? WHERE name='_叶'", ('[[1, "' + "{_枝}" * 50 + '"]]',))
+        import time
+        t = time.time()
+        out = decks.draw("根", random.Random(1))
+        self.assertLess(time.time() - t, 3)
+        self.assertIn("{_", out)                                                 # 超了的原样留着
+
+    def test_blocklist_on_save(self):
+        bl = Path(os.environ["CHANGRI_DB_PATH"]).parent / "blocklist.txt"
+        bl.write_text("坏词测试\n", encoding="utf-8")
+        try:
+            ok, msg, _ = decks.save(None, "【吃】\n米饭\n坏 词 测 试 面\n")
+            self.assertFalse(ok)
+            self.assertIn("第 2 张", msg)
+            ok, msg, _ = decks.save(None, "【坏词测试】\n米饭\n")
+            self.assertFalse(ok)
+            self.assertIn("牌堆名", msg)
+            self.assertTrue(decks.save(None, "【吃】\n米饭\n")[0])
+        finally:
+            bl.unlink()
+
+    def test_ai_prompt_has_rules_and_example(self):
+        self.assertIn("【今晚吃什么】", decks.AI_PROMPT)
+        self.assertIn(f"最多 {decks.MAX_CARD_LEN} 个字", decks.AI_PROMPT)
+        self.assertTrue(decks.parse(decks.TEMPLATE)[0])
+
     def test_edit_delete_permissions(self):
         ok, _m, fid = decks.save(self.a, "【签】\n上上签")
         self.assertFalse(decks.save(self.b, "【签】\n下下签", file_id=fid)[0])    # 不能改别人的
@@ -134,7 +175,7 @@ class AdminPage(unittest.TestCase):
         with get_conn() as c:
             c.execute("DELETE FROM web_users")
         admin_mod._fails.clear()
-        set_config("ext:decks", "1")
+        set_config("ext:decks", "0")          # 老机器以前关过也没关系：0.22.6 起牌堆是核心功能，页面照样能开
         self.c = admin_mod.create_app().test_client()
         webusers.create_user("boss", "longenough1", "owner")
         self._tok = lambda path="/login": re.search(r'name="_csrf" value="([0-9a-f]+)"', self.c.get(path).get_data(as_text=True)).group(1)
@@ -144,6 +185,8 @@ class AdminPage(unittest.TestCase):
         page = self.c.get("/decks").get_data(as_text=True)
         self.assertIn("【今晚吃什么】", page)
         self.assertIn("长日牌堆模板", self.c.get("/decks/template.txt").get_data(as_text=True))
+        self.assertIn("复制 AI 提示词", page)
+        self.assertIn("请帮我写一份「长日牌堆」文件", page)
         self.c.post("/decks/save", data={"_csrf": self._tok("/decks"), "raw": "【签】\n上上签", "title": "抽签"})
         self.assertIn("抽签", self.c.get("/decks").get_data(as_text=True))
         self.assertIn("🃏 抽卡「签」：上上签", self.c.get("/decks?try=签").get_data(as_text=True))
@@ -154,6 +197,20 @@ class AdminPage(unittest.TestCase):
         fid = decks.files()[0]["id"]
         self.c.post(f"/decks/{fid}/delete", data={"_csrf": self._tok("/decks")})
         self.assertIn("没有叫", decks.draw("运势"))
+
+    def test_rejected_save_keeps_draft(self):
+        bomb = "".join(f"【_{c}】\n" + ("{_%s}" % n) * 10 + "\n" for c, n in zip("abcd", "bcde")) + "【_e】\nx\n【炸】\n{_a}\n"
+        page = self.c.post("/decks/save", data={"_csrf": self._tok("/decks"), "raw": bomb, "title": "炸弹"}).get_data(as_text=True)
+        self.assertIn("套得太多", page)
+        self.assertIn("{_b}{_b}", page)                                         # 刚贴的内容还在输入框里
+        self.assertIn('value="炸弹"', page)
+
+    def test_contact_qq_entry(self):
+        # 弹窗点了「不用了」以后，功能与设置能搜到「联系 QQ」（总览上的入口在 test_admin_multibot 里测）
+        ext = self.c.get("/extensions").get_data(as_text=True)
+        import re
+        base = next(m for m in re.findall(r'data-search="([^"]*)"', ext) if m.startswith("基础"))
+        self.assertIn("联系 QQ", base)
 
     def test_phone_has_no_decks(self):
         from changri.phone.app import create_phone_app

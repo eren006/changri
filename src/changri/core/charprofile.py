@@ -4,7 +4,8 @@
   可以一次发多行一起改（每行一条）。
 - 皮相没自己填过时按性别给默认值（男 亨利卡维尔 / 女 刘亦菲），改了性别默认皮相跟着换。
 - 签名 12 小时只能改一次，皮相 2 小时只能改一次。
-- 「修改名字 新名字」改本名（跟别人的本名、简称都不能重复）；房间、短信这些都按角色编号记，改名不影响。
+- 「修改名字 新名字」改本名（跟别人的本名、简称都不能重复）；房间、短信这些都按角色编号记，改名不影响；
+  点歌是按名字记的，改名 / 改简称时点给旧名字的歌跟着改到新名字上。本名 24 小时只能改一次（第一次不限）。
 - 简称：数字、英文字母、汉字，1–10 个字，跟所有人的本名、简称都不能重复；短信、约会这些要填名字的地方都能用它代替本名
   （roles.get_role_by_name 找不到本名时按简称再找一遍，所以各个指令不用单独适配）。填回自己的本名 = 清除简称。
 和小手机里的「微信名」是两回事：微信名只影响显示，简称是填指令用的。
@@ -17,6 +18,7 @@ from .db import get_conn
 PREFIXES = ("修改名字", "修改性别", "修改年龄", "修改皮相", "修改签名", "修改简称")
 DEFAULT_LOOKS = {"男": "亨利卡维尔", "女": "刘亦菲"}
 BIO_COOLDOWN = 12 * 3600
+NAME_COOLDOWN = 24 * 3600          # 本名 24 小时只能改一次（第一次改不限，方便建完角色马上改错字）；管理员改不受限
 LOOK_COOLDOWN = 2 * 3600
 LOOK_MAX = 20
 BIO_MAX = 100
@@ -56,30 +58,52 @@ def name_taken(name: str, except_id: int = 0) -> bool:
 def set_short(role, val: str) -> str:
     if not val:
         return "❌ 请输入简称，例：修改简称 小明"
+    old = get(role["id"]).get("short") or ""
     if val == role["name"]:
         _save(role["id"], short="")
+        _move_songs(old, role["name"])
         return f"✅ 简称已清除，填名字时用本名「{role['name']}」。"
     if not SHORT_RE.fullmatch(val):
         return "❌ 简称只能是数字、英文字母、汉字，长度 1–10。"
+    from . import roles
+    why = roles.name_problem(val, "简称")
+    if why:
+        return f"❌ {why}"
     if name_taken(val, role["id"]):
         return f"❌ 「{val}」已经是别人的名字或简称了，换一个。"
     _save(role["id"], short=val)
+    _move_songs(old, val)
     return f"✅ 简称已设为「{val}」，以后短信、约会等填名字的地方都能用它代替「{role['name']}」。"
 
 
-def rename(role, val: str) -> str:
+def _move_songs(old: str, new: str) -> None:
+    """点歌按名字记（song_requests.to_name）：改名 / 改简称时，点给旧名字的歌挪到新名字上，不然点歌台里就没了。"""
+    if old and new and old != new:
+        with get_conn() as c:
+            c.execute("UPDATE song_requests SET to_name=? WHERE to_name=?", (new, old))
+
+
+def rename(role, val: str, now: int | None = None, admin: bool = False) -> str:
     from . import roles
     if not val:
         return "❌ 请输入新名字，例：修改名字 林晚"
     if val == role["name"]:
         return "❌ 新名字和现在的一样。"
-    if not roles._valid_name(val):
-        return f"❌ 角色名要在 {roles.NAME_MAX} 字以内，且不能带空格。"
+    why = roles.name_problem(val)
+    if why:
+        return f"❌ {why}"
     if name_taken(val, role["id"]):
         return f"❌ 「{val}」已经是别人的名字或简称了，换一个。"
+    now = now or int(time.time())
+    last = get(role["id"]).get("name_ts") or 0
+    if last and now - last < NAME_COOLDOWN and not admin:
+        return f"⏳ 名字 24 小时只能改一次，还要等 {-(-(NAME_COOLDOWN - (now - last)) // 3600)} 小时。"
     with get_conn() as c:
         c.execute("UPDATE roles SET name=? WHERE id=?", (val, role["id"]))
         c.execute("UPDATE role_profiles SET short='' WHERE role_id=? AND short=?", (role["id"], val))   # 改成自己的简称：简称就不用了
+    if not admin:
+        _save(role["id"], name_ts=now)
+    _move_songs(role["name"], val)
     return f"✅ 名字已从「{role['name']}」改为「{val}」。"
 
 
@@ -88,7 +112,7 @@ def edit_line(role, line: str, now: int | None = None, admin: bool = False) -> s
     line = line.strip()
     key, val = line[:4], line[4:].strip()
     if key == "修改名字":
-        return rename(role, val)
+        return rename(role, val, now, admin)
     if key == "修改性别":
         if val not in ("男", "女"):
             return "❌ 性别只能填：男 / 女"
@@ -151,7 +175,7 @@ def summary_lines(role) -> list[str]:
 
 
 HELP = ("💡 可以发这些修改档案（可以一次发多行一起改，每行一条）：\n"
-        "  修改名字 新名字\n"
+        "  修改名字 新名字（24 小时能改一次）\n"
         "  修改性别 男/女\n"
         "  修改年龄 数字\n"
         "  修改皮相 明星名（2 小时能改一次）\n"

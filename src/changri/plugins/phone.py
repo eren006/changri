@@ -21,6 +21,8 @@ async def _(bot: Bot, event: GroupMessageCreateEvent):
     role = roles.find_role_for_sender(bot.self_id, event.group_openid, event.author.member_openid)
     if not role:
         await cmd.finish("请先在你的个人群里发「创建新角色 名字」绑定角色。")
+    if not roles.is_own_group(role["id"], bot.self_id, event.group_openid):
+        await cmd.finish("手机码只能在你自己的个人群里要：这里别人也看得到，拿到激活码就能登录你的小手机。")
     code = phonecodes.code_for_role(role["id"])
     url = phone_url()
     where = f"🔗 打开：{url}" if url else "🔗 网址请向管理员要（管理员还没在设置平台填小手机地址）"

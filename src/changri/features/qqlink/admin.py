@@ -35,7 +35,8 @@ def register(app, login_required):
         sample = {"kind": "约会", "id": 12, "day": 3, "start_hm": "20:00", "end_hm": "21:00", "place": "海边咖啡馆"}
         presets = list(qqpool_core.ROOM_NAME_PRESETS)
         from changri.core import outage
-        return render_template("qqlink.html", fallback_missing=outage.ready(), fallback_active=outage.active(),
+        view = request.args.get("view") or ("settings" if link_rows else "guide")     # 还没连过小号：先看教程（连上以后表单提交回来留在设置）
+        return render_template("qqlink.html", view=view, fallback_missing=outage.ready(), fallback_active=outage.active(),
                                fb_on=outage.enabled(), backfill_on=get_config("qq_backfill_enabled", "1") == "1",
                                alert_min=max(1, get_int("qqlink_alert_secs", 120) // 60), conf=qqpool_core.conf(), pool=[g for g in qqpool_core.list_groups() if g["kind"] != "room"], kinds=qqpool_core.KINDS,
                                st=st, link_rows=link_rows, multi=multi, has_token=bool(get_config("qqlink_token", "")), skip="\n".join(sorted(qqpool_core.skip_users())),
@@ -163,7 +164,7 @@ def register(app, login_required):
     def qqlink_bind():
         name, qq = request.form.get("role", "").strip(), request.form.get("qq", "").strip()
         role = roles_core.get_role_by_name(name)
-        err = "没有叫这个名字的角色" if not role else roles_core.bind_qq(role["id"], qq)
+        err = "没有叫这个名字的角色" if not role else roles_core.bind_qq(role["id"], qq, force=True)
         flash(err or f"已把 QQ {qq} 认到「{name}」名下")
         return redirect(url_for("qqlink_page"))
 

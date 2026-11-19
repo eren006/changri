@@ -103,12 +103,40 @@ class PlayE2E(unittest.TestCase):
         rpg.adjust(ids["甲"], "TEA", 2)
         return rpg, ids
 
+    def test_special_item_use_and_buy(self):
+        """特殊道具：「使用 道具名 目标」能用；「购买」是真的买（以前这段误放在「购买」里：使用用不了、购买反而用掉）。"""
+        from changri.core import specials
+        rpg, ids = self._econ()
+        specials.ensure(True)
+        tap = rpg.find_item("SPEC_006")
+        rpg.adjust(ids["甲"], tap["code"], 1)
+        out = self.say(f"使用 {tap['name']} 乙")
+        self.assertTrue(any("装好了" in o for o in out), out)
+        self.assertFalse(any(x["item_code"] == tap["code"] for x in rpg.inventory(ids["甲"])))
+        rpg.set_listing(tap["code"], 10, "GOLD")
+        out = self.say(f"购买 {tap['name']}")
+        self.assertTrue(any("获得" in o for o in out), out)
+        self.assertTrue(any(x["item_code"] == tap["code"] for x in rpg.inventory(ids["甲"])))
+
     def test_card_and_bag_are_images(self):
         self._econ()
         self.assertEqual(self.say("角色卡"), ["<图>"])
         self.assertEqual(self.say("名片"), ["<图>"])
         self.assertEqual(self.say("背包"), ["<图>"])
         self.assertIn("空", self.say("背包", member="M2", group="P2")[0])                  # 空背包还是文字
+
+    def test_card_works_without_shop(self):
+        from changri.core import rpgcard
+        self._econ()
+        rid = roles.get_role_by_name("甲")["id"]
+        set_config("ext:rpg", "0")
+        try:
+            info = rpgcard.data(rid)
+            self.assertFalse(info["shop"])
+            self.assertEqual((info["money"], info["items"]), ([], []))        # 商城关着：不显示货币和背包
+            self.assertEqual(self.say("名片"), ["<图>"])
+        finally:
+            set_config("ext:rpg", "1")
 
     def test_transfer_currency_and_items(self):
         rpg, ids = self._econ()
@@ -243,6 +271,149 @@ class PlayE2E(unittest.TestCase):
             self.assertEqual(st(), "free")
             out = self.say("约会 1400-1500 咖啡厅 乙")
             self.assertTrue(any("请申请入群" in o and "100001" in o for o in out), out)
+        finally:
+            qqmanager.group_others = old
+
+    def test_pool_group_never_becomes_personal(self):
+        """备用群池里的群不能建角色、认群；老写法「设为备用群池」在个人群里发，报错后群也不能留在池里；已经是个人群的群不会被分给房间。"""
+        self.add_pool(1)
+        self.assertIn("约会用的备用群", self.say("创建新角色 丁", member="M9", group="POOL0")[0])
+        self.assertIsNone(roles.get_role_by_name("丁"))
+        out = self.say("设为备用群池 A组", member="ADMIN", group="P2")                    # P2 是丙的个人群
+        self.assertIn("❌", out[0])
+        self.assertEqual(pool.is_pool_group("B1", "P2")["in_pool"], 0)
+        with get_conn() as c:                                                           # 就算以前已经混进池里（老数据），也不分
+            c.execute("UPDATE pool_groups SET in_pool=1 WHERE bot_id='B1' AND group_openid='P2'")
+            c.execute("UPDATE pool_groups SET state='occupied' WHERE group_openid='POOL0'")
+        a, b = (roles.get_role_by_name(n)["id"] for n in ("甲", "乙"))
+        ok, _info, rid = rooms.create("约会", a, [b], "1400-1500", "咖啡厅")
+        self.assertFalse(ok)                                                             # 唯一「空闲」的是丙的个人群：不给
+
+    def test_wish_take_checks_group_and_reverts(self):
+        """摘心愿开房间也查分到的群里有没有外人；换不到干净的群，房间撤掉，心愿退回没被摘，别人还能摘。"""
+        from changri.core import qqmanager, qqpool, wishes
+        qqpool.add_rooms("B1", "100001", "A组")
+        roles.bind_qq(roles.get_role_by_name("丙")["id"], "5550009")
+        members = {"100001": {"5550009"}}
+
+        async def fake(app_id, gid):
+            return members[gid]
+        old, qqmanager.group_others = qqmanager.group_others, fake
+        try:
+            self.say("挂心愿 1600-1700 花园 一起散步")
+            wid = get_conn().execute("SELECT MAX(id) FROM wishes").fetchone()[0]
+            out = self.say(f"摘心愿 {wid}", member="M1", group="P1")
+            self.assertTrue(any("备用群池暂时没有空闲的群" in o for o in out), out)
+            w = wishes.get(wid)
+            self.assertEqual(w["status"], "open"); self.assertIsNone(w["room_id"])
+            self.assertEqual(get_conn().execute("SELECT COUNT(*) FROM rooms").fetchone()[0], 0)
+        finally:
+            qqmanager.group_others = old
+
+    def test_wish_min_minutes_follow_date(self):
+        set_config("min_minutes_约会", "59")
+        self.assertIn("心愿的时间至少要 59 分钟", self.say("挂心愿 1600-1630 花园 一起散步")[0])
+
+    def test_timeline_change_rechecks_at_apply(self):
+        """改时间线：申请后、全员同意前，有人在新时间约了别的 → 最后一票同意时作废，时间线不变。官约玩家不能改。"""
+        self.add_pool(3)
+        self.say("约会 1400-1500 咖啡厅 乙")
+        rid = get_conn().execute("SELECT MAX(id) FROM rooms").fetchone()[0]
+        out = self.say(f"修改时间线 R{rid} 1600-1700")
+        self.assertTrue(any("已申请" in o for o in out), out)
+        self.say("约会 1600-1700 花园 丙", member="M1", group="P1")                       # 乙在新时间又约了丙
+        out = self.say(f"同意时间线 R{rid}", member="M1", group="P1")
+        self.assertTrue(any("作废" in o for o in out), out)
+        self.assertEqual(rooms.get(rid)["start_hm"], "14:00")
+        self.say("发起官约 1800-1900 后山 甲/乙", member="ADMIN", group="ADM")
+        oid = get_conn().execute("SELECT MAX(id) FROM rooms").fetchone()[0]
+        self.assertIn("由管理员定", self.say(f"修改时间线 R{oid} 2000-2100")[0])
+
+    def test_solo_room_change_applies_directly(self):
+        from changri.core import extensions
+        self.add_pool(1)
+        extensions.set_enabled("stakeout", True)
+        try:
+            self.say("踩点 1400-1500 大图书馆")
+            rid = get_conn().execute("SELECT MAX(id) FROM rooms").fetchone()[0]
+            out = self.say(f"修改时间线 R{rid} 1600-1700")
+            self.assertTrue(any("已改为" in o for o in out), out)
+            self.assertEqual(rooms.get(rid)["start_hm"], "16:00")
+        finally:
+            extensions.set_enabled("stakeout", False)
+
+    def test_wechat_room_not_waiting_for_group(self):
+        from changri.core import overview
+        a, b = (roles.get_role_by_name(n)["id"] for n in ("甲", "乙"))
+        rooms.create("微信", a, [b], "", "")
+        self.assertFalse(any("还在等群" in x for x in overview.todo_items(roles.get_role(a))))
+
+    def test_delete_live_room_tells_everyone(self):
+        """管理员删除进行中的房间：参与者收到通知，房间群里请大家退群。"""
+        self.add_pool(1)
+        self.say("约会 1400-1500 咖啡厅 乙")
+        rid = get_conn().execute("SELECT MAX(id) FROM rooms").fetchone()[0]
+        out = self.say(f"删除时间线 甲 R{rid}", member="ADMIN", group="ADM")
+        self.assertTrue(any(o.startswith("[P1]") and "已被管理员删除" in o for o in out), out)
+        self.assertTrue(any(o.startswith("[POOL0]") and "请退群" in o for o in out), out)
+        self.assertIsNone(rooms.get(rid))
+
+    def test_cannot_take_someone_elses_qq(self):
+        """「绑定QQ」不能把别人认过的号改到自己名下；自己重绑同一个号照常；管理员在后台可以改绑。"""
+        self.assertIn("第 2 步完成", self.say("绑定QQ 5550001")[0])
+        self.assertIn("已经认在别人名下", self.say("绑定QQ 5550001", member="M1", group="P1")[0])
+        self.assertEqual([r["name"] for r in roles.roles_by_qq("5550001")], ["甲"])
+        self.assertIn("认到你的", self.say("绑定QQ 5550001")[0])
+        self.assertEqual(roles.bind_qq(roles.get_role_by_name("乙")["id"], "5550001", force=True), "")
+        self.assertEqual([r["name"] for r in roles.roles_by_qq("5550001")], ["乙"])
+
+    def test_codes_only_in_own_group(self):
+        """手机码、换绑码在别的群（房间群、水群）要不到，只在自己的个人群给。"""
+        set_config("phone_enabled", "1")
+        self.add_pool(1)
+        for word in ("手机码", "换绑码"):
+            out = self.say(word, group="POOL0")
+            self.assertTrue(out and "只能在你自己的个人群" in out[0], out)
+        self.assertIn("激活码", self.say("手机码")[0])
+        self.assertIn("换绑码：", self.say("换绑码")[0])
+
+    def test_name_rules(self):
+        """名字不能带指令分隔符、不能叫「大家」、不能是 R12 / 纯数字、不能和化名重名；简称同样。"""
+        for bad, word in (("甲/乙", "「/」"), ("大家", "撞"), ("R12", "房间号"), ("123", "房间号")):
+            self.assertIn(word, self.say(f"创建新角色 {bad}", member="M9", group="P9")[0])
+        with get_conn() as c:
+            c.execute("INSERT INTO phone_aliases(owner_id, target_id, alias, created_ts) VALUES(?,?,?,0)",
+                      (roles.get_role_by_name("甲")["id"], roles.get_role_by_name("乙")["id"], "夜莺"))
+        self.assertIn("化名", self.say("创建新角色 夜莺", member="M9", group="P9")[0])
+        self.assertIn("房间号", self.say("修改简称 R3")[0])
+        self.assertIn("「|」", self.say("修改名字 甲|乙")[0])
+
+    def test_rename_cooldown_and_songs_follow(self):
+        from changri.core import charprofile, song
+        set_config("ext:song", "1")
+        song.record(roles.get_role_by_name("乙")["id"], {"to": "甲", "message": "送你"}, {"title": "晴天"}, "test")
+        self.assertIn("已从「甲」改为「阿甲」", self.say("修改名字 阿甲")[0])               # 第一次改不限
+        me = roles.get_role_by_name("阿甲")
+        self.assertTrue(any("晴天" in x["text"] for x in __import__("changri.core.phoneview", fromlist=["x"]).song_items(me)))
+        self.assertIn("24 小时只能改一次", self.say("修改名字 阿甲甲")[0])
+        self.assertIn("改为", charprofile.edit(me, "修改名字 阿甲甲", admin=True))           # 管理员不受限
+
+    def test_special_groups_not_personal(self):
+        self.say("设为水群", member="ADMIN", group="WATER")
+        self.assertIn("水群", self.say("创建新角色 丁", member="M9", group="WATER")[0])
+        self.assertIsNone(roles.get_role_by_name("丁"))
+
+    def test_unbound_qq_hint_for_qq_room_group(self):
+        from changri.core import qqmanager, qqpool
+        qqpool.add_rooms("B1", "100001", "A组")
+
+        async def fake(app_id, gid):
+            return set()
+        old, qqmanager.group_others = qqmanager.group_others, fake
+        try:
+            out = self.say("约会 1400-1500 咖啡厅 乙")
+            self.assertTrue(any("你还没绑 QQ" in o for o in out), out)                       # 发起人
+            self.assertTrue(any(o.startswith("[P1]") and "你还没绑 QQ" in o for o in out), out)   # 被邀请的人
         finally:
             qqmanager.group_others = old
 
@@ -532,8 +703,8 @@ class PlayE2E(unittest.TestCase):
         out = self.say("发起官约 D5 1400-1500 无 乙/丙", member="ADMIN", group="ADM")    # 指定天、地点写「无」
         self.assertTrue(any("D5" in o for o in out), out)
         self.assertEqual({r["day"] for r in rooms.timeline(roles.get_role_by_name("乙")["id"])}, {1, 5})
-        out = self.say("发起官电 D6 2000-2100 乙/丙", member="ADMIN", group="ADM")
-        self.assertTrue(any("官电已发起" in o for o in out), out)
+        out = self.say("发起官电 D6 2000-2100 乙/丙", member="ADMIN", group="ADM")       # 以后的天：先只占时间线
+        self.assertTrue(any("官电已排好" in o for o in out), out)
 
     def test_change_timeline_needs_everyone(self):
         self.add_pool(1)
@@ -544,10 +715,69 @@ class PlayE2E(unittest.TestCase):
         out = self.say("同意时间线", member="M1", group="POOL0")
         self.assertTrue(any("时间线已改为 D1 16:00-17:00" in o for o in out))
         self.assertEqual(rooms.get(rid)["start_hm"], "16:00")
-        # 拒绝
+        # 不同意就不理：申请挂着，时间不变
         self.say("修改时间线 1800-1900", member="M0", group="POOL0")
-        self.assertTrue(any("已拒绝" in o for o in self.say("拒绝时间线", member="M1", group="POOL0")))
         self.assertEqual(rooms.get(rid)["start_hm"], "16:00")
+
+    def test_decline_two_person_cancels(self):
+        """「拒绝时间线」= 不想参加（照老系统）：整场取消，双方时间线拿掉，个人群里带房间号也能发。"""
+        self.add_pool(1)
+        self.say("约会 1400-1500 咖啡厅 乙")
+        rid = rooms.timeline(roles.get_role_by_name("甲")["id"])[0]["id"]
+        out = self.say(f"拒绝时间线 R{rid}", member="M1", group="P1")
+        self.assertTrue(any(f"已取消 R{rid}" in o for o in out), out)
+        self.assertTrue(any(o.startswith("[P0]") and "乙 拒绝了" in o for o in out), out)       # 发起人收到
+        self.assertEqual(rooms.get(rid)["status"], "cancelled")
+        self.assertEqual(rooms.timeline(roles.get_role_by_name("甲")["id"]), [])
+        self.assertIn("已经结束或取消", self.say(f"拒绝时间线 R{rid}", member="M1", group="P1")[0])
+
+    def test_decline_multi_person_dissolves(self):
+        """三人以上也整场解散（作者定）：所有人的时间线都拿掉，其他人收到通知。"""
+        self.add_pool(1)
+        self.say("约会 1400-1500 咖啡厅 乙/丙")
+        rid = rooms.timeline(roles.get_role_by_name("甲")["id"])[0]["id"]
+        out = self.say("拒绝时间线", member="M2", group="POOL0")
+        self.assertTrue(any(f"已取消 R{rid}" in o for o in out), out)
+        self.assertTrue(any(o.startswith("[P0]") and "丙 拒绝了" in o for o in out), out)
+        self.assertTrue(any(o.startswith("[P1]") and "丙 拒绝了" in o for o in out), out)
+        self.assertEqual(rooms.get(rid)["status"], "cancelled")
+        for n in ("甲", "乙", "丙"):
+            self.assertEqual(rooms.timeline(roles.get_role_by_name(n)["id"]), [])
+
+    def test_decline_with_pending_change_dissolves_at_once(self):
+        """有人申请改时间时，「拒绝时间线」也是一次就整场取消（不再是投反对票）。"""
+        self.add_pool(1)
+        self.say("约会 1400-1500 咖啡厅 乙")
+        rid = rooms.timeline(roles.get_role_by_name("甲")["id"])[0]["id"]
+        self.say("修改时间线 D1 1600-1700", member="M0", group="POOL0")
+        self.say("拒绝时间线", member="M1", group="POOL0")
+        self.assertEqual(rooms.get(rid)["status"], "cancelled")
+
+    def test_decline_only_before_scene_starts(self):
+        """开始写戏（有一句算进复盘的戏文）以后不能拒绝，要「结束约会」。"""
+        self.add_pool(1)
+        self.say("约会 1400-1500 咖啡厅 乙")
+        rid = rooms.timeline(roles.get_role_by_name("甲")["id"])[0]["id"]
+        with get_conn() as c:
+            c.execute("INSERT INTO room_lines(room_id, ts, role_id, name, text, is_rp, chars) VALUES(?,?,?,?,?,1,4)",
+                      (rid, 1, roles.get_role_by_name("甲")["id"], "甲", "你也来了"))
+        out = self.say(f"拒绝时间线 R{rid}", member="M1", group="P1")
+        self.assertIn("已经开始写了", out[0])
+        self.assertIn("结束约会", out[0])
+        self.assertEqual(rooms.get(rid)["status"], "open")
+
+    def test_room_notice_explains_decline(self):
+        self.add_pool(1)
+        out = self.say("约会 1400-1500 咖啡厅 乙")
+        self.assertTrue(any("拒绝时间线" in o and "开始写戏之前" in o for o in out), out)
+
+    def test_official_cannot_be_declined(self):
+        self.add_pool(1)
+        self.say("发起官约 D1 1400-1500 后山 甲/乙", member="ADMIN", group="ADM")
+        rid = rooms.timeline(roles.get_role_by_name("甲")["id"])[0]["id"]
+        out = self.say(f"拒绝时间线 R{rid}", member="M1", group="P1")
+        self.assertIn("不能拒绝", out[0])
+        self.assertEqual(rooms.get(rid)["status"], "open")
 
     def test_sheet_submit_tells_backstage(self):
         """提交公知/二表：公告群发「已经上交」一句；后台群收一份带内容的；公知再交是「修改了公知」；二表再交不发。"""
@@ -696,12 +926,8 @@ class PlayE2E(unittest.TestCase):
         self.assertIn("乙、丙", out[0])
         out = self.say("同意时间线", member="M1", group="POOL0")
         self.assertTrue(any("还在等：丙" in o for o in out), out)
-        out = self.say("拒绝时间线", member="M2", group="POOL0")
-        self.assertTrue(any("时间线保持 D1 14:00-15:00" in o and "已拒绝 甲 的申请" in o for o in out), out)
-        self.assertTrue(any(o.startswith("[P0]") and "拒绝了你" in o for o in out), out)       # 申请人
-        self.assertTrue(any(o.startswith("[P1]") and "拒绝了 甲 " in o for o in out), out)     # 同意过的人也知道作废了
-        self.assertEqual(rooms.get(rid)["start_hm"], "14:00")
-        self.assertIn("没有待处理", self.say("同意时间线", member="M1", group="POOL0")[0])
+        self.assertEqual(rooms.get(rid)["start_hm"], "14:00")                                # 丙还没同意：不生效
+        self.assertIn("不同意就不用理", self.say("修改时间线 D1 1600-1700", member="M0", group="POOL0")[0])
 
     def test_change_timeline_from_personal_group(self):
         """在个人群带房间号也能改：申请推到对方的个人群，对方在自己的个人群带房间号同意就生效。"""
@@ -1149,6 +1375,18 @@ class PlayE2E(unittest.TestCase):
         self.assertIn("已撤回", self.say(f"撤心愿 {wishes.list_open()[0]['id']}")[0])
         self.assertIn("昵称最多 10 个字", self.say("挂心愿 1600-1700 图书馆 看书 | 一二三四五六七八九十一")[0])
 
+    def test_wish_and_official_on_d0(self):
+        """D0 是档期第一天：D0 挂的心愿能摘，D0 能发官约（以前建房间那步把 day=0 当成「D几 要大于 0」拒了）。"""
+        self.add_pool(2)
+        self.say("设置天数 D0", member="ADMIN", group="ADM")
+        self.say("挂心愿 1400-1500 花园 一起散步")
+        wid = wishes.list_open()[0]["id"]
+        out = self.say(f"摘心愿 {wid}", member="M1", group="P1")
+        self.assertTrue(any("摘了心愿" in o for o in out), out)
+        self.assertFalse(any("D几" in o for o in out), out)
+        out = self.say("发起官约 D0 1600-1700 花园 乙/丙", member="ADMIN", group="ADM")
+        self.assertFalse(any("D几" in o for o in out), out)
+
     def test_wish_goes_to_stage_group(self):
         """挂出的心愿默认发到戏群（只显示昵称，不显示真名）；关掉「挂心愿时发到戏群」就不发。"""
         set_config("stage_group", "B1|STAGE")
@@ -1157,6 +1395,43 @@ class PlayE2E(unittest.TestCase):
         self.assertTrue(st and "神秘人A" in st[0] and "甲" not in st[0], out)
         set_config("wish_stage_send", "0")
         self.assertFalse(any("[STAGE]" in o for o in self.say("挂心愿 1600-1700 图书馆 陪我看书")))
+
+    def test_wish_broadcast_shared_by_phone(self):
+        """小手机挂的心愿也走 wishes.broadcast：戏群照发（以前小手机只看公告群开关，戏群收不到）。"""
+        set_config("stage_group", "B1|STAGE")
+        self.say("挂心愿 1400-1500 花园 一起散步 | 神秘人A")
+        got = []
+
+        async def send(bot_id, gid, text):
+            got.append((bot_id, gid, text))
+        asyncio.new_event_loop().run_until_complete(wishes.broadcast(wishes.list_open()[0], send))
+        self.assertEqual([(b, g) for b, g, _ in got], [("B1", "STAGE")])
+        self.assertIn("神秘人A", got[0][2])
+
+    def test_wish_taken_next_day_lands_on_that_day(self):
+        """心愿没过期就能摘，不管挂在哪天：D0 挂、D1 摘，房间开在 D1 同一个钟点。"""
+        self.add_pool(1)
+        self.say("设置天数 D0", member="ADMIN", group="ADM")
+        self.say("挂心愿 1400-1500 花园 一起散步")
+        wid = wishes.list_open()[0]["id"]
+        self.assertIn("摘的当天", self.say("看心愿", member="M1", group="P1")[0])
+        self.say("设置天数 D1", member="ADMIN", group="ADM")
+        out = self.say(f"摘心愿 {wid}", member="M1", group="P1")
+        self.assertTrue(any("摘了心愿" in o for o in out), out)
+        w = wishes.get(wid)
+        self.assertEqual(w["day"], 1)
+        r = rooms.get(w["room_id"])
+        self.assertEqual((r["day"], r["start_hm"], r["end_hm"]), (1, "14:00", "15:00"))
+
+    def test_wish_id_formats(self):
+        """按钮上写「摘 #1」，有人照着打 #1、[1]、【1】：都认；乱写还是给用法。"""
+        for s, n in (("1", 1), ("#2", 2), ("＃3", 3), ("[4]", 4), ("【5】", 5), ("R6", 6), (" 7 ", 7)):
+            self.assertEqual(wishes.parse_id(s), n, s)
+        for s in ("", "D0 1", "一", "1 2"):
+            self.assertIsNone(wishes.parse_id(s), s)
+        self.say("挂心愿 1400-1500 花园 一起散步")
+        wid = wishes.list_open()[0]["id"]
+        self.assertNotIn("用法", self.say(f"摘心愿 [{wid}]", member="M1", group="P1")[0])
 
     def test_wish_expire_and_cap(self):
         for t in ("0800-0900", "0900-1000", "1000-1100"):

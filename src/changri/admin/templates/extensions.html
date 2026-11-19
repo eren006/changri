@@ -109,7 +109,7 @@
 {% if owner %}<p class="note" style="margin:-8px 0 16px"><b style="color:var(--warn)">注意：</b>扩展是 Python 代码，装上就和主程序有同样的权限（包括能读到机器人的 AppSecret）。只安装你信得过的人写的扩展。上传的扩展默认是关闭的，要自己打开开关。</p>{% endif %}
 
 {% for it in items if it.group == cur %}
-<article class="ext" data-search="{{ it.name }} {{ it.description }} {{ it.author }}">
+<article class="ext" data-search="{{ it.name }} {{ it.description }} {{ it.author }}{% for f in it.fields or [] %} {{ f.label }}{% endfor %}{% for st in it.settings or [] %} {{ st.label or st.key }}{% endfor %}">
   <div class="head">
     {% if it.kind != 'core' %}<span class="sw {{ 'on' if it.enabled }}">
       <form method="post" action="{{ url_for('extensions_toggle') }}" style="margin:0;height:100%">{{ csrf() }}
@@ -190,6 +190,8 @@
 {% endfor %}
 <script>
 function filterExt(){var q=document.getElementById("q").value.trim().toLowerCase();document.querySelectorAll("article.ext").forEach(function(a){a.style.display=(!q||a.dataset.search.toLowerCase().indexOf(q)>=0)?"":"none";});}
+/* ?open=设置项 key（比如 contact_qq）：直接打开那张卡片的设置框，滚到那一项。别的页面要指到某个设置就用这个链接 */
+(function(){var k=new URLSearchParams(location.search).get("open");if(!k||!/^[a-z0-9_]+$/.test(k))return;var el=document.getElementById(k);var d=el&&el.closest("dialog");if(!d)return;d.showModal();var row=el.closest(".srow")||el;row.scrollIntoView({block:"center"});el.focus({preventScroll:true});})();
 </script>
 
 {% endif %}

@@ -923,6 +923,142 @@ class PhoneThreads(Phone):
         self.assertEqual(self.c.get("/p/me/poll").get_json()["total"], 0)
 
 
+    def test_chaos_does_not_leak_on_phone(self):
+        """混乱短信：发件人小手机看原文、挂在原本发给的人名下；误投的人看到改过的；撕走的后半截进第三人的「飘来的半张纸」。"""
+        from unittest import mock
+        from changri.core import chaosletter, messaging
+        set_config("sms_cooldown_sec", "0"); set_config("ext:chaos_letter", "1"); set_config("letter_public_send", "0")
+        with get_conn() as c:
+            c.execute("DELETE FROM chaos_letters")
+        roles.create_role("丙", "B1", "P2", "M2"); roles.create_role("丁", "B1", "P3", "M3")
+        cc, dd = roles.get_role_by_name("丙"), roles.get_role_by_name("丁")
+        fixed = {"shown": "月色……（后半截被撕走了）", "sign": "甲", "true_to": cc["id"], "torn": (dd["id"], "很好你呢"), "effects": ["误投", "撕成两半"]}
+        self._login(self.a)
+        with mock.patch.object(chaosletter, "compose", return_value=fixed):
+            html, sent = self._post("/p/me/send", to=self.b["id"], kind="sms", text="月色很好你呢")
+        self.assertIn("已送达「乙」", html)
+        a_thread = self.c.get(f"/p/me/{self.b['id']}").get_data(as_text=True)
+        self.assertIn("月色很好你呢", a_thread); self.assertNotIn("被撕走", a_thread)          # 甲看自己写的原文，挂在乙名下
+        self.assertNotIn(f'href="/p/me/{cc["id"]}"', self.c.get("/p/me").get_data(as_text=True))   # 甲那边没有「和丙的对话」
+        self.assertNotIn("丙", self.c.get("/p/me/search?q=月色").get_data(as_text=True))         # 搜索也不露馅
+        row = messaging.last_recallable(self.a["id"])
+        if row:
+            self.assertEqual(row["to_name"], "乙")                                             # 撤回提示写原本发给的人
+        self._login(self.b)
+        self.assertNotIn("月色", self.c.get("/p/me").get_data(as_text=True))                     # 乙根本没收到
+        self._login(cc)
+        self.assertIn("被撕走", self.c.get(f"/p/me/{self.a['id']}").get_data(as_text=True))       # 丙收到的是改过的
+        self._login(dd)
+        self.assertIn("飘来的半张纸", self.c.get("/p/me").get_data(as_text=True))
+        self.assertEqual(self.c.get("/p/me/poll").get_json()["total"], 1)
+        self.assertIn("很好你呢", self.c.get("/p/me/sys/torn").get_data(as_text=True))
+        self.assertEqual(self.c.get("/p/me/poll").get_json()["total"], 0)
+
+    def test_lost_and_blocked_not_on_recipient_phone(self):
+        from changri.core import messaging
+        lost = messaging.queue_message("gift", self.a["id"], self.b["id"], "玫瑰", "送你")
+        messaging.mark_lost(lost)
+        blk = messaging.queue_message("sms", self.a["id"], self.b["id"], "", "拉黑了还发")
+        messaging.mark_blocked(blk, True)
+        self._login(self.b)
+        self.assertEqual(self.c.get("/p/me/poll").get_json()["total"], 0)
+        self.assertNotIn("玫瑰", self.c.get("/p/me").get_data(as_text=True))
+        self.assertNotIn("拉黑了还发", self.c.get(f"/p/me/{self.a['id']}").get_data(as_text=True))
+        self._login(self.a)                                                                   # 甲以为送到了：自己那边照常看到
+        html = self.c.get(f"/p/me/{self.b['id']}").get_data(as_text=True)
+        self.assertIn("玫瑰", html); self.assertIn("拉黑了还发", html)
+
+    def test_recall_hides_on_phone_and_takes_images(self):
+        """撤回：群里的文字和跟着发的图片都撤；双方小手机里也不再显示。"""
+        import asyncio
+        from unittest import mock
+        from changri.core import messaging, sendmsg
+        mid = messaging.queue_message("sms", self.a["id"], self.b["id"], "", "发错了")
+        with get_conn() as c:
+            c.execute("UPDATE messages SET status='sent', delivered_bot='B1', delivered_group='G', delivered_msg_id='T1', delivered_img_ids='I1,I2', "
+                      "delivered_ts=? WHERE id=?", (int(time.time()), mid))
+        undone = []
+
+        async def fake_recall(bot, grp, msg_id):
+            undone.append(msg_id)
+        m = messaging.last_recallable(self.a["id"])
+        with mock.patch("nonebot.get_bots", return_value={"B1": object()}), mock.patch("changri.core.qqsend.recall_group_message", fake_recall):
+            asyncio.run(sendmsg.recall(m))
+        self.assertEqual(undone, ["T1", "I1", "I2"])
+        for who, other in ((self.a, self.b), (self.b, self.a)):
+            self._login(who)
+            self.assertNotIn("发错了", self.c.get(f"/p/me/{other['id']}").get_data(as_text=True))
+            self.assertNotIn("发错了", self.c.get("/p/me").get_data(as_text=True))
+
+    def test_refused_does_not_use_quota(self):
+        """对方明确拒收：告诉了发件人没发出去，就不算今天的次数、不进冷却；静默拉黑照算。"""
+        from changri.core import messaging
+        set_config("sms_cooldown_sec", "600")
+        m1 = messaging.queue_message("sms", self.a["id"], self.b["id"], "", "在吗")
+        messaging.mark_blocked(m1, False)
+        self.assertEqual(messaging.day_count(self.a["id"], "sms"), 0)
+        self.assertEqual(messaging.cooldown_left(self.a["id"], "sms"), 0)
+        m2 = messaging.queue_message("sms", self.a["id"], self.b["id"], "", "在吗")
+        messaging.mark_blocked(m2, True)
+        self.assertEqual(messaging.day_count(self.a["id"], "sms"), 1)
+        self.assertGreater(messaging.cooldown_left(self.a["id"], "sms"), 0)
+
+    def test_retry_delivery_runs_chaos_followups(self):
+        """当场没送到、自动重试送到的混乱短信：撕走的后半截照样送给第三人，只做一次。"""
+        import asyncio
+        from changri.core import chaosletter, messaging, sendmsg
+        with get_conn() as c:
+            c.execute("DELETE FROM chaos_letters")
+        set_config("letter_public_send", "0")
+        roles.create_role("丙", "B1", "P2", "M2")
+        cc = roles.get_role_by_name("丙")
+        mid = messaging.queue_message("sms", self.a["id"], self.b["id"], "", "上半……（后半截被撕走了）")
+        c = {"shown": "上半……（后半截被撕走了）", "sign": "甲", "true_to": self.b["id"], "torn": (cc["id"], "下半"), "effects": ["撕成两半"]}
+        chaosletter.attach(chaosletter.log(self.a["id"], self.b["id"], c, "上半下半"), mid, c)
+        with get_conn() as conn:
+            conn.execute("UPDATE messages SET attempts=1 WHERE id=?", (mid,))
+        sent = []
+
+        async def fake(bot, grp, text, *a, **k):
+            sent.append((grp, text))
+            return "mid"
+        self.assertEqual(asyncio.run(messaging.retry_pending(fake, on_delivered=sendmsg.after_delivered)), 1)
+        self.assertTrue(any("下半" in t and g == "P2" for g, t in sent), sent)
+        self.assertEqual([x["torn_text"] for x in chaosletter.torn_items(cc["id"])], ["下半"])
+        self.assertIsNone(chaosletter.take_after(mid))                                       # 只做一次
+
+    def test_alias_chaos_no_leak(self):
+        """匿名短信也出混乱效果：误投给第三人时落款还是化名、进他的署名会话；发件人在匿名对话里看原文；对方看不到；公告不写化名背后是谁。"""
+        from unittest import mock
+        from changri.core import aliases, announce, chaosletter, messaging
+        set_config("sms_cooldown_sec", "0"); set_config("ext:chaos_letter", "1")
+        set_config("letter_public_send", "1"); set_config("letter_public_chance", "100")
+        announce.set_announce("B1", "ANN")
+        roles.create_role("丙", "B1", "P2", "M2")
+        cc = roles.get_role_by_name("丙")
+        self._login(self.a)
+        self._post("/p/me/alias", to=self.b["id"], alias="夜莺")
+        aid = aliases.threads(self.a["id"])[0]["alias_id"]
+        fixed = {"shown": "今晚……月", "sign": "丙", "true_to": cc["id"], "torn": None, "effects": ["抹字", "落款写错", "误投"]}
+        with mock.patch.object(chaosletter, "compose", return_value=dict(fixed)):
+            html, sent = self._post(f"/p/me/a/{aid}/send", text="今晚的月亮")
+        self.assertTrue(any(g == "P2" and "夜莺 给你发来一条短信" in t for g, t in sent), sent)      # 丙收到，落款还是化名
+        ann = [t for g, t in sent if g == "ANN"]
+        self.assertTrue(ann and "夜莺" in ann[0] and "甲" not in ann[0] and "落款写错" not in ann[0], ann)
+        mine = self.c.get(f"/p/me/a/{aid}").get_data(as_text=True)
+        self.assertIn("今晚的月亮", mine); self.assertNotIn("今晚……月", mine)                        # 甲在匿名对话里看原文
+        self.assertNotIn(f'href="/p/me/{cc["id"]}"', self.c.get("/p/me").get_data(as_text=True))
+        self._login(self.b)
+        self.assertNotIn("今晚", self.c.get(f"/p/me/a/{aid}").get_data(as_text=True))                # 乙没收到
+        self._login(cc)
+        html = self.c.get("/p/me/s/夜莺").get_data(as_text=True)
+        self.assertIn("今晚……月", html); self.assertNotIn("甲", html.split("<header")[1].split("</header>")[0])
+        # 乙回给化名后撤回：提示写化名，不写甲
+        mid = messaging.queue_message("sms", self.b["id"], self.a["id"], "", "你是谁", "乙（回你的化名「夜莺」）", alias_id=aid)
+        with get_conn() as c:
+            c.execute("UPDATE messages SET status='sent', delivered_msg_id='X', delivered_ts=? WHERE id=?", (int(time.time()), mid))
+        self.assertEqual(messaging.last_recallable(self.b["id"])["to_name"], "夜莺")
+
 class PhonePush(Phone):
     """网页推送（照老系统）：订阅只认浏览器自家的推送服务；第一次扫只记起点；之后有新东西各推一条，不写是谁、写了什么。"""
 

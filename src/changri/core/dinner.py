@@ -1,5 +1,6 @@
 """晚餐（额外）：管理员开一桌 N 个座位，玩家入座，相邻座位（首尾也算相邻）可以「戳你一下」。
-状态存在 config 的 dinner_state（JSON）里：{"max": 座位数, "era": 风格, "dishes": [...], "seats": [角色名或 null]}。"""
+状态存在 config 的 dinner_state（JSON）里：{"max": 座位数, "era": 风格, "dishes": [...], "seats": [角色名或 null], "bot", "group"（开在哪个群，送甜点播报用）}。
+开始、结束晚餐都会清掉这局的送甜点（core/dinner_dessert.py，config 的 dessert_game）和我有你没有（core/dinner_ihave.py，ihave_game）。"""
 import json
 import random
 import time
@@ -28,17 +29,21 @@ def _save(s: dict | None) -> None:
     set_config("dinner_state", json.dumps(s, ensure_ascii=False) if s else "")
 
 
-def start(n: int, era: str = "现代中餐") -> tuple[bool, str]:
+def start(n: int, era: str = "现代中餐", bot_id: str = "", group: str = "") -> tuple[bool, str]:
     if n < 2 or n > 30:
         return False, "座位数要在 2 到 30 之间。"
     dishes = [] if era == "无菜" else random.sample(MENUS.get(era, ["家常小菜"]), min(len(MENUS.get(era, ["家常小菜"])), 5 + n // 3))
-    _save({"max": n, "era": era, "dishes": dishes, "seats": [None] * n})
+    _save({"max": n, "era": era, "dishes": dishes, "seats": [None] * n, "bot": bot_id, "group": group})
+    set_config("dessert_game", "")
+    set_config("ihave_game", "")
     return True, render(state(), "🍽️ 【晚餐开始】")
 
 
 def stop() -> bool:
     had = state() is not None
     _save(None)
+    set_config("dessert_game", "")
+    set_config("ihave_game", "")
     return had
 
 

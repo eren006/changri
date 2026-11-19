@@ -71,6 +71,105 @@ class SeasonTests(unittest.TestCase):
         self.assertEqual(self.run_tick("2026-11-16", "23:59")[0], "advanced")
         self.assertEqual(season.current_day(), 1)
 
+    def test_missed_2359_is_caught_up_next_day(self):
+        """23:59 那一分钟机器人不在线（更新重启、断网）：第二天上线补推进一次，不会整季少一天；同一天不重复补。"""
+        season.book("甲季", "2026-11-15", "2026-11-20")
+        season.start("", now="2026-11-14")
+        self.assertEqual(self.run_tick("2026-11-15", "00:05")[0], "d0")
+        r, sent = self.run_tick("2026-11-16", "08:30")                             # 11-15 的 23:59 错过了
+        self.assertEqual(r, "caught_up")
+        self.assertEqual(season.current_day(), 1)
+        self.assertIn("补推进", sent[-1][2])
+        self.assertEqual(self.run_tick("2026-11-16", "09:00")[0], "idle")
+        self.assertEqual(self.run_tick("2026-11-16", "23:59")[0], "advanced")       # 当晚照常
+        self.assertEqual(season.current_day(), 2)
+        self.assertEqual(self.run_tick("2026-11-17", "00:01")[0], "idle")          # 刚推进过的不再补
+        self.assertEqual(season.current_day(), 2)
+
+    def test_d0_entered_late_is_not_caught_up(self):
+        """开始日机器人不在线、第二天才自动进 D0：进 D0 那天就是 D0，不会马上补成 D1。"""
+        season.book("甲季", "2026-11-15", "2026-11-20")
+        season.start("", now="2026-11-14")
+        self.assertEqual(self.run_tick("2026-11-16", "10:00")[0], "d0")
+        self.assertEqual(self.run_tick("2026-11-16", "10:01")[0], "idle")
+        self.assertEqual(season.current_day(), 0)
+
+    def test_legacy_empty_marker_only_advances_at_2359(self):
+        """老版本自动进 D0 时 auto_day_last 记成空：升级后白天不能误补一天。"""
+        season.book("甲季", "2026-11-15", "2026-11-20")
+        season.start("", now="2026-11-14")
+        self.run_tick("2026-11-15", "00:05")
+        set_config("auto_day_last", "")
+        self.assertEqual(self.run_tick("2026-11-15", "15:00")[0], "idle")
+        self.assertEqual(self.run_tick("2026-11-15", "23:59")[0], "advanced")
+        self.assertEqual(season.current_day(), 1)
+
+    def test_wipe_preview_lists_everything_that_goes(self):
+        """收尾预览以前只列角色、短信、心动信、关系线 4 项，心愿、房间、论坛也会被删却没说。角色一直列，别的有才列。"""
+        self.assertEqual(season.wipe_preview(), {"角色": 0})
+        roles.create_role("甲", "B", "G1", "M1")
+        roles.create_role("乙", "B", "G2", "M2")
+        a, b = roles.get_role_by_name("甲")["id"], roles.get_role_by_name("乙")["id"]
+        lovemail.add_mail(a, b, "匿名", "信")
+        with get_conn() as c:
+            c.execute("DELETE FROM wishes")
+        pv = season.wipe_preview()
+        self.assertEqual(pv["角色"], 2)
+        self.assertEqual(pv["心动信"], 1)
+        self.assertNotIn("心愿", pv)                                                 # 没有的不列
+        self.assertNotIn("短信和礼物", pv)
+
+    def test_stage_warnings(self):
+        """「季度状态」的舞台检查：没设的群、没空群都点出来；设齐了就没有。"""
+        from changri.core import announce, entrance
+        w = "\n".join(season.stage_warnings())
+        for k in ("公告群", "后台群", "戏群", "备用群池"):
+            self.assertIn(k, w)
+        announce.set_announce("B", "ANN")
+        announce.set_backstage("B", "BS")
+        entrance.set_stage("B", "STAGE")
+        w = "\n".join(season.stage_warnings())
+        for k in ("公告群", "后台群", "戏群"):
+            self.assertNotIn("没设" + k, w)
+        self.assertIn("备用群池", w)
+
+    def test_prep_note_only_in_prep(self):
+        """筹备期拉线、挂心愿、写心动信的回执末尾提醒「到 D0 会被清掉」；正式开季后没有。"""
+        season.book("甲季", "2026-11-15", "2026-11-20")
+        season.start("", now="2026-11-14")
+        self.assertIn("筹备期", season.prep_note("关系线"))
+        self.assertIn("11-15", season.prep_note("关系线"))
+        self.run_tick("2026-11-15", "00:05")
+        self.assertEqual(season.prep_note("关系线"), "")
+
+    def test_end_reminds_players_to_save(self):
+        """结束季度：没开季末报告时，给每位玩家（不含 NPC）的个人群单独发「收尾前存档」提醒；开了就并在报告里。"""
+        season.book("甲季", "2026-11-15", "2026-11-20")
+        season.start("", now="2026-11-14")
+        roles.create_role("甲", "B", "G1", "M1")
+        roles.create_role("乙", "B", "G2", "M2")
+        sent = Sent()
+        ok, msg = asyncio.new_event_loop().run_until_complete(season.end_and_report(sent))
+        self.assertTrue(ok)
+        self.assertIn("已提醒 2 位玩家", msg)
+        to_players = [t for _, g, t in sent if g in ("G1", "G2")]
+        self.assertEqual(len(to_players), 2)
+        self.assertTrue(all("复盘 R12" in t and "收尾" in t for t in to_players))
+
+    def test_wipe_clears_dinner_games_and_plans(self):
+        """收尾清掉存在设置里、记着本季角色的小游戏和计划官约；上季没「结束晚餐」也不会带到下一季。别的设置不动。"""
+        for k in season.SEASON_CONFIG_KEYS:
+            set_config(k, '{"x": 1}')
+        set_config("poke_at:3", "1")
+        set_config("alarm_last:3", "x")
+        set_config("guard_locations", "后山")
+        set_config("lovemail_delivery_time", "21:30")
+        season.wipe()
+        for k in (*season.SEASON_CONFIG_KEYS, "poke_at:3", "alarm_last:3"):
+            self.assertEqual(get_config(k, "空"), "空", k)
+        self.assertEqual(get_config("guard_locations"), "后山")
+        self.assertEqual(get_config("lovemail_delivery_time"), "21:30")
+
     def test_auto_day_announces_today_counts(self):
         """自动换天时公告群那条带上全员今天的计数（换天之前算）。"""
         season.book("丁季", "2026-11-10", "2026-11-17", "2026-11-18", "")

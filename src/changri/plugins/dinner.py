@@ -1,19 +1,21 @@
 """晚餐（额外扩展，默认关闭）：管理员「开始晚餐 座位数 [风格]」，玩家「入座 座位号」，相邻座位「戳你一下 角色名」。规则在 core/dinner.py。
-晚餐上的小游戏（开了晚餐就能玩）：围猎、巡逻，规则在 core/dinner_games.py。"""
+晚餐上的小游戏（开了晚餐就能玩）：围猎、巡逻，规则在 core/dinner_games.py；送甜点在 core/dinner_dessert.py；我有你没有在 core/dinner_ihave.py。"""
 import asyncio
 
 import nonebot
-from nonebot import logger
+from nonebot import logger, on_command
+from nonebot.rule import Rule
 from nonebot.adapters.qq import Bot, GroupMessageCreateEvent
 from nonebot.params import CommandArg
 from nonebot_plugin_apscheduler import scheduler
 
-from changri.core import dinner, dinner_games as games, drinking, messaging, roles
+from changri.core import dinner, dinner_dessert as dessert, dinner_ihave as ihave, dinner_games as games, drinking, messaging, roles
 from changri.core.db import per_bot
 from nonebot.adapters.qq import MessageSegment
 
 from changri.core.qqsend import make_send, make_send_image, reply_long
 from changri.plugins.play import NEED_ROLE, _cmd, _is_admin, _me
+from changri.core.textutil import parse_id
 
 start_cmd = _cmd("开始晚餐")
 sit_cmd = _cmd("入座")
@@ -28,7 +30,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     p = args.extract_plain_text().split()
     if not p or not p[0].isdigit():
         await start_cmd.finish("用法：开始晚餐 座位数 [风格]\n风格：" + "、".join(dinner.MENUS) + "、无菜\n例：开始晚餐 5 现代西餐")
-    ok, msg = dinner.start(int(p[0]), p[1] if len(p) > 1 else "现代中餐")
+    ok, msg = dinner.start(int(p[0]), p[1] if len(p) > 1 else "现代中餐", bot.self_id, event.group_openid)
     await start_cmd.finish(msg if ok else "❌ " + msg)
 
 
@@ -37,10 +39,10 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     me = _me(bot, event)
     if not me:
         await sit_cmd.finish(NEED_ROLE)
-    t = args.extract_plain_text().strip()
-    if not t.isdigit():
-        await sit_cmd.finish("用法：入座 座位号")
-    ok, msg = dinner.sit(me["name"], int(t))
+    n = parse_id(args.extract_plain_text())
+    if not n:
+        await sit_cmd.finish("用法：入座 座位号，例：入座 3")
+    ok, msg = dinner.sit(me["name"], n)
     await sit_cmd.finish(msg if ok else "❌ " + msg)
 
 
@@ -49,7 +51,9 @@ async def _(bot: Bot, event: GroupMessageCreateEvent):
     if not _is_admin(bot, event):
         await end_cmd.finish("❌ 权限不足，仅管理员可用。")
     hunted = games.hunt_end()
-    await end_cmd.finish(("🏁 晚餐已结束。" + ("进行中的围猎也一起结束了。" if hunted else "")) if dinner.stop() else "现在没有进行中的晚餐。")
+    ihave_on = ihave.active() is not None
+    also = "、".join(x for x, on in (("围猎", hunted), ("我有你没有", ihave_on)) if on)
+    await end_cmd.finish(("🏁 晚餐已结束。" + (f"进行中的{also}也一起结束了。" if also else "")) if dinner.stop() else "现在没有进行中的晚餐。")
 
 
 @poke_cmd.handle()
@@ -290,6 +294,189 @@ async def _(bot: Bot, event: GroupMessageCreateEvent):
     if not _is_admin(bot, event):
         await guard_end.finish("❌ 权限不足，仅管理员可用。")
     await guard_end.finish("🧹 已清空巡逻赛。" if games.guard_end() else "现在没有巡逻赛。")
+
+
+# ================= 送甜点（毒果） =================
+
+dessert_claim = _cmd("领取甜点")
+dessert_give = _cmd("送甜点")
+dessert_mine = _cmd("我的甜点")
+dessert_all = _cmd("全部甜点")
+dessert_reveal = _cmd("揭晓甜点")
+
+OWN_GROUP_ONLY = "🤫 这个指令只能在你自己的个人群里发，别人看不到。"
+
+
+async def _dessert_me(matcher, bot: Bot, event: GroupMessageCreateEvent):
+    """送甜点的玩家指令都要在本人个人群发：真假、谁送的都不能让群里别人看到。"""
+    me = _me(bot, event)
+    if not me:
+        await matcher.finish(NEED_ROLE)
+    if not roles.is_own_group(me["id"], bot.self_id, event.group_openid):
+        await matcher.finish(OWN_GROUP_ONLY)
+    return me
+
+
+@dessert_claim.handle()
+async def _(bot: Bot, event: GroupMessageCreateEvent):
+    me = await _dessert_me(dessert_claim, bot, event)
+    ok, text = dessert.claim(me["name"])
+    await dessert_claim.finish(text if ok else "❌ " + text)
+
+
+@dessert_give.handle()
+async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
+    me = await _dessert_me(dessert_give, bot, event)
+    p = args.extract_plain_text().split()
+    to, name = (p[0], " ".join(p[1:])) if len(p) >= 2 else ("", "")
+    ok, text = dessert.give(me["name"], to, name)
+    if not ok:
+        await dessert_give.finish("❌ " + text)
+    send = make_send()
+    target = roles.get_role_by_name(to)
+    if target:
+        await messaging.push_to_role(target["id"], f"🍰 {me['name']} 给你送来了一道「{name}」。是甜是毒，只有 TA 知道。", send)
+    where = dessert.broadcast_target()
+    if where:
+        try:
+            await send(where[0], where[1], f"🍰 有人给「{to}」送来了一道「{name}」。")
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[送甜点] 播报失败：{e}")
+    await dessert_give.finish(text)
+
+
+@dessert_mine.handle()
+async def _(bot: Bot, event: GroupMessageCreateEvent):
+    me = await _dessert_me(dessert_mine, bot, event)
+    await dessert_mine.finish(dessert.mine_text(me["name"]))
+
+
+@dessert_all.handle()
+async def _(bot: Bot, event: GroupMessageCreateEvent):
+    if not _is_admin(bot, event):
+        await dessert_all.finish("❌ 权限不足，仅管理员可用。")
+    await reply_long(dessert_all, dessert.all_text())
+
+
+@dessert_reveal.handle()
+async def _(bot: Bot, event: GroupMessageCreateEvent):
+    if not _is_admin(bot, event):
+        await dessert_reveal.finish("❌ 权限不足，仅管理员可用。")
+    ok, text = dessert.reveal()
+    if not ok:
+        await dessert_reveal.finish("❌ " + text)
+    await reply_long(dessert_reveal, text)
+
+
+# ================= 我有你没有 =================
+
+
+
+def _in_ihave_group(event: GroupMessageCreateEvent) -> bool:
+    """「发言」「不折」「下一轮」这些词太常见：只有一局正在进行、又是在开局的群里才算指令，
+    别的时候、别的群里照常放过去（不然 block=True 会把台词吞掉，复盘记录收不到）。"""
+    g = ihave.active()
+    return bool(g) and g["group"] == event.group_openid
+
+
+def _icmd(name: str):
+    return on_command(name, rule=Rule(_in_ihave_group), priority=10, block=True)
+
+
+ihave_start = _cmd("开始我有你没有")
+ihave_speak = _icmd("发言")
+ihave_fold = _icmd("折手指")
+ihave_keep = _icmd("不折")
+ihave_fold_up = _icmd("补折")
+ihave_keep_up = _icmd("补不折")
+ihave_next = _icmd("下一轮")
+ihave_status = _cmd("我有你没有状态")
+ihave_end = _cmd("结束我有你没有")
+
+
+def _ihave_seen(me, event) -> None:
+    """玩家在开局的群里发指令时记下 openid，「下一轮」@ 人要用。"""
+    g = ihave.active()
+    if g and me and g["group"] == event.group_openid:
+        ihave.note_openid(me["name"], event.author.member_openid)
+
+
+async def _reply_at(matcher, text: str, at: list[tuple[str, str]]) -> None:
+    """回复里 @ 一串人：有 openid 的用 markdown 真 @，发不了或没记到 openid 就写「@名字」。"""
+    real = [(n, o) for n, o in at if o]
+    if real:
+        tags = " ".join(f'<qqbot-at-user id="{o}" />' for _, o in real)
+        plain = " ".join(f"@{n}" for n, o in at if not o)
+        try:
+            await matcher.send(MessageSegment.markdown(f"{tags} {plain}\n{text}".replace(" \n", "\n")))
+            return
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[我有你没有] markdown @ 发不出去，改发纯文字：{e}")
+    head = " ".join(f"@{n}" for n, _ in at)
+    await reply_long(matcher, (head + "\n" if head else "") + text, as_image=False)
+
+
+@ihave_start.handle()
+async def _(bot: Bot, event: GroupMessageCreateEvent):
+    me = _me(bot, event)
+    admin = _is_admin(bot, event)
+    if not me and not admin:
+        await ihave_start.finish(NEED_ROLE)
+    ok, text = ihave.start(me["name"] if me else "", admin, bot.self_id, event.group_openid)
+    if not ok:
+        await ihave_start.finish("❌ " + text)
+    _ihave_seen(me, event)
+    await ihave_start.finish(text)
+
+
+@ihave_speak.handle()
+async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
+    me = _me(bot, event)
+    if not me:
+        await ihave_speak.finish(NEED_ROLE)
+    _ihave_seen(me, event)
+    ok, text = ihave.speak(me["name"], args.extract_plain_text())
+    await ihave_speak.finish(text if ok else "❌ " + text)
+
+
+def _ihave_vote(matcher, fold: bool, make_up: bool):
+    @matcher.handle()
+    async def _(bot: Bot, event: GroupMessageCreateEvent):
+        me = _me(bot, event)
+        if not me:
+            await matcher.finish(NEED_ROLE)
+        _ihave_seen(me, event)
+        why = (ihave.make_up if make_up else ihave.vote)(me["name"], fold)
+        await matcher.finish(("❌ " + why) if why else None)   # 成功不回执：人多时消息太多
+
+
+_ihave_vote(ihave_fold, True, False)
+_ihave_vote(ihave_keep, False, False)
+_ihave_vote(ihave_fold_up, True, True)
+_ihave_vote(ihave_keep_up, False, True)
+
+
+@ihave_next.handle()
+async def _(bot: Bot, event: GroupMessageCreateEvent):
+    me = _me(bot, event)
+    _ihave_seen(me, event)
+    ok, r = ihave.next_round(me["name"] if me else "", _is_admin(bot, event))
+    if not ok:
+        await ihave_next.finish("❌ " + r)
+    await _reply_at(ihave_next, r["text"], r["at"])
+
+
+@ihave_status.handle()
+async def _():
+    await ihave_status.finish(ihave.status())
+
+
+@ihave_end.handle()
+async def _(bot: Bot, event: GroupMessageCreateEvent):
+    if not _is_admin(bot, event):
+        await ihave_end.finish("❌ 权限不足，仅管理员可用。")
+    ok, text = ihave.end()
+    await ihave_end.finish(text if ok else "❌ " + text)
 
 
 # ================= 喝酒游戏（每个群一局） =================

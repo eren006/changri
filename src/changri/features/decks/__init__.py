@@ -3,13 +3,8 @@
 # 功能声明：设置平台「扩展」页的卡片、开关默认值、设置组、左侧菜单、群指令模块。由 features/registry.py 收集。
 FEATURE = {'id': 'decks',
  'name': '牌堆',
- 'module': 'changri.plugins.decks',
- 'settings_group': None,
- 'nav': ['decks_page'],
- 'default_on': False,
  'links': [('decks_page', '打开管理页')],
  'description': '大家自己写抽取的内容，机器人负责抽：照模板写好（一行一张牌，可以设权重、套用别的牌堆、掷骰），管理员在「跑团 → 牌堆」页贴进去或上传文件（也能直接用海豹的 json / toml 牌堆），'
-                '群里发「抽卡 牌堆名 [张数]」抽，只发「抽卡」列出所有牌堆；内置的塔罗、扑克、随机遭遇也能抽。属于「额外」，默认关闭。',
- 'kind': 'official',
- 'order': 120,
- 'url_prefixes': ['/decks']}
+                '群里发「抽卡 牌堆名 [张数]」抽，只发「抽卡」列出所有牌堆；内置的塔罗、扑克、随机遭遇也能抽。一直开着，不用开关。',
+ 'kind': 'core',
+ 'order': 120}

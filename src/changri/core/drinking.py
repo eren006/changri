@@ -150,9 +150,11 @@ def drink(group: str, name: str, pos_text: str) -> tuple[bool, str]:
         return False, "还没上酒：先「上酒」。"
     if name not in s["players"]:
         return False, "你已经喝醉了，不能再喝了。" if any(p["name"] == name for p in s["drunk"]) else "你还没加入喝酒游戏。"
-    if not pos_text.strip().isdigit() or not 1 <= int(pos_text) <= CUPS:
-        return False, f"要写 1 到 {CUPS} 的号码：喝酒 7"
-    i = int(pos_text) - 1
+    from .textutil import parse_id
+    n = parse_id(pos_text)
+    if not n or not 1 <= n <= CUPS:
+        return False, f"要写 1 到 {CUPS} 的号码，例：喝酒 7"
+    i = n - 1
     if s["drunk_cups"][i]:
         return False, f"{i + 1} 号已经被喝掉了，换一杯。还剩：{_left_text(s)}"
     t, sub, v, desc = DRINKS[s["cups"][i]]

@@ -187,6 +187,43 @@ class UpdaterTests(unittest.TestCase):
         self.assertIsNone(updater.rollback_if_failing(self.data))
         self.assertEqual((self.root / "current").read_text().strip(), "0.2.0")
 
+    def test_extra_saved_in_pending(self):
+        self.release()
+        updater.update_now(self.data, extra={"bots_online": 2, "auto": True})
+        info = updater.read_pending(self.data)
+        self.assertEqual((info["bots_online"], info["auto"], info["from"], info["to"]), (2, True, "0.1.0", "0.2.0"))
+
+    def test_rollback_now_after_failed_check(self):
+        """新版本跑起来了但升级后检查没通过：看门进程用 rollback_now 马上回滚，原因写进提示，update_failed.json 记着失败的版本。"""
+        self.release()
+        updater.update_now(self.data, extra={"auto": True})
+        c = sqlite3.connect(self.data / "changri.db"); c.execute("update t set v='migrated'"); c.commit(); c.close()
+        with mock.patch.object(updater.os, "_exit") as ex, mock.patch.object(updater, "DATA_DIR", self.data):
+            updater.request_rollback("机器人没全连上", self.data)
+        ex.assert_called_once_with(updater.ROLLBACK_CODE)
+        msg = updater.rollback_now(self.data)
+        self.assertIn("机器人没全连上", msg)
+        self.assertEqual((self.root / "current").read_text().strip(), "0.1.0")
+        self.assertEqual(db_value(self.data / "changri.db"), "before")
+        failed = json.loads((self.data / "update_failed.json").read_text())
+        self.assertEqual((failed["to"], failed["auto"]), ("0.2.0", True))
+        self.assertIsNone(updater.rollback_now(self.data))                 # 没有待确认的更新：什么也不做
+
+    def test_confirm_records_auto_update(self):
+        self.release()
+        (self.data / "update_failed.json").write_text('{"to": "0.2.0"}')
+        updater.update_now(self.data, extra={"auto": True})
+        updater.confirm_healthy(self.data)
+        done = json.loads((self.data / "update_auto.json").read_text())
+        self.assertEqual((done["from"], done["to"]), ("0.1.0", "0.2.0"))
+        self.assertFalse((self.data / "update_failed.json").exists())
+
+    def test_manual_confirm_does_not_record_auto(self):
+        self.release()
+        updater.update_now(self.data)
+        updater.confirm_healthy(self.data)
+        self.assertFalse((self.data / "update_auto.json").exists())
+
     def test_prune_keeps_recent_versions(self):
         for v in ("0.0.1", "0.0.2", "0.0.3"):
             (self.root / "versions" / v).mkdir()
@@ -209,6 +246,10 @@ class ChangesTests(unittest.TestCase):
         self.assertEqual(updater.parse_changes(None), [])
         self.assertEqual([c["version"] for c in updater.pending_changes(ch, "0.21.7", "0.21.9")], ["0.21.9", "0.21.8"])
         self.assertEqual([c["version"] for c in updater.pending_changes(ch, "0.21.6", "0.21.8")], ["0.21.8", "0.21.7"])
+
+    def test_auto_and_urgent_flags(self):
+        ch = updater.parse_changes([{"version": "0.3.0", "auto": False}, {"version": "0.2.0", "urgent": True}, {"version": "0.1.0", "urgent": "yes"}])
+        self.assertEqual([(c["auto"], c["urgent"]) for c in ch], [(False, False), (True, True), (True, False)])
 
 
 if __name__ == "__main__":

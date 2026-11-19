@@ -5,6 +5,6 @@ FEATURE = {'id': 'base',
  'name': '基础',
  'settings_group': '基础',
  'links': [('dashboard', '总览')],
- 'description': '角色与群绑定、/ping、欢迎语、拉黑、长内容发图、系统名称、报错接收。',
+ 'description': '角色与群绑定、/ping、拉黑、长内容发图、系统名称、报错接收、联系 QQ。',
  'kind': 'core',
  'order': 0}

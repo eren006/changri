@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}排单{% endblock %}
+{% block body %}
+<h1>排单</h1>
+<p class="lede">客户在群里下单、补图，你在工作群里「发送」交付，再到这里给每单扣张数。</p>
+{% include "_paidan_tabs.html" %}
+{% if biz_count == 0 %}
+<div class="callout">还没有业务。先到 <a href="{{ url_for('paidan_biz') }}">业务</a> 新建一个，再绑工作群；然后到 <a href="{{ url_for('paidan_settings') }}">设置</a> 绑定 owner。</div>
+{% elif not ov.owner %}
+<div class="callout">还没绑定 owner：新单私聊和工期催单都要 @ 你。到 <a href="{{ url_for('paidan_settings') }}">设置</a> 拿绑定码。</div>
+{% endif %}
+{% if ov.paused %}<div class="callout">今天暂停中：客户不能下单，不发提醒。</div>{% endif %}
+<div class="stats">
+  <div class="stat"><b>{{ ov.open }}</b><span>在排</span></div>
+  <div class="stat"><b>{{ ov.pending|length }}</b><span>已发图，待扣张数</span></div>
+  <div class="stat"><b>{{ ov.due|length }}</b><span>今明两天到 DDL</span></div>
+  <div class="stat"><b>{{ ov.overdue|length }}</b><span>已超期</span></div>
+</div>
+
+<section>
+  <div class="sec-head"><h2>待扣张数<span class="n">{{ ov.pending|length }} 单</span></h2></div>
+  {% if ov.pending %}<div class="rowlist">{% for o in ov.pending %}
+    <div class="row"><div><a href="{{ url_for('paidan_order', oid=o.id) }}"><b>{{ o.no }}</b></a> {{ who(o) }}<div class="muted">发过 {{ o.images_out }} 张图</div></div>
+      <div class="acts"><a class="btn sm" href="{{ url_for('paidan_order', oid=o.id) }}">去扣张数</a></div></div>
+  {% endfor %}</div>{% else %}<p class="empty">没有待扣张数的单。</p>{% endif %}
+</section>
+
+<section>
+  <div class="sec-head"><h2>快到 DDL / 已超期</h2></div>
+  {% if ov.due or ov.overdue %}<div class="rowlist">
+    {% for o in ov.overdue %}<div class="row"><div><a href="{{ url_for('paidan_order', oid=o.id) }}"><b>{{ o.no }}</b></a> {{ who(o) }}<div class="muted"><span class="dot bad"></span>DDL {{ o.deadline|pd_md }}，已超期</div></div></div>{% endfor %}
+    {% for o in ov.due %}<div class="row"><div><a href="{{ url_for('paidan_order', oid=o.id) }}"><b>{{ o.no }}</b></a> {{ who(o) }}<div class="muted"><span class="dot warn"></span>DDL {{ o.deadline|pd_md }}</div></div></div>{% endfor %}
+  </div>{% else %}<p class="empty">今明两天没有到期的单。</p>{% endif %}
+</section>
+
+<section>
+  <div class="sec-head"><h2>5 天内到期的额度<span class="n">{{ ov.expiring|length }} 笔</span></h2></div>
+  {% if ov.expiring %}<div class="rowlist">{% for q in ov.expiring %}
+    <div class="row"><div><a href="{{ url_for('paidan_client', cid=q.client_id) }}"><b>{{ q.cname }}</b></a><div class="muted">剩 {{ q.total - q.used }} 张，{{ q.expires|pd_md }} 到期</div></div></div>
+  {% endfor %}</div>{% else %}<p class="empty">没有快到期的额度。</p>{% endif %}
+</section>
+
+<section>
+  <div class="sec-head"><h2>各业务在排</h2></div>
+  {% if ov.biz %}<div class="rowlist">{% for x in ov.biz %}
+    <div class="row"><div><b>{{ x.b.letter }} · {{ x.b.name }}</b><div class="muted">{{ x.open }} 单在排 · 工期 {{ x.b.days }} 天{% if not x.b.group_openid %} · <span class="dot warn"></span>工作群没绑定{% endif %}</div></div>
+      <div class="acts"><a class="btn sm ghost" href="{{ url_for('paidan_orders', bid=x.b.id) }}">看订单</a></div></div>
+  {% endfor %}</div>{% else %}<p class="empty">还没有业务。</p>{% endif %}
+</section>
+{% endblock %}

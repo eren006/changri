@@ -1,4 +1,4 @@
-"""牌堆（额外扩展，默认关）：大家自己写抽取的内容，机器人负责抽。群里发「抽卡 牌堆名 [张数]」，只发「抽卡」列出能抽的牌堆。
+"""牌堆（核心功能，一直开着）：大家自己写抽取的内容，机器人负责抽。群里发「抽卡 牌堆名 [张数]」，只发「抽卡」列出能抽的牌堆。
 牌堆只在后台「跑团 → 牌堆」页管理（跟小手机没有关系）：管理员把照模板写好的内容贴进去或上传文件，保存后全群就能抽；不合适的直接删。
 
 长日牌堆的写法（TEMPLATE 就是一份完整示例）：
@@ -9,7 +9,13 @@
 - [1d6]、[2d10+3]：在这里掷骰，换成掷出来的数。
 - 一行里想换行就写 \\n。
 也能直接导入海豹（SealDice）的 json / toml 牌堆：::3::权重、{%名字} 和 {名字}、_ 开头的辅助牌堆都认，导入后整理成上面的写法。
-内置的塔罗、扑克、随机遭遇（core/dicefun）也能用「抽卡 塔罗 3」抽。"""
+内置的塔罗、扑克、随机遭遇（core/dicefun）也能用「抽卡 塔罗 3」抽。
+
+防护（牌堆是玩家写、管理员上传的，内容不可信）：
+- {牌堆} 嵌套会指数增长（每张 10 个引用套 4 层 = 1 万次查库），抽卡又跑在机器人主循环里，会卡住所有群。
+  所以一次抽卡最多展开 MAX_EXPAND 次 {…}，超了剩下的原样留着；保存时也按最坏情况算一遍，超了直接拒绝。
+- 保存时每张牌过一遍违禁词（core/phonegate，跟小手机同一份词表），命中就拒绝并说是哪个牌堆。
+AI_PROMPT 是给玩家复制去问 AI 的提示词，后台牌堆页有「复制 AI 提示词」按钮。"""
 import json
 import random
 import re
@@ -47,6 +53,22 @@ MAX_WEIGHT = 100
 MAX_DRAW = 10
 MAX_DEPTH = 8                 # {牌堆} 套 {牌堆} 最多套几层
 MAX_OUT = 1500                # 一次抽出来的文字最多多长
+MAX_EXPAND = 200              # 一次抽卡（几张加起来）最多展开几次 {牌堆}
+
+AI_PROMPT = f"""请帮我写一份「长日牌堆」文件，内容是：（在这里写你想要什么，比如「今晚吃什么，30 道家常菜，火锅抽到的机会大一点」）
+
+严格按下面的规则写，只输出文件内容本身，不要解释，不要加代码块标记：
+1. 每个牌堆用单独一行【牌堆名】开头，下面一行一张牌。牌堆名最多 {MAX_NAME} 个字，不能有空格和 {{ }} [ ] # * 【 】 这些符号；不能叫塔罗、扑克、遭遇、随机遭遇（机器人自带）。
+2. 一张牌写在一行里，最多 {MAX_CARD_LEN} 个字；牌里要换行就写 \\n。
+3. 想让某张牌更容易抽到，在行首写「数字*」，比如 3*火锅（数字 1 到 {MAX_WEIGHT}，不写就是 1）。
+4. {{牌堆名}} 表示从那个牌堆再抽一张填进来；[1d6]、[2d10+3] 表示掷骰换成数字。只给别的牌堆用的牌堆，名字以 _ 开头。一张牌里的 {{…}} 不要超过 3 个，最多套 3 层，太多机器人会拒收。
+5. # 开头的行是说明，机器人不读，可以用来写注释。
+6. 一份最多 {MAX_DECKS_PER_FILE} 个牌堆、{MAX_CARDS} 张牌。
+7. 不要写网址和联系方式；也不要写色情、血腥暴力、政治敏感、骂人的内容，机器人会拒收。
+
+下面是一份示例，照这个格式写：
+
+{TEMPLATE}"""
 
 _NAME_RE = re.compile(r"^_?[^\s{}\[\]【】#*]{1,%d}$" % MAX_NAME)
 _HEAD_RE = re.compile(r"^【\s*(.+?)\s*】$")
@@ -198,6 +220,12 @@ def save(owner_id: int | None, raw: str, file_id: int = 0, title: str = "") -> t
     clash = [n for n in decks if n.lower() in builtin]
     if clash:
         return False, f"「{clash[0]}」是内置牌堆的名字，换一个吧。", 0
+    bad = _blocked(decks, owner_id)
+    if bad:
+        return False, bad, 0
+    heavy = _too_nested(decks)
+    if heavy:
+        return False, heavy, 0
     now = int(time.time())
     with get_conn() as c:
         if file_id:
@@ -227,6 +255,58 @@ def save(owner_id: int | None, raw: str, file_id: int = 0, title: str = "") -> t
                       (file_id, n, 1 if n.startswith("_") else 0, json.dumps(cards, ensure_ascii=False)))
     shown = [n for n in names if not n.startswith("_")]
     return True, f"保存好了：{('、'.join(shown) or '（只有辅助牌堆）')}，共 {sum(len(v) for v in decks.values())} 张牌。", file_id
+
+
+def _blocked(decks: dict[str, list[tuple[int, str]]], owner_id: int | None) -> str:
+    """违禁词：跟小手机同一份词表（data/blocklist.txt，没有就用随包带的）。命中返回要告诉管理员的话。"""
+    from . import phonegate
+    who = "管理员" if owner_id is None else f"role#{owner_id}"
+    for name, cards in decks.items():
+        if phonegate.blocked_hit(who, "牌堆", name):
+            return f"牌堆名「{name}」里有不能发的词，改一改再保存。"
+        for i, (_w, t) in enumerate(cards, 1):
+            if phonegate.blocked_hit(who, "牌堆", t):
+                return f"牌堆「{name}」第 {i} 张牌里有不能发的词，改一改再保存（违禁词表在小手机设置里）。"
+    return ""
+
+
+def _too_nested(decks: dict[str, list[tuple[int, str]]]) -> str:
+    """按最坏情况算抽一张要展开几次 {牌堆}（这份里的优先，其次别的文件里的），超过 MAX_EXPAND 返回原因。"""
+    memo: dict[tuple[str, int], int] = {}
+    others: dict[str, list[tuple[int, str]] | None] = {}
+
+    def cards_of(name):
+        if name in decks:
+            return decks[name]
+        if name not in others:
+            others[name] = _cards(name)
+        return others[name]
+
+    def worst(name, depth):
+        if depth >= MAX_DEPTH:
+            return 0
+        key = (name, depth)
+        if key not in memo:
+            memo[key] = 0                    # 先占位：自己套自己时按 0 算，深度上限兜底
+            best = 0
+            for _w, t in cards_of(name) or []:
+                cost = 0
+                for m in _REF_RE.finditer(t):
+                    cost += 1 + (worst(m.group(1), depth + 1) if cards_of(m.group(1)) else 0)
+                    if cost > MAX_EXPAND:
+                        break
+                best = max(best, cost)
+                if best > MAX_EXPAND:
+                    break
+            memo[key] = best
+        return memo[key]
+
+    for name in decks:
+        n = worst(name, 0)
+        if n > MAX_EXPAND:
+            return (f"牌堆「{name}」套得太多：最坏情况下抽一张要展开 {MAX_EXPAND} 次以上 {{…}}（上限 {MAX_EXPAND}）。"
+                    "少写几个 {…}，或者少套几层。")         # 算到超过上限就停了，具体数字没意义
+    return ""
 
 
 def delete(file_id: int, owner_id: int | None = None) -> bool:
@@ -302,15 +382,19 @@ def _roll(expr: str) -> str | None:
     return str(dice.roll_terms(node)[1])
 
 
-def expand(text: str, rng: random.Random, depth: int = 0) -> str:
-    """把一张牌里的 {牌堆} 和 [骰子] 换掉。套太深、找不到的牌堆原样留着，不报错。"""
+def expand(text: str, rng: random.Random, depth: int = 0, budget: list[int] | None = None) -> str:
+    """把一张牌里的 {牌堆} 和 [骰子] 换掉。套太深、找不到的牌堆、超过展开次数的原样留着，不报错。
+    budget = [还能展开几次]，同一次抽卡的几张共用一个（默认 MAX_EXPAND）。"""
+    budget = [MAX_EXPAND] if budget is None else budget
+
     def ref(m):
-        if depth >= MAX_DEPTH:
+        if depth >= MAX_DEPTH or budget[0] <= 0:
             return m.group(0)
+        budget[0] -= 1
         cards = _cards(m.group(1))
         if not cards:
             return m.group(0)
-        return expand(_pick(cards, 1, rng)[0], rng, depth + 1)
+        return expand(_pick(cards, 1, rng)[0], rng, depth + 1, budget)
     text = _REF_RE.sub(ref, text)
     text = _DICE_RE.sub(lambda m: _roll(m.group(1)) or m.group(0), text)
     return text.replace("\\n", "\n")
@@ -342,7 +426,8 @@ def draw(raw: str, rng: random.Random | None = None) -> str:
     if not cards:
         near = [d["name"] for d in listing() if name.lower() in d["name"].lower() or d["name"].lower() in name.lower()][:5]
         return f"没有叫「{name}」的牌堆。" + (f"是不是：{'、'.join(near)}？" if near else "发「抽卡」看看有哪些。")
-    picks = [expand(t, rng) for t in _pick(cards, n, rng)]
+    budget = [MAX_EXPAND]
+    picks = [expand(t, rng, budget=budget) for t in _pick(cards, n, rng)]
     if len(picks) == 1:
         text = f"🃏 抽卡「{name}」：{picks[0]}"
     else:

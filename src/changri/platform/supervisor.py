@@ -3,6 +3,7 @@
 - 子进程退出码 3（点了「重启」、装完更新、改了扩展）：马上重新拉起；current 变了（装了新版本）就自己退出码 10，
   让外面的启动脚本按新版本、新运行环境重新起看门进程。
 - 子进程异常退出：5 秒后重新拉起。刚更新完的新版本 90 秒内就退出，算一次失败，连续 3 次就回滚（core/updater.py）。
+- 子进程退出码 4：新版本跑起来了但升级后检查没通过，马上回滚（updater.rollback_now），退出码 10 按旧版本重新拉起。
 - 连续 MAX_QUICK_CRASHES 次都是一启动就崩（端口被占、配置写错这类重来多少次都不会好的）：不再拉起，退出码 0。
   用 0 是为了让老版本的 Start-Changri.bat 也停下来（它见到非 0 会自己再循环）；有窗口的话先停住让人看清原因。
 - 每次拉起前先看设置平台端口上是不是已经有一个长日bot 在跑（/healthz 回 ok）：是的话这次不启动、帮他打开设置平台，退出码 0。
@@ -10,6 +11,8 @@
   端口被卡死的旧长日bot / 别的程序占着：不在这里修，提示用官网的修复工具（portcheck.fix_hint）。
 - 子进程退出码 PORT_BUSY（设置平台端口被别的程序占了，platform/portcheck.py）：不再拉起，退出码 0。
 - 收到 Ctrl+C / 服务停止：把子进程一起停掉，自己退出码 0（启动脚本看到 0 就不再循环）。
+  同时替子进程写好「正常退出」（_mark_stopped）：Windows 上关窗口时子进程是被直接结束的，
+  自己的收尾跑不到，不写的话下次启动会被记成「崩溃」并上报。
 Windows 和 Linux 用同一套，取代以前 start.bat / start.sh 里的循环。
 """
 from __future__ import annotations
@@ -26,6 +29,7 @@ from .portcheck import PORT_BUSY
 RELAUNCH = 10            # 给启动脚本：按 current 重新起我
 RESTART_CODE = 3
 HEALTHY_AFTER = 90
+CONFIRM_FALLBACK = 900   # 升级后检查（core/autoupdate.post_check）最多几分钟；子进程跑满这么久还没确认，看门进程替它确认
 CRASH_DELAY = 5
 MAX_QUICK_CRASHES = 5    # 连续这么多次「没跑满 HEALTHY_AFTER 秒就崩」就放弃
 
@@ -36,6 +40,16 @@ def _child_cmd() -> list[str]:
 
 def _log(msg: str) -> None:
     print(time.strftime("%m-%d %H:%M:%S"), "[看门]", msg, flush=True)
+
+
+def _mark_stopped() -> None:
+    """人为停止（关窗口、Ctrl+C、停服务）：替子进程删掉「运行中」标记（core/errlog.py），下次启动不记成崩溃。
+    Windows 关窗口时子进程直接被系统或 terminate() 结束，NoneBot 的 on_shutdown 和 atexit 都跑不到。"""
+    try:
+        from ..core import errlog
+        errlog.mark_clean_exit()
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def _open_browser_once() -> None:
@@ -107,6 +121,7 @@ def run() -> int:
 
     def on_signal(signum, _frame):
         stopping["flag"] = True
+        _mark_stopped()
         p = child["p"]
         if p and p.poll() is None:
             try:
@@ -133,13 +148,20 @@ def run() -> int:
             code = child["p"].wait()
         except KeyboardInterrupt:
             stopping["flag"] = True
+            _mark_stopped()
             child["p"].terminate()
             code = child["p"].wait()
         ran = time.monotonic() - t0
         if stopping["flag"]:
+            _mark_stopped()                            # 子进程退得晚、又写回过标记也不怕：等它真退出了再删一次
             _log("已停止。")
             return 0
-        if ran >= HEALTHY_AFTER:
+        if code == updater.ROLLBACK_CODE and (msg := updater.rollback_now()):     # 新版本跑起来了，但升级后检查没通过
+            _log(msg)
+            return RELAUNCH
+        # 正常由子进程跑完升级后检查再确认；新版本跑了这么久还没确认（检查卡住了），算成功。
+        # 刚装完更新退出的是旧版本（current 已经变了），它跑得再久也不算：以前这里会把新版本的待确认记录直接删掉，回滚保护形同虚设
+        if ran >= CONFIRM_FALLBACK and (not layout.INSTALLED or layout.read_current() == started_version):
             updater.confirm_healthy()
         if layout.INSTALLED and layout.read_current() != started_version:
             _log(f"切换到版本 {layout.read_current()}……")

@@ -46,7 +46,7 @@ def register(app, ctx):
         if not msg:
             ok, msg, left = lovemail.add_mail(role["id"], target["id"], sig, content)
             if ok:
-                flash(f"💌 已投进「{target['name']}」的信箱，今天还剩 {left} 封。派送前可以在「寄出的」里撤回。")
+                flash(f"💌 已投进「{target['name']}」的信箱，" + (f"{msg}还剩 {left} 封。" if msg else f"今天还剩 {left} 封。") + "派送前可以在「寄出的」里撤回。")
                 return redirect(url_for("lovemail_page", view="sent"))
         flash(msg)
         session["lm_draft"] = {"to": to[:20], "content": content[:2000], "signature": f.get("signature", "")[:20]}

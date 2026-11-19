@@ -166,6 +166,39 @@ def note_whitelist() -> bool:
     return True
 
 
+# ---------- 配置问题：群里没打开机器人主动发言 ----------
+# 机器人自己发的消息（播报、通知、@人、点歌……，不是回复指令的那种）QQ 默认不让发，要群主在群里打开「机器人主动在群聊内发言」。
+# 没打开时 QQ 返回「主动消息失败, 无权限」，不管带不带按钮、是不是 Markdown 都一样被拦，所以别说成按钮或 Markdown 的问题。
+# 和 IP 白名单一样单独记成一条「配置」，写清去哪里打开；10 分钟内只记一条。
+
+NO_PUSH_SOURCE = "主动发言"
+NO_PUSH_QUIET = 600
+
+
+def is_no_push_error(text: str) -> bool:
+    t = text or ""
+    return "主动消息失败" in t and "无权限" in t
+
+
+def no_push_text(what: str = "") -> str:
+    head = f"{what.strip()[:150]}——" if what.strip() else ""
+    return (f"{head}QQ 拦下了机器人主动发的消息（主动消息失败, 无权限）：这个群的群主还没打开「机器人主动在群聊内发言」。"
+            "请群主打开：群设置 → 群机器人 → 管理 → 点机器人 →「机器人主动在群聊内发言」。"
+            "没打开时机器人照样能回复指令，但播报、通知、@人、点歌这些它自己发的消息都会被拦；不是按钮或 Markdown 的问题，改发纯文字也一样发不出。")
+
+
+def note_no_push(what: str = "", now: float | None = None) -> bool:
+    """记一条「群里没打开机器人主动发言」。what：哪条消息没发出去（日志原文的开头）。10 分钟内记过就不再记。返回这次有没有记。"""
+    now = now or time.time()
+    for r in reversed(read_all()):
+        if r.get("kind") == "config" and r.get("source") == NO_PUSH_SOURCE:
+            if now - r.get("ts", 0) < NO_PUSH_QUIET:
+                return False
+            break
+    record("config", NO_PUSH_SOURCE, no_push_text(_TAG.sub("", what)), now=now)
+    return True
+
+
 # ---------- 配置问题：按钮被 QQ 拒绝 ----------
 # 带按钮的消息被拒时机器人自动退回纯文字、连续被拒才暂停按钮一会儿（core/qqsend.py），功能不受影响，所以以前只在窗口里打一行警告。
 # 开机自启（没有窗口）的 Windows 用户就看不到为什么没按钮了：记成一条「配置」，带上 QQ 返回的原文，后台「报错日志」里能直接看。
@@ -179,6 +212,8 @@ def note_button_rejected(where: str, err: str, now: float | None = None) -> bool
     IP 白名单的问题不归这里（纯文字也会被拒，由 note_whitelist 管）。10 分钟内记过就不再记。返回这次有没有记。"""
     if is_whitelist_error(err):
         return False
+    if is_no_push_error(err):                      # 群里没开主动发言：不是按钮的问题
+        return note_no_push(f"{where}带按钮的消息没发出去", now=now)
     now = now or time.time()
     for r in reversed(read_all()):
         if r.get("kind") == "config" and r.get("source") == BUTTON_SOURCE:
@@ -293,6 +328,9 @@ def _loguru_sink(message) -> None:
     text = str(rec["message"])
     if is_whitelist_error(text) or is_whitelist_error(trace):
         note_whitelist()                           # 配置问题：不记成「出错」，也不带一大段堆栈
+        return
+    if is_no_push_error(text) or is_no_push_error(trace):
+        note_no_push(text.split("：<")[0])          # 配置问题：说清是群里没开主动发言，不记成「出错」
         return
     if is_flap(text):
         note_flap(text, trace)                     # 临时断线：偶尔一条记成提醒，反复出现才记成出错

@@ -10,6 +10,7 @@ latest.json（发布者用 packaging/build.py 生成并签名）：
 流程：下载 → 校验 sha256 和 Ed25519 签名（公钥内置，主页被改也推不进恶意代码）→ 解压到 versions/<版本>/
 → 备份所有数据库 → 写「待确认」标记 → 改写 current → 进程退出，看门进程用新版本拉起。
 新版本 90 秒内连续崩溃 3 次：看门进程把数据库恢复成更新前的备份、current 改回旧版本（见 rollback_if_failing）。
+新版本跑起来了但升级后检查没通过（core/autoupdate.post_check）：子进程退出码 4，看门进程同样回滚（rollback_now）。
 data/ 永远不碰；下载的包装完就删，旧版本只留最近 3 个。开发时（直接从源码运行）不能在线更新。
 """
 from __future__ import annotations
@@ -39,6 +40,7 @@ MAX_RUNTIME = 250 * 1024 * 1024
 MAX_ATTEMPTS = 3
 HEALTHY_AFTER = 90           # 新版本连续跑这么多秒就算成功
 RESTART_CODE = 3             # 「请重启我」：看门进程重新拉起（current 变了就换新版本）
+ROLLBACK_CODE = 4            # 「升级后检查没通过，请回滚」：看门进程恢复数据库、切回旧版本
 
 _lock = threading.Lock()
 
@@ -148,7 +150,9 @@ def parse_changes(raw) -> list[dict]:
         def items(k):
             v = e.get(k)
             return [str(x).strip()[:300] for x in (v if isinstance(v, list) else [])[:30] if str(x).strip()]
-        out.append({"version": str(e["version"]), "date": str(e.get("date", ""))[:10], "features": items("features"), "fixes": items("fixes")})
+        out.append({"version": str(e["version"]), "date": str(e.get("date", ""))[:10], "features": items("features"), "fixes": items("fixes"),
+                    "auto": e.get("auto") is not False,          # 作者标了 "auto": false：这一版不自动更新，只能主人手动点
+                    "urgent": e.get("urgent") is True})          # 作者标了 "urgent": true：不等落后几个版本，空闲时就自动更新
     return out
 
 
@@ -289,8 +293,9 @@ def _extract_runtime(tar_path: Path, runtime: str, runtimes_dir: Path) -> Path:
 
 # ---------- 更新 ----------
 
-def update_now(data_dir: Path | None = None) -> dict:
-    """检查 → 下载校验 → 装到新目录 → 备份 → 切换。成功后调用方负责 restart()。"""
+def update_now(data_dir: Path | None = None, extra: dict | None = None) -> dict:
+    """检查 → 下载校验 → 装到新目录 → 备份 → 切换。成功后调用方负责 restart()。
+    extra 一起写进 update_pending.json：更新前的样子（几个机器人在线、有哪些定时任务……），新版本起来后拿来对照检查。"""
     data_dir = data_dir or DATA_DIR
     if not layout.INSTALLED:
         raise UpdateError("现在是直接从源码运行的（开发环境），不能在线更新。")
@@ -313,7 +318,7 @@ def update_now(data_dir: Path | None = None) -> dict:
         cur = layout.read_current() or current_version()
         from ..platform import backup
         bdir = backup.make("update", f"{cur}_to_{v}", data_dir=data_dir)
-        _pending_path(data_dir).write_text(json.dumps({"from": cur, "to": v, "backup": str(bdir), "attempts": 0, "ts": int(time.time())}),
+        _pending_path(data_dir).write_text(json.dumps({**(extra or {}), "from": cur, "to": v, "backup": str(bdir), "attempts": 0, "ts": int(time.time())}),
                                    encoding="utf-8")
         layout.write_current(v)
         layout.prune(keep_also=(cur,))
@@ -328,8 +333,8 @@ def _pending_path(data_dir: Path = DATA_DIR) -> Path:
     return data_dir / "update_pending.json"
 
 
-def rollback_if_failing(data_dir: Path = DATA_DIR) -> str | None:
-    """新版本又一次很快就退出了：记一次；满 MAX_ATTEMPTS 次就恢复数据库、切回旧版本。返回给人看的一句话（没回滚就是 None）。"""
+def read_pending(data_dir: Path = DATA_DIR) -> dict | None:
+    """刚更新完、还没确认成功时的记录（update_pending.json）；没有就是 None。"""
     p = _pending_path(data_dir)
     if not p.exists():
         return None
@@ -338,10 +343,11 @@ def rollback_if_failing(data_dir: Path = DATA_DIR) -> str | None:
     except ValueError:
         p.unlink(missing_ok=True)
         return None
-    info["attempts"] = int(info.get("attempts", 0)) + 1
-    if info["attempts"] < MAX_ATTEMPTS:
-        p.write_text(json.dumps(info), encoding="utf-8")
-        return None
+    return info if isinstance(info, dict) else None
+
+
+def _rollback(info: dict, msg: str, data_dir: Path) -> str:
+    """恢复更新前备份的数据库、current 改回旧版本，留下给人看的说明。程序必须是停着的（看门进程调用）。"""
     from ..platform import backup
     bdir = Path(info.get("backup", ""))
     if bdir.is_dir():
@@ -349,13 +355,59 @@ def rollback_if_failing(data_dir: Path = DATA_DIR) -> str | None:
     old = str(info.get("from", ""))
     if old and (layout.VERSIONS / old).is_dir():
         layout.write_current(old)
-    msg = f"新版本 {info.get('to')} 连续 {MAX_ATTEMPTS} 次没能启动，已自动回到 {old}（数据库也恢复到了更新前）。"
     (data_dir / "update_failed.txt").write_text(msg, encoding="utf-8")
-    p.unlink(missing_ok=True)
+    (data_dir / "update_failed.json").write_text(json.dumps({"from": old, "to": str(info.get("to", "")), "auto": bool(info.get("auto")),
+                                                              "ts": int(time.time()), "message": msg}, ensure_ascii=False), encoding="utf-8")
+    _pending_path(data_dir).unlink(missing_ok=True)
     return msg
 
 
+def rollback_if_failing(data_dir: Path = DATA_DIR) -> str | None:
+    """新版本又一次很快就退出了：记一次；满 MAX_ATTEMPTS 次就恢复数据库、切回旧版本。返回给人看的一句话（没回滚就是 None）。"""
+    info = read_pending(data_dir)
+    if info is None:
+        return None
+    info["attempts"] = int(info.get("attempts", 0)) + 1
+    if info["attempts"] < MAX_ATTEMPTS:
+        _pending_path(data_dir).write_text(json.dumps(info), encoding="utf-8")
+        return None
+    old = str(info.get("from", ""))
+    return _rollback(info, f"新版本 {info.get('to')} 连续 {MAX_ATTEMPTS} 次没能启动，已自动回到 {old}（数据库也恢复到了更新前）。", data_dir)
+
+
+def rollback_now(data_dir: Path = DATA_DIR) -> str | None:
+    """子进程用退出码 4 说「升级后检查没通过」：马上回滚（看门进程调用）。没有待确认的更新就什么也不做。"""
+    info = read_pending(data_dir)
+    if info is None:
+        return None
+    why = str(info.get("check_failed") or "升级后检查没通过")
+    return _rollback(info, f"更新到 {info.get('to')} 后检查没通过（{why}），已自动回到 {info.get('from')}。"
+                           f"数据库恢复到了更新前，更新后这几分钟里新写的内容没有保留。", data_dir)
+
+
+def request_rollback(reason: str, data_dir: Path = DATA_DIR) -> None:
+    """新版本自己发现不对（升级后检查没通过）：把原因记进待确认记录，退出码 4 让看门进程回滚。"""
+    info = read_pending(data_dir)
+    if info is None:
+        return
+    info["check_failed"] = reason[:300]
+    _pending_path(data_dir).write_text(json.dumps(info, ensure_ascii=False), encoding="utf-8")
+    try:
+        from . import errlog
+        errlog.mark_clean_exit()
+    except Exception:  # noqa: BLE001
+        pass
+    os._exit(ROLLBACK_CODE)
+
+
 def confirm_healthy(data_dir: Path = DATA_DIR) -> None:
+    """新版本通过了检查：删掉待确认记录；自动更新的另外记一笔，后台顶上告诉主人「已自动更新」。"""
+    info = read_pending(data_dir)
+    if info and info.get("auto"):
+        (data_dir / "update_auto.json").write_text(json.dumps({"from": info.get("from"), "to": info.get("to"), "ts": int(time.time())},
+                                                              ensure_ascii=False), encoding="utf-8")
+    if info:
+        (data_dir / "update_failed.json").unlink(missing_ok=True)
     _pending_path(data_dir).unlink(missing_ok=True)
 
 

@@ -1,0 +1,6 @@
+{% if not enabled %}<div class="callout bad">排单现在是关着的：到「功能与设置 → 个性化模块」打开开关，再点「重启并生效」。</div>{% endif %}
+<nav class="tabs" aria-label="排单分页">
+  {% for ep, key, label in [('paidan_page','home','总览'),('paidan_orders','orders','订单'),('paidan_clients','clients','客户'),('paidan_biz','biz','业务'),('paidan_sandan','sandan','散单'),('paidan_pause','pause','暂停'),('paidan_settings','settings','设置')] %}
+  <a href="{{ url_for(ep) }}" {% if tab == key %}aria-current="page"{% endif %}>{{ label }}</a>
+  {% endfor %}
+</nav>

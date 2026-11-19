@@ -56,9 +56,8 @@ class SeasonView(unittest.TestCase):
     def test_end_publishes_and_sends_to_backstage_only(self):
         self.assertTrue(seasonview.is_published(self.sid))
         self.assertIn("已发到后台群", self.msg)
-        self.assertEqual([g for g, _ in self.sent], ["STAFF"])                          # 只发后台群
         url = seasonview.url(self.sid)
-        self.assertIn(url, self.sent[0][1])
+        self.assertEqual([g for g, t in self.sent if url in t], ["STAFF"])              # 复盘网页链接只发后台群
         self.assertTrue(url.startswith("https://phone.example/v/"))
 
     def test_pages_and_txt(self):

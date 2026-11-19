@@ -21,14 +21,25 @@
 </section>
 
 <section>
+  <div class="sec-head keep"><h2>让 AI 帮忙写</h2>
+    <span class="btns"><button class="btn ghost" type="button" id="dkAiCopy">复制 AI 提示词</button></span></div>
+  <div class="card">
+    <p style="margin:0 0 10px">把下面这段发给玩家：贴给 ChatGPT、豆包、Kimi 这类 AI，把第一行括号里换成想要的内容，AI 写出来的就能直接贴进下面「添加牌堆」。格式规则和上限都写在里面了。</p>
+    <details><summary>看提示词全文</summary>
+    <pre id="dkAi" style="margin:10px 0 0;padding:12px;border-radius:8px;background:var(--soft);white-space:pre-wrap;font-size:13px;line-height:1.6;max-height:360px;overflow:auto">{{ ai_prompt }}</pre>
+    </details>
+  </div>
+</section>
+
+<section>
   <div class="sec-head keep"><h2>{{ '改「' ~ edit.title ~ '」' if edit else '添加牌堆' }}</h2></div>
   <form class="form" method="post" action="{{ url_for('decks_save') }}" enctype="multipart/form-data">{{ csrf() }}
     {% if edit %}<input type="hidden" name="file_id" value="{{ edit.id }}">{% endif %}
     <div class="fields">
-      <div><label for="dkTitle">这份叫什么（可空，空着就用第一个牌堆的名字）</label><input id="dkTitle" name="title" maxlength="30" value="{{ edit.title if edit else '' }}" placeholder="比如：阿林的晚饭牌堆"></div>
+      <div><label for="dkTitle">这份叫什么（可空，空着就用第一个牌堆的名字）</label><input id="dkTitle" name="title" maxlength="30" value="{{ draft_title if draft is not none else (edit.title if edit else '') }}" placeholder="比如：阿林的晚饭牌堆"></div>
       <div><label for="dkFile">上传文件（.txt / .json / .toml）</label><input id="dkFile" type="file" name="file" accept=".txt,.json,.toml,text/plain,application/json"></div>
       <div style="grid-column:1/-1"><label for="dkRaw">或者直接贴内容（选了文件就以文件为准）</label>
-        <textarea id="dkRaw" name="raw" rows="14" spellcheck="false" style="font-family:ui-monospace,Menlo,monospace;font-size:13px">{{ edit.raw if edit else '' }}</textarea></div>
+        <textarea id="dkRaw" name="raw" rows="14" spellcheck="false" style="font-family:ui-monospace,Menlo,monospace;font-size:13px">{{ draft if draft is not none else (edit.raw if edit else '') }}</textarea></div>
     </div>
     <div class="actions"><button class="btn" type="submit">{{ '保存修改' if edit else '保存' }}</button>{% if not edit %}<button class="btn ghost" type="button" id="dkUse">把模板填进来</button>{% else %}<a class="btn ghost" href="{{ url_for('decks_page') }}">取消</a>{% endif %}</div>
   </form>
@@ -60,11 +71,32 @@
 <script>
 (function () {
   var tpl = document.getElementById('dkTpl').textContent, ta = document.getElementById('dkRaw');
-  var copy = document.getElementById('dkCopy');
-  copy.addEventListener('click', function () {
-    (navigator.clipboard ? navigator.clipboard.writeText(tpl) : Promise.reject()).then(function () { copy.textContent = '已复制'; },
-      function () { copy.textContent = '复制不了，请手动选中'; });
-  });
+  // 后台常常是 http://公网IP:5091 打开的：不是 https，浏览器不给 navigator.clipboard，退回老办法（选中一个临时文本框再 execCommand）
+  function legacyCopy(text) {
+    var t = document.createElement('textarea');
+    t.value = text; t.setAttribute('readonly', ''); t.style.position = 'fixed'; t.style.opacity = '0';
+    document.body.appendChild(t); t.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    document.body.removeChild(t);
+    return ok;
+  }
+  function copyBtn(id, text) {
+    var b = document.getElementById(id), label = b.textContent;
+    function done(ok) {
+      b.textContent = ok ? '已复制' : '复制不了，请展开后手动选中';
+      setTimeout(function () { b.textContent = label; }, 2000);
+    }
+    b.addEventListener('click', function () {
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(legacyCopy(text)); });
+      } else {
+        done(legacyCopy(text));
+      }
+    });
+  }
+  copyBtn('dkCopy', tpl);
+  copyBtn('dkAiCopy', document.getElementById('dkAi').textContent);
   var use = document.getElementById('dkUse');
   if (use) use.addEventListener('click', function () {
     if (ta.value.trim() && !confirm('输入框里已经有内容，换成模板吗？')) return;

@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% import "_rpg_icons.html" as ic %}
+{% block title %}排单 · {{ c.name }}{% endblock %}
+{% block body %}
+<h1>{{ c.name }}{% if c.archived %} <span class="kind">已完结</span>{% endif %}</h1>
+<p class="lede"><a href="{{ url_for('paidan_clients') }}">← 客户列表</a></p>
+{% include "_paidan_tabs.html" %}
+{% if c.archived %}<div class="callout">这个客户已完结：不能下单、不发到期提醒和暂停通知，数据都留着。</div>{% endif %}
+{% if short %}<div class="callout bad">有 {{ short|length }} 单额度不足：{% for o in short %}<a href="{{ url_for('paidan_order', oid=o.id) }}">{{ o.no }}</a>（差 {{ o.shortfall }} 张）{% if not loop.last %}、{% endif %}{% endfor %}。请跟客户沟通。</div>{% endif %}
+
+<section>
+  <div class="sec-head"><h2>资料和绑定</h2>
+    <span class="btns"><details class="panel"><summary class="btn ghost">编辑</summary>
+      <form class="form" method="post" action="{{ url_for('paidan_client_save', cid=c.id) }}">{{ csrf() }}
+        <div class="fields">
+          <div><label for="en">名字</label><input id="en" name="name" required value="{{ c.name }}"></div>
+          <div><label for="eq">QQ 号（选填）</label><input id="eq" name="qq" inputmode="numeric" value="{{ c.qq }}"></div>
+          <div><label for="eg">客户群真实群号（选填）</label><input id="eg" name="real_gid" inputmode="numeric" value="{{ c.real_gid }}"></div>
+          {% for s in slots %}<div><label for="es{{ s.b.id }}">{{ s.b.letter }} 单口</label><input id="es{{ s.b.id }}" name="slots_{{ s.b.id }}" type="number" min="1" value="{{ s.n }}"></div>{% endfor %}
+        </div>
+        <div class="field"><label for="enote">备注</label><input id="enote" name="note" value="{{ c.note }}"></div>
+        <div class="actions"><button class="btn" type="submit">保存</button>
+          <button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
+      </form></details></span></div>
+  <div class="rowlist">
+    <div class="row"><div><b>客户群</b><div class="muted">{% if c.group_openid %}<span class="dot ok"></span>已绑定{% if c.real_gid %} · 群号 {{ c.real_gid }}{% endif %}{% else %}<span class="dot warn"></span>没绑定{% if code %}，绑定码 <b>{{ code }}</b>，让客户本人在他的群里发「绑定 {{ code }}」{% endif %}{% endif %}</div></div>
+      <div class="acts">
+        <form method="post" action="{{ url_for('paidan_client_code', cid=c.id) }}">{{ csrf() }}<button class="btn sm ghost" type="submit">{{ '换绑（新绑定码）' if c.group_openid else '新的绑定码' }}</button></form>
+        {% if c.group_openid %}<form method="post" action="{{ url_for('paidan_client_unbind', cid=c.id) }}" onsubmit="return confirm('解绑后这个群里不能再下单，要重新绑定。确定？')">{{ csrf() }}<button class="linkbtn" type="submit">解绑</button></form>{% endif %}
+      </div></div>
+    <div class="row"><div><b>QQ 号</b><div class="muted">{{ c.qq or '没填' }}</div></div></div>
+    {% if c.note %}<div class="row"><div><b>备注</b><div class="muted">{{ c.note }}</div></div></div>{% endif %}
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><h2>各业务</h2></div>
+  <div class="rowlist">{% for s in slots %}
+    <div class="row"><div><b>{{ s.b.letter }} · {{ s.b.name }}</b><div class="muted">单口 {{ s.open }}/{{ s.n }} 在排 · 剩 {{ s.left }} 张有效额度</div></div></div>
+  {% else %}<p class="empty">还没有业务。</p>{% endfor %}</div>
+</section>
+
+<section>
+  <div class="sec-head"><h2>额度<span class="n">{{ quotas|length }} 笔</span></h2>
+    {% if bizs %}<span class="btns"><details class="panel"><summary class="btn">{{ ic.plus() }}录一笔额度</summary>
+      <form class="form" method="post" action="{{ url_for('paidan_quota_add', cid=c.id) }}">{{ csrf() }}
+        <div class="fields">
+          <div><label for="qb">业务</label><select id="qb" name="bid">{% for b in bizs %}<option value="{{ b.id }}">{{ b.letter }} · {{ b.name }}</option>{% endfor %}</select></div>
+          <div><label for="qt">张数</label><input id="qt" name="total" type="number" min="1" required></div>
+          <div><label for="qe">到期日期</label><input id="qe" name="expires" type="date" min="{{ today }}" required></div>
+        </div>
+        <p class="note">到期日当天还能用，第二天 0 点起作废。</p>
+        <div class="actions"><button class="btn" type="submit">录额度</button>
+          <button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
+      </form></details></span>{% endif %}</div>
+  {% if quotas %}<div class="tablewrap"><table class="rt">
+    <thead><tr><th>业务</th><th>用了</th><th>到期</th><th>状态</th><th></th></tr></thead>
+    <tbody>{% for x in quotas %}<tr>
+      <td>{{ x.b.letter if x.b }} · {{ x.b.name if x.b }}</td>
+      <td>{{ x.q.used }}/{{ x.q.total }}</td>
+      <td>{{ x.q.expires }}{% if x.ext %}<div class="muted">{% for e in x.ext %}{{ e.old_date|pd_md }}→{{ e.new_date|pd_md }}{{ '（暂停）' if e.by == 'pause' }}{% if not loop.last %}、{% endif %}{% endfor %}</div>{% endif %}</td>
+      <td><span class="dot {{ 'ok' if x.state == '有效' else ('bad' if x.state == '已过期' else '') }}"></span>{{ x.state }}</td>
+      <td>{% if x.state != '已过期' %}<details class="panel"><summary class="btn sm ghost">延期</summary>
+        <form class="form" method="post" action="{{ url_for('paidan_quota_extend', qid=x.q.id) }}">{{ csrf() }}
+          <div class="fields"><div><label for="x{{ x.q.id }}">新的到期日期</label><input id="x{{ x.q.id }}" name="expires" type="date" min="{{ today }}" value="{{ x.q.expires }}" required></div></div>
+          <div class="actions"><button class="btn" type="submit">延期</button><button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
+        </form></details>{% endif %}</td>
+    </tr>{% endfor %}</tbody></table></div>
+  {% else %}<p class="empty">还没有额度。点「录一笔额度」。</p>{% endif %}
+</section>
+
+<section>
+  <div class="sec-head"><h2>订单<span class="n">{{ orders|length }} 单</span></h2></div>
+  {% if orders %}<div class="rowlist">{% for o in orders %}
+    <div class="row"><div><a href="{{ url_for('paidan_order', oid=o.id) }}"><b>{{ o.no }}</b></a>
+      <div class="muted">{{ {'open':'在排','done':'已完成','cancelled':'已取消'}[o.status] }} · {{ o.created_ts|pd_ts }} 下单{% if o.status == 'done' %} · 扣 {{ o.charged }} 张{% endif %}</div></div></div>
+  {% endfor %}</div>{% else %}<p class="empty">还没下过单。</p>{% endif %}
+</section>
+
+<section>
+  <div class="sec-head"><h2>{{ '恢复' if c.archived else '已完结' }}</h2></div>
+  <div class="rowlist"><div class="row">
+    <div><b>{{ '恢复这个客户' if c.archived else '标记已完结' }}</b><div class="muted">{{ '恢复后可以继续下单、收提醒。' if c.archived else '用完了、不再合作的客户：不能再下单、不再提醒，列表里收起来。数据都保留，可以恢复。有在排的单时不能完结。' }}</div></div>
+    <div class="acts"><form method="post" action="{{ url_for('paidan_client_archive', cid=c.id) }}"{% if not c.archived %} onsubmit="return confirm('把 {{ c.name }} 标记为已完结？')"{% endif %}>{{ csrf() }}<input type="hidden" name="on" value="{{ '0' if c.archived else '1' }}"><button class="btn sm ghost" type="submit">{{ '恢复' if c.archived else '标记已完结' }}</button></form></div>
+  </div></div>
+</section>
+{% endblock %}

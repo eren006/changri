@@ -11,6 +11,7 @@ from .db import get_conn
 
 SONG_THREAD = "点歌台"
 STEAL_THREAD = "偷盗记录"
+TORN_THREAD = "飘来的半张纸"          # 混乱短信「撕成两半」的后半截，落到第三个人手机里
 
 
 def _names() -> tuple[dict[int, str], dict[str, int]]:
@@ -24,7 +25,9 @@ def key_of(m, rid: int, by_id: dict, by_name: dict):
     if m["alias_id"]:
         return None
     if m["from_role_id"] == rid:
-        return ("r", m["to_role_id"])
+        if m["orig_alias"]:                                       # 误投出去的匿名短信：发件人那边在匿名对话里看，不进真名会话
+            return None
+        return ("r", m["orig_to"] or m["to_role_id"])            # 误投 / 送错人：发件人这边还挂在原本想发的人名下
     if m["to_role_id"] != rid:
         return None
     sign = (m["sign"] or "").strip()
@@ -36,12 +39,23 @@ def key_of(m, rid: int, by_id: dict, by_name: dict):
 
 
 def _mine_or_received(rid: int) -> list:
+    """我发的全部 + 我真收到的（礼物丢了、被我拉黑的那些我根本没收到，不显示）。撤回的两边都不显示（群里也撤掉了；匿名对话同样如此）。"""
+    from .messaging import NOT_RECEIVED_SQL
     with get_conn() as c:
-        return c.execute("SELECT * FROM messages WHERE (from_role_id=? OR to_role_id=?) AND alias_id IS NULL ORDER BY id DESC", (rid, rid)).fetchall()
+        return c.execute(f"SELECT * FROM messages WHERE (from_role_id=? OR (to_role_id=? AND {NOT_RECEIVED_SQL})) AND alias_id IS NULL AND error!='已撤回' ORDER BY id DESC",
+                         (rid, rid)).fetchall()
 
 
-def _preview(m) -> str:
-    return ((m["content"] or "［图片］") if m["kind"] == "sms" else f"［礼物］{m['title'] or m['content']}")[:40]
+def text_of(m, rid: int) -> str:
+    """这条在 rid 手机里显示的正文：发件人看自己原本写的（混乱短信改过的字只给收件人看）。"""
+    if m["from_role_id"] == rid and m["orig_content"] is not None:
+        return m["orig_content"]
+    return m["content"]
+
+
+def _preview(m, rid: int) -> str:
+    text = text_of(m, rid)
+    return ((text or "［图片］") if m["kind"] == "sms" else f"［礼物］{m['title'] or text}")[:40]
 
 
 def inbox(role, song_on: bool = False, steal_on: bool = False) -> list[dict]:
@@ -54,7 +68,7 @@ def inbox(role, song_on: bool = False, steal_on: bool = False) -> list[dict]:
         k = key_of(m, rid, by_id, by_name)
         if not k or k in out:
             continue
-        out[k] = {"name": by_id.get(k[1], "?") if k[0] == "r" else k[1], "preview": _preview(m), "ts": m["created_ts"], "url_kind": k[0], "key": k[1]}
+        out[k] = {"name": by_id.get(k[1], "?") if k[0] == "r" else k[1], "preview": _preview(m, rid), "ts": m["created_ts"], "url_kind": k[0], "key": k[1]}
     rows = list(out.values())
     for t in aliases.threads(rid):
         rows.append({"name": t["title"], "preview": t["preview"], "ts": t["ts"], "url_kind": "alias", "key": t["alias_id"]})
@@ -62,6 +76,9 @@ def inbox(role, song_on: bool = False, steal_on: bool = False) -> list[dict]:
         s = song_items(role)
         if s:
             rows.append({"name": SONG_THREAD, "preview": s[-1]["text"][:40], "ts": s[-1]["ts"], "url_kind": "song", "key": ""})
+    tn = torn_items(rid)
+    if tn:
+        rows.append({"name": TORN_THREAD, "preview": tn[-1]["text"][:40], "ts": tn[-1]["ts"], "url_kind": "torn", "key": ""})
     if steal_on:
         st = steal_items(rid)
         if st:
@@ -111,3 +128,8 @@ def song_items(role) -> list[dict]:
 def steal_items(rid: int) -> list[dict]:
     from . import gifts
     return [{"mine": False, "text": x["text"], "ts": x["ts"]} for x in reversed(gifts.steal_log(rid, 200)) if x["text"]]
+
+
+def torn_items(rid: int) -> list[dict]:
+    from . import chaosletter
+    return [{"mine": False, "text": f"……{x['torn_text']}\n落款：{x['torn_sign']}", "ts": x["ts"]} for x in chaosletter.torn_items(rid)]

@@ -35,6 +35,13 @@ def register(bot_id: str, group_openid: str, real_gid: str = "", set_name: str =
         return c.execute("SELECT id FROM pool_groups WHERE bot_id=? AND group_openid=?", (bot_id, group_openid)).fetchone()["id"]
 
 
+def is_room_group(bot_id: str, group_openid: str) -> bool:
+    """这个群在备用群池里（空闲 / 正在当房间 / 等人退群都算）：不能拿来建角色、认群，不然约会会开进某人的个人群。"""
+    with get_conn() as c:
+        return c.execute("SELECT 1 FROM pool_groups WHERE bot_id=? AND group_openid=? AND in_pool=1 AND moved=0",
+                         (bot_id, group_openid)).fetchone() is not None
+
+
 def is_pool_group(bot_id: str, group_openid: str):
     with get_conn() as c:
         return c.execute("SELECT * FROM pool_groups WHERE bot_id=? AND group_openid=?", (bot_id, group_openid)).fetchone()
@@ -131,7 +138,9 @@ def allocate(room_id: int):
     """领一个空群给房间。池里没有空群返回 None（调用方会撤掉这个房间，不排队）。
     QQ 号没登录（没连上）的群不分：登记在哪个 QQ 号名下，就跟着那个号走。"""
     with get_conn() as c:
-        g = next((x for x in c.execute("SELECT * FROM pool_groups WHERE in_pool=1 AND moved=0 AND state='free' ORDER BY RANDOM()") if link_ready(x)), None)
+        g = next((x for x in c.execute(                       # 已经绑成谁的个人群的不分（放进池以前就有人在里面建了角色）
+            "SELECT * FROM pool_groups p WHERE in_pool=1 AND moved=0 AND state='free' AND NOT EXISTS "
+            "(SELECT 1 FROM role_groups g WHERE g.bot_id=p.bot_id AND g.group_openid=p.group_openid) ORDER BY RANDOM()") if link_ready(x)), None)
         if not g:
             return None
         c.execute("UPDATE pool_groups SET state='occupied', room_id=? WHERE id=?", (room_id, g["id"]))

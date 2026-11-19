@@ -13,6 +13,8 @@ Send = Callable[[str, str, str], Awaitable[object]]   # send(bot_id, group_openi
 
 MAX_ATTEMPTS = 3
 RETRY_WINDOW = 24 * 3600
+# 对方明确拒收（非静默拉黑）：发件人当场被告知没发出去，所以不算今天的次数、不进冷却。静默拉黑照算，不然发件人能看出来。
+REFUSED = "被拉黑（已告知发件人）"
 
 
 def cooldown_left(role_id: int, kind: str) -> int:
@@ -22,7 +24,7 @@ def cooldown_left(role_id: int, kind: str) -> int:
         return 0
     with get_conn() as conn:
         row = conn.execute(
-            "SELECT MAX(created_ts) AS t FROM messages WHERE from_role_id=? AND kind=?", (role_id, kind)
+            f"SELECT MAX(created_ts) AS t FROM messages WHERE from_role_id=? AND kind=? AND error!='{REFUSED}'", (role_id, kind)
         ).fetchone()
     last = row["t"] or 0
     return max(0, last + cd - int(time.time()))
@@ -34,7 +36,7 @@ RECALL_WINDOW = 120   # 官方接口只允许撤回 2 分钟内的消息
 def day_count(role_id: int, kind: str) -> int:
     """今天（游戏天数，没有季度按自然日）已经发了几条；撤回的不算。"""
     with get_conn() as conn:
-        n = conn.execute("SELECT COUNT(*) FROM messages WHERE from_role_id=? AND kind=? AND day=? AND error!='已撤回'",
+        n = conn.execute(f"SELECT COUNT(*) FROM messages WHERE from_role_id=? AND kind=? AND day=? AND error NOT IN ('已撤回', '{REFUSED}')",
                          (role_id, kind, season.day_key())).fetchone()[0]
     from . import godmode
     return max(0, n - godmode.offset(role_id, kind))
@@ -44,20 +46,38 @@ def daily_limit(kind: str) -> int:
     return get_int("sms_daily_limit" if kind == "sms" else "gift_daily_limit", 0)
 
 
-def queue_message(kind: str, from_id: int, to_id: int, title: str, content: str, sign: str = "") -> int:
+def queue_message(kind: str, from_id: int, to_id: int, title: str, content: str, sign: str = "", alias_id: int | None = None) -> int:
+    """alias_id：匿名对话的短信，入库时一起写上（分两步写的话，中间那一下会被当成真名短信显示出来）。"""
     with get_conn() as conn:
         cur = conn.execute(
-            "INSERT INTO messages(kind, from_role_id, to_role_id, title, content, created_ts, day, sign) VALUES(?,?,?,?,?,?,?,?)",
-            (kind, from_id, to_id, title, content, int(time.time()), season.day_key(), sign),
+            "INSERT INTO messages(kind, from_role_id, to_role_id, title, content, created_ts, day, sign, alias_id) VALUES(?,?,?,?,?,?,?,?,?)",
+            (kind, from_id, to_id, title, content, int(time.time()), season.day_key(), sign, alias_id),
         )
         return cur.lastrowid
+
+
+# 收件人那边根本没收到的：礼物丢失、被拉黑。小手机（会话、未读、网页提醒）不给收件人显示这些，发件人照常看到。
+def not_received_sql(p: str = "") -> str:
+    """p：表别名前缀，比如 "m."。"""
+    return f"NOT ({p}status='failed' AND ({p}error LIKE '被拉黑%' OR {p}error LIKE '礼物丢失%'))"
+
+
+NOT_RECEIVED_SQL = not_received_sql()
+
+
+def set_original(msg_id: int, orig_to: int, orig_content: str | None) -> None:
+    """混乱短信出了岔子：记下发件人原本想发给谁（0 = 没换人）、原本写的什么（None = 没改字）。"""
+    with get_conn() as conn:
+        conn.execute("UPDATE messages SET orig_to=?, orig_content=? WHERE id=?", (orig_to, orig_content, msg_id))
 
 
 def last_recallable(role_id: int):
     """我最近发的、已送到对方群里、还在 2 分钟内、没撤回过的一条短信/礼物。"""
     with get_conn() as conn:
         return conn.execute(
-            "SELECT m.*, t.name AS to_name FROM messages m JOIN roles t ON t.id=m.to_role_id "
+            # 误投了也写原本发给的人；匿名对话里回给化名的，写化名（写真名就把化名背后是谁说出去了）
+            "SELECT m.*, CASE WHEN a.id IS NOT NULL AND a.owner_id!=m.from_role_id THEN a.alias ELSE t.name END AS to_name FROM messages m "
+            "JOIN roles t ON t.id=COALESCE(NULLIF(m.orig_to, 0), m.to_role_id) LEFT JOIN phone_aliases a ON a.id=COALESCE(m.alias_id, NULLIF(m.orig_alias, 0)) "
             "WHERE m.from_role_id=? AND m.status='sent' AND m.delivered_msg_id!='' AND m.error!='已撤回' AND m.delivered_ts>=? "
             "ORDER BY m.id DESC LIMIT 1", (role_id, int(time.time()) - RECALL_WINDOW)).fetchone()
 
@@ -119,7 +139,7 @@ def mark_blocked(msg_id: int, silent: bool) -> None:
     """被拉黑的消息不投递。status 只能是 pending/sent/failed，所以记成 failed 并写明原因。"""
     with get_conn() as conn:
         conn.execute("UPDATE messages SET status='failed', error=? WHERE id=?",
-                     ("被拉黑（静默，发件人以为已送达）" if silent else "被拉黑（已告知发件人）", msg_id))
+                     ("被拉黑（静默，发件人以为已送达）" if silent else REFUSED, msg_id))
 
 
 def mark_lost(msg_id: int) -> None:
@@ -143,7 +163,7 @@ async def _maybe_broadcast(m, send: Send, shown_to: int = 0) -> None:
     with get_conn() as conn:
         to = conn.execute("SELECT name FROM roles WHERE id=?", (shown_to or m["to_role_id"],)).fetchone()
     who = (m["sign"] or m["from_name"]) 
-    target = "某人" if get_config("drop_hide_receiver", "0") == "1" or not to else to["name"]
+    target = "某人" if hide_receiver("gift") or not to else to["name"]
     try:
         line = f"🎁 {who} 送出了一份礼物「{m['title']}」给 {target}"
         await send(ann[0], ann[1], line)
@@ -168,18 +188,19 @@ async def deliver(msg_id: int, send: Send, shown_to: int = 0) -> bool:
     text = render(m["kind"], m["sign"] or m["from_name"], m["title"], m["content"] or ("（图片）" if imgs else ""))
     ok, info, bot_id, mid = await push_to_role_ex(m["to_role_id"], text, send, buttons=reply_buttons(m))
     if ok:
+        img_ids = []
         for data in imgs:                                  # 图片紧跟文字发到同一个群；发不出去不影响短信算送达
             try:
                 from changri.core.qqsend import make_send_image
-                await make_send_image()(bot_id, info, data)
+                img_ids.append(await make_send_image()(bot_id, info, data) or "")
             except Exception as e:  # noqa: BLE001
                 import logging
                 logging.getLogger(__name__).warning("[短信图片] 发到对方群失败：%s", e)
         with get_conn() as conn:
             conn.execute(
                 "UPDATE messages SET status='sent', attempts=attempts+1, delivered_group=?, delivered_ts=?, error='', "
-                "delivered_bot=?, delivered_msg_id=? WHERE id=?",
-                (info, int(time.time()), bot_id, mid, msg_id),
+                "delivered_bot=?, delivered_msg_id=?, delivered_img_ids=? WHERE id=?",
+                (info, int(time.time()), bot_id, mid, ",".join(i for i in img_ids if i), msg_id),
             )
         if m["kind"] == "gift":
             await _maybe_broadcast(m, send, shown_to)
@@ -192,7 +213,8 @@ async def deliver(msg_id: int, send: Send, shown_to: int = 0) -> bool:
     return False
 
 
-async def retry_pending(send: Send) -> int:
+async def retry_pending(send: Send, on_delivered=None) -> int:
+    """on_delivered(msg_id, send)：补送成功后要补做的事（截信器 / 回音壁、混乱短信的后续），由 sendmsg.after_delivered 传进来。"""
     cutoff = int(time.time()) - RETRY_WINDOW
     with get_conn() as conn:
         ids = [r["id"] for r in conn.execute(
@@ -202,6 +224,12 @@ async def retry_pending(send: Send) -> int:
     for i in ids:
         if await deliver(i, send):
             ok += 1
+            if on_delivered:
+                try:
+                    await on_delivered(i, send)
+                except Exception as e:  # noqa: BLE001
+                    import logging
+                    logging.getLogger(__name__).warning("[短信] 补送后的后续处理失败：%s", e)
     return ok
 
 
@@ -210,3 +238,10 @@ def admin_delete(msg_id: int) -> bool:
     with get_conn() as conn:
         conn.execute("DELETE FROM message_images WHERE msg_id=?", (msg_id,))
         return conn.execute("DELETE FROM messages WHERE id=?", (msg_id,)).rowcount > 0
+
+
+def hide_receiver(kind: str) -> bool:
+    """公开播报时隐藏收件人：礼物（gift_hide_receiver）和心动信曝光（lovemail_hide_receiver）各一个开关。
+    以前两个共用 drop_hide_receiver；没单独设过的，照老开关的值，升级上来行为不变。"""
+    from .db import get_config
+    return get_config(f"{kind}_hide_receiver", get_config("drop_hide_receiver", "0")) == "1"

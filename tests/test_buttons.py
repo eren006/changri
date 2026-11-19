@@ -264,7 +264,9 @@ class ButtonsE2E(unittest.TestCase):
             self.assertIn(x, labels)
         self.assertIn(("时间线", "时间线", True), btns)
         set_config("ext:rpg", "0")
-        self.assertNotIn("角色卡", [b[0] for b in self.say("我的")[0][1]])     # 关掉的功能不出现
+        after = [b[0] for b in self.say("我的")[0][1]]
+        self.assertNotIn("背包", after)                                        # 关掉的功能不出现
+        self.assertIn("角色卡", after)                                         # 角色卡是常规功能，商城关着也在
         self.assertEqual(self.say("我的角色")[0][0][:3], "角色：")              # 原来的「我的角色」不受影响
         self.assertEqual(self.say("我的不存在的东西"), [])                       # 打错的不理
 

@@ -1,7 +1,9 @@
 """小手机匿名对话（照老系统 rp_archive 的「匿名对话（化名）」）：
 - 「新信息」页写化名、选收件人，开一段能来回聊的对话；对同一个人最多 3 个化名，同一收件人下化名不能重名，化名最多 10 个字；
 - 收件人那边对话标题是化名；收件人回复送回化名主人；
-- 跟短信共用每日次数、冷却、开放时段、功能权限；不加混乱效果、不公开播报（容易穿帮或串线）；
+- 跟短信共用每日次数、冷却、开放时段、功能权限；
+- 混乱短信开着时也会出岔子（作者 2026-11-18 定的）：抹字、撕半照常；误投给第三个人时落款仍是化名，进他的署名会话（不能回），
+  发件人那边还在这段匿名对话里看到原文；不出「落款写错」（落款就是化名，换成真名会串线）；公告播报只写化名，不写背后是谁；
 - 不看按真实身份的拉黑（不然「拉黑某人看化名对话断不断」就能反查出化名是谁）；匿名对话有自己的「拉黑并结束」，满 2 小时才能解除；
 - 只有管理员能看到化名背后是谁。
 短信本身走 messages 表（alias_id 不为空）和 messaging.deliver：化名主人发的落款是化名；收件人回的落款写明「回你的化名」。"""
@@ -96,14 +98,39 @@ async def send(role, alias_id: int, text: str, send_fn) -> tuple[bool, str]:
         frm, to, sign, shown = a["owner_id"], a["target_id"], a["alias"], a["target_name"]
     else:                                         # 对方 → 化名主人：落款写清是回给哪个化名的
         frm, to, sign, shown = a["target_id"], a["owner_id"], f"{a['target_name']}（回你的化名「{a['alias']}」）", a["alias"]
-    mid = messaging.queue_message("sms", frm, to, "", text, sign)
-    with get_conn() as c:
-        c.execute("UPDATE messages SET alias_id=? WHERE id=?", (alias_id, mid))
+    c = _chaos(frm, to, sign, text)
+    content, true_to = (c["shown"], c["true_to"]) if c else (text, to)
+    if true_to != to:                             # 误投：第三个人不在这段对话里，按落款进他的署名会话；orig_alias 让发件人这边还挂在匿名对话上
+        mid = messaging.queue_message("sms", frm, true_to, "", content, sign)
+        with get_conn() as conn:
+            conn.execute("UPDATE messages SET orig_alias=? WHERE id=?", (alias_id, mid))
+    else:
+        mid = messaging.queue_message("sms", frm, to, "", content, sign, alias_id=alias_id)
+    if c:
+        from . import chaosletter
+        messaging.set_original(mid, to if true_to != to else 0, text if content != text else None)
+        chaosletter.attach(c["log_id"], mid, c, to_shown=shown)        # 公告里写化名 / 收件人，不写化名背后是谁
     lim, used = messaging.daily_limit("sms"), messaging.day_count(role["id"], "sms")
     tail = f"（今天 {used}/{lim}）" if lim > 0 else ""
     if await messaging.deliver(mid, send_fn):
+        from . import sendmsg
+        await sendmsg.after_delivered(mid, send_fn)
         return True, f"已送达「{shown}」。{tail}"
     return True, f"「{shown}」那边暂时收不到，已记下，稍后会自动重试。"
+
+
+def _chaos(frm: int, to: int, sign: str, text: str) -> dict | None:
+    """混乱短信开着：按概率改这条匿名短信。不出「落款写错」（落款就是化名）。没出岔子返回 None。"""
+    from . import chaosletter, extensions
+    if not extensions.is_enabled("chaos_letter"):
+        return None
+    c = chaosletter.compose({"id": frm, "name": sign}, {"id": to}, text)
+    c["sign"] = sign
+    c["effects"] = [e for e in c["effects"] if e != "落款写错"]
+    if not c["effects"]:
+        return None
+    c["log_id"] = chaosletter.log(frm, to, c, text)
+    return c
 
 
 def block(role, alias_id: int, unblock: bool = False, now: int | None = None) -> tuple[bool, str]:
@@ -135,17 +162,21 @@ def threads(role_id: int) -> list[dict]:
                          "JOIN roles t ON t.id=a.target_id WHERE a.owner_id=? OR a.target_id=?", (role_id, role_id)).fetchall()
         out = []
         for a in rows:
-            m = c.execute("SELECT content, created_ts FROM messages WHERE alias_id=? AND error!='已撤回' ORDER BY id DESC LIMIT 1", (a["id"],)).fetchone()
+            ms = messages(a["id"], role_id)
+            m = ms[-1] if ms else None
             if not m and a["target_id"] == role_id:          # 化名还没发过信：收件人那边先不出现
                 continue
-            out.append({"alias_id": a["id"], "title": title_for(a, role_id), "preview": (m["content"] if m else "（还没有发信）")[:40],
+            from .phoneview import text_of
+            out.append({"alias_id": a["id"], "title": title_for(a, role_id), "preview": ((text_of(m, role_id) or "") if m else "（还没有发信）")[:40],
                         "ts": m["created_ts"] if m else a["created_ts"], "blocked": bool(a["blocked_by"])})
     return out
 
 
-def messages(alias_id: int) -> list:
+def messages(alias_id: int, role_id: int) -> list:
+    """这段匿名对话里 role_id 能看到的：真在对话里的，加上自己发出去却被误投给别人的（对方没收到，不给对方看）。"""
     with get_conn() as c:
-        return c.execute("SELECT * FROM messages WHERE alias_id=? AND error!='已撤回' ORDER BY id", (alias_id,)).fetchall()
+        return c.execute("SELECT * FROM messages WHERE (alias_id=?1 OR (orig_alias=?1 AND from_role_id=?2)) AND error!='已撤回' ORDER BY id",
+                         (alias_id, role_id)).fetchall()
 
 
 def wait_minutes(a, now: int | None = None) -> int:

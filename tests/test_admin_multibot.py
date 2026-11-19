@@ -170,6 +170,7 @@ class AdminMultiBot(unittest.TestCase):
         import time as _t
         db.set_config("heartbeat:111111", "0")
         html = self.c.get("/b/111111/").get_data(as_text=True)
+        self.assertIn("extensions?open=contact_qq", html)                      # 报错日志里一直有「联系 QQ」入口（弹窗点了「不用了」也找得到）
         self.assertIn("这个机器人（111111）不在线", html)
         self.assertIn("约会房间的群", html)
         db.set_config("heartbeat:111111", str(int(_t.time())))
@@ -454,7 +455,7 @@ class AdminMultiBot(unittest.TestCase):
         tok = lambda: self._csrf(f"{base}/extensions")                    # noqa: E731
         from changri.core import rpg
         with db.use_bot("111111"):
-            rpg.delete_attr_def("HP")
+            self.assertTrue(rpg.delete_attr_def("HP")[0])
             self.assertEqual([x["name"] for x in rpg.attr_defs()], [])             # 删了就是删了，不会自己长回来
         r = self.c.post(base + "/init", data={"mode": "fill", "_csrf": tok()})
         self.assertEqual(r.status_code, 302)

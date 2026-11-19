@@ -34,12 +34,12 @@ load_dotenv(LEGACY_ENV)          # 老版本 .env 里的 ADMIN_PASSWORD（只在
 SECTIONS = [
     ("基础", {
         "hello_text": ("/ping 的回复（一行一句，可以写好几句，每次随机回一句；空着就回「收到。」）", "收到。"),
-        "welcome_text": ("机器人被拉进新群时发的欢迎语（留空用默认）", ""),
         "msgmon_enabled": ("消息监听（1 开 / 0 关；后台「消息监听」页实时看机器人收到的群消息：官方机器人所在的群，加上 QQ 小号在群号组里听到的。只放在内存里，每个机器人最近 500 条，重启就清空，不存数据库）", "1"),
         "error_report_url": ("报错接收地址（http/https 网址；留空 = 报错只存在本机。程序崩溃或出错、恢复后会自动把报错文字发到这里，不含聊天内容和群号。默认发到主站 system.changri.work）", "https://system.changri.work/api/errors"),
         "contact_qq": ("联系 QQ（选填。填了以后，这台机器的报错发给作者时会带上这个 QQ 号，作者在后台看到报错、需要的话可以加你帮你看；不填就不带，报错照常发）", ""),
         "usage_report": ("匿名使用情况上报（1 开 / 0 关；每 6 小时跟着检查更新发一次：随机生成的实例编号、版本、系统、几个机器人连着、处理了多少次指令和每个指令各几次——只记指令名，不含后面写的内容——、开着哪些官方扩展。不带群号、QQ 号、角色和聊天内容，作者用来看装了的人有没有在用）", "1"),
         "season_report": ("季末报告（1 开 / 0 关；开了以后，结束季度时会给每位有互动的玩家的个人群先发一句话、再单独发一张本季结算海报：约会场次、短信礼物心动信、互动最多的人、最常互动的时间、最精彩的一场戏。海报画不出来就改发文字小结。机器人要还在个人群里才发得出去。「季度与出场」页的「季末报告」里也能开关、看样式缩略图、下载每个人的海报）", "0"),
+        "season_save_reminder": ("收尾前存档提醒（1 开 / 0 关；开了以后，结束季度时提醒每位玩家趁收尾前用「复盘 R12」存喜欢的戏、看「时间线」，收尾后角色、时间线、小手机都会清空。开着季末报告时这段话并进报告里，不另发）", "1"),
         "season_poster_skin": ("季末海报的样式（第一次用某款时从主站下载花边素材，下载不了就用素色纸）", "antique"),
         "announce_frequency": ("「第 N 次记录」公告的触发频率：电话、约会、官约、心愿、短信、礼物、心动信、拉线各自计数，每满这么多次往公告群发一句「【第 N 次××记录】」（0 = 不发）", "2"),
         "block_undo_hours": ("拉黑满几小时才能解除", "2"),
@@ -63,10 +63,11 @@ SECTIONS = [
         "gift_daily_limit": ("每人每天最多送几次礼（0 = 不限）", "0"),
         "gift_public_send": ("礼物公开播报：送达后按概率把「谁送了什么给谁」发到公告群（1 开 / 0 关）", "0"),
         "gift_public_chance": ("礼物公开概率（%）", "50"),
+        "gift_hide_receiver": ("礼物公开播报时隐藏收礼人（1 是 / 0 否）", "0"),
     }),
     ("约会房间", {
         "window_date": ("约会/电话/微信开放时段（写成 10-23 或 20:00-02:00，留空 = 全天开放）", ""),
-        "min_minutes_约会": ("约会最短时长（分钟，约的时间段比这短就约不成；0 = 不限）", "59"),
+        "min_minutes_约会": ("约会最短时长（分钟，约的时间段比这短就约不成；挂心愿也按这个；0 = 不限）", "59"),
         "min_minutes_电话": ("电话最短时长（分钟，0 = 不限）", "29"),
         "room_redo_similarity": ("复盘里同一个人 10 分钟内发的、和自己上一条相似度达到多少 % 的发言，算撤回重发：只留后一条，字数按后一条算（8 字以上才算；0 = 不处理）", "60"),
         "arc_max_hours": ("最长弧长（小时）：房间里谁回得比这更慢，或正在等的回复已经超过它，「弧长与复盘」页顶上标红；0 = 不标", "12"),
@@ -158,6 +159,7 @@ SECTIONS = [
     }),
     ("晚餐", {
         "dinner_poke_cooldown_min": ("「戳你一下」冷却（分钟，0 = 不冷却）", "5"),
+        "dinner_dessert_cooldown_sec": ("「送甜点」冷却（秒，0 = 不冷却；格式写错、找不到人不算）", "180"),
     }),
     ("心愿", {
         "window_wish": ("心愿开放时段（写成 10-23 或 20:00-02:00，留空 = 全天开放）", ""),
@@ -176,7 +178,7 @@ SECTIONS = [
         "lovemail_max_len": ("单封信最大字数", "500"),
         "lovemail_expose": ("曝光开关（1 开 / 0 关）", "0"),
         "lovemail_expose_chance": ("曝光概率（%）", "10"),
-        "drop_hide_receiver": ("曝光时隐藏收信人（1 是 / 0 否）", "0"),
+        "lovemail_hide_receiver": ("心动信曝光时隐藏收信人（1 是 / 0 否）", "0"),
         "daily_tip": ("每日指令提示（派送后发公告群，留空或填「关闭」= 不发）", ""),
     }),
     ("跑团骰子", {
@@ -311,7 +313,7 @@ def _dashboard() -> dict:
         n_admins = conn.execute("SELECT COUNT(*) FROM admins").fetchone()[0]
         day0 = int(time.mktime(time.strptime(time.strftime("%Y-%m-%d"), "%Y-%m-%d")))
         n_msg_today = conn.execute("SELECT COUNT(*) FROM messages WHERE created_ts>=?", (day0,)).fetchone()[0]
-        n_undelivered = conn.execute("SELECT COUNT(*) FROM messages WHERE created_ts>=? AND status!='sent' AND error NOT LIKE '被拉黑%'", (int(time.time()) - 86400,)).fetchone()[0]
+        n_undelivered = conn.execute("SELECT COUNT(*) FROM messages WHERE created_ts>=? AND status!='sent' AND error NOT LIKE '被拉黑%' AND error NOT LIKE '礼物丢失%' AND error!='已撤回'", (int(time.time()) - 86400,)).fetchone()[0]
     enabled = get_config("lovemail_enabled", "1") != "0"
     steps = [
         (target - 10, "截止预告", f"提醒 {n_main} 个个人群：10 分钟后截止收稿"),

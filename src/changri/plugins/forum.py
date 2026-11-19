@@ -10,6 +10,7 @@ from nonebot.params import CommandArg
 from changri.core import admins, announce, forum, godmode, roles, windows
 from changri.core.buttons import Btn
 from changri.core.qqsend import reply_buttons, send_to_group
+from changri.core.textutil import parse_id
 
 NEED_ROLE = "请先在你的个人群里发「创建新角色 名字」绑定角色。"
 NOT_ADMIN = "❌ 权限不足，仅管理员可用。"
@@ -110,9 +111,9 @@ async def _vote_floor(matcher, bot, event, args, val: int):
         await matcher.finish(NEED_ROLE)
     p = args.extract_plain_text().split()
     n = forum.parse_post_ref(p[0]) if p else None
-    if not n or len(p) < 2 or not p[1].isdigit():
-        await matcher.finish("用法：点赞楼层 贴号 楼层（点踩楼层同理）。")
-    floor = int(p[1])
+    floor = parse_id(p[1]) if len(p) >= 2 else None
+    if not n or not floor:
+        await matcher.finish("用法：点赞楼层 贴号 楼层，例：点赞楼层 001 3（点踩楼层同理）。")
     if floor == 1:
         await matcher.finish("1 楼就是主帖，直接用「点赞 贴号」。")
     rid = forum.reply_id(n, floor)
@@ -161,7 +162,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
         await del_floor.finish(NOT_ADMIN)
     p = args.extract_plain_text().split()
     n = forum.parse_post_ref(p[0]) if p else None
-    if not n or len(p) < 2 or not p[1].isdigit() or not forum.delete_floor(n, int(p[1])):
+    if not n or len(p) < 2 or not parse_id(p[1]) or not forum.delete_floor(n, parse_id(p[1])):
         await del_floor.finish("用法：删楼层 贴号 楼层（1 楼是主帖，要删整帖用「删帖」）。")
     await del_floor.finish(f"✅ 已删除 {forum.pid(n)} 的 {p[1]} 楼（楼号保留，内容改成「该楼层已被删除」）。")
 

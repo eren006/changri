@@ -4,6 +4,7 @@ from nonebot.params import CommandArg
 
 from changri.core import collect
 from changri.plugins.play import NEED_ROLE, _cmd, _me
+from changri.core.textutil import parse_id
 
 cmd = _cmd("收集")
 
@@ -18,7 +19,8 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
         await cmd.finish(collect.describe_open())
     head, _, rest = text.partition(" ")
     cid = None
-    if head.isdigit() and rest.strip() and collect.get(int(head)):       # 第一个词是存在的收集编号才当编号，否则整段都是内容
-        cid, text = int(head), rest.strip()
+    n = parse_id(head)
+    if n and rest.strip() and collect.get(n):       # 第一个词是存在的收集编号才当编号，否则整段都是内容
+        cid, text = n, rest.strip()
     ok, tip = collect.submit(me["id"], text, cid)
     await cmd.finish(tip)
