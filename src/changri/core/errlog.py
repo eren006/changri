@@ -108,9 +108,11 @@ def read_all() -> list[dict]:
         out = []
         for line in _path().read_text(encoding="utf-8").splitlines():
             try:
-                out.append(json.loads(line))
+                r = json.loads(line)
             except ValueError:
                 continue
+            if r.get("source") not in TRANSIENT_SOURCES or is_auth_error(r.get("message", ""), r.get("trace", "")):   # 旧版本记下的断线：不再显示、不再上报（其实是密钥不对的留着）
+                out.append(r)
         return out
     except OSError:
         return []
@@ -161,6 +163,48 @@ def note_whitelist() -> bool:
     record("config", WHITELIST_SOURCE, WHITELIST_TEXT)
     try:
         print("\n[长日bot] ⚠️ " + WHITELIST_TEXT + "\n", file=sys.stderr, flush=True)     # 看着窗口 / 日志的人也能直接看到
+    except Exception:  # noqa: BLE001
+        pass
+    return True
+
+
+# ---------- 配置问题：AppID / AppSecret 不对 ----------
+# QQ 不认这个机器人的 AppID 和 AppSecret（填错了，或者在 QQ 开放平台重置过 AppSecret、旧的就作废了）：
+# 机器人每隔几秒连一次、每次都被拒，日志里看起来和「断线重连」一模一样（Error while process data from websocket），
+# 真正的原因在堆栈最后一行 invalid appid or secret。这不是短暂的毛病，必须让装的人看到：单独记成「配置」，10 分钟内只记一条。
+# 以前它被当成「QQ 连接」断线，#569b42 那台 30 分钟重连 540 次就是这个（2026-11-20 查到）。
+
+AUTH_SOURCE = "AppID / AppSecret"
+AUTH_MARKS = ("invalid appid or secret", "Get authorization failed")
+AUTH_QUIET = 600
+AUTH_SHOW = 1800
+AUTH_TEXT = ("QQ 不认这个机器人的 AppID / AppSecret（invalid appid or secret），机器人连不上 QQ，群里发什么都不会回。"
+             "多半是 AppSecret 填错了，或者在 QQ 开放平台点过「重置 AppSecret」，旧的作废了。"
+             "请到 QQ 开放平台「开发管理 → 开发设置」核对 AppID、重新生成 AppSecret，再到设置平台「机器人接入」页把这个机器人的 AppSecret 改成新的。")
+
+
+def is_auth_error(text: str, trace: str = "") -> bool:
+    t = f"{text or ''}\n{trace or ''}"
+    return any(m in t for m in AUTH_MARKS)
+
+
+def auth_issue(now: float | None = None, within: int = AUTH_SHOW) -> dict | None:
+    """最近有没有因为 AppID / AppSecret 不对连不上：有就返回那条记录。改好以后不再撞，过半小时自己消失。"""
+    now = now or time.time()
+    for r in reversed(read_all()):
+        if r.get("kind") == "config" and r.get("source") == AUTH_SOURCE:
+            return r if now - r.get("ts", 0) <= within else None
+    return None
+
+
+def note_auth(now: float | None = None) -> bool:
+    """记一条「AppID / AppSecret 不对」。10 分钟内记过就不再记。返回这次有没有记。"""
+    now = now or time.time()
+    if auth_issue(now=now, within=AUTH_QUIET):
+        return False
+    record("config", AUTH_SOURCE, AUTH_TEXT, now=now)
+    try:
+        print("\n[长日bot] ⚠️ " + AUTH_TEXT + "\n", file=sys.stderr, flush=True)
     except Exception:  # noqa: BLE001
         pass
     return True
@@ -268,16 +312,22 @@ def note_notice(source: str, message: str, trace: str = "", now: float | None = 
     return True
 
 
-# ---------- 临时断线：偶尔一条记成提醒 ----------
-# 机器人和 QQ 服务器之间的连接偶尔会断（网络抖一下、QQ 那边重启连接），QQ 适配器会自己重连，但它把这些都记成 ERROR。
-# 偶尔一条不算出错：记成「提醒」（30 分钟一条）。30 分钟内反复出现 FLAP_LIMIT 次以上才合成一条「出错」（之后 30 分钟内不再记），那多半是网络或配置真有问题。
+# ---------- 短暂的毛病：一律不记 ----------
+# 和 QQ 服务器的连接偶尔会断（网络抖一下、QQ 那边重启连接），QQ 适配器会自己重连，但它把这些都记成 ERROR；
+# 发消息、调接口时偶尔超时、对方断开，也是一样：过一会儿自己就好了，装的人和作者看到都做不了什么。
+# 以前偶尔一条记成提醒、30 分钟内 5 次以上合成一条「出错」，结果真正的报错被它们淹没（作者 2026-11-20：这类不用报）。
+# 现在本机不记、后台不显示、也不上报；以前已经记下的，读的时候也滤掉（见 read_all）。
+# 真正要装的人去改的配置问题（IP 白名单、主动发言、按钮权限）不在这里，照常记成「配置」。
 
 FLAP_MARKS = ("WebSocket Closed", "Failed to get gateway info", "Received invalid session event",
               "Error while setup websocket", "Error while process data from websocket", "Failed to establish connection to QQ")
-FLAP_WINDOW = 1800
-FLAP_LIMIT = 5
-_flaps: list[float] = []
-_flap_reported = [0.0]
+# 网络库的超时 / 连接被断：看堆栈最后一行（真正抛出来的异常）是不是这些
+_TRANSIENT_EXC = re.compile(
+    r"^(?:httpx\.|httpcore\.|aiohttp\.(?:client_exceptions\.)?|websockets\.(?:exceptions\.)?|asyncio\.(?:exceptions\.)?|builtins\.)?"
+    r"(?:ReadTimeout|WriteTimeout|ConnectTimeout|PoolTimeout|TimeoutException|ReadError|WriteError|ConnectError|RemoteProtocolError|"
+    r"ServerDisconnectedError|ClientConnectorError|ClientOSError|ServerTimeoutError|ConnectionClosed\w*|InvalidStatus\w*|"
+    r"ConnectionResetError|ConnectionAbortedError|ConnectionRefusedError|IncompleteReadError)\b")
+TRANSIENT_SOURCES = {"QQ 连接"}                   # 旧版本按断线记下的来源名：读出来时滤掉
 _TAG = re.compile(r"</?[a-z#][^>]*>")
 
 
@@ -285,23 +335,14 @@ def is_flap(text: str) -> bool:
     return any(m in (text or "") for m in FLAP_MARKS)
 
 
-def note_flap(message: str, trace: str = "", now: float | None = None) -> bool:
-    """临时断线来了一条。返回这次有没有记成「出错」（偶尔一条记成提醒，不算）。"""
-    now = now or time.time()
-    last = _TAG.sub("", message).strip()
-    with _lock:
-        _flaps[:] = [t for t in _flaps if now - t < FLAP_WINDOW] + [now]
-        n = len(_flaps)
-        escalate = n >= FLAP_LIMIT and now - _flap_reported[0] >= FLAP_WINDOW
-        if escalate:
-            _flap_reported[0] = now
-            _flaps.clear()
-    if not escalate:
-        note_notice("QQ 连接", f"和 QQ 服务器的连接断了一下，会自己重连（{last}）。偶尔一次不用管。", now=now)
+def is_transient(text: str, trace: str = "") -> bool:
+    """短暂的毛病（断线重连、网络超时、对方断开）：不记。AppID / AppSecret 不对不算（见 is_auth_error）。"""
+    if is_auth_error(text, trace):
         return False
-    record("error", "QQ 连接", f"30 分钟内和 QQ 服务器的连接断开 / 重连了 {n} 次（最近一次：{last}）。偶尔断一下会自己重连，"
-                              "这么频繁多半是这台服务器的网络不稳，或者 AppSecret、IP 白名单不对。", trace)
-    return True
+    if is_flap(text) or is_flap(trace):
+        return True
+    last = next((ln.strip() for ln in reversed((trace or "").strip().splitlines()) if ln.strip()), "")
+    return bool(_TRANSIENT_EXC.match(last))
 
 
 # ---------- Windows 上关连接时的噪音：不算出错 ----------
@@ -362,9 +403,11 @@ def _loguru_sink(message) -> None:
     if is_no_push_error(text) or is_no_push_error(trace):
         note_no_push(text.split("：<")[0])          # 配置问题：说清是群里没开主动发言，不记成「出错」
         return
-    if is_flap(text):
-        note_flap(text, trace)                     # 临时断线：偶尔一条记成提醒，反复出现才记成出错
+    if is_auth_error(text, trace):
+        note_auth()                                # 配置问题：密钥不对，看着像断线重连，其实一直连不上（先于 is_transient 判断）
         return
+    if is_transient(text, trace):
+        return                                     # 短暂的毛病：一会儿自己就好，不记（见 is_transient）
     if level >= 40:
         record("error", src, text, trace)
     elif _own_code(path):

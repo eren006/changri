@@ -93,7 +93,7 @@ class AdminTests(unittest.TestCase):
         self.assertEqual(self.c.post("/contact-prompt", data={"action": "no", "_csrf": token(self.c, "/accounts")}).status_code, 403)
 
     def test_theme_switch(self):
-        """后台外观：睡莲 / 芭蕾 / 圣诞 / 樱花 / 默认，记在 cookie 里，回到刚才的页面；圣诞会飘雪。"""
+        """后台外观：睡莲 / 芭蕾 / 圣诞 / 樱花 / 新春 / 默认，记在 cookie 里，回到刚才的页面；圣诞会飘雪。"""
         self.login()
         html = self.c.get("/season").get_data(as_text=True)
         self.assertIn('aria-label="睡莲"', html)
@@ -118,6 +118,13 @@ class AdminTests(unittest.TestCase):
         self.assertIn('id="petals"', html)
         self.assertNotIn('id="snow"', html)
         self.assertIn('@media (prefers-color-scheme: dark){\n  :root[data-theme="sakura"]', html)
+        self.c.post("/theme", data={"theme": "newyear", "_csrf": tok})                 # 新春：飘元宝金钱红包，不飘雪、不飘花瓣
+        html = self.c.get("/season").get_data(as_text=True)
+        self.assertIn('data-theme="newyear"', html)
+        self.assertIn('aria-label="新春" aria-pressed="true"', html)
+        self.assertIn('id="fortune"', html)
+        self.assertNotIn('id="snow"', html)
+        self.assertNotIn('id="petals"', html)
         self.c.post("/theme", data={"theme": "", "_csrf": tok})                        # 切回原来的样子
         html = self.c.get("/season").get_data(as_text=True)
         self.assertIn('<html lang="zh-CN">', html)

@@ -160,6 +160,26 @@ class AdminMultiBot(unittest.TestCase):
         self.assertEqual(post("/rooms/notify", hours="2", text="快回", mode="idle").status_code, 302)
         self.assertEqual(post("/rooms/notify", hours="", text="").status_code, 302)
 
+    def test_auto_update_note_dismiss_on_picker(self):
+        """「选择机器人」页（没带机器人前缀）上点自动更新提示的「知道了」：要真的关掉，不能被当成「没选机器人」拦下（作者 11-20 反馈点不了）。"""
+        if type(self) is not AdminMultiBot:
+            return
+        import json
+        from unittest import mock
+        from changri.core import autoupdate
+        d = Path(tempfile.mkdtemp())
+        (d / "update_auto.json").write_text(json.dumps({"from": "0.22.6", "to": "0.22.9", "ts": 1}), encoding="utf-8")
+        with mock.patch.object(autoupdate, "DATA_DIR", d):
+            botconf.add_account("222222", "b" * 20, "乙号")                     # 两个机器人：不会自动跳进某一个
+            html = self.c.get("/?pick=1").get_data(as_text=True)
+            self.assertIn("自动从 0.22.6 更新到", html)
+            self.assertIn('action="/update/auto/seen"', html)
+            r = self.c.post("/update/auto/seen", data={"next": "/?pick=1", "_csrf": self._csrf("/?pick=1")}, follow_redirects=True)
+            html = r.get_data(as_text=True)
+            self.assertNotIn("没有选定机器人", html)
+            self.assertNotIn("自动从 0.22.6 更新到", html)                      # 关掉了
+            self.assertTrue(json.loads((d / "update_auto.json").read_text(encoding="utf-8"))["seen"])
+
     def _csrf(self, path):
         import re
         html = self.c.get(path).get_data(as_text=True)

@@ -20,7 +20,7 @@ from .db import get_config, set_config
 
 from ..paths import APP_ROOT as ROOT, DATA_DIR, EXT_DOCS_DIR, PKG_DIR
 USER_DIR = Path(os.environ.get("CHANGRI_EXT_DIR") or DATA_DIR / "extensions")     # 用户扩展算数据：更新程序不碰
-API_VERSION = 1
+API_VERSION = 2
 
 # 核心：别的功能的地基，不能关
 CORE_MODULES = ["changri.plugins.ping", "changri.plugins.botsync", "changri.plugins.social", "changri.plugins.charcard", "changri.plugins.core_admin", "changri.plugins.season", "changri.plugins.play", "changri.plugins.autoreply", "changri.plugins.trpg", "changri.plugins.trpglog", "changri.plugins.prefix", "changri.plugins.qqwatch", "changri.plugins.msgmon", "changri.plugins.decks"]  # 季度与游戏天数是地基：短信礼物、心动信的每日次数都按它算「今天」
@@ -488,10 +488,10 @@ def ai_prompt() -> str:
         "- 玩家发什么指令触发（写出完整的例子）：\n"
         "- 发了之后机器人怎么回（成功、失败、参数不对时各回什么）：\n"
         "- 需要在设置平台里调的选项（每项写：人话名字、类型 string/text/int/bool/choice、默认值、一句说明；数字可以写单位）：\n"
-        "- 需要用到的角色信息、属性、天数、定时任务等（只能用 changri_api 里有的：玩家清单 all_roles、属性 get_attr/set_attr、天数等；物品栏/商城/地点目前没有接口，不要自己读数据库）：\n\n"
+        "- 需要用到的角色信息、属性、天数、定时任务等（只能用 changri_api 里有的：玩家清单 all_roles、属性 get_attr/set_attr、金币和道具 item_count/give_item/take_item、地点、关系线、每日次数 today_count/today_add、自己存数据 data_get/data_set、天数等；商城上架、心动信目前没有接口，不要自己读数据库）：\n\n"
         "========== 输出要求 ==========\n"
         "1. 只输出两个代码块，分别标明文件名 manifest.json 和 __init__.py，不要多余的解释（第 8 条的提醒除外）。\n"
-        "2. manifest.json 的 id 用小写字母、数字、下划线，字母开头。\n"
+        "2. manifest.json 的 id 用小写字母、数字、下划线，字母开头；用到规范里标 ★ 的接口时写 \"api\": 2。\n"
         "3. 只从 changri_api 导入，不要 import core / plugins / admin。\n"
         "4. 不能用 sys.exit / os._exit / time.sleep / requests；等待用 await asyncio.sleep，联网用 httpx 异步。\n"
         "5. 指令名不要和主程序已有的重名（约会、私约、电话、时间线、心愿、发帖、短信、送礼 等）。\n"
@@ -511,6 +511,86 @@ def skeleton_zip() -> bytes:
             if f.is_file() and "__pycache__" not in f.parts:
                 z.write(f, f"my_extension/{f.relative_to(demo)}")
     return buf.getvalue()
+
+
+# ---------- 插件接口清单（直接读 ext_api.py 生成，不 import：设置平台那边不一定起了 NoneBot） ----------
+
+_SECTION_RE = re.compile(r"^#\s*-{3,}\s*(.+?)\s*-{3,}\s*$")
+
+# 不是 ext_api.py 里定义的、从 NoneBot 等处原样转出去的名字，手写说明
+_BASICS = [
+    ("on_command", "on_command(\"指令名\", priority=10, block=True)", "注册一条指令（NoneBot 原样）。指令名别和主程序重名；priority 写 10。",
+     "cmd = on_command(\"签到\", priority=10, block=True)"),
+    ("on_message", "on_message(priority=10, block=False)", "收所有群消息（NoneBot 原样）。一定写 block=False，不然会拦住主程序。",
+     "m = on_message(priority=10, block=False)"),
+    ("Bot / GroupMessageCreateEvent", "", "类型，写在 handler 的参数里。",
+     "async def _(bot: Bot, event: GroupMessageCreateEvent): ..."),
+    ("CommandArg / Message", "args: Message = CommandArg()", "拿指令后面跟的文字。玩家发「播报 戏群 开演」，args.extract_plain_text() 就是「戏群 开演」。",
+     "async def _(bot: Bot, event: GroupMessageCreateEvent, args: Message = CommandArg()):\n    text = args.extract_plain_text().strip()"),
+    ("reply_long", "await reply_long(matcher, text)", "回复触发指令的人，太长自动转成图片。",
+     "await reply_long(cmd, \"很长的一段……\")"),
+    ("scheduler", "@scheduler.scheduled_job(...)", "定时任务。别在里面写 time.sleep。",
+     "@scheduler.scheduled_job(\"cron\", hour=20, minute=0)\nasync def nightly(): ..."),
+    ("API_VERSION", "", "当前接口版本号。用到版本 2 新加的接口时，在 manifest.json 写 \"api\": 2，旧版主程序会提示先更新。", ""),
+]
+
+
+def api_reference() -> list[dict]:
+    """[{title, entries: [{name, sig, doc, example}]}]，给「插件接口」页用。"""
+    src = (PKG_DIR / "ext_api.py").read_text(encoding="utf-8")
+    heads = [(i + 1, m[1]) for i, ln in enumerate(src.splitlines()) if (m := _SECTION_RE.match(ln))]
+    sections: dict[str, list] = {}
+    for node in ast.parse(src).body:
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) or node.name.startswith("_"):
+            continue
+        title = next((t for ln, t in reversed(heads) if ln < node.lineno), "其他")
+        desc, _, example = (ast.get_docstring(node) or "").partition("例：")
+        sig = f"{node.name}({ast.unparse(node.args)})" + (f" -> {ast.unparse(node.returns)}" if node.returns else "")
+        if isinstance(node, ast.AsyncFunctionDef):
+            sig = "await " + sig
+        sections.setdefault(title, []).append({"name": node.name, "sig": sig, "doc": " ".join(desc.split()), "example": example.strip()})
+    basics = [{"name": n, "sig": s, "doc": d, "example": e} for n, s, d, e in _BASICS]
+    return [{"title": "写指令要用的", "entries": basics}] + [{"title": t, "entries": its} for t, its in sections.items()]
+
+
+# ---------- 现成插件：extdocs/现成插件/<id>/，设置平台里一键装 ----------
+
+READY_DIR = EXT_DOCS_DIR / "现成插件"
+_READY_ID = re.compile(r"^[a-z][a-z0-9_]{1,30}$")
+
+
+def ready_made() -> list[dict]:
+    """现成插件的 manifest 列表，多一项 installed（extensions/ 里已经有同名的）。"""
+    out = []
+    for d in sorted(READY_DIR.iterdir()) if READY_DIR.is_dir() else []:
+        try:
+            m = json.loads((d / "manifest.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if m.get("id") == d.name:
+            out.append({**m, "installed": (USER_DIR / d.name).exists()})
+    return out
+
+
+def ready_zip(ext_id: str) -> bytes | None:
+    """现成插件打成 zip（下载下来自己改，或者给 install_ready 用）。没有这个插件返回 None。"""
+    d = READY_DIR / ext_id
+    if not _READY_ID.match(ext_id) or not (d / "manifest.json").is_file():
+        return None
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for f in sorted(d.rglob("*")):
+            if f.is_file() and "__pycache__" not in f.parts:
+                z.write(f, f"{ext_id}/{f.relative_to(d)}")
+    return buf.getvalue()
+
+
+def install_ready(ext_id: str, replace: bool = False) -> tuple[bool, str]:
+    """把现成插件装进 extensions/：和上传走同一套检查，装上默认关着。"""
+    data = ready_zip(ext_id)
+    if data is None:
+        return False, "没有这个现成插件。"
+    return install_zip(data, replace=replace)
 
 
 def _exit_for_restart() -> None:

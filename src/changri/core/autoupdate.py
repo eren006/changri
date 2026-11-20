@@ -225,7 +225,8 @@ def snapshot() -> dict:
         pass
     try:
         from nonebot_plugin_apscheduler import scheduler
-        snap["jobs"] = sorted(j.id for j in scheduler.get_jobs() if j.id not in ("update_confirm", "update_post_check", "auto_update"))
+        snap["jobs"] = sorted(j.id for j in scheduler.get_jobs() if j.id not in ("update_confirm", "update_post_check", "auto_update",
+                                                                         "usage_on_connect"))   # 机器人连上后 1 分钟的一次性补报，跑完就没了
     except Exception:  # noqa: BLE001
         pass
     try:

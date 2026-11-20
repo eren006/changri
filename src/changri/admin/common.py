@@ -37,7 +37,7 @@ SECTIONS = [
         "msgmon_enabled": ("消息监听（1 开 / 0 关；后台「消息监听」页实时看机器人收到的群消息：官方机器人所在的群，加上 QQ 小号在群号组里听到的。只放在内存里，每个机器人最近 500 条，重启就清空，不存数据库）", "1"),
         "error_report_url": ("报错接收地址（http/https 网址；留空 = 报错只存在本机。程序崩溃或出错、恢复后会自动把报错文字发到这里，不含聊天内容和群号。默认发到主站 system.changri.work）", "https://system.changri.work/api/errors"),
         "contact_qq": ("联系 QQ（选填。填了以后，这台机器的报错发给作者时会带上这个 QQ 号，作者在后台看到报错、需要的话可以加你帮你看；不填就不带，报错照常发）", ""),
-        "usage_report": ("匿名使用情况上报（1 开 / 0 关；每 6 小时跟着检查更新发一次：随机生成的实例编号、版本、系统、几个机器人连着、处理了多少次指令和每个指令各几次——只记指令名，不含后面写的内容——、开着哪些官方扩展。不带群号、QQ 号、角色和聊天内容，作者用来看装了的人有没有在用）", "1"),
+        "usage_report": ("匿名使用情况上报（1 开 / 0 关；启动后和之后每小时发一次：随机生成的实例编号、版本、系统、几个机器人连着、处理了多少次指令和每个指令各几次——只记指令名，不含后面写的内容——、开着哪些官方扩展。不带群号、QQ 号、角色和聊天内容，作者用来看装了的人有没有在用）", "1"),
         "season_report": ("季末报告（1 开 / 0 关；开了以后，结束季度时会给每位有互动的玩家的个人群先发一句话、再单独发一张本季结算海报：约会场次、短信礼物心动信、互动最多的人、最常互动的时间、最精彩的一场戏。海报画不出来就改发文字小结。机器人要还在个人群里才发得出去。「季度与出场」页的「季末报告」里也能开关、看样式缩略图、下载每个人的海报）", "0"),
         "season_save_reminder": ("收尾前存档提醒（1 开 / 0 关；开了以后，结束季度时提醒每位玩家趁收尾前用「复盘 R12」存喜欢的戏、看「时间线」，收尾后角色、时间线、小手机都会清空。开着季末报告时这段话并进报告里，不另发）", "1"),
         "season_poster_skin": ("季末海报的样式（第一次用某款时从主站下载花边素材，下载不了就用素色纸）", "antique"),
@@ -349,6 +349,11 @@ def _dashboard() -> dict:
         todo.append(("bad", "IP 白名单没加对，机器人现在回不了话", url_for("bots_page"),
                      f"{_fmt_ts(wl['ts'])} QQ 拒绝了机器人发消息。到 QQ 开放平台「开发管理 → 开发设置 → IP 白名单」加上这台服务器的公网 IP"
                      + (f"：{ip}" if ip else "（点进来按「检查连接」能看到是多少）") + "；加好以后这条提醒半小时内自己消失"))
+    au = errlog.auth_issue()
+    if au:                                              # 连不上 QQ：和白名单一样排在最前面
+        todo.insert(0, ("bad", "AppID / AppSecret 不对，机器人连不上 QQ", url_for("bots_page"),
+                        f"{_fmt_ts(au['ts'])} QQ 拒绝了机器人登录（invalid appid or secret）。多半是 AppSecret 填错了，或者在 QQ 开放平台重置过；"
+                        "到 QQ 开放平台核对后，在「机器人接入」页把 AppSecret 改成新的。改好以后这条提醒半小时内自己消失"))
     from changri.core import httpsproxy
     if httpsproxy.active() and not httpsproxy.cert_ok(httpsproxy.subject(), timeout=2):
         todo.append(("bad", "HTTPS 证书失效了", url_for("https_page"), "玩家的小手机网址是 https，现在打不开；多半是 80 端口被关了，证书续不上"))
@@ -384,7 +389,7 @@ def _dashboard() -> dict:
 # 不属于任何一个机器人的页面（账号、更新、远程访问、机器人清单、登录）；其余页面都在 /b/<AppID>/ 下
 GLOBAL_ENDPOINTS = {"theme_set", "wizard", "bots_erase", "login", "logout", "setup", "static", "bots_page", "bots_add", "bots_test", "bots_secret", "bots_toggle", "bots_delete",
                     "accounts_page", "accounts_generate", "accounts_reset", "accounts_disable", "accounts_password", "accounts_delete",
-                    "update_page", "update_check", "update_skip", "update_apply", "remote_page", "remote_save", "dashboard",
+                    "update_page", "update_check", "update_skip", "update_apply", "update_auto_seen", "remote_page", "remote_save", "dashboard",
                     "https_page", "https_status", "https_enable", "https_disable"}
 
 

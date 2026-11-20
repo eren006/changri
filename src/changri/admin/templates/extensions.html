@@ -79,13 +79,79 @@
 {% endif %}
 
 <nav class="tabs" aria-label="扩展分页">
-  <a href="{{ url_for('extensions_page') }}" {% if cur == 'core' and tab != 'ai' %}aria-current="page"{% endif %}>核心功能</a>
+  <a href="{{ url_for('extensions_page') }}" {% if cur == 'core' and tab not in ('ai', 'api') %}aria-current="page"{% endif %}>核心功能</a>
   <a href="{{ url_for('extensions_page', tab='aux') }}" {% if tab == 'aux' %}aria-current="page"{% endif %}>辅助功能</a>
   <a href="{{ url_for('extensions_page', tab='custom') }}" {% if tab == 'custom' %}aria-current="page"{% endif %}>个性化模块</a>
+  <a href="{{ url_for('extensions_page', tab='api') }}" {% if tab == 'api' %}aria-current="page"{% endif %}>插件接口</a>
   <a href="{{ url_for('extensions_page', tab='ai') }}" {% if tab == 'ai' %}aria-current="page"{% endif %}>给 AI 的模板</a>
 </nav>
 
-{% if tab == 'ai' %}
+{% if tab == 'api' %}
+<style>
+.ready{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin:0 0 28px}
+.ready .card{border:1px solid var(--card-line);box-shadow:var(--shadow-sm);border-radius:var(--r-card);background:var(--surface);padding:16px 18px;display:flex;flex-direction:column;gap:8px}
+.ready h3{margin:0;font-size:15.5px}
+.ready p{margin:0;font-size:13.5px;color:var(--mute);line-height:1.55;flex:1}
+.ready .acts{margin:4px 0 0;align-items:center}
+.apihead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:0 0 10px}
+.apihead h2{margin:0;font-size:17px}
+.apinav{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px}
+.apinav a{font-size:13px;border:1px solid var(--line);border-radius:999px;padding:3px 11px;text-decoration:none;color:var(--ink);background:var(--surface)}
+.ui .apisec{margin:0 0 22px;padding:0;border:0}
+.apisec h3{font-size:14.5px;margin:0 0 8px;color:var(--mute);font-weight:600;scroll-margin-top:16px}
+.api{border:1px solid var(--card-line);border-radius:10px;background:var(--surface);padding:12px 16px;margin:0 0 8px}
+.api code.sig{display:block;font:13px/1.5 ui-monospace,Menlo,monospace;color:var(--dusk);overflow-wrap:anywhere;background:none;padding:0}
+.api .d{margin:6px 0 0;font-size:13.5px;line-height:1.6}
+.api pre{position:relative;margin:8px 0 0;padding:8px 56px 8px 12px;border-radius:8px;background:var(--paper);border:1px solid var(--line);font:12.5px/1.55 ui-monospace,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+.api pre button{position:absolute;top:5px;right:5px;font-size:12px;padding:1px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--mute);cursor:pointer}
+#apiempty{display:none}
+</style>
+
+<p class="note" style="margin:0 0 16px">写插件能用的东西都在这一页：上面是<b>现成插件</b>，装上就能用，也可以下载下来照着改；下面是<b>接口清单</b>，写插件只用这里列出的东西（<code>from changri_api import …</code>）。清单是直接从程序里读出来的，更新主程序后会自动跟着变。</p>
+
+<div class="apihead"><h2>现成插件</h2><span class="note">装上默认关着，去「辅助功能」打开开关、重启后生效。</span></div>
+<div class="ready">
+  {% for r in ready %}
+  <div class="card">
+    <h3>{{ r.name }}</h3>
+    <p>{{ r.description }}</p>
+    <div class="acts">
+      {% if owner %}
+      <form method="post" action="{{ url_for('extensions_ready_install', ext_id=r.id) }}" style="margin:0"{% if r.installed %} onsubmit="return confirm('已经装过「{{ r.name }}」。用现成的版本覆盖？你改过的代码会被换掉，设置和存的数据会保留。')"{% endif %}>{{ csrf() }}
+        {% if r.installed %}<input type="hidden" name="replace" value="1">{% endif %}
+        <button class="btn sm{{ ' ghost' if r.installed }}" type="submit">{{ '重新装' if r.installed else '装上' }}</button></form>
+      {% endif %}
+      <a class="btn sm ghost" href="{{ url_for('extensions_ready_zip', ext_id=r.id) }}">下载 zip</a>
+      {% if r.installed %}<span class="tag">已装</span>{% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="apihead"><h2>接口清单</h2><span class="note">当前接口版本 {{ api_version }}</span></div>
+<div class="bar"><input type="search" id="apiq" placeholder="搜函数名或用途，比如 金币、戏群、每天" aria-label="搜索接口" oninput="filterApi()"></div>
+<nav class="apinav" aria-label="接口分类">{% for s in api_ref %}<a href="#api-{{ loop.index }}">{{ s.title.split('（')[0] }}</a>{% endfor %}</nav>
+{% for s in api_ref %}
+<section class="apisec" id="api-{{ loop.index }}">
+  <h3>{{ s.title }}</h3>
+  {% for a in s.entries %}
+  <div class="api" data-search="{{ a.name }} {{ a.doc }} {{ s.title }}">
+    <code class="sig">{{ a.sig or a.name }}</code>
+    {% if a.doc %}<p class="d">{{ a.doc }}</p>{% endif %}
+    {% if a.example %}<pre><span>{{ a.example }}</span><button type="button" onclick="copyEx(this)">复制</button></pre>{% endif %}
+  </div>
+  {% endfor %}
+</section>
+{% endfor %}
+<p class="note" id="apiempty">没有找到。需要的接口这里没有？告诉作者加进 changri_api，不要直接读数据库。</p>
+<p class="note">不在这张清单里的东西不保证以后还在。需要别的接口？告诉作者加进来。</p>
+<script>
+function filterApi(){var q=document.getElementById("apiq").value.trim().toLowerCase(),any=false;
+  document.querySelectorAll(".apisec").forEach(function(s){var n=0;s.querySelectorAll(".api").forEach(function(a){var hit=!q||a.dataset.search.toLowerCase().indexOf(q)>=0;a.style.display=hit?"":"none";if(hit)n++;});s.style.display=n?"":"none";if(n)any=true;});
+  document.querySelector(".apinav").style.display=q?"none":"";document.getElementById("apiempty").style.display=any?"none":"block";}
+function copyEx(b){var t=b.previousElementSibling.textContent;if(navigator.clipboard)navigator.clipboard.writeText(t);b.textContent="已复制";setTimeout(function(){b.textContent="复制";},1500);}
+</script>
+{% elif tab == 'ai' %}
 <p class="note" style="margin:0 0 12px">想自己加功能但不会写代码：把下面这一整段复制给 AI（ChatGPT、Claude 都行），把最后「我想要的扩展」那几项改成你的需求，AI 会写出两个文件。把它们放进一个文件夹打成 zip，回到「功能列表」上传。上传时会自动检查，有问题会告诉你哪一行。</p>
 <div class="bar"><button class="btn" type="button" onclick="var t=document.getElementById('aip');t.select();navigator.clipboard&&navigator.clipboard.writeText(t.value);this.textContent='已复制'">复制全部</button>
   <a class="btn ghost" href="{{ url_for('extensions_ai_prompt') }}">下载成文件</a>

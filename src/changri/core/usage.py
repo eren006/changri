@@ -4,7 +4,9 @@
 配了几个机器人、几个连着、上次上报以来处理了多少次指令（以及每个指令各几次，只有指令名，比如「ra 12」，
 不带指令后面写的内容；只算长日bot 自带的指令，用户自己装的扩展不算）、开着哪些官方扩展、程序连续运行了多久。
 不带群号、QQ 号、角色名、聊天内容。后台「基础」设置里「匿名使用情况上报」关掉就不发。
-跟着「检查更新」一起发（启动 2 分钟后一次，之后每 6 小时一次），发不出去就算了，不重试、不影响别的。
+启动 2 分钟后发一次，之后每小时一次；连着的机器人比上次报的多了（比如刚在后台加了机器人）也补报一次。
+发不出去就留到下次，不另外重试、不影响别的。还没报出去的指令次数每几分钟存到 data/usage_pending.json，
+重启不会丢。
 """
 from __future__ import annotations
 
@@ -24,6 +26,9 @@ _started = time.time()
 _lock = threading.Lock()
 _cmds = 0
 _by_name: dict[str, int] = {}
+_loaded = False            # data/usage_pending.json（上次没报出去的数）读进来没有
+_dirty = False             # 内存里的数和文件里的不一样，要存
+_last_online = -1          # 上次报出去时连着几个机器人（还没报过是 -1）
 CMD_NAME_MAX = 16          # 指令名最多几个字
 CMD_KINDS_MAX = 80         # 一次最多报多少种指令（按次数取前面的）
 
@@ -46,29 +51,83 @@ def install_id() -> str:
     return v
 
 
+def _pending_path():
+    return DATA_DIR / "usage_pending.json"
+
+
+def _ensure_loaded() -> None:
+    """第一次用到时把上次没报出去的数（data/usage_pending.json）并进来。调用方要拿着 _lock。"""
+    global _loaded, _cmds
+    if _loaded:
+        return
+    _loaded = True
+    try:
+        d = json.loads(_pending_path().read_text(encoding="utf-8"))
+        _cmds += max(0, int(d.get("cmds", 0)))
+        for k, v in (d.get("by_cmd") or {}).items():
+            k = str(k)[:CMD_NAME_MAX]
+            if k and int(v) > 0:
+                _by_name[k] = _by_name.get(k, 0) + int(v)
+    except (OSError, ValueError, TypeError, AttributeError):
+        pass
+
+
+def save_pending() -> None:
+    """把还没报出去的指令次数存进 data/usage_pending.json（没有就删掉文件），重启后接着算。定时调，出错就算了。"""
+    global _dirty
+    with _lock:
+        _ensure_loaded()
+        if not _dirty:
+            return
+        n, by = _cmds, dict(_by_name)
+        _dirty = False
+    p = _pending_path()
+    try:
+        if n <= 0:
+            p.unlink(missing_ok=True)
+        else:
+            p.parent.mkdir(parents=True, exist_ok=True)
+            tmp = p.with_suffix(".tmp")
+            tmp.write_text(json.dumps({"cmds": n, "by_cmd": by}, ensure_ascii=False), encoding="utf-8")
+            tmp.replace(p)
+    except OSError:
+        with _lock:
+            _dirty = True
+
+
 def count_command(name: str = "") -> None:
     """name 是玩家用的指令词（注册过的主名字或别名，不是整句话）；空的只算总数。"""
-    global _cmds
+    global _cmds, _dirty
     name = str(name or "").strip()[:CMD_NAME_MAX]
     with _lock:
+        _ensure_loaded()
         _cmds += 1
+        _dirty = True
         if name:
             _by_name[name] = _by_name.get(name, 0) + 1
 
 
 def _take_count() -> tuple[int, dict[str, int]]:
-    global _cmds, _by_name
+    global _cmds, _by_name, _dirty
     with _lock:
+        _ensure_loaded()
         n, by, _cmds, _by_name = _cmds, _by_name, 0, {}
+        _dirty = True
     return n, by
 
 
 def _put_back(n: int, by: dict[str, int]) -> None:
-    global _cmds
+    global _cmds, _dirty
     with _lock:
         _cmds += n
+        _dirty = True
         for k, v in by.items():
             _by_name[k] = _by_name.get(k, 0) + v
+
+
+def last_online() -> int:
+    """上次报出去时连着几个机器人；还没报成功过是 -1。"""
+    return _last_online
 
 
 def official_exts_on() -> list[str]:
@@ -103,8 +162,10 @@ def payload(bots: int, online: int, cmds: int, by_name: dict[str, int] | None = 
 
 def report(bots: int, online: int, url: str = DEFAULT_URL) -> bool:
     """发一次。关着、发不出去都返回 False；发不出去时这段时间的指令数并回去，下次一起报。"""
+    global _last_online
     if not enabled():
         _take_count()
+        save_pending()
         return False
     cmds, by = _take_count()
     body = json.dumps(payload(bots, online, cmds, by, official_exts_on()), ensure_ascii=False).encode()
@@ -118,6 +179,9 @@ def report(bots: int, online: int, url: str = DEFAULT_URL) -> bool:
         ok = False
     except Exception:  # noqa: BLE001
         ok = False
-    if not ok:
+    if ok:
+        _last_online = int(online)
+    else:
         _put_back(cmds, by)
+    save_pending()
     return ok

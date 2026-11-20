@@ -464,13 +464,19 @@ CHANGELOG = ROOT / "packaging" / "changelog.json"
 
 
 def load_changelog() -> list[dict]:
-    """packaging/changelog.json：每个版本一条 {version, date, features:[新功能…], fixes:[修 bug…]}，新的在前。
-    最近 20 条随 latest.json 发出去，设置平台「更新」页按版本、按「新功能 / 修 bug」分开列。"""
+    """packaging/changelog.json：每个版本一条 {version, date, features:[新功能…], fixes:[修 bug…], internal:[内部改动…]}，新的在前。
+    最近 20 条随 latest.json 发出去，设置平台「更新」页按版本、按「新功能 / 修 bug」分开列。
+    internal 只给作者看（监控后台「下一版」里列），打包时去掉，不进 latest.json（见 public_changes）。"""
     try:
         rows = json.loads(CHANGELOG.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return []
     return [r for r in rows if isinstance(r, dict) and r.get("version")] if isinstance(rows, list) else []
+
+
+def public_changes(changes: list[dict]) -> list[dict]:
+    """发给用户的更新说明：去掉 internal（上报频率、重构这类维护改动，用的人感觉不到，作者 2026-11-20 定的不写给用户看）。"""
+    return [{k: v for k, v in c.items() if k != "internal"} for c in changes]
 
 
 def notes_from(entry: dict) -> str:
@@ -525,7 +531,7 @@ def main() -> None:
     notes = a.notes if a.notes and a.notes != ver else (notes_from(entry) if entry else a.notes)
     if not entry:
         log(f"  提示：packaging/changelog.json 里没有 {ver} 这一条，「更新」页只能显示 --notes 的文字。")
-    manifest = {"version": ver, "notes": notes, "changes": changes[:20], "runtime": rid,
+    manifest = {"version": ver, "notes": notes, "changes": public_changes(changes[:20]), "runtime": rid,
                 "app": {"url": f"downloads/{app_zip.name}", "sha256": app_sha, "signature": sign(key, updater.sign_message(ver, app_sha)),
                         "size": app_zip.stat().st_size},
                 "runtimes": {}, "full": {}}

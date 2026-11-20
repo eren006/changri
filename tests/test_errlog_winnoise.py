@@ -40,10 +40,11 @@ class WinNoise(unittest.TestCase):
         errlog._loguru_sink(Msg("Accept failed on a socket", exc=OSError("[WinError 64] 指定的网络名不再可用。")))
         self.assertEqual(self.kinds(), [])
 
-    def test_own_code_connection_errors_still_recorded(self):
+    def test_own_code_connection_reset_dropped(self):
+        # 对方把连接断了：短暂的毛病，自己代码里碰到也不记（作者 2026-11-20，见 errlog.is_transient）
         errlog._loguru_sink(Msg("发消息失败", src="changri.core.qqsend:send:10",
                                 exc=ConnectionResetError("[WinError 10054] 远程主机强迫关闭了一个现有的连接。")))
-        self.assertEqual(self.kinds(), ["error"])
+        self.assertEqual(self.kinds(), [])
 
     def test_other_asyncio_errors_still_recorded(self):
         errlog._loguru_sink(Msg("Task exception was never retrieved", exc=ValueError("别的错")))

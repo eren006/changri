@@ -428,5 +428,33 @@ class ExtensionAdminTests(_PatchedDir):
             self.assertFalse(ec.is_enabled("tiny_demo"))                           # 重置后又关上
 
 
+    def test_api_tab_and_ready_made_install(self):
+        self.login()
+        page = self.c.get("/extensions?tab=api").get_data(as_text=True)
+        for word in ("插件接口", "现成插件", "每日签到", "富豪榜", "stage_group", "give_item", "today_count", "data_set", "接口版本 2"):
+            self.assertIn(word, page)
+        self.assertIn('aria-current="page">插件接口', page)
+        self.assertNotIn('aria-current="page">核心功能', page)
+        z = self.c.get("/extensions/ready/daily_signin.zip")
+        self.assertEqual(z.status_code, 200)
+        self.assertIn("daily_signin/manifest.json", zipfile.ZipFile(io.BytesIO(z.data)).namelist())
+        self.assertEqual(self.c.get("/extensions/ready/nope_nope.zip").status_code, 404)
+        r = self.c.post("/extensions/ready/daily_signin/install", data={"_csrf": token(self.c, "/extensions")}, follow_redirects=True)
+        self.assertIn("已安装", r.get_data(as_text=True))
+        self.assertTrue((EXT_TMP / "daily_signin" / "__init__.py").is_file())
+        self.assertFalse(E.user_is_enabled("daily_signin"))                         # 装上默认关着
+        self.assertIn("已装", self.c.get("/extensions?tab=api").get_data(as_text=True))
+        r = self.c.post("/extensions/ready/daily_signin/install", data={"_csrf": token(self.c, "/extensions")}, follow_redirects=True)
+        self.assertIn("已经装了", r.get_data(as_text=True))                             # 没勾覆盖不会悄悄换掉
+        r = self.c.post("/extensions/ready/daily_signin/install", data={"replace": "1", "_csrf": token(self.c, "/extensions")}, follow_redirects=True)
+        self.assertIn("已安装", r.get_data(as_text=True))
+
+    def test_api_tab_non_owner_view_only(self):
+        self.login("helper", "longenough2")
+        page = self.c.get("/extensions?tab=api").get_data(as_text=True)
+        self.assertIn("每日签到", page)
+        self.assertNotIn("/extensions/ready/daily_signin/install", page)
+        self.assertEqual(self.c.post("/extensions/ready/daily_signin/install", data={"_csrf": token(self.c, "/extensions")}).status_code, 403)
+
 if __name__ == "__main__":
     unittest.main()

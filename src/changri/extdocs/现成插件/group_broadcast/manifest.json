@@ -1,0 +1,13 @@
+{
+  "id": "group_broadcast",
+  "name": "群播报",
+  "version": "1.0.0",
+  "author": "长日将尽",
+  "description": "管理员在任意群发「播报 戏群 内容」，机器人把内容发到戏群；也可以发到公告群、水群、后台群。演示怎么拿特殊的群、怎么限定只有管理员能用。",
+  "homepage": "",
+  "license": "MIT",
+  "api": 2,
+  "settings": [
+    {"key": "prefix", "label": "播报开头", "type": "string", "default": "📢 ", "desc": "加在每条播报最前面的文字，不要就清空"}
+  ]
+}

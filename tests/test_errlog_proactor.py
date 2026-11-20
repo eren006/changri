@@ -36,8 +36,10 @@ class Proactor(unittest.TestCase):
 
     def test_other_errors_kept(self):
         errlog._loguru_sink(Msg(MSG, _exc(ValueError("真出错了"))))                         # 同一个位置但不是断连
-        errlog._loguru_sink(Msg("Exception in callback foo()", _exc(ConnectionResetError())))   # 断连但不是关连接那一步
-        self.assertEqual(len(errlog.read_all()), 2)
+        errlog._loguru_sink(Msg("Exception in callback foo()", _exc(ConnectionResetError())))   # 断连：短暂的毛病，也不记（errlog.is_transient）
+        rows = errlog.read_all()
+        self.assertEqual(len(rows), 1)                                                          # 只留下「真出错了」那条
+        self.assertIn("ValueError", rows[0]["trace"])
 
     def test_accept_side_winerror_dropped(self):
         # 接连接时对方已经走了：WinError 64，有时只露出 OSError(22, ..., None, 64)；10054 的其他报法也认

@@ -1,0 +1,15 @@
+{
+  "id": "gold_rank",
+  "name": "富豪榜",
+  "version": "1.0.0",
+  "author": "长日将尽",
+  "description": "发「富豪榜」看谁的金币最多。演示怎么遍历玩家清单、读背包里的货币。",
+  "homepage": "",
+  "license": "MIT",
+  "api": 2,
+  "settings": [
+    {"key": "currency", "label": "按什么排", "type": "string", "default": "金币", "desc": "物品名或物品码，一般是货币"},
+    {"key": "top", "label": "显示前几名", "type": "int", "default": 10, "unit": "名", "desc": "最多 50"},
+    {"key": "admin_only", "label": "只有管理员能看", "type": "bool", "default": false, "desc": "打开后玩家发了会提示只有管理员能看"}
+  ]
+}

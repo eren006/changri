@@ -103,13 +103,48 @@ async def _update_check():
         await asyncio.get_running_loop().run_in_executor(None, notices.fetch)
     except Exception as e:  # noqa: BLE001
         logger.debug(f"[通知] 拉取失败：{e}")
-    try:                                                   # 顺便匿名上报一次使用情况（后台「基础」里能关，见 core/usage.py）
+
+
+async def _usage_report(only_if_more_online: bool = False) -> None:
+    """匿名上报一次使用情况（后台「基础」里能关，见 core/usage.py）。
+    only_if_more_online：机器人连上时用，连着的比上次报出去的多才发（断线重连不重复报）。"""
+    try:
         from changri.core import usage
         from changri.core.db import list_bot_ids
         bots, online = len(list_bot_ids()), len(nonebot.get_bots())
+        if only_if_more_online and online <= usage.last_online():
+            return
         await asyncio.get_running_loop().run_in_executor(None, usage.report, bots, online)
     except Exception as e:  # noqa: BLE001
         logger.debug(f"[使用情况] 上报失败：{e}")
+
+
+@scheduler.scheduled_job("interval", hours=1, id="usage_report", next_run_time=datetime.datetime.now() + datetime.timedelta(minutes=2))
+async def _usage_report_job():
+    await _usage_report()
+
+
+@scheduler.scheduled_job("interval", minutes=5, id="usage_save", max_instances=1, coalesce=True)
+async def _usage_save():
+    """还没报出去的指令次数存盘，重启（包括 Windows 直接关窗口）最多丢 5 分钟的。"""
+    from changri.core import usage
+    await asyncio.get_running_loop().run_in_executor(None, usage.save_pending)
+
+
+_driver = nonebot.get_driver()
+
+
+@_driver.on_bot_connect
+async def _usage_on_connect():
+    """刚在后台加了机器人、或者启动 2 分钟后才连上：等 1 分钟（几个机器人一起连上只报一次）再补报，主站就能看到连着几个。"""
+    scheduler.add_job(_usage_report, "date", run_date=datetime.datetime.now() + datetime.timedelta(minutes=1),
+                      kwargs={"only_if_more_online": True}, id="usage_on_connect", replace_existing=True)
+
+
+@_driver.on_shutdown
+async def _usage_save_on_exit():
+    from changri.core import usage
+    usage.save_pending()
 
 
 @scheduler.scheduled_job("interval", seconds=30, id="heartbeat", max_instances=1, coalesce=True)

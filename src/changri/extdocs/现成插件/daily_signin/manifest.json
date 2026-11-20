@@ -1,0 +1,17 @@
+{
+  "id": "daily_signin",
+  "name": "每日签到",
+  "version": "1.0.0",
+  "author": "长日将尽",
+  "description": "玩家发「签到」领金币，每天一次；连续签到每天多给一点。「我的待回」里会提醒今天还没签。",
+  "homepage": "",
+  "license": "MIT",
+  "api": 2,
+  "settings": [
+    {"key": "currency", "label": "发什么", "type": "string", "default": "金币", "desc": "物品名或物品码，要在「物品与商城」的物品库里有"},
+    {"key": "reward", "label": "每次给多少", "type": "int", "default": 10, "unit": "个", "desc": "第一天签到给的数量"},
+    {"key": "streak_bonus", "label": "连签每天多给", "type": "int", "default": 2, "unit": "个", "desc": "连续签到第 N 天多给 (N-1)×这个数；0 就是不加"},
+    {"key": "streak_cap", "label": "连签加成最多算几天", "type": "int", "default": 7, "unit": "天", "desc": "超过这个天数按这个天数算，防止越滚越多"},
+    {"key": "remind", "label": "在「我的待回」里提醒", "type": "bool", "default": true, "desc": "打开后，没签到的玩家在「我的待回」里会看到一行提醒"}
+  ]
+}

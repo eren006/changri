@@ -93,6 +93,29 @@
 /* 总览的大卡片：紅梅到墨色，右上角一朵淡淡的樱花代替圆 */
 :root[data-theme="sakura"] .ios .hero{background:linear-gradient(135deg,#a8355a 0%,#6e2a45 52%,#2a2026 100%);box-shadow:0 12px 28px -12px rgb(110 42 69 / .5)}
 :root[data-theme="sakura"] .ios .hero::after{border-radius:0;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='%23ffffff' fill-opacity='.12'%3E%3Cpath transform='rotate(0 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(72 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(144 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(216 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3Cpath transform='rotate(288 50 50)' d='M50 50C37 39 35 19 44 9l6 7 6-7c9 10 7 30-6 41z'/%3E%3C/g%3E%3C/svg%3E") center / contain no-repeat;transform:rotate(12deg)}
+/* ---------- 新春：朱漆侧栏、描金祥云、洒金笺一样的暖米色页面；页面上飘元宝、金钱、红包、灯笼、金橘、梅花 ---------- */
+/* 红只给侧栏和强调色，页面底色不发红，免得看久了累。金色只做点缀（选中条、祥云、总览大卡片上的铜钱纹）。 */
+:root[data-theme="newyear"]{
+  --paper:#faf4ea; --surface:#fffcf6; --ink:#2b1b17; --mute:#6b4f45; --line:#ecdccb; --soft:#f4e8d8;
+  --field:#a08676; --card-line:#eedfcd; --shadow-sm:0 1px 3px 0 rgb(96 34 20 / .08),0 1px 2px -1px rgb(96 34 20 / .08);
+  --night:#7a1b20; --night-ink:#fcefe2; --night-mute:#efc6b4; --night-line:#9c3a35;
+  --dusk:#b3202a; --dusk-ink:#fff; --ok:#2c6b47; --warn:#8a5a10; --bad:#a8281c;
+  --rail-accent:#f0c860; --rail-hover:rgb(255 222 160 / .07); --rail-active:rgb(255 222 160 / .12);
+  --rail-bg:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 130'%3E%3Cg fill='none' stroke='%23e9c46a' stroke-linecap='round' stroke-linejoin='round'%3E%3Cg stroke-opacity='.42' stroke-width='2.2'%3E%3Cpath d='M28 104H168C186 104 194 86 182 76C172 68 158 72 160 84C161 90 170 90 170 84'/%3E%3Cpath d='M78 104C60 104 50 86 62 74C72 64 88 72 84 84C82 90 74 90 74 84'/%3E%3Cpath d='M70 78C74 58 94 52 106 62C104 44 124 34 140 44C154 52 154 72 140 76C130 79 126 68 134 64'/%3E%3Cpath d='M144 70C156 64 168 68 172 74'/%3E%3Cpath d='M168 104C196 104 214 98 236 86'/%3E%3C/g%3E%3Cg stroke-opacity='.22' stroke-width='1.6' transform='translate(-6 0)'%3E%3Cpath d='M10 30H70C80 30 84 20 77 15C71 11 64 14 66 20C67 23 71 23 71 20'/%3E%3Cpath d='M36 30C26 30 22 20 29 14C35 9 43 14 41 20'/%3E%3Cpath d='M70 30C88 30 98 26 110 20'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E") left -10px bottom 110px / 250px no-repeat,
+    radial-gradient(100% 16% at 50% 0%, rgb(240 200 96 / .20), transparent 75%),
+    radial-gradient(90% 14% at 50% 100%, rgb(60 6 10 / .45), transparent 100%),
+    linear-gradient(180deg, #8a2025 0%, #7a1b20 50%, #64151a 100%);
+  --page-bg:
+    radial-gradient(55% 34% at 100% 0%, rgb(240 196 100 / .16), transparent 70%),
+    radial-gradient(45% 30% at 0% 100%, rgb(200 60 50 / .06), transparent 70%),
+    var(--paper);
+}
+/* 页面大标题上方一道描金短线 */
+:root[data-theme="newyear"] main h1::before{content:"";display:block;width:28px;height:3px;border-radius:2px;background:linear-gradient(90deg,#c9932b,#f0c860);margin:0 0 16px}
+/* 总览的大卡片：朱红到深红，右上角一枚淡金铜钱纹代替圆 */
+:root[data-theme="newyear"] .ios .hero{background:linear-gradient(135deg,#c42a30 0%,#951c22 55%,#5e1015 100%);box-shadow:0 12px 28px -12px rgb(150 28 34 / .5)}
+:root[data-theme="newyear"] .ios .hero::after{border-radius:0;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%23ffe7a0' stroke-opacity='.22'%3E%3Ccircle cx='50' cy='50' r='46' stroke-width='3'/%3E%3Ccircle cx='50' cy='50' r='38' stroke-width='1.5'/%3E%3Crect x='38' y='38' width='24' height='24' stroke-width='3'/%3E%3C/g%3E%3C/svg%3E") center / contain no-repeat;transform:rotate(12deg)}
 /* 选主题的小圆点 */
 .themes{margin:18px 8px 0;display:flex;align-items:center;gap:8px;white-space:nowrap;font-size:13px;color:var(--night-mute)}
 .themes form{display:flex;gap:6px;margin:0}
@@ -101,7 +124,7 @@
 .themes button:hover{transform:scale(1.12)}
 .themes button[aria-pressed="true"]{border-color:var(--night-ink)}
 @media (prefers-reduced-motion: reduce){.themes button{transition:none}.themes button:hover{transform:none}}
-#snow,#petals{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:60}
+#snow,#petals,#fortune{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:60}
 {% endmacro %}
 
 {% macro theme_picker(current) %}
@@ -109,7 +132,8 @@
                 ("lily", "睡莲", "conic-gradient(#d3d9f0 0 33%, #5b4c9e 0 66%, #e2a9bc 0)"),
                 ("ballet", "芭蕾", "conic-gradient(#2b2630 0 33%, #f4ba84 0 66%, #e8a4b4 0)"),
                 ("xmas", "圣诞", "conic-gradient(#15301f 0 33%, #a8233a 0 66%, #d9b44a 0)"),
-                ("sakura", "樱花", "conic-gradient(#231c20 0 33%, #a8355a 0 66%, #f3c6d3 0)")] -%}
+                ("sakura", "樱花", "conic-gradient(#231c20 0 33%, #a8355a 0 66%, #f3c6d3 0)"),
+                ("newyear", "新春", "conic-gradient(#7a1b20 0 33%, #c42a30 0 66%, #f0c860 0)")] -%}
 <div class="themes"><span id="themes-label">外观</span>
   <form method="post" action="{{ url_for('theme_set') }}" aria-labelledby="themes-label">{{ csrf() }}
     {%- for key, name, sw in opts %}
@@ -198,6 +222,213 @@
     requestAnimationFrame(draw);
   }
   document.addEventListener('visibilitychange', function(){ var was = run; run = !document.hidden; if (run && !was) requestAnimationFrame(draw); });
+  addEventListener('resize', size);
+  size(); requestAnimationFrame(draw);
+})();
+</script>
+{%- elif current == "newyear" %}
+<canvas id="fortune" aria-hidden="true"></canvas>
+<script>
+/* 新春主题：天上飘元宝、金钱（招财进宝）、红包、小灯笼、金橘、梅花，夹着一闪一闪的金光。
+   每样东西开头用 canvas 细细画一次（渐变、描边、高光、投影）存成贴图，之后每帧只贴图，不卡。
+   各有各的动法：元宝慢慢摇、金钱翻面、红包像纸一样飘、灯笼摆、金橘转、梅花翻。
+   大小和速度按「远近」配：小的慢、淡，大的快、实，看着有层次。数量按屏幕面积算、有上限，不至于挡字。
+   不挡点击；系统设了「减少动态效果」就不飘；标签页切走时暂停。 */
+(function(){
+  if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  var cv = document.getElementById('fortune'); if (!cv || !cv.getContext) return;
+  var cx = cv.getContext('2d'), items = [], glints = [], w = 0, h = 0, dpr = 1, run = true, t = 0, last = 0;
+  var TAU = Math.PI * 2, R = 48, SP = {};
+  var SERIF = '"Songti SC","STSong","Noto Serif CJK SC","Source Han Serif SC","SimSun",serif';
+
+  /* ---- 画贴图的小工具 ---- */
+  function rr(g, x, y, ww, hh, r){ g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + ww, y, x + ww, y + hh, r); g.arcTo(x + ww, y + hh, x, y + hh, r); g.arcTo(x, y + hh, x, y, r); g.arcTo(x, y, x + ww, y, r); g.closePath(); }
+  function grad(gr, stops){ for (var i = 0; i < stops.length; i += 2) gr.addColorStop(stops[i], stops[i + 1]); return gr; }
+  function star(g, x, y, s, col){             /* 四角星的闪光 */
+    g.beginPath(); g.moveTo(x, y - s); g.quadraticCurveTo(x, y, x + s * .7, y); g.quadraticCurveTo(x, y, x, y + s);
+    g.quadraticCurveTo(x, y, x - s * .7, y); g.quadraticCurveTo(x, y, x, y - s); g.fillStyle = col; g.fill();
+  }
+  /* 先画到一张临时画布，再带着柔和投影贴到正式贴图上：浅色页底上也有立体感 */
+  function sprite(name, ext, draw, shadow){
+    var q = 2, s = Math.ceil(R * ext), n = s * 2 * q;
+    var a = document.createElement('canvas'); a.width = a.height = n;
+    var g = a.getContext('2d'); g.scale(q, q); g.translate(s, s); draw(g, R);
+    var b = document.createElement('canvas'); b.width = b.height = n;
+    var k = b.getContext('2d');
+    if (shadow !== false){ k.shadowColor = 'rgba(110,40,10,.28)'; k.shadowBlur = R * .22 * q; k.shadowOffsetY = R * .08 * q; }
+    k.drawImage(a, 0, 0);
+    SP[name] = {c: b, s: s};
+  }
+
+  /* 金元宝：两头翘起的船形底座，中间鼓起的圆顶，金色渐变、亮边、高光 */
+  sprite('ingot', 1.15, function(g, r){
+    var d = grad(g.createRadialGradient(-.2 * r, -.55 * r, .03 * r, 0, -.22 * r, .66 * r), [0, '#fffbe6', .3, '#ffe28e', .72, '#e6aa2c', 1, '#b07012']);
+    g.beginPath(); g.ellipse(0, -.28 * r, .5 * r, .5 * r, 0, 0, TAU); g.fillStyle = d; g.fill();
+    g.lineWidth = .035 * r; g.strokeStyle = 'rgba(122,70,8,.55)'; g.stroke();
+    g.beginPath(); g.moveTo(-.84 * r, -.52 * r);                      /* 两头是圆润翘起的厚边，不是尖角 */
+    g.quadraticCurveTo(-1.06 * r, -.5 * r, -.99 * r, -.28 * r);
+    g.bezierCurveTo(-.9 * r, .32 * r, -.5 * r, .6 * r, 0, .6 * r);
+    g.bezierCurveTo(.5 * r, .6 * r, .9 * r, .32 * r, .99 * r, -.28 * r);
+    g.quadraticCurveTo(1.06 * r, -.5 * r, .84 * r, -.52 * r);
+    g.bezierCurveTo(.68 * r, -.22 * r, .44 * r, -.02 * r, 0, -.02 * r);
+    g.bezierCurveTo(-.44 * r, -.02 * r, -.68 * r, -.22 * r, -.84 * r, -.52 * r); g.closePath();
+    g.fillStyle = grad(g.createLinearGradient(0, -.44 * r, 0, .58 * r), [0, '#fff0b3', .28, '#f7cf58', .68, '#d99a22', 1, '#9a5a0b']); g.fill();
+    g.fillStyle = grad(g.createLinearGradient(-r, 0, r, 0), [0, 'rgba(255,250,220,.4)', .32, 'rgba(255,255,255,0)', .7, 'rgba(110,55,0,0)', 1, 'rgba(110,55,0,.3)']); g.fill();
+    g.stroke();
+    g.beginPath(); g.moveTo(-.86 * r, -.47 * r); g.bezierCurveTo(-.68 * r, -.17 * r, -.44 * r, .03 * r, 0, .03 * r); g.bezierCurveTo(.44 * r, .03 * r, .68 * r, -.17 * r, .86 * r, -.47 * r);
+    g.strokeStyle = 'rgba(255,247,210,.95)'; g.lineWidth = .055 * r; g.stroke();          /* 前沿的亮边 */
+    g.fillStyle = 'rgba(255,255,255,.85)'; g.beginPath(); g.ellipse(-.22 * r, -.58 * r, .12 * r, .06 * r, -.5, 0, TAU); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.45)'; g.beginPath(); g.ellipse(-.56 * r, .2 * r, .15 * r, .035 * r, .55, 0, TAU); g.fill();
+    star(g, .3 * r, -.6 * r, .17 * r, 'rgba(255,255,255,.9)');
+  });
+
+  /* 金钱：外圆内方，内外两道边，钱文「招财进宝」，左上一抹高光 */
+  function coinFace(g, r){
+    g.beginPath(); g.arc(0, 0, r, 0, TAU); g.rect(-.24 * r, -.24 * r, .48 * r, .48 * r);
+    g.fillStyle = grad(g.createRadialGradient(-.32 * r, -.36 * r, .04 * r, 0, 0, r), [0, '#fff6c8', .35, '#f7d264', .75, '#dfa22a', 1, '#a2640d']);
+    g.fill('evenodd'); g.lineWidth = .045 * r; g.strokeStyle = 'rgba(118,66,6,.65)'; g.stroke();
+    g.beginPath(); g.arc(0, 0, .8 * r, 0, TAU); g.strokeStyle = 'rgba(150,90,12,.6)'; g.lineWidth = .06 * r; g.stroke();
+    g.beginPath(); g.arc(0, 0, .86 * r, Math.PI * .95, Math.PI * 1.65); g.strokeStyle = 'rgba(255,246,200,.75)'; g.lineWidth = .035 * r; g.stroke();
+    g.strokeStyle = 'rgba(150,90,12,.55)'; g.lineWidth = .05 * r; g.strokeRect(-.31 * r, -.31 * r, .62 * r, .62 * r);
+    g.fillStyle = 'rgba(128,72,6,.8)'; g.font = '700 ' + (.3 * r) + 'px ' + SERIF; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('招', 0, -.56 * r); g.fillText('财', .56 * r, 0); g.fillText('进', 0, .56 * r); g.fillText('宝', -.56 * r, 0);
+    g.fillStyle = 'rgba(255,255,255,.7)'; g.beginPath(); g.ellipse(-.48 * r, -.5 * r, .15 * r, .06 * r, -.8, 0, TAU); g.fill();
+  }
+  sprite('coin', 1.12, coinFace);
+  sprite('coinEdge', 1.12, function(g, r){                      /* 翻到侧面时露出来的钱边 */
+    g.beginPath(); g.arc(0, 0, r, 0, TAU); g.fillStyle = grad(g.createLinearGradient(0, -r, 0, r), [0, '#e9b544', .5, '#b97a16', 1, '#8a520a']); g.fill();
+  }, false);
+
+  /* 红包：大红渐变、描金细框、封口折页带投影，金色圆印上一个「福」 */
+  sprite('envelope', 1.12, function(g, r){
+    var ww = .62 * r, hh = .86 * r;
+    rr(g, -ww, -hh, ww * 2, hh * 2, .1 * r);
+    g.fillStyle = grad(g.createLinearGradient(-ww, -hh, ww, hh), [0, '#ec4f42', .55, '#cc2630', 1, '#a2141e']); g.fill();
+    g.lineWidth = .03 * r; g.strokeStyle = 'rgba(110,10,15,.5)'; g.stroke();
+    g.save(); g.clip();
+    rr(g, -ww + .09 * r, -hh + .09 * r, ww * 2 - .18 * r, hh * 2 - .18 * r, .06 * r); g.strokeStyle = 'rgba(246,205,98,.6)'; g.lineWidth = .025 * r; g.stroke();
+    g.beginPath(); g.moveTo(-ww - 2, -hh - 2); g.lineTo(-ww - 2, -.52 * hh); g.quadraticCurveTo(0, .26 * hh, ww + 2, -.52 * hh); g.lineTo(ww + 2, -hh - 2); g.closePath();
+    g.shadowColor = 'rgba(70,0,0,.4)'; g.shadowBlur = .14 * r * 2; g.shadowOffsetY = .05 * r * 2;
+    g.fillStyle = grad(g.createLinearGradient(0, -hh, 0, -.1 * hh), [0, '#dc3a3f', 1, '#b51d27']); g.fill();
+    g.shadowColor = 'transparent';
+    g.fillStyle = 'rgba(255,255,255,.14)'; g.beginPath(); g.moveTo(-ww, .1 * hh); g.lineTo(-ww + .22 * r, -.05 * hh); g.lineTo(-ww + .22 * r, hh); g.lineTo(-ww, hh); g.fill();
+    g.restore();
+    var cy = -.135 * hh;
+    g.beginPath(); g.arc(0, cy, .27 * r, 0, TAU);
+    g.fillStyle = grad(g.createRadialGradient(-.08 * r, cy - .1 * r, .02 * r, 0, cy, .27 * r), [0, '#fff3b8', .5, '#f2c34c', 1, '#c48514']); g.fill();
+    g.lineWidth = .03 * r; g.strokeStyle = 'rgba(120,70,8,.6)'; g.stroke();
+    g.fillStyle = '#b3121c'; g.font = '700 ' + (.32 * r) + 'px ' + SERIF; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('福', 0, cy + .01 * r);
+  });
+
+  /* 小灯笼：发光的红灯身、竖向灯骨、金色上下盖、灯身上金字「福」、底下红穗子 */
+  sprite('lantern', 1.3, function(g, r){
+    g.strokeStyle = '#b8862a'; g.lineWidth = .04 * r; g.beginPath(); g.moveTo(0, -1.1 * r); g.lineTo(0, -.74 * r); g.stroke();
+    g.save(); g.shadowColor = 'rgba(255,110,40,.6)'; g.shadowBlur = .55 * r * 2;
+    g.beginPath(); g.ellipse(0, -.04 * r, .72 * r, .64 * r, 0, 0, TAU);
+    g.fillStyle = grad(g.createRadialGradient(-.14 * r, -.12 * r, .05 * r, 0, -.04 * r, .78 * r), [0, '#ffb070', .4, '#e9382f', 1, '#9c121b']); g.fill(); g.restore();
+    g.strokeStyle = 'rgba(105,8,14,.4)'; g.lineWidth = .028 * r;
+    [.62, .34, .06].forEach(function(k){ g.beginPath(); g.ellipse(0, -.04 * r, .72 * r * k, .64 * r, 0, 0, TAU); g.stroke(); });
+    g.fillStyle = 'rgba(255,214,110,.92)'; g.font = '700 ' + (.46 * r) + 'px ' + SERIF; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('福', 0, -.02 * r);
+    var cap = grad(g.createLinearGradient(-.34 * r, 0, .34 * r, 0), [0, '#9e6514', .5, '#f7d77e', 1, '#9e6514']);
+    g.fillStyle = cap; rr(g, -.34 * r, -.8 * r, .68 * r, .15 * r, .04 * r); g.fill(); rr(g, -.3 * r, .56 * r, .6 * r, .14 * r, .04 * r); g.fill();
+    g.strokeStyle = '#cf2a30'; g.lineWidth = .035 * r; g.lineCap = 'round';
+    for (var i = -3; i <= 3; i++){ g.beginPath(); g.moveTo(i * .035 * r, .76 * r); g.lineTo(i * .055 * r, 1.22 * r); g.stroke(); }
+    g.beginPath(); g.arc(0, .76 * r, .075 * r, 0, TAU); g.fillStyle = '#f2c34c'; g.fill();
+  });
+
+  /* 金橘：橙色果子带果皮的小点和高光，顶上一片绿叶 */
+  sprite('orange', 1.15, function(g, r){
+    g.beginPath(); g.arc(0, .1 * r, .74 * r, 0, TAU);
+    g.fillStyle = grad(g.createRadialGradient(-.26 * r, -.14 * r, .05 * r, 0, .1 * r, .78 * r), [0, '#ffd88a', .42, '#ff9d2c', 1, '#d65f0e']); g.fill();
+    g.lineWidth = .03 * r; g.strokeStyle = 'rgba(150,60,0,.4)'; g.stroke();
+    g.fillStyle = 'rgba(255,236,190,.28)';
+    [[.3, .3], [-.1, .45], [.45, -.05], [-.4, .3], [.1, -.2], [.2, .55]].forEach(function(p){ g.beginPath(); g.arc(p[0] * r, p[1] * r, .03 * r, 0, TAU); g.fill(); });
+    g.fillStyle = 'rgba(255,255,255,.6)'; g.beginPath(); g.ellipse(-.3 * r, -.18 * r, .16 * r, .09 * r, -.7, 0, TAU); g.fill();
+    g.fillStyle = '#6b3d14'; rr(g, -.04 * r, -.74 * r, .08 * r, .14 * r, .03 * r); g.fill();
+    g.beginPath(); g.moveTo(.02 * r, -.66 * r); g.quadraticCurveTo(.3 * r, -1.06 * r, .78 * r, -.86 * r); g.quadraticCurveTo(.44 * r, -.5 * r, .02 * r, -.66 * r);
+    g.fillStyle = grad(g.createLinearGradient(0, -.66 * r, .78 * r, -.86 * r), [0, '#2f6e2c', 1, '#62ad4f']); g.fill();
+    g.beginPath(); g.moveTo(.06 * r, -.67 * r); g.quadraticCurveTo(.4 * r, -.78 * r, .7 * r, -.84 * r); g.strokeStyle = 'rgba(210,240,190,.6)'; g.lineWidth = .025 * r; g.stroke();
+  });
+
+  /* 梅花：五片圆瓣、花心淡黄、一圈金色花蕊 */
+  sprite('plum', 1.05, function(g, r){
+    for (var i = 0; i < 5; i++){
+      var a = i * TAU / 5 - Math.PI / 2, px = Math.cos(a) * .48 * r, py = Math.sin(a) * .48 * r;
+      g.beginPath(); g.arc(px, py, .4 * r, 0, TAU);
+      g.fillStyle = grad(g.createRadialGradient(px * .3, py * .3, .05 * r, px, py, .44 * r), [0, '#ffd3d8', .45, '#f2707f', 1, '#d0304a']); g.fill();
+      g.lineWidth = .03 * r; g.strokeStyle = 'rgba(140,20,40,.35)'; g.stroke();
+    }
+    g.beginPath(); g.arc(0, 0, .2 * r, 0, TAU); g.fillStyle = '#fff1c4'; g.fill();
+    g.fillStyle = '#e0a82e';
+    for (i = 0; i < 9; i++){ var b = i * TAU / 9; g.beginPath(); g.arc(Math.cos(b) * .28 * r, Math.sin(b) * .28 * r, .045 * r, 0, TAU); g.fill(); }
+  }, false);
+
+  /* 种类、出现的比例、大小范围（半径 px）、下落快慢 */
+  var KINDS = [
+    {k: 'ingot', p: 22, r0: 24, r1: 34, fall: 1.15},
+    {k: 'coin', p: 30, r0: 15, r1: 22, fall: 1.0},
+    {k: 'envelope', p: 15, r0: 19, r1: 25, fall: .75},
+    {k: 'lantern', p: 8, r0: 18, r1: 23, fall: .7},
+    {k: 'orange', p: 11, r0: 16, r1: 21, fall: 1.05},
+    {k: 'plum', p: 14, r0: 10, r1: 14, fall: .6}
+  ], TOTAL = KINDS.reduce(function(s, k){ return s + k.p; }, 0);
+  function pick(){ var n = Math.random() * TOTAL; for (var i = 0; i < KINDS.length; i++){ n -= KINDS[i].p; if (n < 0) return KINDS[i]; } return KINDS[0]; }
+
+  function make(y){
+    var K = pick(), z = .55 + Math.random() * .45;
+    return {K: K, z: z, r: (K.r0 + Math.random() * (K.r1 - K.r0)) * (.7 + .3 * z), x: Math.random() * w, y: y,
+            vy: (.35 + .5 * z) * K.fall, ph: Math.random() * TAU, rot: (Math.random() - .5) * .6, vr: (Math.random() - .5) * .025,
+            fl: Math.random() * TAU, vf: .035 + Math.random() * .035, a: .62 + .36 * z};
+  }
+  function makeGlint(y){ return {x: Math.random() * w, y: y, s: 2 + Math.random() * 2.6, vy: .2 + Math.random() * .3, ph: Math.random() * TAU, sp: .03 + Math.random() * .04}; }
+  function size(){
+    dpr = Math.min(window.devicePixelRatio || 1, 2); w = innerWidth; h = innerHeight;
+    cv.width = w * dpr; cv.height = h * dpr; cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var want = Math.max(5, Math.min(16, Math.round(w * h / 70000)));
+    while (items.length < want) items.push(make(Math.random() * h));
+    items.length = want;
+    var wg = Math.round(want * .8);
+    while (glints.length < wg) glints.push(makeGlint(Math.random() * h));
+    glints.length = wg;
+  }
+  function blit(name, r){ var s = SP[name], k = r / R; cx.drawImage(s.c, -s.s * k, -s.s * k, s.s * 2 * k, s.s * 2 * k); }
+  function drawItem(it, dt){
+    var k = it.K.k, r = it.r;
+    cx.save(); cx.globalAlpha = it.a; cx.translate(it.x, it.y);
+    if (k === 'ingot'){ cx.rotate(it.rot + .32 * Math.sin(t * .018 + it.ph)); blit('ingot', r); }
+    else if (k === 'coin'){                                     /* 翻面：正面按 cos 压扁，侧面叠几层钱边显出厚度 */
+      it.fl += it.vf * dt; var c = Math.cos(it.fl), sx = Math.max(Math.abs(c), .07), off = Math.sin(it.fl) * r * .16;
+      cx.rotate(it.rot); cx.scale(sx, 1);
+      for (var j = 0; j < 4; j++){ cx.save(); cx.translate((-off / 2 + j * off / 6) / sx, 0); blit('coinEdge', r); cx.restore(); }
+      cx.translate(off / 2 / sx, 0); blit('coin', r);
+    }
+    else if (k === 'envelope'){ cx.rotate(it.rot + .45 * Math.sin(t * .022 + it.ph)); cx.scale(1, .72 + .28 * Math.cos(t * .035 + it.ph)); blit('envelope', r); }
+    else if (k === 'lantern'){ cx.translate(0, -r * 1.1); cx.rotate(.22 * Math.sin(t * .03 + it.ph)); cx.translate(0, r * 1.1); blit('lantern', r); }
+    else if (k === 'orange'){ it.rot += it.vr * dt; cx.rotate(it.rot); blit('orange', r); }
+    else { it.rot += it.vr * 1.6 * dt; cx.rotate(it.rot); cx.scale(1, .5 + .5 * Math.abs(Math.sin(t * .02 + it.ph))); blit('plum', r); }
+    cx.restore();
+  }
+  function drawGlint(g){
+    var a = Math.pow(Math.max(0, Math.sin(t * g.sp + g.ph)), 3); if (a < .02) return;
+    var rg = cx.createRadialGradient(g.x, g.y, 0, g.x, g.y, g.s * 2.6);
+    rg.addColorStop(0, 'rgba(255,222,140,' + (a * .55) + ')'); rg.addColorStop(1, 'rgba(255,200,90,0)');
+    cx.fillStyle = rg; cx.beginPath(); cx.arc(g.x, g.y, g.s * 2.6, 0, TAU); cx.fill();
+    star(cx, g.x, g.y, g.s * (1.4 + .5 * a), 'rgba(255,246,214,' + a + ')');
+  }
+  function draw(ts){
+    if (!run) return;
+    var dt = last ? Math.min(3, (ts - last) / 16.67) : 1; last = ts; t += dt;
+    cx.clearRect(0, 0, w, h);
+    for (var i = 0; i < glints.length; i++){ var g = glints[i]; g.y += g.vy * dt; if (g.y > h + 10) { glints[i] = makeGlint(-10); continue; } drawGlint(g); }
+    for (i = 0; i < items.length; i++){
+      var it = items[i];
+      it.y += it.vy * dt; it.x += Math.sin(t * .012 + it.ph) * .28 * dt;
+      if (it.y > h + it.r * 2.5) { items[i] = make(-it.r * 2.5); continue; }
+      drawItem(it, dt);
+    }
+    requestAnimationFrame(draw);
+  }
+  document.addEventListener('visibilitychange', function(){ var was = run; run = !document.hidden; if (run && !was){ last = 0; requestAnimationFrame(draw); } });
   addEventListener('resize', size);
   size(); requestAnimationFrame(draw);
 })();

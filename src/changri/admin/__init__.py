@@ -15,7 +15,7 @@ from changri.admin.common import GLOBAL_ENDPOINTS, HIDDEN_FIELDS, LOCK_AFTER, LO
 from changri.core.textutil import hm_text, next_day_mark
 
 THEME_COOKIE = "admin_theme"
-THEMES = {"lily", "ballet", "xmas", "sakura"}          # 样式在 templates/_themes.html；空 = 默认
+THEMES = {"lily", "ballet", "xmas", "sakura", "newyear"}          # 样式在 templates/_themes.html；空 = 默认
 
 
 def create_app() -> Flask:
@@ -671,7 +671,25 @@ def create_app() -> Flask:
             it["group"] = "core" if it["kind"] == "core" else ("custom" if it.get("personal") else "aux")
         tab = request.args.get("tab", "core")
         return render_template("extensions.html", items=items, tab=tab, cur=tab if tab in ("aux", "custom") else "core", pending=ext_core.pending_restart(),
-                               owner=bool(session.get("owner")), restarting=request.args.get("restarting") == "1", ai_prompt=ext_core.ai_prompt() if request.args.get("tab") == "ai" else "")
+                               owner=bool(session.get("owner")), restarting=request.args.get("restarting") == "1", ai_prompt=ext_core.ai_prompt() if request.args.get("tab") == "ai" else "",
+                               api_ref=ext_core.api_reference() if tab == "api" else [], ready=ext_core.ready_made() if tab == "api" else [],
+                               api_version=ext_core.API_VERSION)
+
+    @app.route("/extensions/ready/<ext_id>.zip")
+    @login_required
+    def extensions_ready_zip(ext_id):
+        from flask import Response, abort
+        data = ext_core.ready_zip(ext_id)
+        if data is None:
+            abort(404)
+        return Response(data, mimetype="application/zip", headers={"Content-Disposition": f"attachment; filename={ext_id}.zip"})
+
+    @app.post("/extensions/ready/<ext_id>/install")
+    @owner_required
+    def extensions_ready_install(ext_id):
+        ok, msg = ext_core.install_ready(ext_id, replace=request.form.get("replace") == "1")
+        flash(msg)
+        return redirect(url_for("extensions_page", tab="aux" if ok else "api"))
 
     @app.route("/extensions/ai-prompt.md")
     @login_required
