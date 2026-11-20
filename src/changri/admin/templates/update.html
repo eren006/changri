@@ -75,7 +75,7 @@
   <h2>自动更新</h2>
   <p>落后太多时，机器人会在没人写戏的时段自己更新。更新前后都会检查：设置平台、小手机能不能打开，数据库能不能读，机器人有没有全连上，定时任务在不在，有没有一下冒出很多报错。有一项不对就自动回到原来的版本。</p>
   {% if auto.last %}<p class="note"><span class="dot ok"></span>上次自动更新：{{ auto.last.ts|datetimefmt }} 从 {{ auto.last.from }} 更新到 {{ auto.last.to }}。</p>{% endif %}
-  {% if auto.decision %}<p class="note">现在这个新版本：{{ '空闲时段会自动更新' if auto.decision[0] else '不会自动更新' }}（{{ auto.decision[1] }}）。</p>{% endif %}
+  {% if auto.decision %}<p class="note">现在这个新版本：{{ ('没人写戏时就会自动更新' if '重要更新' in auto.decision[1] else '空闲时段会自动更新') if auto.decision[0] else '不会自动更新' }}（{{ auto.decision[1] }}）。</p>{% endif %}
   {% if not auto.installed %}<p class="note">现在是直接从源码运行的（开发环境），不会自动更新。</p>{% endif %}
   <form method="post" action="{{ url_for('update_auto_save') }}" class="au-f">{{ csrf() }}
     <div class="au-row"><label class="sw"><input type="checkbox" name="on" value="1" {{ 'checked' if auto.enabled }} aria-label="自动更新"><i></i></label><span>落后太多时自动更新</span></div>
@@ -84,7 +84,7 @@
       <div><label for="au-d">或者最早没装的版本发布满几天</label><input id="au-d" type="number" name="auto_update_days" min="1" max="365" value="{{ auto.days }}" inputmode="numeric"></div>
       <div><label for="au-w">只在这个时段更新</label><input id="au-w" type="text" name="window" value="{{ auto.window }}" placeholder="04:00-06:00"></div>
     </div>
-    <p class="note">半小时内有人在房间里写戏、心动信派送前后半小时，都会等到下一次。作者标了「重要」的版本不等落后几个，空闲时就更新；标了「要手动更新」的版本不会自动装。点过「这次先不更新」的版本也不会自动装。</p>
+    <p class="note">半小时内有人在房间里写戏、心动信派送前后半小时，都会等到下一次。作者标了「重要」的版本不等落后几个、也不等上面的时段，半小时没人写戏就更新；标了「要手动更新」的版本不会自动装。点过「这次先不更新」的版本也不会自动装。</p>
     <button class="btn" type="submit">保存</button>
   </form>
 </section>

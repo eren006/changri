@@ -79,7 +79,7 @@ class DecideTests(Base):
         i = info(1)
         i["pending"][0]["urgent"] = True
         set_config("update_skip", "0.2.0")
-        self.assertEqual(autoupdate.decide(i, data_dir=self.data), (True, "有重要更新"))
+        self.assertEqual(autoupdate.decide(i, data_dir=self.data), (True, "有重要更新，不等时段，半小时没人写戏就装"))
 
     def test_skipped_version_not_auto(self):
         set_config("update_skip", "0.2.0")
@@ -113,6 +113,8 @@ class PreCheckTests(Base):
 
     def test_outside_window(self):
         self.assertIn("不在自动更新时段", autoupdate.pre_check(info(), now=at("12:00"), data_dir=self.data))
+        # 紧急版本不等时段：白天也装；但有人在写戏照样等
+        self.assertEqual(autoupdate.pre_check(info(urgent=True), now=at("12:00"), data_dir=self.data), "")
 
     def test_recent_play_blocks(self):
         now = at("04:30")
@@ -121,6 +123,14 @@ class PreCheckTests(Base):
             c.execute("INSERT INTO room_lines(room_id, ts, text) VALUES (1, ?, '戏')", (int(now) - 600,))
         self.assertIn("写戏", autoupdate.pre_check(info(), now=now, data_dir=self.data))
         self.assertEqual(autoupdate.pre_check(info(), now=now + 3600, data_dir=self.data), "")
+
+    def test_urgent_daytime_still_waits_for_quiet(self):
+        now = at("12:00")
+        with get_conn() as c:
+            c.execute("PRAGMA foreign_keys=OFF")
+            c.execute("INSERT INTO room_lines(room_id, ts, text) VALUES (1, ?, '戏')", (int(now) - 600,))
+        self.assertIn("写戏", autoupdate.pre_check(info(urgent=True), now=now, data_dir=self.data))      # 紧急也不在跑戏时更新
+        self.assertEqual(autoupdate.pre_check(info(urgent=True), now=now + 3600, data_dir=self.data), "")
 
     def test_lovemail_time_blocks(self):
         set_config("lovemail_delivery_time", "04:45")

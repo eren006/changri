@@ -3,7 +3,8 @@
 什么时候自动更新（maybe_update，每 10 分钟由 plugins/botsync 调一次，只在后台已经发现有新版本时才往下走）：
 - 主人没关「自动更新」（update 页的开关，auto_update_enabled，默认开）；
 - 落后够多：中间差了 auto_update_behind 个版本（默认 3），或者最早没装的那版已经发布 auto_update_days 天（默认 14）；
-  作者在 changelog 里标了 "urgent": true 的版本不等落后，空闲就更新；
+  作者在 changelog 里标了 "urgent": true 的版本不等落后，也不等空闲时段：半小时没人写戏就更新（作者 2026-11-20 定：
+  紧急修复要尽快到用户手里，等凌晨的话，像 Windows 3 天时限那种问题，等的这段时间里还会再坏一次）；
 - 作者没给中间任何一版标 "auto": false（改动大、要主人自己看着更新的版本）；
 - 主人没对这一版点过「这次先不更新」（urgent 的除外），这一版也没有自动更新失败过；
 - 更新前检查都过（pre_check）：在空闲时段里（默认凌晨 04:00–06:00）、半小时内没人在房间里写戏、
@@ -120,7 +121,7 @@ def decide(info: dict, now: float | None = None, data_dir: Path | None = None) -
     if _failed_version(data_dir) == info["version"]:
         return False, f"{info['version']} 自动更新失败过，不再自动试"
     if any(c.get("urgent") for c in pend):
-        return True, "有重要更新"
+        return True, "有重要更新，不等时段，半小时没人写戏就装"
     from .db import get_config
     if get_config("update_skip", "") == info["version"]:
         return False, "主人选了这个版本先不更新"
@@ -197,7 +198,8 @@ def pre_check(info: dict, now: float | None = None, data_dir: Path | None = None
     data_dir = data_dir or DATA_DIR
     t = time.localtime(now or time.time())
     minute = t.tm_hour * 60 + t.tm_min
-    if not in_window(minute, window()):
+    urgent = any(c.get("urgent") for c in info.get("pending") or [])
+    if not urgent and not in_window(minute, window()):          # 紧急版本不等时段，下面几条照样要过
         return f"不在自动更新时段（{window_text()}）"
     if _recent_play(int(now or time.time()) - QUIET_MINUTES * 60):
         return f"{QUIET_MINUTES} 分钟内有人在房间里写戏"
