@@ -8,6 +8,7 @@ Python 自带 logging 记的也收（接到 loguru 上，见 _StdBridge），不
 唯一的例外是装的人自己在后台「基础」里填的「联系 QQ」（选填）：填了才随报错一起发，方便作者看到报错后联系他。"""
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -349,8 +350,10 @@ def is_transient(text: str, trace: str = "") -> bool:
 # Windows 版 Python 的 Proactor 事件循环有个老毛病：对方（QQ 服务器、浏览器、手机网页）已经把连接断了，
 # 我们这边再去关 socket 时 shutdown() 会抛 WinError 10054 / 10053，asyncio 就记一条
 # "Exception in callback ..._call_connection_lost(None)"。连接本来就要关，什么都没坏，只是吵：窗口里降成调试信息，也不进报错日志。
+# 同一个位置还有一种：websockets 库（连 SnowLuma、QQ）收到两次「连接断了」，第二次去设已经设过的结果，抛 InvalidStateError: invalid state。
+# 也是断开时多通知了一次，asyncio 接住了，程序照常跑；只在 _call_connection_lost 里才这么认，别处的 InvalidStateError 照记。
 
-_PROACTOR_NOISE = (ConnectionResetError, ConnectionAbortedError)
+_PROACTOR_NOISE = (ConnectionResetError, ConnectionAbortedError, asyncio.InvalidStateError)
 
 
 def is_proactor_noise(text: str, trace: str = "", exc: BaseException | None = None) -> bool:

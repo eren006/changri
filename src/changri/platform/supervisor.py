@@ -21,6 +21,7 @@ import os
 import signal
 import subprocess
 import sys
+import threading
 import time
 
 from . import layout
@@ -36,6 +37,16 @@ MAX_QUICK_CRASHES = 5    # 连续这么多次「没跑满 HEALTHY_AFTER 秒就�
 
 def _child_cmd() -> list[str]:
     return [sys.executable, "-m", "changri", "run"]
+
+
+def _repair_win_task() -> None:
+    """Windows 开机自启：旧任务带着 3 天时限，自动换掉（见 service.repair_win_task）。"""
+    try:
+        from .service import repair_win_task
+        if msg := repair_win_task():
+            _log(msg)
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def _log(msg: str) -> None:
@@ -135,6 +146,7 @@ def run() -> int:
         signal.signal(signal.SIGBREAK, on_signal)        # Windows 关窗口 / Ctrl+Break
 
     _open_browser_once()
+    threading.Thread(target=_repair_win_task, name="win-task-repair", daemon=True).start()   # 放后台：schtasks 万一卡住也不耽误机器人启动
     quick_crashes = 0
     while not stopping["flag"]:
         if (port := _already_running()) is not None:

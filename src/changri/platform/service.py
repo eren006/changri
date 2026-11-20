@@ -270,15 +270,91 @@ def _win_launcher() -> str:
     return str(APP_ROOT / "Start-Changri.bat")
 
 
+# 任务用 XML 建，不用 schtasks /SC ONSTART 那串参数：那样建出来的任务带着 Windows 的默认设置
+# 「运行超过 3 天就停止」（ExecutionTimeLimit=PT72H），挂着跑的机器人每 3 天被系统结束一次，之后要等重启电脑才再起来。
+# 这里写成 PT0S（不限时）；顺便关掉「用电池时不启动 / 切到电池就停止」，同一时间只跑一个。
+# 除了开机触发，再加一个每 5 分钟的触发：任务在跑就什么都不做（IgnoreNew），不在跑（被结束、程序退出了）就拉起来，
+# 不用等重启电脑。旧任务被自动换掉之后，当前这一轮还带着旧的 3 天时限，到点被结束时靠它 5 分钟内起来。
+_WIN_TASK_XML = """<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo><Description>长日bot 开机自动运行</Description></RegistrationInfo>
+  <Triggers>
+    <BootTrigger><Enabled>true</Enabled></BootTrigger>
+    <TimeTrigger>
+      <Repetition><Interval>PT5M</Interval><StopAtDurationEnd>false</StopAtDurationEnd></Repetition>
+      <StartBoundary>2026-01-01T00:00:00</StartBoundary>
+      <Enabled>true</Enabled>
+    </TimeTrigger>
+  </Triggers>
+  <Principals><Principal id="Author"><UserId>S-1-5-18</UserId><RunLevel>HighestAvailable</RunLevel></Principal></Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <AllowHardTerminate>true</AllowHardTerminate>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <IdleSettings><StopOnIdleEnd>false</StopOnIdleEnd><RestartOnIdle>false</RestartOnIdle></IdleSettings>
+    <AllowStartOnDemand>true</AllowStartOnDemand>
+    <Enabled>true</Enabled>
+    <Hidden>false</Hidden>
+    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
+    <Priority>7</Priority>
+  </Settings>
+  <Actions Context="Author"><Exec><Command>{command}</Command><Arguments>--service</Arguments></Exec></Actions>
+</Task>
+"""
+
+
+def _win_task_xml() -> str:
+    from xml.sax.saxutils import escape
+    return _WIN_TASK_XML.format(command=escape(f'"{_win_launcher()}"'))      # 路径里常有空格，照 schtasks /TR 建出来的样子加引号
+
+
 def _win_install() -> str:
     import ctypes
     if not ctypes.windll.shell32.IsUserAnAdmin():
         raise RuntimeError("请右键「Install-Autostart.bat」，选「以管理员身份运行」。")
-    _run(["schtasks", "/Create", "/TN", TASK, "/TR", f'"{_win_launcher()}" --service', "/SC", "ONSTART", "/RU", "SYSTEM", "/RL", "HIGHEST", "/F"])
+    _win_register()
     fw = open_firewall()
     _run(["schtasks", "/Run", "/TN", TASK], check=False)
     return "已设为开机自动运行，并已在后台启动（没有窗口）" + (f"；{fw}" if fw else "") + \
         "。如果之前双击开着的窗口还在，请先关掉它，否则端口会冲突。"
+
+
+def _win_register() -> None:
+    """按 _WIN_TASK_XML 建（或覆盖）任务。要管理员或 SYSTEM。"""
+    import tempfile
+    fd, xml_path = tempfile.mkstemp(suffix=".xml")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-16") as f:     # schtasks /XML 要 UTF-16（带 BOM）
+            f.write(_win_task_xml())
+        _run(["schtasks", "/Create", "/TN", TASK, "/XML", xml_path, "/F"])
+    finally:
+        try:
+            os.unlink(xml_path)
+        except OSError:
+            pass
+
+
+def repair_win_task() -> str | None:
+    """开机自启（以 SYSTEM 运行）每次启动时调用：任务是旧版本建的（带 3 天时限、没有 5 分钟拉起），就按新设置重建一遍，
+    等于替用户以管理员身份重新运行了 Install-Autostart.bat，不用他们知道这件事。
+    不是 Windows、不是开机自启起来的（双击窗口没有权限改 SYSTEM 的任务）、没装开机自启：什么都不做。
+    返回给看门进程打印的一句话；没改返回 None。出错不抛（顶多下次启动再试，Doctor 里也还会提示重装）。"""
+    if not _is_windows() or os.environ.get("CHANGRI_SERVICE") != "1":
+        return None
+    try:
+        r = _run(["schtasks", "/Query", "/TN", TASK, "/XML"], check=False)
+        if r.returncode != 0 or not _win_task_needs_repair(r.stdout):
+            return None
+        _win_register()
+        return "开机自启是旧版本装的（Windows 默认运行 3 天就停止），已自动换成新设置：不限时，停了 5 分钟内自动拉起。"
+    except Exception as e:  # noqa: BLE001
+        return f"想自动更新开机自启的设置，没成功（{e}）。可以右键 Install-Autostart.bat，选「以管理员身份运行」重新装一次。"
+
+
+def _win_task_needs_repair(xml: str) -> bool:
+    return "<Task" in (xml or "") and (_win_task_time_limited(xml) or "<Repetition>" not in xml)
 
 
 def _win_firewall(ports: list[int]) -> bool:
@@ -303,7 +379,26 @@ def _win_status() -> str:
     if r.returncode != 0:
         return "没有设开机自启"
     running = "Running" in r.stdout or "正在运行" in r.stdout
-    return f"已设开机自启，现在{'正在运行' if running else '没在运行'}。"
+    out = f"已设开机自启，现在{'正在运行' if running else '没在运行'}。"
+    try:
+        xml = _run(["schtasks", "/Query", "/TN", TASK, "/XML"], check=False).stdout
+    except (OSError, UnicodeDecodeError):
+        xml = ""
+    if _win_task_time_limited(xml):
+        out += "但这个开机自启是旧版本装的，带着 Windows 默认的「运行 3 天就停止」：机器人每 3 天会被系统结束一次。" \
+               "请右键 Install-Autostart.bat，选「以管理员身份运行」，重新装一次就好（数据不受影响）。"
+    return out
+
+
+def _win_task_time_limited(xml: str) -> bool:
+    """任务设了运行时限。只有写明 PT0S 才算不限：Windows 导出任务时省略和默认一样的项，
+    没写 ExecutionTimeLimit 就是默认的 PT72H（旧版本用 schtasks /SC ONSTART 建的正是这样，一台用户机器 11-20 导出确认过）。
+    查不到任务（xml 是空的、不是任务定义）不算。"""
+    import re
+    if "<Task" not in (xml or ""):
+        return False
+    m = re.search(r"<ExecutionTimeLimit>\s*([^<\s]+)\s*</ExecutionTimeLimit>", xml)
+    return not m or m.group(1).upper() not in ("PT0S", "P0D")
 
 
 def install() -> str:

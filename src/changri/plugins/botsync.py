@@ -70,7 +70,7 @@ async def _post_update_check():
 
 
 scheduler.add_job(_post_update_check, "date", run_date=datetime.datetime.now() + datetime.timedelta(seconds=updater.HEALTHY_AFTER),
-                  id="update_post_check")
+                  id="update_post_check", misfire_grace_time=None)     # 只跑一次的任务：到点时程序正忙也要补做（默认晚 1 秒就跳过）
 
 
 @scheduler.scheduled_job("interval", minutes=10, id="auto_update", max_instances=1, coalesce=True)
@@ -138,7 +138,7 @@ _driver = nonebot.get_driver()
 async def _usage_on_connect():
     """刚在后台加了机器人、或者启动 2 分钟后才连上：等 1 分钟（几个机器人一起连上只报一次）再补报，主站就能看到连着几个。"""
     scheduler.add_job(_usage_report, "date", run_date=datetime.datetime.now() + datetime.timedelta(minutes=1),
-                      kwargs={"only_if_more_online": True}, id="usage_on_connect", replace_existing=True)
+                      kwargs={"only_if_more_online": True}, id="usage_on_connect", replace_existing=True, misfire_grace_time=None)
 
 
 @_driver.on_shutdown
@@ -162,4 +162,7 @@ async def _heartbeat():
 # 启动 90 秒后还活着，就撤掉扩展的崩溃保护标记（见 core/extensions.py 的 load_all）
 from changri.core import extensions as _ext  # noqa: E402
 
-scheduler.add_job(_ext.confirm_boot, "date", run_date=datetime.datetime.now() + datetime.timedelta(seconds=90), id="ext_boot_confirm", replace_existing=True)
+# misfire_grace_time=None：到点时程序正忙也要补做。默认晚 1 秒就跳过，跳过了这次启动就一直没「确认平安」，
+# 之后一旦异常退出（断电、被强行结束），下次启动会把用户扩展全部当成嫌疑自动停用
+scheduler.add_job(_ext.confirm_boot, "date", run_date=datetime.datetime.now() + datetime.timedelta(seconds=90), id="ext_boot_confirm",
+                  replace_existing=True, misfire_grace_time=None)

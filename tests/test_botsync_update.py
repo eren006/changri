@@ -37,6 +37,12 @@ class BotsyncUpdateJobs(unittest.TestCase):
         self.assertTrue({"update_post_check", "auto_update", "update_check"} <= ids)
         self.assertNotIn("update_confirm", ids)
 
+    def test_one_shot_jobs_never_skipped(self):
+        # 只跑一次的任务不能因为到点时程序正忙就被跳过（APScheduler 默认晚 1 秒就跳过）
+        jobs = {j.id: j for j in scheduler.get_jobs()}
+        for jid in ("update_post_check", "ext_boot_confirm"):
+            self.assertIsNone(jobs[jid].misfire_grace_time, jid)
+
     def test_snapshot_in_real_process(self):
         snap = autoupdate.snapshot()
         self.assertEqual(snap["bots_online"], 0)

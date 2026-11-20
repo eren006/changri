@@ -1,9 +1,22 @@
 [
   {
-    "version": "0.22.11",
+    "version": "0.22.12",
     "date": "",
     "features": [],
     "fixes": []
+  },
+  {
+    "version": "0.22.11",
+    "date": "2026-11-20",
+    "urgent": true,
+    "features": [],
+    "fixes": [
+      "Windows 开机自启的机器人每 3 天会被系统停掉一次，要重启电脑才再起来（Windows 任务计划默认「运行超过 3 天就停止」）。更新后会自动换成新设置，不用做什么；以后机器人万一停了，5 分钟内会自己重新起来"
+    ],
+    "internal": [
+      "Windows 上连接断开时 websockets 偶尔报的「InvalidStateError: invalid state」不再记进报错日志：只是断开时多通知了一次，程序没事",
+      "启动后只跑一次的检查（确认扩展正常、更新后检查）到点时程序正忙也会补做，不会被跳过"
+    ]
   },
   {
     "version": "0.22.10",

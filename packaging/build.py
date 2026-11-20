@@ -345,6 +345,32 @@ def _local_secrets() -> dict[str, str]:
     return out
 
 
+def _private_marks(files: dict[str, bytes]) -> list[str]:
+    """和同步公开仓库用同一套「私人标识」规则（作者名字、服务器代号和 IP、本机路径），注释里的也算。
+    规则在 tools/scan_public.py（不进公开仓库）；别人用公开仓库自己打包时没有这个文件，就跳过这一项。
+    以前打包只查本机用户名和路径，0.22.10 安装包里漏进了注释里的作者名字，公开仓库同步时才被拦下。"""
+    scanner = ROOT / "tools" / "scan_public.py"
+    if not scanner.is_file():
+        return []
+    import importlib.util
+    sp = importlib.util.spec_from_file_location("scan_public_for_build", scanner)
+    mod = importlib.util.module_from_spec(sp)
+    sp.loader.exec_module(mod)
+    out = []
+    for rel, data in files.items():
+        if b"\0" in data[:4096]:
+            continue                                        # 二进制（字体、图片）
+        try:
+            text = data.decode("utf-8")
+        except UnicodeDecodeError:
+            continue
+        for i, line in enumerate(text.splitlines(), 1):
+            for rule, rx in mod.PRIVATE:
+                if m := rx.search(line):
+                    out.append(f"{rel} 第 {i} 行：{rule}（{m.group(0)}）")
+    return out
+
+
 def check_no_secrets(files: dict[str, bytes]) -> None:
     """打进包里的程序文件（不含第三方运行环境）里不能出现发布者本机的口令、用户名、路径和私钥；有就停止打包。"""
     import re
@@ -359,6 +385,7 @@ def check_no_secrets(files: dict[str, bytes]) -> None:
             bad.append(f"{rel}：像是一段私钥")
         if Path(rel).name in (".env", ".secret_key", ".setup_code") or rel.endswith((".db", ".pem", ".key")):
             bad.append(f"{rel}：不该打进安装包的文件")
+    bad += _private_marks(files)
     if bad:
         sys.exit("安装包里发现敏感内容，已停止打包：\n  " + "\n  ".join(sorted(set(bad))[:30]))
     log(f"  敏感信息检查通过（{len(files)} 个程序文件）")

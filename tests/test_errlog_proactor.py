@@ -34,6 +34,21 @@ class Proactor(unittest.TestCase):
         errlog._loguru_sink(Msg(MSG, _exc(ConnectionAbortedError(10053, "aborted"))))
         self.assertEqual(errlog.read_all(), [])
 
+    def test_websockets_invalid_state_dropped(self):
+        # websockets 在 Windows 上连接断开时 connection_lost 被叫两次：InvalidStateError: invalid state（11-19 线上报过）
+        import asyncio
+        errlog._loguru_sink(Msg(MSG, _exc(asyncio.InvalidStateError("invalid state"))))
+        trace = ('Traceback (most recent call last):\n  File "proactor_events.py", line 158, in _call_connection_lost\n'
+                 '  File "websockets/asyncio/connection.py", line 1042, in connection_lost\n'
+                 'asyncio.exceptions.InvalidStateError: invalid state\n')
+        self.assertTrue(errlog.is_proactor_noise(MSG, trace))                     # 旧格式只有 trace 文本也认
+        self.assertEqual(errlog.read_all(), [])
+
+    def test_invalid_state_elsewhere_kept(self):
+        import asyncio
+        errlog._loguru_sink(Msg("Exception in callback foo()", _exc(asyncio.InvalidStateError("invalid state"))))
+        self.assertEqual(len(errlog.read_all()), 1)                              # 不在关连接那里：照记
+
     def test_other_errors_kept(self):
         errlog._loguru_sink(Msg(MSG, _exc(ValueError("真出错了"))))                         # 同一个位置但不是断连
         errlog._loguru_sink(Msg("Exception in callback foo()", _exc(ConnectionResetError())))   # 断连：短暂的毛病，也不记（errlog.is_transient）
