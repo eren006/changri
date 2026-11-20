@@ -2,14 +2,15 @@
 {% block title %}图片管理{% endblock %}
 {% block body %}
 <h1>图片管理</h1>
-<p class="lede">机器人存着的图片都在这里：短信和礼物里发的图、公知二表交的图、出场预存的图。可以看、可以删；删掉后，对应的文字还在，图的位置会空出来，QQ 群里已经发出去的图不受影响。</p>
+<p class="lede">机器人存着的图片都在这里：短信和礼物里发的图、心动信附的图、公知二表交的图、出场预存的图、朋友圈的图。可以看、可以删；删掉后，对应的文字还在，图的位置会空出来，QQ 群里已经发出去的图不受影响。</p>
 
 <div class="stats">
   {% for s, label in sources %}<div class="stat"><b>{{ counts[s] }} 张</b><span>{{ label }} · {{ sizes[s] }} MB</span></div>{% endfor %}
 </div>
 
 <nav class="tabs" aria-label="图片来源">{% for s, label in sources %}<a class="tab{{ ' on' if s == src }}" href="{{ url_for('images_page', src=s) }}">{{ label }}<span class="n">{{ counts[s] }}</span></a>{% endfor %}</nav>
-{% if src == 'sms' and not sms_on %}<div class="callout">现在不允许短信带图片。要打开，到「功能与设置 → 短信」里改「短信/礼物留言可以带图片」（单张最大 {{ max_mb }} MB）。</div>{% endif %}
+{% if src == 'sms' and not sms_on %}<div class="callout">现在不允许短信带图片。要打开，到「功能与设置 → 短信」里改「短信/礼物可以带图片」（单张最大 {{ max_mb }} MB）。</div>{% endif %}
+{% if src == 'lovemail' and not mail_on %}<div class="callout">现在心动信不能附图。要打开，到「功能与设置 → 心动信」里改「心动信可以附一张图」。</div>{% endif %}
 
 {% if src == 'moments' %}
 <form class="form" method="post" action="{{ url_for('images_moments_settings') }}" style="margin:0 0 18px">{{ csrf() }}
@@ -22,8 +23,8 @@
   <div class="sec-head keep"><h2>{% for s, label in sources %}{{ label if s == src }}{% endfor %}<span class="n">{{ counts[src] }} 张</span></h2>
     {% if counts[src] %}<span class="btns"><details class="panel"><summary class="btn ghost">批量清理</summary>
       <form class="form" method="post" action="{{ url_for('images_purge') }}">{{ csrf() }}<input type="hidden" name="src" value="{{ src }}">
-        {% if src == 'sms' %}<div class="fields"><div><label for="d">删除多少天前的图片</label><input id="d" type="number" min="1" name="days" placeholder="例如 30"></div></div>{% endif %}
-        <div class="actions">{% if src == 'sms' %}<button class="btn" type="submit">删除这些</button>{% endif %}
+        {% if src in ('sms', 'lovemail') %}<div class="fields"><div><label for="d">删除多少天前的图片{% if src == 'lovemail' %}（还没派送的信的图不会删）{% endif %}</label><input id="d" type="number" min="1" name="days" placeholder="例如 30"></div></div>{% endif %}
+        <div class="actions">{% if src in ('sms', 'lovemail') %}<button class="btn" type="submit">删除这些</button>{% endif %}
           <button class="btn ghost danger" type="submit" name="all" value="1" onclick="return confirm('删除这里全部 {{ counts[src] }} 张图片？不能撤销。')">全部删除</button>
           <button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
       </form></details></span>{% endif %}</div>

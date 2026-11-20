@@ -78,14 +78,27 @@
       function isGift() { return k.value === 'gift'; }
       var imgF = document.getElementById('imgFile');
       function hasImg() { return !!(imgF && imgF.files && imgF.files.length); }
-      function ready() { return isGift() ? !!gn.value.trim() : (!!t.value.trim() || hasImg()); }
+      // 照片礼物：送礼时附了图，图就是礼物，不走礼品店——礼物名随便写（可以不写），礼品店的按钮收起来
+      var giftImgOk = {{ 'true' if gift_images_ok else 'false' }}, gnLocked = gn.readOnly, gnHint = gn.placeholder,
+          ipBtn = document.getElementById('imgPick');
+      function photoGift() { return isGift() && hasImg(); }
+      function ready() { return isGift() ? (!!gn.value.trim() || photoGift()) : (!!t.value.trim() || hasImg()); }
       function refresh() {
         t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 140) + 'px';
         t.placeholder = isGift() ? '留言（可以不写）' : '短信';
+        if (ipBtn) ipBtn.hidden = isGift() && !giftImgOk;
+        if (photoGift() && [].some.call(pp.querySelectorAll('.preset-item'), function (x) { return x.dataset.name === gn.value; })) gn.value = '';   // 礼品店的礼物不能附图
+        gn.readOnly = gnLocked && !photoGift();
+        gn.placeholder = photoGift() ? '照片礼物的名字（可以不写）' : gnHint;
+        if (po) { po.hidden = photoGift(); if (photoGift()) { pp.hidden = true; po.setAttribute('aria-expanded', 'false'); } }
         f.classList.toggle('gift-mode', isGift()); b.disabled = !ready();
       }
       t.addEventListener('input', refresh); gn.addEventListener('input', refresh);
-      g.addEventListener('click', function () { k.value = isGift() ? 'sms' : 'gift'; refresh(); (isGift() ? gn : t).focus(); });
+      g.addEventListener('click', function () {
+        k.value = isGift() ? 'sms' : 'gift';
+        if (isGift() && !giftImgOk && hasImg()) { imgF.value = ''; document.getElementById('imgChip').hidden = true; }
+        refresh(); (isGift() ? gn : t).focus();
+      });
       if (po) po.addEventListener('click', function () { pp.hidden = !pp.hidden; po.setAttribute('aria-expanded', String(!pp.hidden)); });
       pp.querySelectorAll('.preset-item').forEach(function (x) { x.addEventListener('click', function () { gn.value = x.dataset.name; pp.hidden = true; refresh(); }); });
       f.addEventListener('submit', function () { b.disabled = true; });

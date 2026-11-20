@@ -1,11 +1,10 @@
-"""图片管理：把几处存图的地方放在一起看、删——短信/礼物图片、公知二表图片、出场图片。
-心动信目前不能带图，所以没有这一项。"""
+"""图片管理：把几处存图的地方放在一起看、删——短信/礼物图片、心动信图片、公知二表图片、出场图片、朋友圈图片。"""
 import re
 
 from . import msgimages, sheets
 from .db import get_conn
 
-SOURCES = [("sms", "短信与礼物"), ("sheet", "公知、二表"), ("entrance", "出场"), ("moments", "朋友圈")]
+SOURCES = [("sms", "短信与礼物"), ("lovemail", "心动信"), ("sheet", "公知、二表"), ("entrance", "出场"), ("moments", "朋友圈")]
 KIND_NAME = {"gongzhi": "公知", "erbiao": "二表"}
 _NAME_RE = re.compile(r"^[A-Za-z0-9_.\-]+$")
 
@@ -15,7 +14,7 @@ def valid(src: str) -> bool:
 
 
 def counts() -> dict:
-    out = {"sms": msgimages.stats()["n"]}
+    out = {"sms": msgimages.stats()["n"], "lovemail": msgimages.mail_stats()["n"]}
     with get_conn() as c:
         out["sheet"] = c.execute("SELECT COUNT(*) FROM sheet_images").fetchone()[0]
         out["entrance"] = c.execute("SELECT COUNT(*) FROM entrance_images").fetchone()[0]
@@ -25,7 +24,7 @@ def counts() -> dict:
 
 def sizes() -> dict:
     """各处占的空间（MB）。公知二表的图是文件，按文件大小估。"""
-    out = {"sms": msgimages.stats()["mb"]}
+    out = {"sms": msgimages.stats()["mb"], "lovemail": msgimages.mail_stats()["mb"]}
     with get_conn() as c:
         out["moments"] = round(c.execute("SELECT COALESCE(SUM(size_bytes),0) FROM moment_images WHERE deleted=0").fetchone()[0] / 1048576, 1)
         out["entrance"] = round((c.execute("SELECT COALESCE(SUM(LENGTH(data)),0) FROM entrance_images").fetchone()[0]) / 1048576, 1)
@@ -47,6 +46,10 @@ def listing(src: str, limit: int, offset: int) -> list[dict]:
     if src == "sms":
         return [{"id": r["id"], "title": f"{r['from_name']} → {r['to_name']}", "sub": f"{'礼物' if r['kind'] == 'gift' else '短信'} · {r['content'][:30]}",
                  "ts": r["created_ts"], "size_kb": round(r["size"] / 1024)} for r in msgimages.listing(limit, offset)]
+    if src == "lovemail":
+        wait = {"pool": " · 等待派送", "held": " · 等待派送"}
+        return [{"id": r["id"], "title": f"{r['from_name']} → {r['to_name']}", "sub": f"署名「{r['signature']}」{wait.get(r['status'], '')} · {(r['content'] or '（只有图）')[:30]}",
+                 "ts": r["created_ts"], "size_kb": round(r["size"] / 1024)} for r in msgimages.mail_listing(limit, offset)]
     with get_conn() as c:
         if src == "sheet":
             rows = c.execute("SELECT i.id, i.kind, i.filename, r.name FROM sheet_images i JOIN roles r ON r.id=i.role_id ORDER BY i.id DESC LIMIT ? OFFSET ?", (limit, offset)).fetchall()
@@ -70,6 +73,9 @@ def listing(src: str, limit: int, offset: int) -> list[dict]:
 def raw(src: str, img_id: int) -> tuple[bytes, str] | None:
     if src == "sms":
         r = msgimages.get(img_id)
+        return (r["data"], r["mime"]) if r else None
+    if src == "lovemail":
+        r = msgimages.mail_get(img_id)
         return (r["data"], r["mime"]) if r else None
     if src == "moments":
         from changri.core import moments
@@ -96,6 +102,8 @@ def _drop_sheet_files(c, where: str, args: tuple) -> None:
 def delete(src: str, img_id: int) -> None:
     if src == "sms":
         msgimages.delete(img_id)
+    elif src == "lovemail":
+        msgimages.mail_delete(img_id)
     elif src == "sheet":
         with get_conn() as c:
             _drop_sheet_files(c, "WHERE id=?", (img_id,))
@@ -111,6 +119,8 @@ def delete(src: str, img_id: int) -> None:
 def delete_all(src: str) -> int:
     if src == "sms":
         return msgimages.delete_all()
+    if src == "lovemail":
+        return msgimages.mail_delete_all()
     if src == "moments":
         with get_conn() as c:
             return c.execute("UPDATE moment_images SET deleted=1, data=x'', thumb=x'', size_bytes=0 WHERE deleted=0").rowcount

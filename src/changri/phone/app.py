@@ -303,7 +303,7 @@ def create_phone_app(secret_key: str) -> Flask:
         return page("thread.html", role=role, me=role["name"], other=who["name"], other_id=other, items=items, mode="thread",
                     blocked=blk, can_recall=bool(messaging.last_recallable(role["id"])),
                     items_catalog=gifts.catalog(role["id"]), only_preset=gifts.only_preset(), draft_gift=request.args.get("gift", ""),
-                    allow_sign=get_config("allow_custom_sign", "0") == "1", images_ok=msgimages.enabled(), image_mb=msgimages.max_bytes() // 1024 // 1024)
+                    allow_sign=get_config("allow_custom_sign", "0") == "1", images_ok=msgimages.enabled(), gift_images_ok=msgimages.gift_enabled(), image_mb=msgimages.max_bytes() // 1024 // 1024)
 
     # ---------- 特别的会话：署名、点歌台、偷盗记录、匿名对话（照老系统） ----------
 

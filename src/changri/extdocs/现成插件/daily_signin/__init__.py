@@ -1,8 +1,8 @@
-"""现成插件：每日签到。用到 today_count / today_add（每天一次）、data_get / data_set（记连签）、give_item（发金币）。"""
+"""现成插件：每日签到。用到 today_count / today_add（每天一次）、season_data_get / season_data_set（记连签，收尾时清空）、give_item（发金币）。"""
 import datetime
 
 from changri_api import (Bot, GroupMessageCreateEvent, data_get, data_set, game_day, give_item, item_count, on_command,
-                         register_pending, season_name, sender_role, setting, today_add, today_count)
+                         register_pending, season_data_get, season_data_set, season_name, sender_role, setting, today_add, today_count)
 
 EXT_ID = "daily_signin"
 
@@ -33,8 +33,10 @@ async def _(bot: Bot, event: GroupMessageCreateEvent):
         await signin.finish(f"{role['name']}，今天已经签过了，明天再来。")
 
     now = _today_no()
-    last = data_get(EXT_ID, f"last_{rid}", "")
-    streak = int(data_get(EXT_ID, f"streak_{rid}", 0)) + 1 if _is_next(last, now) else 1
+    last = season_data_get(EXT_ID, f"last_{rid}")
+    if last is None:                        # 1.0 版存在一直留着的数据里：这一季还接着算，签一次就搬过来
+        last = data_get(EXT_ID, f"last_{rid}", "")
+    streak = int(season_data_get(EXT_ID, f"streak_{rid}", data_get(EXT_ID, f"streak_{rid}", 0))) + 1 if _is_next(last, now) else 1
 
     cap = max(1, int(setting(EXT_ID, "streak_cap") or 1))
     amount = max(0, int(setting(EXT_ID, "reward") or 0)) + max(0, int(setting(EXT_ID, "streak_bonus") or 0)) * (min(streak, cap) - 1)
@@ -45,8 +47,10 @@ async def _(bot: Bot, event: GroupMessageCreateEvent):
             await signin.finish(f"签到失败：{msg}（请管理员检查「每日签到」设置里的「发什么」）")
 
     today_add(EXT_ID, "签到", rid)
-    data_set(EXT_ID, f"last_{rid}", now)
-    data_set(EXT_ID, f"streak_{rid}", streak)
+    season_data_set(EXT_ID, f"last_{rid}", now)
+    season_data_set(EXT_ID, f"streak_{rid}", streak)
+    data_set(EXT_ID, f"last_{rid}", None)   # 1.0 版留下的旧记录删掉
+    data_set(EXT_ID, f"streak_{rid}", None)
     tail = f"连续签到 {streak} 天。" if streak > 1 else ""
     await signin.finish(f"✅ {role['name']} 签到成功，获得 {currency}×{amount}。{tail}现在有 {item_count(rid, currency)} 个{currency}。")
 

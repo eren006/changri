@@ -7,8 +7,8 @@ from nonebot.adapters.qq import Bot, GroupMessageCreateEvent
 from nonebot.matcher import current_bot
 from nonebot.params import CommandArg
 
-from changri.core.qqsend import make_send, reply_long  # noqa: E402
-from changri.core import admins, lovemail, messaging, roles, season
+from changri.core.qqsend import download_images, make_send, reply_long  # noqa: E402
+from changri.core import admins, lovemail, messaging, msgimages, roles, season
 from changri.core.announce import get_announce
 from changri.core.db import get_config, get_int, per_bot, set_config
 from changri.core.schedule import run_lovemail_tick
@@ -59,7 +59,18 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
     me = _me(event)
     if not me:
         await post_mail.finish("✨ 你还不是本系统的会员，请先使用「创建新角色」来认领你的身份吧。")
-    receiver, content, signature = lovemail.parse_post(args.extract_plain_text())
+    text = args.extract_plain_text()
+    images, img_note = [], ""
+    if any(seg.type == "image" for seg in event.get_message()):         # 附图：当场下载（QQ 的图片链接会过期）
+        if not msgimages.mail_enabled():
+            await post_mail.finish("⚠️ 现在心动信不能附图片。把图去掉再投一次吧。")
+        images = await download_images(event.get_message(), limit=1, max_bytes=msgimages.max_bytes())
+        if not images:
+            await post_mail.finish(f"⚠️ 图片没下载下来，或者超过了 {msgimages.max_bytes() // 1024 // 1024} MB，这封信没有投出去，换一张再试试。")
+        img_note = "\n🖼 附了一张图，派送时一起送到。"
+    receiver, content, signature = lovemail.parse_post(text)
+    if not receiver and images and len(text.split()) == 1 and "【" not in text:     # 只附图不写字：发送心动信 收信人 + 图
+        receiver = text.strip()
     if not receiver:
         await post_mail.finish("⚠️ 格式错误！请指定发送对象。\n简单写法（署名是你的真名）：发送心动信 角色名 想说的话\n"
                                "想换署名用这种：\n发送心动信\n【发送对象】角色名\n【内容】想说的话\n【署名】自定义昵称（不写就是「匿名」）")
@@ -67,12 +78,12 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
     if not target:
         await post_mail.finish(f"⚠️ 找不到角色「{receiver}」的投递地址，请确认名字是否正确。")
     signature = signature or me["name"]
-    ok, msg, left = lovemail.add_mail(me["id"], target["id"], signature, content)
+    ok, msg, left = lovemail.add_mail(me["id"], target["id"], signature, content, images)
     if not ok:
         await post_mail.finish(msg)
     limit = lovemail.today_limit()
     await post_mail.finish(
-        f"💌 心动信已成功投递至「{target['name']}」的信箱！\n📝 署名：{signature}\n"
+        f"💌 心动信已成功投递至「{target['name']}」的信箱！\n📝 署名：{signature}{img_note}\n"
         + (f"{msg}\n📅 明天剩余次数：{left}/{lovemail.limit_for(lovemail.post_key())}" if msg else f"📅 今日剩余次数：{left}/{limit}")
         + "\n✨ 提示：派送前你仍可以使用「撤回心动信」取消本次投递。" + season.prep_note("还没派送的心动信"))
 
@@ -88,7 +99,8 @@ async def _(event: GroupMessageCreateEvent):
     pool = lovemail.my_pool(me["id"])
     if not pool:
         await my_mails.finish("📭 你目前没有待投递的信件。")
-    text = "📄 你待投递的信件如下：\n" + "".join(f"\n#{i} | 接收者: {m['to_name']}\n内容: {m['content']}\n" for i, m in enumerate(pool, 1))
+    pics = msgimages.mail_ids_by_mail([m["id"] for m in pool])
+    text = "📄 你待投递的信件如下：\n" + "".join(f"\n#{i} | 接收者: {m['to_name']}\n内容: {lovemail.shown_content(m['content'])}{' 📎附图' if pics.get(m['id']) else ''}\n" for i, m in enumerate(pool, 1))
     await reply_long(my_mails, text)
     await my_mails.finish()
 

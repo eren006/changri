@@ -252,5 +252,23 @@ class ChangesTests(unittest.TestCase):
         self.assertEqual([(c["auto"], c["urgent"]) for c in ch], [(False, False), (True, True), (True, False)])
 
 
+class FreshSSLContextTest(unittest.TestCase):
+    """每次联网都现建 SSL context：缺的根证书后来装上了，不重启长日bot 也能认到（Python 3.12 的 urlopen 会沿用第一次建的）。"""
+
+    def test_each_request_gets_new_context(self):
+        seen = []
+
+        def fake_urlopen(req, timeout=None, context=None):
+            seen.append(context)
+            return io.BytesIO(b"{}")
+
+        with mock.patch.object(updater.urllib.request, "urlopen", fake_urlopen):
+            updater._open("https://example.com/latest.json", 5)
+            updater._open("https://example.com/latest.json", 5)
+        self.assertEqual(len(seen), 2)
+        self.assertTrue(all(c is not None for c in seen))
+        self.assertIsNot(seen[0], seen[1])
+
+
 if __name__ == "__main__":
     unittest.main()

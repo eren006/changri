@@ -186,9 +186,14 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, state: T_State):
     p = state["social"]
     kind = p["kind"]
     images = []
-    if msgimages.enabled():                                  # 带图片：当场下载（QQ 的图片链接会过期）
+    had_image = any(seg.type == "image" for seg in event.get_message())
+    if had_image and msgimages.enabled():                    # 带图片：当场下载（QQ 的图片链接会过期）
         images = await download_images(event.get_message(), limit=1, max_bytes=msgimages.max_bytes())
-    if p["bad"] and not (kind == "sms" and p["to"] and images):       # 只有图片没有文字的短信（短信 对象）也算
+    lost_note = ""                                           # 带了图却没带上：要说一声，不然玩家以为图也送到了
+    if had_image and not images:
+        lost_note = ("\n（管理员没有开放图片，这条没带上图片。）" if not msgimages.enabled()
+                     else f"\n⚠️ 图片没带上：下载失败，或者超过了 {msgimages.max_bytes() // 1024 // 1024} MB。")
+    if p["bad"] and not (p["to"] and images):                # 只有图片没有文字的短信（短信 对象）、只有图片的照片礼物（送礼 对象）也算
         await social_msg.finish(forms.TEMPLATES["短信" if kind == "sms" else "送礼"])
     me = roles.find_role_for_sender(bot.self_id, event.group_openid, event.author.member_openid)
     if not me:
@@ -199,7 +204,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, state: T_State):
     if target["id"] == me["id"]:
         await social_msg.finish("不能发给自己。")
     ok, text = await sendmsg.send(me, target, kind, p["gift"], p["content"], p["sign"], _make_send(), images)
-    await social_msg.finish(text + ("\n🖼 图片已一起发送。" if images and ok else "")
+    await social_msg.finish(text + ("\n🖼 图片已一起发送。" if images and ok else "") + lost_note
                             + ("\n（管理员没有开放自定义署名，这条用你的角色名发出。）" if ok and p.get("sign_dropped") else ""))
 
 
@@ -251,7 +256,7 @@ def _received_text(me) -> str:
     rows = gifts.received(me["id"])
     if not rows:
         return "还没有人送过你礼物。"
-    return f"🎁 「{me['name']}」收到过的礼物（共 {sum(r['n'] for r in rows)} 件）：\n" + "\n".join(f"{r['title']} ×{r['n']}" for r in rows)
+    return f"🎁 「{me['name']}」收到过的礼物（共 {sum(r['n'] for r in rows)} 件）：\n" + "\n".join(f"{'📷 ' if r['photo'] else ''}{r['title']} ×{r['n']}" for r in rows)
 
 
 @album.handle()

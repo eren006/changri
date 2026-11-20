@@ -10,7 +10,9 @@ def register(app, login_required):
     @app.route("/lovemail")
     @login_required
     def lovemail_page():
-        return render_template("lovemail.html", pool=lovemail_core.pool_all(), announce=get_announce(),
+        from changri.core import msgimages
+        pool = lovemail_core.pool_all()
+        return render_template("lovemail.html", pool=pool, pics=msgimages.mail_ids_by_mail([m["id"] for m in pool]), announce=get_announce(),
                                at=get_config("lovemail_delivery_time", "22:00"), last=get_config("lovemail_last_run", "—"),
                                pending_now=get_config("lovemail_deliver_now", "0") == "1", open_=get_config("lovemail_enabled", "1") != "0")
 

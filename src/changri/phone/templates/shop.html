@@ -27,7 +27,7 @@
     {% endif %}
     <div class="disc-label">收到过的礼物</div>
     {% if album %}<div class="disc-group">
-      {% for a in album %}<div class="row">{{ admin_app_icon('shop') }}<span class="name">{{ a.title }}</span><span class="detail">×{{ a.n }}</span></div>{% endfor %}
+      {% for a in album %}<div class="row">{{ admin_app_icon('shop') }}<span class="name">{% if a.photo %}📷 {% endif %}{{ a.title }}</span><span class="detail">×{{ a.n }}</span></div>{% endfor %}
     </div>{% else %}<div class="empty">还没有人送过你礼物。</div>{% endif %}
   </div>
 {% endblock %}

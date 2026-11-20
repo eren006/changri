@@ -21,6 +21,7 @@ import json
 import os
 import re
 import shutil
+import ssl
 import tarfile
 import tempfile
 import threading
@@ -102,7 +103,13 @@ def _open(url: str, timeout: float, headers: dict | None = None):
     if scheme != "https" and not (_allow_insecure() and scheme in ("file", "http")):
         raise UpdateError("更新地址必须是 https。")
     req = urllib.request.Request(url, headers={"User-Agent": "changri-bot-updater", **(headers or {})})
-    return urllib.request.urlopen(req, timeout=timeout)
+    return urllib.request.urlopen(req, timeout=timeout, context=_ssl_context())
+
+
+def _ssl_context() -> ssl.SSLContext:
+    """每次联网都现建一份：Python 3.12 起 urlopen 不传 context 时，进程里第一次联网建的那份会一直沿用。
+    Windows 服务器上缺的根证书后来被装上了（比如用浏览器打开过一次主页），不现建的话要重启长日bot 才认。"""
+    return ssl.create_default_context()
 
 
 def manifest_url() -> str:
@@ -199,7 +206,7 @@ MIRROR_PREFIX = "https://ghfast.top/"      # 主页把下载跳转到这个 GitH
 def _direct_url(url: str) -> str | None:
     """主页的下载地址若跳转到镜像，返回去掉镜像前缀的直连地址；否则 None。"""
     try:
-        opener = urllib.request.build_opener(_NoRedirect)
+        opener = urllib.request.build_opener(_NoRedirect, urllib.request.HTTPSHandler(context=_ssl_context()))
         opener.open(urllib.request.Request(url, headers={"User-Agent": "changri-bot-updater"}), timeout=15)
     except urllib.error.HTTPError as e:
         loc = e.headers.get("Location", "")

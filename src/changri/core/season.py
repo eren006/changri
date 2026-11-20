@@ -482,7 +482,7 @@ SEASON_CONFIG_KEYS = ("dinner_state", "dessert_game", "ihave_game", "dinner_game
 
 
 def wipe() -> None:
-    """清空本季数据：角色（连带群位、属性、出场、认群码）、短信、拉黑、心动信、关系线。管理员、设置、季度记录都保留。
+    """清空本季数据：角色（连带群位、属性、出场、认群码）、短信、拉黑、心动信、关系线、扩展的本季数据。管理员、设置、季度记录都保留。
     清空之前先给刚结束的那一季存一份档案（房间复盘、统计），之后还能在「季度」页回看。"""
     last = latest_ended()
     if last and get_config("season_wiped", "1") == "0":
@@ -497,6 +497,8 @@ def wipe() -> None:
         conn.execute("DELETE FROM config WHERE key LIKE 'poke_at:%' OR key LIKE 'alarm_last:%'")
     from . import milestone
     milestone.reset()                                                         # 「第 N 次记录」的计数跟着季度清零
+    from . import extdata
+    extdata.clear_season()                                                    # 扩展按季度存的数据（season_data_set）一起清
     set_config("season_wiped", "1")
     set_config("game_day", "")
     set_config("entrance_active", "0")

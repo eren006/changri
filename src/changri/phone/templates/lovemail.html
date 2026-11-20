@@ -21,7 +21,8 @@
       {% for m in recv %}
       {% if loop.first or m.game_day != recv[loop.index0 - 1].game_day %}<div class="stamp"><b>{{ m.game_day or '往期' }}</b></div>{% endif %}
       <article class="lm-letter">
-        <div class="lm-body">{{ m.content }}</div>
+        {% if m.content %}<div class="lm-body">{{ m.content }}</div>{% endif %}
+        {% for i in m.imgs %}<a href="{{ url_for('lovemail_image', img_id=i) }}" target="_blank" rel="noopener"><img class="msg-img lm-img" src="{{ url_for('lovemail_image', img_id=i) }}" alt="信里附的图" loading="lazy"></a>{% endfor %}
         <div class="lm-sig">—— {{ m.signature }}</div>
         {% if m.public %}<div class="tag">{{ phone_symbol('megaphone') }} 派送途中飘落到了公告区</div>{% endif %}
       </article>
@@ -35,7 +36,8 @@
       {% for p in lm.pending %}
       <article class="lm-letter lm-pending">
         <div class="lm-to">寄给 {{ p.to }}{% if p.game_day %} · {{ p.game_day }}{% endif %}</div>
-        <div class="lm-body">{{ p.content }}</div>
+        {% if p.content %}<div class="lm-body">{{ p.content }}</div>{% endif %}
+        {% for i in p.imgs %}<a href="{{ url_for('lovemail_image', img_id=i) }}" target="_blank" rel="noopener"><img class="msg-img lm-img" src="{{ url_for('lovemail_image', img_id=i) }}" alt="信里附的图" loading="lazy"></a>{% endfor %}
         <div class="lm-sig">—— {{ p.signature }}</div>
         {% if true %}
         <form method="post" action="{{ url_for('lovemail_post') }}" onsubmit="return confirm('撤回这封寄给 {{ p.to }} 的信？')">
@@ -51,7 +53,8 @@
       {% if loop.first or m.game_day != sent[loop.index0 - 1].game_day %}<div class="stamp"><b>{{ m.game_day or '往期' }}</b> 已派送</div>{% endif %}
       <article class="lm-letter lm-sent">
         <div class="lm-to">寄给 {{ m.to }}</div>
-        <div class="lm-body">{{ m.content }}</div>
+        {% if m.content %}<div class="lm-body">{{ m.content }}</div>{% endif %}
+        {% for i in m.imgs %}<a href="{{ url_for('lovemail_image', img_id=i) }}" target="_blank" rel="noopener"><img class="msg-img lm-img" src="{{ url_for('lovemail_image', img_id=i) }}" alt="信里附的图" loading="lazy"></a>{% endfor %}
         <div class="lm-sig">—— {{ m.signature }}</div>
         {% if m.public %}<div class="tag">{{ phone_symbol('megaphone') }} 派送途中飘落到了公告区</div>{% endif %}
       </article>
@@ -62,7 +65,7 @@
     {% else %}
       {% if lm.why %}<div class="song-note">{{ lm.why }}</div>{% endif %}
       {% set d = draft or {} %}
-      <form class="song-form" method="post" action="{{ url_for('lovemail_post') }}">
+      <form class="song-form" method="post" action="{{ url_for('lovemail_post') }}"{% if images_ok %} enctype="multipart/form-data"{% endif %}>
         <input type="hidden" name="_csrf" value="{{ csrf() }}">
         <label for="lmTo">寄给</label>
         <select id="lmTo" name="to" required>
@@ -70,7 +73,14 @@
           {% for n in contacts %}<option value="{{ n }}"{% if n == (d.to or preset_to) %} selected{% endif %}>{{ n }}</option>{% endfor %}
         </select>
         <label for="lmContent">想说的话（{{ max_len }} 字内）</label>
-        <textarea id="lmContent" name="content" maxlength="{{ max_len }}" required rows="6">{{ d.content }}</textarea>
+        <textarea id="lmContent" name="content" maxlength="{{ max_len }}"{% if not images_ok %} required{% endif %} rows="6">{{ d.content }}</textarea>
+        {% if images_ok %}
+        <span class="lm-pick-label" id="lmImgHint">附一张图（选填，最大 {{ image_mb }} MB；只附图不写字也行）</span>
+        <div class="lm-pick">
+          <label class="lm-pick-btn"><input id="lmImg" type="file" name="image" accept="image/png,image/jpeg,image/gif,image/webp" aria-describedby="lmImgHint"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><circle cx="9" cy="10.5" r="1.6"/><path d="M4 17l5-4.5 3.5 3 3-2.5 4.5 4"/></svg>选图片</label>
+          <div class="img-chip" id="lmImgChip" hidden><span id="lmImgName"></span><button type="button" id="lmImgClear" aria-label="去掉图片">×</button></div>
+        </div>
+        {% endif %}
         <label for="lmSig">署名（选填，{{ sig_max }} 字内，不写就是「匿名」）</label>
         <input id="lmSig" name="signature" maxlength="{{ sig_max }}" autocomplete="off" placeholder="匿名" value="{{ d.signature }}">
         <button type="submit" class="song-submit"{% if not lm.can %} disabled{% endif %}>投进信箱</button>
@@ -78,5 +88,38 @@
       <p class="song-note">对方只会看到署名，不会知道是你。信会在{{ ' ' ~ lm.delivery_time if lm.delivery_time else '每晚' }} 统一派送，派送前可以在「寄出的」里撤回。群里「发送心动信」和这里共用每天的次数。</p>
     {% endif %}
   </div>
+  {% if view == 'write' and images_ok %}
+  <script>
+    (function () {
+      // 大图先在手机上缩小（最长边 1600、JPEG），省流量也不容易超上限；GIF 动图保持原样。和短信那边一样
+      var f = document.getElementById('lmImg'), chip = document.getElementById('lmImgChip'), nm = document.getElementById('lmImgName');
+      if (!f) return;
+      function show() { var has = !!(f.files && f.files.length); chip.hidden = !has; nm.textContent = has ? '图片：' + f.files[0].name : ''; }
+      document.getElementById('lmImgClear').addEventListener('click', function () { f.value = ''; show(); });
+      f.addEventListener('change', function () {
+        var file = f.files[0];
+        show();
+        if (!window.DataTransfer || !file || !/^image\/(jpeg|png|webp)$/.test(file.type) || file.size <= 300 * 1024) return;
+        var url = URL.createObjectURL(file), im = new Image();
+        im.onload = function () {
+          var r = Math.min(1, 1600 / Math.max(im.width, im.height)), c = document.createElement('canvas');
+          c.width = Math.round(im.width * r); c.height = Math.round(im.height * r);
+          c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+          c.toBlob(function (blob) {
+            URL.revokeObjectURL(url);
+            if (blob && blob.size < file.size) {
+              var dt = new DataTransfer();
+              dt.items.add(new File([blob], file.name.replace(/\.\w+$/, '') + '.jpg', {type: 'image/jpeg'}));
+              f.files = dt.files;
+              show();
+            }
+          }, 'image/jpeg', 0.85);
+        };
+        im.onerror = function () { URL.revokeObjectURL(url); };
+        im.src = url;
+      });
+    })();
+  </script>
+  {% endif %}
 
 {% endblock %}

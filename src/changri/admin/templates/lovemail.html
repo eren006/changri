@@ -31,7 +31,7 @@
   <table class="rt">
     <tr><th>日期</th><th>谁 → 谁</th><th>署名</th><th>内容</th><th></th></tr>
     {% for m in pool %}
-    <tr><td class="tabular">{{ m.day }}</td><td>{{ m.from_name }} → {{ m.to_name }}</td><td>{{ m.signature }}</td><td>{{ m.content }}</td>
+    <tr><td class="tabular">{{ m.day }}</td><td>{{ m.from_name }} → {{ m.to_name }}</td><td>{{ m.signature }}</td><td>{{ m.content or "（一张图片）" }}{% if pics and pics.get(m.id) %} <span class="muted">📎 附图</span>{% endif %}</td>
       <td><form method="post" action="{{ url_for('lovemail_delete', mail_id=m.id) }}" onsubmit="return confirm('删除这封信？')">{{ csrf() }}<button class="linkbtn">删除</button></form></td></tr>
     {% else %}<tr><td colspan="5" class="empty">信池是空的。</td></tr>{% endfor %}
   </table>

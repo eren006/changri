@@ -18,6 +18,11 @@ IP_SERVICES = ("https://api.ipify.org", "https://ifconfig.me/ip", "https://icanh
 
 # ---------- 旧的 .env 来源 ----------
 
+
+# QQ 开放平台里找东西的路径（照 2026-11 的界面写；界面改了就改这里和 admin/templates/_ip_whitelist.html）
+CREDS_PATH = "QQ 开放平台（q.qq.com）「机器人 → 去创建或管理我的 QQ 机器人 → 点你的机器人 → 开发设置」"
+WHITELIST_PATH = "QQ 开放平台（q.qq.com）「机器人 → 去创建或管理我的 QQ 机器人 → 点你的机器人 → 开发设置 → 服务器 IP 白名单 → 添加 IP」"
+
 def _env_bots() -> list[dict]:
     raw = os.environ.get("QQ_BOTS") or dotenv_values(ENV_PATH).get("QQ_BOTS") or "[]"
     try:
@@ -57,7 +62,7 @@ def mask(secret: str) -> str:
 
 def _check_id(app_id: str, secret: str) -> str:
     if not re.fullmatch(r"\d{6,20}", app_id):
-        return "AppID 是一串数字，请从 QQ 开放平台「开发管理 → 开发设置」复制。"
+        return f"AppID 是一串数字，请从 {CREDS_PATH} 复制。"
     if not re.fullmatch(r"[A-Za-z0-9]{16,64}", secret):
         return "AppSecret 看起来不对（应是十几到几十位字母数字），请重新复制。"
     return ""
@@ -171,5 +176,5 @@ def test_credentials(app_id: str, secret: str) -> dict:
         m = re.search(r"\d{1,3}(?:\.\d{1,3}){3}", msg)
         ip = m.group(0) if m else public_ip()
         return {"ok": False, "step": "whitelist", "ip": ip,
-                "message": "密钥是对的，但这台服务器的 IP 还没加进白名单。请到 QQ 开放平台「开发管理 → 开发设置 → IP 白名单」添加" + (f"：{ip}" if ip else "这台服务器的公网 IP") + "，保存后再测一次。"}
+                "message": f"密钥是对的，但这台服务器的 IP 还没加进白名单。请到 {WHITELIST_PATH} 添加" + (f"：{ip}" if ip else "这台服务器的公网 IP") + "，保存后再测一次。"}
     return {"ok": False, "step": "network", "ip": "", "message": f"QQ 返回了意外的结果（{status}）：{msg or text[:120]}"}

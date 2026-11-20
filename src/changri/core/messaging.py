@@ -46,12 +46,12 @@ def daily_limit(kind: str) -> int:
     return get_int("sms_daily_limit" if kind == "sms" else "gift_daily_limit", 0)
 
 
-def queue_message(kind: str, from_id: int, to_id: int, title: str, content: str, sign: str = "", alias_id: int | None = None) -> int:
-    """alias_id：匿名对话的短信，入库时一起写上（分两步写的话，中间那一下会被当成真名短信显示出来）。"""
+def queue_message(kind: str, from_id: int, to_id: int, title: str, content: str, sign: str = "", alias_id: int | None = None, photo: bool = False) -> int:
+    """alias_id：匿名对话的短信，入库时一起写上（分两步写的话，中间那一下会被当成真名短信显示出来）。photo：照片礼物（见 sendmsg.photo_gift）。"""
     with get_conn() as conn:
         cur = conn.execute(
-            "INSERT INTO messages(kind, from_role_id, to_role_id, title, content, created_ts, day, sign, alias_id) VALUES(?,?,?,?,?,?,?,?,?)",
-            (kind, from_id, to_id, title, content, int(time.time()), season.day_key(), sign, alias_id),
+            "INSERT INTO messages(kind, from_role_id, to_role_id, title, content, created_ts, day, sign, alias_id, photo) VALUES(?,?,?,?,?,?,?,?,?,?)",
+            (kind, from_id, to_id, title, content, int(time.time()), season.day_key(), sign, alias_id, int(photo)),
         )
         return cur.lastrowid
 

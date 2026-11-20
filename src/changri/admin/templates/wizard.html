@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from '_ip_whitelist.html' import ip_whitelist_steps %}
 {% block title %}安装向导{% endblock %}
 {% block head %}<style>
 .steps{list-style:none;margin:0;padding:0;max-width:720px}
@@ -25,7 +26,7 @@
     {% if steps[0] %}
       <p class="note">已接入：{{ acc.note or '机器人' }}（AppID {{ acc.app_id }}）。想再接一个，在「机器人接入」页添加。</p>
     {% else %}
-      <p class="note">到 QQ 开放平台（q.qq.com）建好机器人后，在「开发管理 → 开发设置」里找到 AppID 和 AppSecret，填在这里。</p>
+      <p class="note">到 QQ 开放平台（<a href="https://q.qq.com/" target="_blank" rel="noopener">q.qq.com</a>）建好机器人后，点「机器人」→「去创建或管理我的 QQ 机器人」→ 点你的机器人 →「开发设置」，里面有 AppID 和 AppSecret，填在这里。</p>
       <form method="post" action="{{ url_for('bots_add') }}">{{ csrf() }}<input type="hidden" name="next" value="wizard">
         <div class="fields">
           <div><label for="w_id">AppID（一串数字）</label><input id="w_id" type="text" name="app_id" inputmode="numeric" autocomplete="off" required></div>
@@ -44,7 +45,9 @@
     {% elif steps[1] %}<p class="note"><span class="dot ok"></span>机器人在线。</p>
     {% else %}
       {% if result %}<p><span class="dot {{ 'ok' if result.ok else 'bad' }}"></span>{{ result.message }}</p>{% endif %}
-      <p class="note">QQ 要求把这台服务器的公网 IP 加进白名单：开放平台 → 开发管理 → 开发设置 → IP 白名单，添加 <b>{{ result.ip if result and result.ip else (ip or '这台服务器的公网 IP') }}</b>，保存后点下面的按钮再检查。连上后这一步会自动打勾（可能要等几秒，刷新一下）。</p>
+      <p class="note">QQ 要求把这台服务器的公网 IP 加进机器人的白名单，不加机器人回不了话。照下面做：</p>
+      {{ ip_whitelist_steps(result.ip if result and result.ip else ip) }}
+      <p class="note">加好以后点下面的按钮再检查。连上后这一步会自动打勾（可能要等几秒，刷新一下）。</p>
       <form method="post" action="{{ url_for('bots_test', app_id=bid) }}">{{ csrf() }}<input type="hidden" name="next" value="wizard"><button class="btn ghost" type="submit">检查连接</button></form>
     {% endif %}
     </div></li>

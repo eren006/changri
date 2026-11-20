@@ -11,8 +11,6 @@
 from __future__ import annotations
 
 import json
-import re
-import threading
 from typing import Awaitable, Callable
 
 import nonebot
@@ -23,6 +21,7 @@ from nonebot.params import CommandArg  # noqa: F401  拿指令后面跟的文字
 from changri.core import admins as _admins
 from changri.core import attrs as _attrs
 from changri.core import extensions as _ext
+from changri.core import extdata as _extdata
 from changri.core import messaging as _messaging
 from changri.core import roles as _roles
 from changri.core import pending as _pending, season as _season
@@ -35,7 +34,6 @@ from changri.core.db import get_config as _get_config
 from changri.core.db import get_conn as _get_conn
 from changri.core.qqsend import make_send as _make_send
 from changri.core.qqsend import reply_long  # noqa: F401  回复触发指令的人：够长自动发图
-from changri.paths import DATA_DIR as _DATA_DIR
 
 nonebot.require("nonebot_plugin_apscheduler")
 from nonebot_plugin_apscheduler import scheduler  # noqa: E402,F401  定时任务：@scheduler.scheduled_job("interval", seconds=60)
@@ -268,47 +266,23 @@ def day_key() -> str:
 
 # ---------- 扩展自己存数据 ----------
 
-_ID_RE = re.compile(r"^[a-z][a-z0-9_]{1,30}$")
-_data_lock = threading.Lock()
-_MAX_DATA = 2 * 1024 * 1024
-
-
-def _data_file(ext_id: str):
-    if not _ID_RE.match(str(ext_id)):
-        raise ValueError(f"扩展 id 不对：{ext_id!r}")
-    return _DATA_DIR / "ext_data" / f"{ext_id}.json"
-
-
-def _data_load(ext_id: str) -> dict:
-    p = _data_file(ext_id)
-    try:
-        d = json.loads(p.read_text(encoding="utf-8"))
-        return d if isinstance(d, dict) else {}
-    except (OSError, ValueError):
-        return {}
-
-
-def _data_save(ext_id: str, d: dict) -> None:
-    p = _data_file(ext_id)
-    raw = json.dumps(d, ensure_ascii=False)
-    if len(raw.encode("utf-8")) > _MAX_DATA:
-        raise ValueError("扩展数据超过 2MB，请清理旧数据")
-    p.parent.mkdir(parents=True, exist_ok=True)
-    tmp = p.with_suffix(".tmp")
-    tmp.write_text(raw, encoding="utf-8")
-    tmp.replace(p)
+# 存在这个机器人自己的 bots/<AppID>/ext_data/ 里，各机器人互不相通（见 core/extdata.py）
+_data_lock = _extdata.lock
+_data_load = _extdata.load
+_data_save = _extdata.save
 
 
 def data_get(ext_id: str, key: str, default=None):
-    """读扩展自己存的数据（存在数据目录 ext_data/<扩展id>.json，更新主程序、重装扩展都不会丢）。没存过返回 default。
-    例：streak = data_get(EXT_ID, f"连签_{role['id']}", 0)"""
+    """读扩展自己存的数据（每个机器人各存一份，更新主程序、重装扩展都不会丢）。没存过返回 default。
+    这里的数据跨季度一直留着，「收尾」也不清：适合设置、累计的统计这类。跟本季角色有关的（连签、积分、本季排行）用 season_data_get。
+    例：total = data_get(EXT_ID, "累计签到次数", 0)"""
     with _data_lock:
         return _data_load(ext_id).get(str(key), default)
 
 
 def data_set(ext_id: str, key: str, value) -> None:
-    """存一条扩展自己的数据。value 要能存成 JSON（数字、文字、True/False、列表、字典）。value 写 None 就是删掉这条。每个扩展最多 2MB。
-    例：data_set(EXT_ID, f"连签_{role['id']}", streak + 1)"""
+    """存一条扩展自己的数据，跨季度一直留着。value 要能存成 JSON（数字、文字、True/False、列表、字典）。value 写 None 就是删掉这条。每个扩展最多 2MB。
+    例：data_set(EXT_ID, "累计签到次数", total + 1)"""
     json.dumps(value)                       # 存不成 JSON 的东西在这里就报错，不写坏文件
     with _data_lock:
         d = _data_load(ext_id)
@@ -320,10 +294,38 @@ def data_set(ext_id: str, key: str, value) -> None:
 
 
 def data_keys(ext_id: str, prefix: str = "") -> list[str]:
-    """扩展存过的所有键（可只列某个前缀开头的）。
-    例：for k in data_keys(EXT_ID, "连签_"): ..."""
+    """扩展存过的所有键（可只列某个前缀开头的）。只列 data_set 存的，不含 season_data_set 的。
+    例：for k in data_keys(EXT_ID, "统计_"): ..."""
     with _data_lock:
         return sorted(k for k in _data_load(ext_id) if k.startswith(prefix))
+
+
+def season_data_get(ext_id: str, key: str, default=None):
+    """读本季的数据（版本 3）。管理员「收尾」时全部清空，新一季从空的开始；没存过返回 default。
+    角色是一季一季重建的，跟角色有关的东西（连签、积分、本季排行）都存这里，上一季的人不会出现在新一季里。
+    例：streak = season_data_get(EXT_ID, f"连签_{role['id']}", 0)"""
+    with _data_lock:
+        return _data_load(ext_id, True).get(str(key), default)
+
+
+def season_data_set(ext_id: str, key: str, value) -> None:
+    """存一条本季的数据（版本 3），「收尾」时清空。value 写 None 就是删掉这条。和 data_set 的数据分开存，各自最多 2MB。
+    例：season_data_set(EXT_ID, f"连签_{role['id']}", streak + 1)"""
+    json.dumps(value)
+    with _data_lock:
+        d = _data_load(ext_id, True)
+        if value is None:
+            d.pop(str(key), None)
+        else:
+            d[str(key)] = value
+        _data_save(ext_id, d, True)
+
+
+def season_data_keys(ext_id: str, prefix: str = "") -> list[str]:
+    """本季存过的所有键（版本 3），做本季排行时用它列出所有人。
+    例：for k in season_data_keys(EXT_ID, "积分_"): ..."""
+    with _data_lock:
+        return sorted(k for k in _data_load(ext_id, True) if k.startswith(prefix))
 
 
 def today_count(ext_id: str, name: str, role_id: int) -> int:
@@ -348,6 +350,36 @@ def today_add(ext_id: str, name: str, role_id: int, n: int = 1) -> int:
         d[key] = rec
         _data_save(ext_id, d)
         return counts[str(role_id)]
+
+
+# ---------- 定时任务：每个团各跑一遍 ----------
+
+def each_team(fn):
+    """定时任务专用（版本 3）：一台服务器可能接了好几个机器人（好几个团），定时任务本身不知道是替哪个团跑的，
+    只会落在第一个团上。加上它，就对每个启用的团各跑一遍，里面的 all_roles、data_get、season_data_get、announce_group 都是那个团自己的；
+    一个团出错不影响别的团。写在 @scheduler.scheduled_job 下面一行（顺序反了不起作用）。
+    例：@scheduler.scheduled_job("cron", hour=20, minute=0)
+    @each_team
+    async def nightly():
+        for r in all_roles(): ..."""
+    import functools
+    import inspect
+    import logging
+
+    from changri.core import db as _db
+
+    @functools.wraps(fn)
+    async def run_each():
+        for app_id in _db.list_bot_ids():
+            try:
+                with _db.use_bot(app_id):
+                    r = fn()
+                    if inspect.isawaitable(r):
+                        await r
+            except Exception as e:  # noqa: BLE001
+                logging.getLogger("changri.ext").warning(f"[{app_id}] 扩展定时任务 {getattr(fn, '__name__', '?')} 出错：{e}")
+    run_each.__changri_each_team__ = True
+    return run_each
 
 
 # ---------- 自己的设置项（在 manifest.json 的 settings 里声明，设置平台自动出表单） ----------

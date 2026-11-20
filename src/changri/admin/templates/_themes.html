@@ -125,6 +125,9 @@
 .themes button[aria-pressed="true"]{border-color:var(--night-ink)}
 @media (prefers-reduced-motion: reduce){.themes button{transition:none}.themes button:hover{transform:none}}
 #snow,#petals,#fortune{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:60}
+/* 新春的元宝、红包个头大，盖在字上挡视线（作者 2026-11-20 反馈）：压到内容后面，只在页面空白处飘，卡片、侧栏、字都在它上面 */
+#fortune{z-index:0}
+:root[data-theme="newyear"] .shell{position:relative;z-index:1}
 {% endmacro %}
 
 {% macro theme_picker(current) %}
@@ -232,7 +235,8 @@
 /* 新春主题：天上飘元宝、金钱（招财进宝）、红包、小灯笼、金橘、梅花，夹着一闪一闪的金光。
    每样东西开头用 canvas 细细画一次（渐变、描边、高光、投影）存成贴图，之后每帧只贴图，不卡。
    各有各的动法：元宝慢慢摇、金钱翻面、红包像纸一样飘、灯笼摆、金橘转、梅花翻。
-   大小和速度按「远近」配：小的慢、淡，大的快、实，看着有层次。数量按屏幕面积算、有上限，不至于挡字。
+   大小和速度按「远近」配：小的慢、淡，大的快、实，看着有层次。数量按屏幕面积算、有上限。
+   画布在页面内容后面（见上面的 #fortune 样式），只在空白处露出来，不盖字、不盖卡片；颜色也调淡一些，免得抢眼。
    不挡点击；系统设了「减少动态效果」就不飘；标签页切走时暂停。 */
 (function(){
   if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -376,15 +380,15 @@
 
   function make(y){
     var K = pick(), z = .55 + Math.random() * .45;
-    return {K: K, z: z, r: (K.r0 + Math.random() * (K.r1 - K.r0)) * (.7 + .3 * z), x: Math.random() * w, y: y,
+    return {K: K, z: z, r: (K.r0 + Math.random() * (K.r1 - K.r0)) * (.6 + .25 * z), x: Math.random() * w, y: y,
             vy: (.35 + .5 * z) * K.fall, ph: Math.random() * TAU, rot: (Math.random() - .5) * .6, vr: (Math.random() - .5) * .025,
-            fl: Math.random() * TAU, vf: .035 + Math.random() * .035, a: .62 + .36 * z};
+            fl: Math.random() * TAU, vf: .035 + Math.random() * .035, a: .45 + .3 * z};
   }
   function makeGlint(y){ return {x: Math.random() * w, y: y, s: 2 + Math.random() * 2.6, vy: .2 + Math.random() * .3, ph: Math.random() * TAU, sp: .03 + Math.random() * .04}; }
   function size(){
     dpr = Math.min(window.devicePixelRatio || 1, 2); w = innerWidth; h = innerHeight;
     cv.width = w * dpr; cv.height = h * dpr; cx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    var want = Math.max(5, Math.min(16, Math.round(w * h / 70000)));
+    var want = Math.max(4, Math.min(12, Math.round(w * h / 90000)));
     while (items.length < want) items.push(make(Math.random() * h));
     items.length = want;
     var wg = Math.round(want * .8);

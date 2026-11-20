@@ -148,9 +148,9 @@ def unlock(role_id: int, item_id: int) -> bool:
 
 
 def heat() -> dict[str, int]:
-    """礼物名 → 被送出去的次数（热度）。"""
+    """礼物名 → 被送出去的次数（热度）。照片礼物不算（名字是玩家随便起的）。"""
     with get_conn() as c:
-        return {r[0]: r[1] for r in c.execute("SELECT title, COUNT(*) FROM messages WHERE kind='gift' AND status='sent' GROUP BY title")}
+        return {r[0]: r[1] for r in c.execute("SELECT title, COUNT(*) FROM messages WHERE kind='gift' AND status='sent' AND photo=0 GROUP BY title")}
 
 
 def refresh_hours() -> int:
@@ -217,11 +217,11 @@ def grant(role_id: int, n: int | None = 1) -> list[dict]:
 
 
 def received(role_id: int) -> list:
-    """我收到过的礼物（已送达的），按礼物名合并：名字、数量、最近一次是谁送的。"""
+    """我收到过的礼物（已送达的），按礼物名合并：名字、数量、最近一次是谁送的。照片礼物和同名的普通礼物分开算（photo=1）。"""
     with get_conn() as conn:
         return conn.execute(
-            "SELECT m.title AS title, COUNT(*) AS n, MAX(m.id) AS last_id FROM messages m "
-            "WHERE m.to_role_id=? AND m.kind='gift' AND m.status='sent' AND m.error!='已撤回' GROUP BY m.title ORDER BY last_id DESC",
+            "SELECT m.title AS title, m.photo AS photo, COUNT(*) AS n, MAX(m.id) AS last_id FROM messages m "
+            "WHERE m.to_role_id=? AND m.kind='gift' AND m.status='sent' AND m.error!='已撤回' GROUP BY m.title, m.photo ORDER BY last_id DESC",
             (role_id,)).fetchall()
 
 

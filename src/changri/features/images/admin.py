@@ -15,7 +15,7 @@ def register(app, login_required):
         per = 48
         rows = imagemgr_core.listing(src, per + 1, (page - 1) * per)
         return render_template("images.html", src=src, sources=imagemgr_core.SOURCES, counts=imagemgr_core.counts(), sizes=imagemgr_core.sizes(),
-                               rows=rows[:per], page=page, more=len(rows) > per, mom_quota=get_config("moment_image_quota", "20"), mom_mb=get_config("moment_total_mb", "300"), sms_on=msgimages_core.enabled(), max_mb=msgimages_core.max_bytes() // 1024 // 1024)
+                               rows=rows[:per], page=page, more=len(rows) > per, mom_quota=get_config("moment_image_quota", "20"), mom_mb=get_config("moment_total_mb", "300"), sms_on=msgimages_core.enabled(), mail_on=msgimages_core.mail_enabled(), max_mb=msgimages_core.max_bytes() // 1024 // 1024)
 
     @app.route("/images/<src>/<int:img_id>/raw")
     @login_required
@@ -57,6 +57,8 @@ def register(app, login_required):
             n = imagemgr_core.delete_all(src)
         elif src == "sms" and days and days > 0:
             n = msgimages_core.delete_older_than(days)
+        elif src == "lovemail" and days and days > 0:
+            n = msgimages_core.mail_delete_older_than(days)          # 还没派送的信的图不删
         else:
             flash("要写清楚清理几天前的，或者选「全部删除」")
             return redirect(url_for("images_page", src=src))

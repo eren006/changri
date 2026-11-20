@@ -49,6 +49,35 @@ class AdminMultiBot(unittest.TestCase):
         self.assertEqual(self.c.get("/b/111111/images/sms/999/raw").status_code, 404)
         self.assertEqual(self.c.post("/b/111111/images/purge", data={"src": "sms", "_csrf": self._csrf("/b/111111/images")}).status_code, 302)
 
+    def test_ip_whitelist_steps(self):
+        """「机器人接入」页和安装向导第 2 步都有加白名单的分步说明，带这台服务器的 IP 和复制按钮。"""
+        if type(self) is not AdminMultiBot:
+            return
+        from unittest import mock
+        with mock.patch("changri.core.botconf.public_ip", return_value="1.2.3.4"):
+            h = self.c.get("/bots").get_data(as_text=True)
+        for s in ("去创建或管理我的 QQ 机器人", "开发设置", "服务器 IP 白名单", "添加 IP", 'data-ip="1.2.3.4"', 'id="ip-whitelist"'):
+            self.assertIn(s, h)
+        from flask import render_template
+        with self.app.test_request_context("/wizard"):
+            w = render_template("wizard.html", acc={"note": "", "app_id": "111111"}, bid="111111", online=False, n_admins=0, n_roles=0, phone_on=False,
+                                steps=[True, False, False, False, False], cur=1, ip="5.6.7.8", result=None)
+        self.assertIn("服务器 IP 白名单", w)
+        self.assertIn('data-ip="5.6.7.8"', w)
+        self.assertNotIn("开发管理", w)
+
+    def test_stray_login_url_redirects(self):
+        """网址后面多带了 login：跳到登录页 / 首页，不报 404、405。POST 照旧报错。"""
+        if type(self) is not AdminMultiBot:
+            return
+        for p, to in (("/login/", "/"), ("/loginlogin", "/"), ("/b/111111/login/", "/b/111111/"), ("/b/111111/settings/login", "/b/111111/")):
+            r = self.c.get(p)
+            self.assertEqual((r.status_code, r.headers["Location"]), (302, to), p)
+        out = self.app.test_client()
+        r = out.get("/b/111111/settingslogin")
+        self.assertEqual((r.status_code, r.headers["Location"]), (302, "/b/111111/login"))
+        self.assertEqual(out.get("/nothing-here").status_code, 404)
+
     def test_tools_page(self):
         if type(self) is not AdminMultiBot:
             return

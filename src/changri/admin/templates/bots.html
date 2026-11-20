@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from '_ip_whitelist.html' import ip_whitelist_steps %}
 {% block title %}机器人{% endblock %}
 {% block body %}
 {% import "_rpg_icons.html" as ic %}
@@ -25,7 +26,7 @@
           <div><label for="asec">AppSecret</label><input id="asec" type="password" name="secret" autocomplete="off" required></div>
           <div><label for="anote">备注（选填）</label><input id="anote" type="text" name="note" maxlength="30"></div>
         </div>
-        <p class="note">两项都在 QQ 开放平台的「开发管理 → 开发设置」里。保存后会马上检查：密钥对不对、这台服务器的 IP 有没有加进白名单。</p>
+        <p class="note">两项都在 QQ 开放平台：「机器人」→「去创建或管理我的 QQ 机器人」→ 点你的机器人 →「开发设置」。保存后会马上检查：密钥对不对、这台服务器的 IP 有没有加进白名单（怎么加见本页下面）。</p>
         <div class="actions"><button class="btn" type="submit">保存并检查</button><button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
       </form></details></span>{% endif %}</div>
   {% if accounts %}
@@ -68,7 +69,8 @@
 <section>
   <h2>接入前要在 QQ 开放平台做的事</h2>
   <ol class="note">
-    <li><b>【必做】把这台服务器的公网 IP 加进白名单：{% if ip %}<span class="tabular">{{ ip }}</span>{% else %}（这里没能自动查到，可在服务器上用浏览器搜「IP」查看）{% endif %}。位置是「开发管理 → 开发设置 → IP 白名单」。不加的话机器人连不上。</b></li>
+    <li id="ip-whitelist"><b>【必做】把这台服务器的公网 IP 加进白名单</b>，不加的话机器人回不了话：
+      {{ ip_whitelist_steps(ip) }}</li>
     <li>（可选）在「沙箱配置」里添加你的测试群和测试用户（机器人没上线前只能在沙箱里用）。</li>
     <li>（可选，了解一下就行）每个机器人看到的群和用户标识各自独立，所以同一个玩家在两个机器人下需要各认一次群、各认一次管理员。角色、短信、心动信、关系线是全团共用的。</li>
   </ol>

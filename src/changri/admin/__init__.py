@@ -207,6 +207,17 @@ def create_app() -> Flask:
             flash("账号或密码不对。")
         return render_template("login.html")
 
+    def _stray_login(err):
+        """网址后面不小心多带了 login（/login/、/loginlogin、/settings/login、收藏夹里存的旧链接……）：
+        不报 400 / 404 / 405，直接跳到登录页（已经登录的跳到首页）。只管 GET，表单提交照旧报错，免得吞掉真正的问题。"""
+        last = request.path.rstrip("/").rsplit("/", 1)[-1].lower()
+        if request.method == "GET" and "login" in last and request.path != "/login":
+            return redirect(url_for("dashboard") if session.get("uid") else url_for("login"))
+        return err
+
+    for _code in (400, 404, 405):
+        app.register_error_handler(_code, _stray_login)
+
     @app.post("/logout")
     def logout():
         session.clear()

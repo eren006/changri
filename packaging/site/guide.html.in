@@ -729,7 +729,7 @@ article h2 .n::after{top:-9px;width:6px;height:7px}
         <li><b>用常用的 QQ 号登录</b>用你平时用的大号扫码登录、注册，<b>不要用小号</b>。以后机器人归这个号管。</li>
         <li><b>按页面步骤完成注册</b>主体类型选「<b>个人</b>」。</li>
         <li><b>超级管理员认证</b>填你自己的身份信息（真实姓名、身份证等）。</li>
-        <li><b>创建机器人</b>注册好后创建一个机器人，在「开发管理 → 开发设置」里找到 AppID 和 AppSecret，复制下来，第一次使用时要填。</li>
+        <li><b>创建机器人</b>注册好后创建一个机器人。点「机器人」→「去创建或管理我的 QQ 机器人」→ 点你的机器人 →「开发设置」，里面有 AppID 和 AppSecret，复制下来，第一次使用时要填。</li>
       </ol>
 
       <h2 id="i-setup"><span class="n">03</span>安装</h2>
@@ -758,9 +758,20 @@ article h2 .n::after{top:-9px;width:6px;height:7px}
       <ol class="steps">
         <li><b>放行端口</b>需要云服务商控制台的「安全组 / 防火墙」放行 TCP <code>5091</code> 和 <code>5092</code>（小手机默认开着） 端口。</li>
         <li><b>打开设置平台</b>浏览器访问 <code>http://服务器公网IP:5091</code>，输入安装时显示的验证码，建管理账号。</li>
-        <li><b>跟着向导走</b>填 AppID / AppSecret → 把服务器 IP 加进 QQ 开放平台的 IP 白名单 → 设 QQ 管理员 → 建第一个角色 →（可选）开小手机。</li>
+        <li><b>跟着向导走</b>填 AppID / AppSecret → 把服务器 IP 加进 QQ 开放平台的 IP 白名单（<a href="#/install#i-ip">怎么加</a>）→ 设 QQ 管理员 → 建第一个角色 →（可选）开小手机。</li>
         <li><b>测一下</b>在群里对机器人发 <code>/ping</code>，回「收到」就通了。</li>
       </ol>
+
+      <h3 id="i-ip">把服务器 IP 加进 QQ 机器人的白名单</h3>
+      <p>QQ 只让白名单里的服务器替机器人说话。不加的话，机器人收得到群里的指令，但回不了话。</p>
+      <ol class="steps">
+        <li><b>登录 QQ 开放平台</b>打开 <a href="https://q.qq.com/" rel="noopener" target="_blank">q.qq.com</a>，用创建机器人的那个 QQ 登录。</li>
+        <li><b>进到机器人管理</b>点「<b>机器人</b>」，再点蓝色的「<b>去创建或管理我的 QQ 机器人</b>」。</li>
+        <li><b>选机器人</b>在列表里点你要用的那个机器人。</li>
+        <li><b>打开开发设置</b>点「<b>开发设置</b>」。</li>
+        <li><b>添加 IP</b>往下找到「<b>服务器 IP 白名单</b>」，点右边的「<b>＋ 添加 IP</b>」，填你服务器的<b>公网 IP</b>，保存。</li>
+      </ol>
+      <div class="callout"><p>填的是 IP（四组数字，像 <code>1.2.3.4</code>），不要带 <code>http://</code> 和端口。不知道是多少：设置平台「机器人接入」页会显示，也可以到云服务商控制台的服务器详情里看「公网 IP」。服务器换了 IP（换服务器、重装、家里宽带重新拨号）要回来再加一次。</p></div>
 
       <h3 id="i-modes">约会房间用的群：选哪种模式、怎么设</h3>
       <p>约会、电话这些房间要从备用群里领一个群。管这些群有两种模式：</p>
@@ -870,8 +881,8 @@ article h2 .n::after{top:-9px;width:6px;height:7px}
 4. 按页面上的步骤一步一步完成注册。要选主体类型的时候选「个人」。
 5. 超级管理员认证：填我自己的真实身份信息（姓名、身份证号等），可能还要手机 QQ 刷脸或扫码确认。
 6. 注册完成后，创建一个机器人：填名字、头像、简介。每填一页都让我截图给你看。
-7. 找到「开发管理 → 开发设置」，里面有 AppID 和 AppSecret。AppSecret 可能要点「生成」或「查看」才显示。让我把这两样都复制到备忘录里存好，并提醒我 AppSecret 和密码一样，不要发给别人。
-8. 还是在「开发管理 → 开发设置」里，找到「IP 白名单」，点添加，把第一部分记下的公网 IP 填进去，保存。告诉我：这一步必须做，不做机器人就连不上。
+7. 点「机器人」→ 蓝色的「去创建或管理我的 QQ 机器人」→ 点刚建好的机器人 →「开发设置」，里面有 AppID 和 AppSecret。AppSecret 可能要点「生成」或「查看」才显示。让我把这两样都复制到备忘录里存好，并提醒我 AppSecret 和密码一样，不要发给别人。
+8. 还是在「开发设置」这一页，往下找到「服务器 IP 白名单」，点右边的「+ 添加 IP」，把第一部分记下的公网 IP 填进去（只填数字，不要带 http:// 和端口），保存。告诉我：这一步必须做，不做机器人就连不上。
 
 第三部分：在服务器上装长日bot（只讲第一部分判断出来的那一种系统，另一种不要讲，免得我混乱）
 
@@ -1231,7 +1242,7 @@ article h2 .n::after{top:-9px;width:6px;height:7px}
       <h1 class="ptitle">常见问题</h1>
       <p class="psub">遇到问题先跑一次自检：Linux <code>sudo /opt/changri-bot/changri doctor</code>，Windows 双击 <code>Doctor.bat</code>。</p>
       <h2 id="f-run"><span class="n">01</span>运行</h2>
-      <details class="qa"><summary>机器人一直不在线</summary><div>多半是 IP 白名单没加对。后台「机器人接入」点「检查连接」，它会告诉你该把哪个 IP 加进 QQ 开放平台。</div></details>
+      <details class="qa"><summary>机器人一直不在线 / 不回话</summary><div>多半是 IP 白名单没加对，照<a href="#/install#i-ip">这一节</a>加。后台「机器人接入」点「检查连接」，它会告诉你该加哪个 IP。</div></details>
       <details class="qa"><summary>打不开设置平台</summary><div>检查云服务商安全组是否放行了 TCP 5091；Linux 用 <code>systemctl status changri-bot</code> 看服务是否在跑。</div></details>
       <details class="qa"><summary>玩家打不开小手机</summary><div>后台「小手机」页点「检查玩家能不能打开」。没通就是安全组没放行 5092。所有机器人共用这一个端口，玩家用激活码登录会自动进到自己的机器人。</div></details>
       <details class="qa"><summary>一台服务器能跑几个机器人？</summary><div>可以同时接好几个，每个机器人是一套独立的系统，各管各的数据，在设置平台里增删即可，不用重启。</div></details>

@@ -85,7 +85,7 @@ class ApiV2Tests(unittest.TestCase):
         self.b = roles.get_role_by_name("乙")["id"]
 
     def test_version(self):
-        self.assertEqual(api.API_VERSION, 2)
+        self.assertEqual(api.API_VERSION, 3)
 
     def test_role_by_id(self):
         self.assertEqual(api.role_by_id(self.a)["name"], "甲")
@@ -166,6 +166,38 @@ class ApiV2Tests(unittest.TestCase):
         with mock.patch("changri.core.season.day_key", return_value="另一天"):          # 换天归零
             self.assertEqual(api.today_count("my_ext", "签到", self.a), 0)
             self.assertEqual(api.today_add("my_ext", "签到", self.a), 1)
+
+    def test_season_data_cleared_on_wrap_up(self):
+        """本季数据（season_data_*）和一直留着的数据分开存；收尾（season.wipe）只清本季的。"""
+        from changri.core import season
+        api.season_data_set("my_ext", f"连签_{self.a}", 4)
+        api.data_set("my_ext", "累计", 9)
+        self.assertEqual(api.season_data_get("my_ext", f"连签_{self.a}"), 4)
+        self.assertEqual(api.season_data_keys("my_ext"), [f"连签_{self.a}"])
+        self.assertNotIn(f"连签_{self.a}", api.data_keys("my_ext"))                    # 两种分开
+        season.wipe()
+        self.assertIsNone(api.season_data_get("my_ext", f"连签_{self.a}"))
+        self.assertEqual(api.season_data_keys("my_ext"), [])
+        self.assertEqual(api.data_get("my_ext", "累计"), 9)                             # 一直留着的不清
+        api.data_set("my_ext", "累计", None)
+        with self.assertRaises(ValueError):
+            api.season_data_get("../evil", "k")
+
+    def test_each_team_runs_once_per_bot(self):
+        """定时任务加 @each_team：每个启用的机器人各跑一遍，里面读到的是那个机器人的；同步函数也行，一个出错不影响别的。"""
+        from unittest import mock
+        seen = []
+
+        @api.each_team
+        def job():
+            from changri.core import db
+            seen.append(db.current_bot())
+            if db.current_bot() == "222":
+                raise RuntimeError("坏了")
+
+        with mock.patch("changri.core.db.list_bot_ids", return_value=["111", "222", "333"]):
+            asyncio.run(job())
+        self.assertEqual(seen, ["111", "222", "333"])
 
 
 class ApiReferenceTests(unittest.TestCase):

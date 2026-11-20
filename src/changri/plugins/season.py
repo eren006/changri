@@ -155,7 +155,7 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
         await wipe_cmd.finish("❌ 季度还在进行中，先「结束季度」。")
     if args.extract_plain_text().strip() != "确认":
         pv = "、".join(f"{k}{v}" for k, v in season.wipe_preview().items())
-        await wipe_cmd.finish(f"⚠️ 收尾会清空：{pv}；还有晚餐小游戏和没执行的计划官约。\n"
+        await wipe_cmd.finish(f"⚠️ 收尾会清空：{pv}；还有晚餐小游戏、没执行的计划官约、插件的本季数据。\n"
                               "房间的戏录会先存进往季档案；论坛帖子、信件、心愿不存档，要留的先自己存。\n"
                               "管理员、设置、季度记录会保留。确认请发「收尾 确认」。")
     season.wipe()

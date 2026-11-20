@@ -5,6 +5,7 @@
 在线更新只覆盖核心代码，不碰 extensions/，所以用户的自定义不会被更新冲掉。
 """
 import ast
+import hashlib
 import io
 import json
 import os
@@ -20,7 +21,7 @@ from .db import get_config, set_config
 
 from ..paths import APP_ROOT as ROOT, DATA_DIR, EXT_DOCS_DIR, PKG_DIR
 USER_DIR = Path(os.environ.get("CHANGRI_EXT_DIR") or DATA_DIR / "extensions")     # 用户扩展算数据：更新程序不碰
-API_VERSION = 2
+API_VERSION = 3
 
 # 核心：别的功能的地基，不能关
 CORE_MODULES = ["changri.plugins.ping", "changri.plugins.botsync", "changri.plugins.social", "changri.plugins.charcard", "changri.plugins.core_admin", "changri.plugins.season", "changri.plugins.play", "changri.plugins.autoreply", "changri.plugins.trpg", "changri.plugins.trpglog", "changri.plugins.prefix", "changri.plugins.qqwatch", "changri.plugins.msgmon", "changri.plugins.decks"]  # 季度与游戏天数是地基：短信礼物、心动信的每日次数都按它算「今天」
@@ -181,8 +182,63 @@ def _dotted(n) -> str:
     return ".".join(reversed(parts))
 
 
-def check_code(files: dict[str, bytes]) -> tuple[list[str], list[str]]:
-    """检查扩展里的 .py。返回 (错误, 警告)：有错误就不让装；警告只是提醒，扩展本来就有完整权限。"""
+# 存数据的规矩（版本 3 起）：跟角色有关的数据要用 season_data_set（收尾清空），不能用 data_set（一直留着）。
+# 角色每季重建：按角色编号存进 data_set 的数据新一季没人用、一直堆到 2MB；按角色名存的会被新一季同名的人接上。
+_ROLE_WORDS = {"rid", "role_id", "roleid", "role_name", "uid", "target_id", "who_id"}
+_SEASON_FUNCS = {"season_data_get", "season_data_set", "season_data_keys"}
+
+
+def _mentions_role(expr) -> bool:
+    """键的写法里带了角色：role["id"]、r["name"]、rid、role_id、xxx_role……"""
+    for c in ast.walk(expr):
+        if isinstance(c, ast.Subscript) and isinstance(c.slice, ast.Constant) and c.slice.value in ("id", "name"):
+            return True
+        if isinstance(c, ast.Name) and (c.id in _ROLE_WORDS or "role" in c.id.lower()):
+            return True
+    return False
+
+
+def _job_rule_issues(path: str, n, api: int | None) -> list[str]:
+    """定时任务要加 @each_team（写在 @scheduler.scheduled_job 下面）：不加只会替第一个团跑，别的团的玩家什么都收不到、数据也对不上。"""
+    names = [_dotted(d.func if isinstance(d, ast.Call) else d).rsplit(".", 1)[-1] for d in n.decorator_list]
+    out = []
+    if "each_team" in names and api is not None and api < 3:
+        out.append(f"{path} 第 {n.lineno} 行用了 each_team：这是接口版本 3 的，manifest.json 要写 \"api\": 3")
+    if "scheduled_job" not in names:
+        return out
+    job = names.index("scheduled_job")
+    if "each_team" not in names:
+        out.append(f"{path} 第 {n.lineno} 行：定时任务 {n.name} 没加 @each_team。一台服务器可能有好几个团，不加只会替第一个团跑；"
+                   "在 @scheduler.scheduled_job(...) 下面一行加 @each_team")
+    elif names.index("each_team") < job:
+        out.append(f"{path} 第 {n.lineno} 行：定时任务 {n.name} 的 @each_team 要写在 @scheduler.scheduled_job(...) 下面一行，顺序反了不起作用")
+    return out
+
+
+def _data_rule_issues(path: str, tree, api: int | None) -> list[str]:
+    out = []
+    for n in ast.walk(tree):
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            out += _job_rule_issues(path, n, api)
+            continue
+        if not isinstance(n, ast.Call):
+            continue
+        name = _dotted(n.func).rsplit(".", 1)[-1]
+        if name == "data_set":
+            key = n.args[1] if len(n.args) > 1 else next((k.value for k in n.keywords if k.arg == "key"), None)
+            val = n.args[2] if len(n.args) > 2 else next((k.value for k in n.keywords if k.arg == "value"), None)
+            deleting = isinstance(val, ast.Constant) and val.value is None          # data_set(..., None) 是删旧记录，正是要的
+            if key is not None and not deleting and _mentions_role(key):
+                out.append(f"{path} 第 {n.lineno} 行：data_set 按角色存数据。角色每季重建，跟角色有关的要用 season_data_set（「收尾」时自动清空），"
+                           "不然上一季的数据会一直留着、新一季同名的人还会接上；真要跨季度留着的，别按角色存")
+        elif name in _SEASON_FUNCS and api is not None and api < 3:
+            out.append(f"{path} 第 {n.lineno} 行用了 {name}：这是接口版本 3 的，manifest.json 要写 \"api\": 3")
+    return out
+
+
+def check_code(files: dict[str, bytes], api: int | None = None, strict: bool = True) -> tuple[list[str], list[str]]:
+    """检查扩展里的 .py。返回 (错误, 警告)：有错误就不让装；警告只是提醒，扩展本来就有完整权限。
+    api：manifest 里写的接口版本。strict=False（已经装好的扩展重新扫描时）：存数据的规矩只标黄，不把已经在用的扩展判成坏的。"""
     errors: list[str] = []
     warns: list[str] = []
     reserved = reserved_commands()
@@ -197,6 +253,7 @@ def check_code(files: dict[str, bytes]) -> tuple[list[str], list[str]]:
         except UnicodeDecodeError:
             errors.append(f"{path} 不是 UTF-8 编码")
             continue
+        (errors if strict else warns).extend(_data_rule_issues(path, tree, api))
         for n in ast.walk(tree):
             if isinstance(n, ast.Call):
                 name = _dotted(n.func)
@@ -235,6 +292,13 @@ def check_code(files: dict[str, bytes]) -> tuple[list[str], list[str]]:
     return errors[:20], list(dict.fromkeys(warns))[:20]
 
 
+def _api_of(m: dict) -> int:
+    try:
+        return int(m.get("api", 1))
+    except (TypeError, ValueError):
+        return 1
+
+
 def _folder_files(d: Path) -> dict[str, bytes]:
     out = {}
     for f in d.rglob("*.py"):
@@ -259,7 +323,7 @@ def scan_user() -> list[dict]:
         m = dict(m)
         st = mf.stat()
         m.update(kind="user", path=str(d), error=err, installed_ts=int(d.stat().st_ctime), updated_ts=int(st.st_mtime))
-        m["code_errors"], m["warnings"] = check_code(_folder_files(d))
+        m["code_errors"], m["warnings"] = check_code(_folder_files(d), _api_of(m), strict=False)
         if m["code_errors"] and not err:
             err = "代码检查没通过：" + m["code_errors"][0]
             m["error"] = err
@@ -352,7 +416,7 @@ def install_zip(data: bytes, replace: bool = False) -> tuple[bool, str]:
     if (prefix + "__init__.py") not in [n.replace("\\", "/") for n in names]:
         return False, "缺少 __init__.py。"
     files = {n.replace("\\", "/")[len(prefix):]: z.read(n) for n in names if n.replace("\\", "/").startswith(prefix) and n.endswith(".py")}
-    errs, warns = check_code(files)
+    errs, warns = check_code(files, _api_of(m))
     if errs:
         return False, "代码检查没通过，没有安装：\n" + "\n".join(errs)
     ext_id = m["id"]
@@ -404,6 +468,12 @@ def load_all() -> dict[str, str]:
     import nonebot
 
     set_config("ext_pending_restart", "0")
+    try:
+        for ext_id in upgrade_ready_made():                 # 在加载用户扩展之前换，这次启动就用上新版
+            import logging
+            logging.getLogger(__name__).info("[扩展] 现成插件 %s 已自动更新到新版", ext_id)
+    except Exception:  # noqa: BLE001  换不成功就照旧用老版本
+        pass
     for mod in CORE_MODULES:
         nonebot.load_plugin(mod)
     failed: dict[str, str] = {}
@@ -488,10 +558,10 @@ def ai_prompt() -> str:
         "- 玩家发什么指令触发（写出完整的例子）：\n"
         "- 发了之后机器人怎么回（成功、失败、参数不对时各回什么）：\n"
         "- 需要在设置平台里调的选项（每项写：人话名字、类型 string/text/int/bool/choice、默认值、一句说明；数字可以写单位）：\n"
-        "- 需要用到的角色信息、属性、天数、定时任务等（只能用 changri_api 里有的：玩家清单 all_roles、属性 get_attr/set_attr、金币和道具 item_count/give_item/take_item、地点、关系线、每日次数 today_count/today_add、自己存数据 data_get/data_set、天数等；商城上架、心动信目前没有接口，不要自己读数据库）：\n\n"
+        "- 需要用到的角色信息、属性、天数、定时任务等（只能用 changri_api 里有的：玩家清单 all_roles、属性 get_attr/set_attr、金币和道具 item_count/give_item/take_item、地点、关系线、每日次数 today_count/today_add、自己存数据 data_get/data_set（跨季度一直留着）和 season_data_get/season_data_set（本季的，收尾清空；跟角色有关的存这里）、天数等；商城上架、心动信目前没有接口，不要自己读数据库）：\n\n"
         "========== 输出要求 ==========\n"
         "1. 只输出两个代码块，分别标明文件名 manifest.json 和 __init__.py，不要多余的解释（第 8 条的提醒除外）。\n"
-        "2. manifest.json 的 id 用小写字母、数字、下划线，字母开头；用到规范里标 ★ 的接口时写 \"api\": 2。\n"
+        "2. manifest.json 的 id 用小写字母、数字、下划线，字母开头；用到规范里标 ★ 的接口时写 \"api\": 2，用到 season_data_get / season_data_set / season_data_keys / each_team 时写 \"api\": 3。\n"
         "3. 只从 changri_api 导入，不要 import core / plugins / admin。\n"
         "4. 不能用 sys.exit / os._exit / time.sleep / requests；等待用 await asyncio.sleep，联网用 httpx 异步。\n"
         "5. 指令名不要和主程序已有的重名（约会、私约、电话、时间线、心愿、发帖、短信、送礼 等）。\n"
@@ -499,6 +569,11 @@ def ai_prompt() -> str:
         "7. 凡是玩家/管理员可能想调的数字、开关、文字（次数上限、冷却、开关、回复内容……），不要写死在代码里：写进 manifest.json 的 settings，"
         "每项带 label（人话）、desc（一句说明，数字注明 0 代表什么）、default，数字可加 unit；代码里用 setting(EXT_ID, key) 读。\n"
         "8. 扩展没有沙盒，写错会改坏全体玩家数据或让机器人卡死：改数据要限定范围、检查 set_attr 的返回值，不要写一条指令改全员的东西；不要读 .env、不要碰数据库文件；回答最后用一两句话提醒我「装之前先备份、先在测试群试」。\n"
+        "9. 存数据分两种，按「管理员收尾、换下一季以后还要不要」选：跟角色有关的（按角色编号、角色名记的连签、积分、次数、本季排行……）一律用 "
+        "season_data_get / season_data_set / season_data_keys，收尾时自动清空；data_get / data_set 只存不指向具体角色、要跨季度留着的东西（比如整个团的累计次数）。"
+        "键名用角色编号 role[\"id\"]，不要用角色名。装的时候会检查：用 data_set 按角色存数据会被拒绝安装。\n"
+        "10. 一台服务器可能接了好几个机器人（好几个团），数据各存各的。不要用全局变量、自己写文件来记玩家的东西，一律用上面的存数据接口。"
+        "定时任务一律在 @scheduler.scheduled_job(...) 下面一行加 @each_team（manifest 写 \"api\": 3），这样每个团各跑一遍；不加、或者两行顺序反了，装的时候会被拒绝。\n"
     )
 
 
@@ -529,9 +604,9 @@ _BASICS = [
      "async def _(bot: Bot, event: GroupMessageCreateEvent, args: Message = CommandArg()):\n    text = args.extract_plain_text().strip()"),
     ("reply_long", "await reply_long(matcher, text)", "回复触发指令的人，太长自动转成图片。",
      "await reply_long(cmd, \"很长的一段……\")"),
-    ("scheduler", "@scheduler.scheduled_job(...)", "定时任务。别在里面写 time.sleep。",
-     "@scheduler.scheduled_job(\"cron\", hour=20, minute=0)\nasync def nightly(): ..."),
-    ("API_VERSION", "", "当前接口版本号。用到版本 2 新加的接口时，在 manifest.json 写 \"api\": 2，旧版主程序会提示先更新。", ""),
+    ("scheduler", "@scheduler.scheduled_job(...)", "定时任务。下面一行一定加 @each_team（每个团各跑一遍），不加装不上。别在里面写 time.sleep。",
+     "@scheduler.scheduled_job(\"cron\", hour=20, minute=0)\n@each_team\nasync def nightly(): ..."),
+    ("API_VERSION", "", "当前接口版本号。用到版本 2、3 新加的接口时，在 manifest.json 写对应的 \"api\": 2 或 3，旧版主程序会提示先更新。版本 3 加了 season_data_get / season_data_set / season_data_keys（本季数据，收尾时清空）和 each_team（定时任务每个团各跑一遍）。", ""),
 ]
 
 
@@ -583,6 +658,33 @@ def ready_zip(ext_id: str) -> bytes | None:
             if f.is_file() and "__pycache__" not in f.parts:
                 z.write(f, f"{ext_id}/{f.relative_to(d)}")
     return buf.getvalue()
+
+
+# 现成插件以前发过的版本：__init__.py 的 sha256。装着的那份跟其中一个一模一样（用户没改过），启动时自动换成随包的新版本；
+# 改过的不动（列表里会标黄提醒）。发新版现成插件时，把旧版的 sha256 加进来。
+_READY_OLD = {
+    "daily_signin": {"8927722c75eaa52f919cbcabbb87dd172c6b0095dca54f06212c73f98edc8cba"},       # 1.0.0：连签存在 data_set 里
+}
+
+
+def upgrade_ready_made() -> list[str]:
+    """把没改过的旧版现成插件换成随包的新版本（设置项、开关、存的数据都不动）。返回换了哪些。"""
+    done = []
+    for ext_id, olds in _READY_OLD.items():
+        inst, src = USER_DIR / ext_id, READY_DIR / ext_id
+        try:
+            h = hashlib.sha256((inst / "__init__.py").read_bytes()).hexdigest()
+        except OSError:
+            continue
+        if h not in olds or not (src / "__init__.py").is_file():
+            continue
+        for f in src.rglob("*"):
+            if f.is_file() and "__pycache__" not in f.parts:
+                dest = inst / f.relative_to(src)
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(f, dest)
+        done.append(ext_id)
+    return done
 
 
 def install_ready(ext_id: str, replace: bool = False) -> tuple[bool, str]:

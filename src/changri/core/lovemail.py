@@ -6,6 +6,8 @@
 - 简单格式「发送心动信 收信人 内容」不写署名，署名默认是真名（插件里补）；【】格式不写署名还是「匿名」。
 - 没有可用群的收信人，信留在池里下次再派；
 - 可选「曝光」：派送时按概率把信公开到公告群。
+- 可以附 1 张图（lovemail_image_enabled 开着时，默认关）：只附图不写字也行。派送时整包文字先发，图按顺序跟在后面；
+  包里不止一封时每张图前面说一声是第几封的。曝光只公开文字，图不公开（写给一个人的照片不该被随机贴到公告群）。
 「每天」按游戏天数算（没有进行中的季度时按自然日）。
 """
 import random
@@ -15,7 +17,7 @@ import time
 from . import blocks, season, windows
 from .textutil import CHUNK, chunk_text
 from .db import get_config, get_conn, get_int
-from .messaging import Send, push_to_role
+from .messaging import Send, push_to_role_ex
 
 SIGNATURE_MAX = 20
 
@@ -101,8 +103,17 @@ def day_count(role_id: int, day: str | None = None) -> int:
     return n
 
 
-def add_mail(from_id: int, to_id: int, signature: str, content: str) -> tuple[bool, str, int]:
-    """投稿。返回 (是否成功, 提示, 今日剩余次数)。"""
+IMAGE_ONLY = "（一张图片）"       # 只附图没写字的信，文字那里显示这个
+
+
+def shown_content(content: str) -> str:
+    return content or IMAGE_ONLY
+
+
+def add_mail(from_id: int, to_id: int, signature: str, content: str, images: list[bytes] | None = None) -> tuple[bool, str, int]:
+    """投稿。images：附的图（最多 1 张，只附图不写字也行）。返回 (是否成功, 提示, 今日剩余次数)。"""
+    from . import msgimages
+    images = list(images or [])[:1]
     if not enabled():
         return False, "📪 心动信目前没有开放。", 0
     from . import godmode
@@ -112,7 +123,11 @@ def add_mail(from_id: int, to_id: int, signature: str, content: str) -> tuple[bo
     if len(signature) > SIGNATURE_MAX:
         return False, f"⚠️ 署名不得超过 {SIGNATURE_MAX} 个字（当前 {len(signature)} 个字），请修改后重新投递。", 0
     limit_len = get_int("lovemail_max_len", 500)
-    if not content or len(content) > limit_len:
+    for data in images:
+        why = msgimages.mail_check(data)
+        if why:
+            return False, "⚠️ " + why, 0
+    if (not content and not images) or len(content) > limit_len:
         return False, f"⚠️ 心动信内容不能为空，也不能超过 {limit_len} 字。", 0
     if to_id == from_id:
         return False, "⚠️ 不能给自己写心动信。", 0
@@ -131,10 +146,12 @@ def add_mail(from_id: int, to_id: int, signature: str, content: str) -> tuple[bo
         got = roles.get_role(to_id)
         return False, f"❌ 「{got['name'] if got else '对方'}」已拒绝你的联络。", 0
     with get_conn() as conn:
-        conn.execute(
+        mail_id = conn.execute(
             "INSERT INTO lovemails(from_role_id, to_role_id, signature, content, day, created_ts, status) VALUES(?,?,?,?,?,?,?)",
             (from_id, to_id, signature, content, key, int(time.time()), "held" if blk else "pool"),
-        )
+        ).lastrowid
+    for data in images:
+        msgimages.mail_save(mail_id, data)
     return True, ("🌙 今天的心动信已经派送过了，这封算明天的，明天派送。" if late else ""), limit - used - 1
 
 
@@ -153,6 +170,7 @@ def revoke(role_id: int, index: int) -> tuple[bool, str]:
         return False, "⚠️ 请输入正确的序号，例如：撤回心动信 1"
     m = mine[index - 1]
     with get_conn() as conn:
+        conn.execute("DELETE FROM lovemail_images WHERE mail_id=?", (m["id"],))
         conn.execute("DELETE FROM lovemails WHERE id=?", (m["id"],))
     return True, f"✅ 已成功撤回发送给「{m['to_name']}」的信件。\n📪 已恢复你 {day_label(m['day'])} 的 1 次发送机会。"
 
@@ -166,15 +184,45 @@ def pool_all() -> list:
         ).fetchall()
 
 
-def render_for_receiver(name: str, mails: list) -> str:
+def render_for_receiver(name: str, mails: list, pics: dict | None = None) -> str:
+    """pics：信 id → 图片 id 列表；有图的信标一句「附图在下面」。"""
+    pics = pics or {}
     text = f"💌 亲爱的 {name}，你有一份包含 {len(mails)} 封信件的心动信件包：\n"
     for i, m in enumerate(mails, 1):
-        text += f"\n第 {i} 封信件\n「 {m['content']} 」\n署名：{m['signature']}\n┈┈┈┈┈┈┈┈┈┈"
+        clip = "\n📎 附了一张图（在下面）" if pics.get(m["id"]) else ""
+        text += f"\n第 {i} 封信件\n「 {shown_content(m['content'])} 」{clip}\n署名：{m['signature']}\n┈┈┈┈┈┈┈┈┈┈"
     return text
 
 
-async def deliver_all(send: Send, announce: tuple[str, str] | None = None) -> dict:
-    """派送信池里所有的信：按收信人归拢，每人一包。返回统计。"""
+async def _send_pictures(mails: list, pics: dict, bot_id: str, group: str, send: Send, send_image) -> None:
+    """信件包的文字发完以后，按顺序把附图发到同一个群。包里不止一封时，每张图前面说一声是第几封的。
+    图发不出去不影响信算送达（文字已经到了），只记日志。"""
+    import logging
+    from . import msgimages
+    for i, m in enumerate(mails, 1):
+        if not pics.get(m["id"]):
+            continue
+        try:
+            if len(mails) > 1:
+                await send(bot_id, group, f"📎 第 {i} 封信件的附图（署名：{m['signature']}）")
+            for data in msgimages.mail_blobs(m["id"]):
+                await send_image(bot_id, group, data)
+        except Exception as e:  # noqa: BLE001
+            logging.getLogger(__name__).warning("[心动信图片] 发到收信人群失败：%s", e)
+
+
+async def deliver_all(send: Send, announce: tuple[str, str] | None = None, send_image=None) -> dict:
+    """派送信池里所有的信：按收信人归拢，每人一包。返回统计。
+    send_image(bot_id, group_openid, bytes)：发附图用，不给就用 qqsend 的（测试里传假的）。"""
+    from . import msgimages
+    if send_image is None:
+        async def send_image(bot_id, group, data):
+            from .qqsend import make_send_image
+            return await make_send_image()(bot_id, group, data)
+    return await _deliver_all(send, announce, send_image, msgimages)
+
+
+async def _deliver_all(send: Send, announce, send_image, msgimages) -> dict:
     with get_conn() as conn:                    # 静默拉黑的信：寄信人那边显示已送出，收信人收不到
         conn.execute("UPDATE lovemails SET status='swallowed', sent_ts=? WHERE status='held'", (int(time.time()),))
     pool = pool_all()
@@ -189,19 +237,24 @@ async def deliver_all(send: Send, announce: tuple[str, str] | None = None) -> di
         by_receiver.setdefault(m["to_role_id"], []).append(m)
     success = fail = max_recv = 0
     public: list[str] = []
+    pics = msgimages.mail_ids_by_mail([m["id"] for m in pool])
     for rid, mails in by_receiver.items():
         name = mails[0]["to_name"]
         ok = True
         first = True
-        for part in chunk_text(render_for_receiver(name, mails)):
-            ok_part, _ = await push_to_role(rid, part, send)
+        where = ("", "")
+        for part in chunk_text(render_for_receiver(name, mails, pics)):
+            ok_part, group, bot_id, _mid = await push_to_role_ex(rid, part, send)
             if not ok_part:
                 ok = False
                 break
             first = False
+            where = (bot_id, group)
         if not ok and first:        # 一条都没发出去：整包留在池里
             fail += len(mails)
             continue
+        if ok and any(pics.get(m["id"]) for m in mails):
+            await _send_pictures(mails, pics, where[0], where[1], send, send_image)
         success += len(mails)
         max_recv = max(max_recv, len(mails))
         from . import milestone
@@ -213,7 +266,7 @@ async def deliver_all(send: Send, announce: tuple[str, str] | None = None) -> di
         for m in mails:
             if expose and random.randint(1, 100) <= chance:
                 who = "某人" if hide_receiver else name
-                public.append(f"📩 寄给「{who}」的心动信\n来自「{m['signature']}」\n「 {m['content']} 」")
+                public.append(f"📩 寄给「{who}」的心动信\n来自「{m['signature']}」\n「 {shown_content(m['content'])} 」")
     if announce:
         try:
             from . import publicfeed
@@ -245,6 +298,7 @@ def revoke_id(role_id: int, mail_id: int) -> tuple[bool, str]:
         m = conn.execute("SELECT m.*, t.name AS to_name FROM lovemails m JOIN roles t ON t.id=m.to_role_id WHERE m.id=? AND m.from_role_id=? AND m.status IN ('pool','held')", (mail_id, role_id)).fetchone()
         if not m:
             return False, "这封信已经派送了，或者不在信池里。"
+        conn.execute("DELETE FROM lovemail_images WHERE mail_id=?", (mail_id,))
         conn.execute("DELETE FROM lovemails WHERE id=?", (mail_id,))
     return True, f"已撤回寄给「{m['to_name']}」的信，{day_label(m['day'])} 的次数也恢复了。"
 

@@ -4,9 +4,23 @@ from . import blocks, gifts, godmode, messaging, msgimages, windows
 from .db import get_config, get_int
 
 KIND_NAME = {"sms": "短信", "gift": "礼物"}
+PHOTO_GIFT = "一张照片"          # 照片礼物没写礼物名时叫这个
 
 
-def precheck(me, target, kind: str, gift: str, content: str, has_image: bool = False) -> str:
+def photo_gift(gift: str) -> tuple[str, str]:
+    """带了图的礼物 = 照片礼物：图就是礼物，不走礼品店。返回 (礼物名, 错误)。
+    写了礼品店的编号（或者名字和礼品店里的一样）就拒：礼品店的礼物是图鉴里收集来的，不能附图，免得两种礼物混在一起。"""
+    gift = (gift or "").strip()
+    if not msgimages.gift_enabled():
+        return "", "现在礼物不能附图片。"
+    if gifts.enabled():
+        shop = gifts.parse_code(gift) is not None or any(x["name"] == gift for x in gifts.items())
+        if shop:
+            return "", "🖼 礼品店的礼物不能附图片。想送照片的话，礼物名写别的（或者不写），图片本身就是礼物。"
+    return gift or PHOTO_GIFT, ""
+
+
+def precheck(me, target, kind: str, gift: str, content: str, has_image: bool = False, photo: bool = False) -> str:
     """能发返回空串，否则返回原因（不会入队）。"""
     closed = windows.check("sms") or godmode.check(me["id"], kind)
     if closed:
@@ -20,7 +34,7 @@ def precheck(me, target, kind: str, gift: str, content: str, has_image: bool = F
         return "短信内容不能为空。"
     if kind == "gift" and not gift.strip():
         return "要写送什么礼物。"
-    if kind == "gift" and gifts.only_preset() and gift not in gifts.catalog():
+    if kind == "gift" and not photo and gifts.only_preset() and gift not in gifts.catalog():
         return "礼物要从礼品店里选，发「礼品店」看有什么。"
     lim = messaging.daily_limit(kind)
     used = messaging.day_count(me["id"], kind)
@@ -33,16 +47,21 @@ def precheck(me, target, kind: str, gift: str, content: str, has_image: bool = F
 
 
 async def send(me, target, kind: str, gift: str, content: str, sign: str, send_fn, images: list[bytes] | None = None, gift_by_name_ok: bool = False) -> tuple[bool, str]:
-    if kind == "gift":
-        gift, why = gifts.resolve(gift, gift_by_name_ok, role_id=me["id"])       # 礼品店的礼物只能送图鉴里有的
-        if why:
-            return False, why
     images = list(images or [])[:1]                          # 每条最多 1 张
+    photo = kind == "gift" and bool(images)
+    if photo:                                                # 照片礼物：不走礼品店
+        gift, why = photo_gift(gift)
+    elif kind == "gift":
+        gift, why = gifts.resolve(gift, gift_by_name_ok, role_id=me["id"])       # 礼品店的礼物只能送图鉴里有的
+    else:
+        why = ""
+    if why:
+        return False, why
     for data in images:
         why = msgimages.check(data)
         if why:
             return False, why
-    bad = precheck(me, target, kind, gift, content, has_image=bool(images))
+    bad = precheck(me, target, kind, gift, content, has_image=bool(images), photo=photo)
     if bad:
         return False, bad
     sign = sign if sign and sign != me["name"] else ""
@@ -57,7 +76,7 @@ async def send(me, target, kind: str, gift: str, content: str, sign: str, send_f
     lost = False
     if kind == "gift":
         lost, to_id = _gift_chaos(me, target)
-    mid = messaging.queue_message(kind, me["id"], to_id, gift, content, sign)
+    mid = messaging.queue_message(kind, me["id"], to_id, gift, content, sign, photo=photo)
     if to_id != target["id"] or content != original:          # 出了岔子：发件人的小手机按他原本写的、原本发给谁显示，不穿帮
         messaging.set_original(mid, target["id"] if to_id != target["id"] else 0, original if content != original else None)
     for data in images:

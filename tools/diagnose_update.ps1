@@ -64,9 +64,9 @@ if (-not $root) {
   Write-Host "检查结果：$r1"
   if ($res -contains 'OK download' -and $autoRoot) {
     Write-Host '原因：这台服务器缺少根证书（证书问题）。刚才运行这行命令时，Windows 已经自动把证书装好了。' -ForegroundColor Yellow
-    Write-Host '已修好！去后台「更新」页点更新就行。' -ForegroundColor Green
+    Write-Host '已修好！请先重启长日bot（关掉再打开；开机自启的直接重启服务器最省事），再去后台「更新」页点更新。旧版本的长日bot 不重启认不到新装的证书。' -ForegroundColor Green
   } elseif ($res -contains 'OK download') {
-    Write-Host '一切正常，直接去后台「更新」页点更新就行。' -ForegroundColor Green
+    Write-Host '一切正常，去后台「更新」页点更新就行。如果后台还是报「连不上更新服务器」，把长日bot 重启一次（关掉再打开）再点。' -ForegroundColor Green
   } elseif ($r1 -match 'CERTIFICATE_VERIFY_FAILED' -and $r1 -match 'expired|not yet valid') {
     Write-Host ("原因：这台服务器的时间不对（现在显示 {0}）。把系统时间改对（设置 → 时间和语言 → 立即同步）再试。" -f (Get-Date -Format 'yyyy-MM-dd HH:mm')) -ForegroundColor Red
   } elseif ($r1 -match 'CERTIFICATE_VERIFY_FAILED' -and $r1 -match 'self.signed|self signed') {
@@ -76,7 +76,7 @@ if (-not $root) {
     try { Invoke-WebRequest $url -UseBasicParsing -TimeoutSec 20 | Out-Null } catch { Write-Host "修复时出错：$($_.Exception.Message)" -ForegroundColor Red }
     $res2 = Test-Update
     Write-Host "修复后再检查：$(Show-Result $res2)"
-    if ($res2 -contains 'OK download') { Write-Host '已修好！去后台「更新」页点更新就行。' -ForegroundColor Green }
+    if ($res2 -contains 'OK download') { Write-Host '已修好！请先重启长日bot（关掉再打开；开机自启的直接重启服务器最省事），再去后台「更新」页点更新。旧版本的长日bot 不重启认不到新装的证书。' -ForegroundColor Green }
     else { Write-Host '还是不行：这台服务器可能关掉了 Windows 自动更新根证书。请把这个窗口截图发给作者。' -ForegroundColor Red }
   } elseif ($r1 -match 'HTTPError|HTTP Error') {
     Write-Host '原因：网络是通的，是更新服务器那边返回了错误，不是你这边的问题。请把这个窗口截图发给作者。' -ForegroundColor Red

@@ -1,6 +1,7 @@
 import io
 import json
 import os
+import shutil
 import re
 import subprocess
 import sys
@@ -168,6 +169,53 @@ class ExtensionCoreTests(_PatchedDir):
         errs, warns = E.check_code({"__init__.py": b"from changri_api import on_message\nm = on_message(priority=1, block=True)\n"})
         self.assertEqual(errs, []); self.assertTrue(len(warns) >= 2)
         self.assertEqual(E.check_code({"__init__.py": "from changri_api import on_command\nc = on_command('小游戏', priority=10)\n".encode()}), ([], []))
+
+    def test_data_rules(self):
+        """按角色存进 data_set 的：新装直接拒，已经装好的只标黄；用 season_data_* 要写 api 3。"""
+        by_role = {"__init__.py": "from changri_api import data_set\ndef f(role, rid):\n    data_set('x', f'连签_{role[\"id\"]}', 1)\n    data_set('x', 'last_' + str(rid), 1)\n".encode()}
+        errs, _ = E.check_code(by_role, 2)
+        self.assertEqual(len(errs), 2)
+        self.assertIn("season_data_set", errs[0])
+        errs, warns = E.check_code(by_role, 2, strict=False)
+        self.assertEqual(errs, [])
+        self.assertTrue(any("season_data_set" in w for w in warns))
+        ok = {"__init__.py": "from changri_api import data_set, season_data_set\ndef f(role):\n    data_set('x', '累计', 1)\n    season_data_set('x', f'连签_{role[\"id\"]}', 1)\n".encode()}
+        self.assertEqual(E.check_code(ok, 3), ([], []))
+        self.assertEqual(E.check_code({"__init__.py": "from changri_api import data_set\ndef f(rid):\n    data_set('x', f'last_{rid}', None)\n".encode()}, 3), ([], []))   # 删旧记录可以
+        errs, _ = E.check_code(ok, 2)
+        self.assertTrue(any('"api": 3' in e for e in errs))
+        for r in E.ready_made():                                                   # 随包的现成插件都得过新规矩
+            files = {f.name: f.read_bytes() for f in (E.READY_DIR / r["id"]).glob("*.py")}
+            self.assertEqual(E.check_code(files, int(r.get("api", 1)))[0], [], r["id"])
+
+    def test_scheduled_job_needs_each_team(self):
+        head = "from changri_api import scheduler, each_team\n"
+        none = head + "@scheduler.scheduled_job('cron', hour=20)\nasync def nightly():\n    pass\n"
+        wrong = head + "@each_team\n@scheduler.scheduled_job('cron', hour=20)\nasync def nightly():\n    pass\n"
+        good = head + "@scheduler.scheduled_job('cron', hour=20)\n@each_team\nasync def nightly():\n    pass\n"
+        self.assertTrue(any("没加 @each_team" in e for e in E.check_code({"__init__.py": none.encode()}, 3)[0]))
+        self.assertTrue(any("顺序反了" in e for e in E.check_code({"__init__.py": wrong.encode()}, 3)[0]))
+        self.assertEqual(E.check_code({"__init__.py": good.encode()}, 3), ([], []))
+        self.assertTrue(any('"api": 3' in e for e in E.check_code({"__init__.py": good.encode()}, 2)[0]))
+        errs, warns = E.check_code({"__init__.py": none.encode()}, 2, strict=False)           # 已经装好的：只标黄
+        self.assertEqual(errs, [])
+        self.assertTrue(any("each_team" in w for w in warns))
+
+    def test_upgrade_untouched_ready_made(self):
+        import hashlib
+        old = b"# old official copy\n"
+        d = E.USER_DIR / "daily_signin"
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "__init__.py").write_bytes(old)
+        (d / "manifest.json").write_text('{"id": "daily_signin", "version": "1.0.0"}', encoding="utf-8")
+        with mock.patch.dict(E._READY_OLD, {"daily_signin": {hashlib.sha256(old).hexdigest()}}):
+            self.assertEqual(E.upgrade_ready_made(), ["daily_signin"])
+            self.assertIn("season_data_set", (d / "__init__.py").read_text(encoding="utf-8"))
+            self.assertIn('"api": 3', (d / "manifest.json").read_text(encoding="utf-8"))
+            (d / "__init__.py").write_bytes(b"# user edited\n")                       # 改过的不动
+            self.assertEqual(E.upgrade_ready_made(), [])
+            self.assertEqual((d / "__init__.py").read_bytes(), b"# user edited\n")
+        shutil.rmtree(d)
 
     def test_install_rejects_bad_code_and_warns(self):
         z = demo_zip()
@@ -431,7 +479,7 @@ class ExtensionAdminTests(_PatchedDir):
     def test_api_tab_and_ready_made_install(self):
         self.login()
         page = self.c.get("/extensions?tab=api").get_data(as_text=True)
-        for word in ("插件接口", "现成插件", "每日签到", "富豪榜", "stage_group", "give_item", "today_count", "data_set", "接口版本 2"):
+        for word in ("插件接口", "现成插件", "每日签到", "富豪榜", "stage_group", "give_item", "today_count", "data_set", "接口版本 3"):
             self.assertIn(word, page)
         self.assertIn('aria-current="page">插件接口', page)
         self.assertNotIn('aria-current="page">核心功能', page)

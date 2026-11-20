@@ -138,8 +138,8 @@ def clear() -> None:
 WHITELIST_SOURCE = "IP 白名单"
 WHITELIST_MARKS = ("code=11298", "接口访问源IP不在白名单")
 WHITELIST_TEXT = ("QQ 拒绝了机器人发消息：这台服务器的公网 IP 不在 QQ 开放平台的 IP 白名单里（没加，或者 IP 变了）。"
-                  "请到 QQ 开放平台「开发管理 → 开发设置 → IP 白名单」加上这台服务器的公网 IP；"
-                  "不知道 IP 是多少，就到设置平台「机器人接入」页点「检查连接」，它会告诉你。")
+                  "请到 QQ 开放平台（q.qq.com）「机器人 → 去创建或管理我的 QQ 机器人 → 点你的机器人 → 开发设置 → 服务器 IP 白名单 → 添加 IP」加上这台服务器的公网 IP；"
+                  "不知道 IP 是多少、不知道怎么加，就到设置平台「机器人接入」页，那里有一步步的说明，点「检查连接」也会告诉你 IP。")
 WHITELIST_QUIET = 600          # 同一个问题 10 分钟内只记一条（每条指令都会撞一次，不刷屏）
 WHITELIST_SHOW = 1800          # 最近 30 分钟内撞过，后台总览才提醒；改好以后不再撞，提醒自己消失
 
@@ -181,7 +181,7 @@ AUTH_QUIET = 600
 AUTH_SHOW = 1800
 AUTH_TEXT = ("QQ 不认这个机器人的 AppID / AppSecret（invalid appid or secret），机器人连不上 QQ，群里发什么都不会回。"
              "多半是 AppSecret 填错了，或者在 QQ 开放平台点过「重置 AppSecret」，旧的作废了。"
-             "请到 QQ 开放平台「开发管理 → 开发设置」核对 AppID、重新生成 AppSecret，再到设置平台「机器人接入」页把这个机器人的 AppSecret 改成新的。")
+             "请到 QQ 开放平台（q.qq.com）「机器人 → 去创建或管理我的 QQ 机器人 → 点你的机器人 → 开发设置」核对 AppID、重新生成 AppSecret，再到设置平台「机器人接入」页把这个机器人的 AppSecret 改成新的。")
 
 
 def is_auth_error(text: str, trace: str = "") -> bool:
