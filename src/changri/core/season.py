@@ -488,6 +488,8 @@ def wipe() -> None:
     if last and get_config("season_wiped", "1") == "0":
         _archive(last["id"])
     with get_conn() as conn:
+        gone_roles = conn.execute("SELECT id, name FROM roles").fetchall()        # 删之前记下来：清插件里按角色记的旧数据要用
+    with get_conn() as conn:
         for t in ("tap_outbox", "item_taps", "letter_effects", "letters", "votes", "replies", "posts", "wishes", "join_requests", "room_lines", "room_members", "rooms", "lovemails", "rel_details", "relations", "messages", "blocks", "entrance_images", "entrance", "bind_codes", "role_attrs", "role_groups", "roles"):
             conn.execute(f"DELETE FROM {t}")
         conn.execute("DELETE FROM sqlite_sequence WHERE name='rooms'")        # 新季度的 R 号从 1 重新开始
@@ -498,7 +500,12 @@ def wipe() -> None:
     from . import milestone
     milestone.reset()                                                         # 「第 N 次记录」的计数跟着季度清零
     from . import extdata
-    extdata.clear_season()                                                    # 扩展按季度存的数据（season_data_set）一起清
+    try:
+        extdata.clear_season()                                                # 扩展按季度存的数据（season_data_set）一起清
+        extdata.clear_role_keys([r["id"] for r in gone_roles], [r["name"] for r in gone_roles])   # 老插件按角色存进 data_set 的（先备份）
+    except Exception as e:  # noqa: BLE001  插件数据清不掉不能拦住收尾
+        import logging
+        logging.getLogger(__name__).warning("[收尾] 清插件数据失败：%s", e)
     set_config("season_wiped", "1")
     set_config("game_day", "")
     set_config("entrance_active", "0")

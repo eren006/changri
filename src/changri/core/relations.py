@@ -35,12 +35,12 @@ def _count_all(conn, role_id: int) -> int:
 def add_detail(from_id: int, to_id: int, to_name: str, text: str) -> tuple[bool, str]:
     """拉线：没有关系线就建立一条，然后追加一段细节。"""
     if not enabled():
-        return False, "❌ 系统已关闭"
+        return False, "❌ 关系线现在没有开放。"
     if from_id == to_id:
-        return False, "⚠️ 你不能跟自己建立关系线哦。"
+        return False, "⚠️ 不能跟自己拉关系线。"
     max_chars = get_int("max_detail_chars", 500)
     if len(text) > max_chars:
-        return False, f"⚠️ 内容过长（{len(text)} 字），单条拉线上限为 {max_chars} 字，请精简后再提交。"
+        return False, f"⚠️ 这段有 {len(text)} 字，一次最多 {max_chars} 字，删短一点再发。"
     lo, hi = _pair(from_id, to_id)
     now = int(time.time())
     with get_conn() as conn:
@@ -50,13 +50,13 @@ def add_detail(from_id: int, to_id: int, to_name: str, text: str) -> tuple[bool,
             max_rel = get_int("max_relationships_per_user", 20)
             started = conn.execute("SELECT COUNT(*) FROM relations WHERE initiator_id=?", (from_id,)).fetchone()[0]
             if started >= max_rel:
-                return False, f"⚠️ 你的发起额度已达上限 ({max_rel})"
+                return False, f"⚠️ 你发起的关系线已经有 {max_rel} 条，到上限了。"
             max_total = get_int("max_relationships_total", 0)
             if max_total > 0:
                 if _count_all(conn, from_id) >= max_total:
-                    return False, f"⚠️ 你的关系线总数已达上限 ({max_total})，发起和收到的都算在内"
+                    return False, f"⚠️ 你的关系线已经有 {max_total} 条（发起的和收到的加起来），到上限了。"
                 if _count_all(conn, to_id) >= max_total:
-                    return False, f"⚠️「{to_name}」的关系线总数已满 ({max_total})，暂时不能再向 ta 发起"
+                    return False, f"⚠️「{to_name}」的关系线已经满了（{max_total} 条），暂时不能再和 TA 拉线。"
             rel_id = conn.execute(
                 "INSERT INTO relations(role_lo, role_hi, initiator_id, created_ts) VALUES(?,?,?,?)", (lo, hi, from_id, now)
             ).lastrowid
@@ -67,10 +67,10 @@ def add_detail(from_id: int, to_id: int, to_name: str, text: str) -> tuple[bool,
             used_count, used_chars = row[0], row[1]
         max_count = get_int("max_detail_count", 20)
         if used_count >= max_count:
-            return False, f"⚠️ 你们的关系线已达段数上限（{max_count} 段），无法继续添加。"
+            return False, f"⚠️ 你们的关系线已经写满 {max_count} 段了，不能再加。"
         max_total_chars = get_int("max_rel_total_chars", 3000)
         if used_chars + len(text) > max_total_chars:
-            return False, f"⚠️ 添加后将超过总字数上限（{max_total_chars} 字，当前已有 {used_chars} 字），请精简内容。"
+            return False, f"⚠️ 加上这段就超过总字数了（最多 {max_total_chars} 字，已经写了 {used_chars} 字），删短一点。"
         conn.execute("INSERT INTO rel_details(rel_id, from_role_id, text, created_ts) VALUES(?,?,?,?)", (rel_id, from_id, text, now))
     from . import milestone
     milestone.bump("拉线")
@@ -202,12 +202,12 @@ def start(from_id: int, to_id: int, to_name: str):
     lo, hi = _pair(from_id, to_id)
     with get_conn() as conn:
         if conn.execute("SELECT COUNT(*) FROM relations WHERE initiator_id=?", (from_id,)).fetchone()[0] >= r["max_rel"]:
-            return None, f"你的发起额度已达上限（{r['max_rel']}）"
+            return None, f"你发起的关系线已经有 {r['max_rel']} 条，到上限了。"
         if r["max_total_rel"] > 0:
             if _count_all(conn, from_id) >= r["max_total_rel"]:
-                return None, f"你的关系线总数已达上限（{r['max_total_rel']}）"
+                return None, f"你的关系线已经有 {r['max_total_rel']} 条（发起的和收到的加起来），到上限了。"
             if _count_all(conn, to_id) >= r["max_total_rel"]:
-                return None, f"「{to_name}」的关系线总数已满，暂时不能再向 ta 发起"
+                return None, f"「{to_name}」的关系线已经满了，暂时不能再和 TA 拉线。"
         conn.execute("INSERT INTO relations(role_lo, role_hi, initiator_id, created_ts) VALUES(?,?,?,?)", (lo, hi, from_id, int(time.time())))
     return get_rel(from_id, to_id), ""
 

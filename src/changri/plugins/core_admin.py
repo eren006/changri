@@ -9,7 +9,7 @@ from changri.core import admins, blocks, roles
 from changri.core.db import get_int
 from changri.core import announce as announce_core
 
-NEED_ROLE = "请先在你的个人群里发「创建新角色 名字」绑定角色。"
+NEED_ROLE = "你还没有角色。在你的个人群里发「创建新角色 名字」就能创建。"
 
 
 def _bid() -> str:
@@ -34,7 +34,7 @@ def _name_args(args) -> list[str]:
 
 
 def _admin_only(matcher_name: str):
-    return "❌ 权限不足，仅管理员可用。"
+    return "❌ 这条指令只有管理员能用。"
 
 
 # ================= 拉黑 =================
@@ -113,7 +113,7 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
 
 
 def _admin_only(matcher_name: str):
-    return f"❌ 权限不足，仅管理员可用。"
+    return f"❌ 这条指令只有管理员能用。"
 
 
 set_announce = _cmd("设为公告群")

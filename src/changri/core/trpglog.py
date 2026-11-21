@@ -204,30 +204,92 @@ def lines(log_id: int) -> list[dict]:
 # ======================== 统计与导出 ========================
 
 def stats(log_id: int) -> dict:
+    """整场的总数，加上按人分的骰点（people）和按角色卡分的理智 / 生命损失（losses）。
+    骰点归给谁：骰子那行的 ref 指向触发它的那句话，取那句话的发言人；对不上的算「（不明）」。"""
     from .trpgrender import verdict
     ls = lines(log_id)
+    by_id = {l["id"]: l for l in ls}
     speakers = {l["speaker_name"] for l in ls if l["kind"] != "bot" and l["speaker_name"]}
     ok = bad = 0
     dice_n = 0
+    people: dict[str, dict] = {}
     for l in ls:
         if l["kind"] != "dice":
             continue
         dice_n += 1
+        who = (by_id.get(l["ref"]) or {}).get("speaker_name") or "（不明）"
+        p = people.setdefault(who, {"name": who, "dice": 0, "crit": 0, "ok": 0, "bad": 0, "fumble": 0})
+        p["dice"] += 1
         v = verdict(l["text"])
         if v:
+            p[v[1]] += 1
             if v[1] in ("crit", "ok"):
                 ok += 1
             else:
                 bad += 1
     with get_conn() as c:
         changes = c.execute("SELECT COUNT(*) AS n FROM trpg_attr_history WHERE log_id=?", (log_id,)).fetchone()["n"]
-    return {"lines": len(ls), "speakers": len(speakers), "dice": dice_n, "success": ok, "fail": bad, "changes": changes}
+        loss_rows = c.execute(
+            "SELECT k.id AS cid, k.name AS card, h.name AS attr, SUM(h.old_value - h.new_value) AS lost FROM trpg_attr_history h "
+            "JOIN trpg_cards k ON k.id=h.card_id WHERE h.log_id=? AND h.name IN ('理智','生命') "
+            "AND h.old_value IS NOT NULL AND h.new_value IS NOT NULL AND h.new_value < h.old_value GROUP BY k.id, h.name",
+            (log_id,)).fetchall()
+    losses: dict[int, dict] = {}                         # 按卡的编号分：两个人的卡同名（默认的「角色1」）不能混成一个
+    for r in loss_rows:
+        losses.setdefault(r["cid"], {"name": r["card"], "理智": 0, "生命": 0})[r["attr"]] = r["lost"]
+    for p in people.values():
+        checks = p["crit"] + p["ok"] + p["bad"] + p["fumble"]
+        p["checks"] = checks
+        p["rate"] = round((p["crit"] + p["ok"]) * 100 / checks) if checks else None
+    return {"lines": len(ls), "speakers": len(speakers), "dice": dice_n, "success": ok, "fail": bad, "changes": changes,
+            "people": sorted(people.values(), key=lambda p: -p["dice"]), "losses": list(losses.values())}
+
+
+def highlights(s: dict) -> list[str]:
+    """团后战报里的几句「之最」。人少、检定少的时候不硬凑：骰运至少要 3 次检定才算。"""
+    ppl = [p for p in s["people"] if p["name"] != "（不明）"]
+    out = []
+
+    def top(key, fmt):
+        best = max(ppl, key=lambda p: p[key], default=None)
+        if best and best[key] > 0:
+            out.append(fmt.format(n=best["name"], v=best[key]))
+    top("crit", "🌟 大成功最多：{n}（{v} 次）")
+    top("fumble", "💥 大失败最多：{n}（{v} 次）")
+    rated = [p for p in ppl if p["checks"] >= 3]
+    if len(rated) >= 2:
+        lucky = max(rated, key=lambda p: (p["rate"], p["checks"]))
+        unlucky = min(rated, key=lambda p: (p["rate"], -p["checks"]))
+        out.append(f"🍀 骰运最好：{lucky['name']}（检定 {lucky['checks']} 次，成功 {lucky['rate']}%）")
+        if unlucky is not lucky and unlucky["rate"] < lucky["rate"]:
+            out.append(f"🌧 骰运最差：{unlucky['name']}（检定 {unlucky['checks']} 次，成功 {unlucky['rate']}%）")
+    for attr, icon in (("理智", "🌀"), ("生命", "🩸")):
+        worst = max(s["losses"], key=lambda x: x[attr], default=None)
+        if worst and worst[attr] > 0:
+            out.append(f"{icon} {attr}掉得最多：{worst['name']}（-{worst[attr]}）")
+    return out
+
+
+def people_text(s: dict) -> str:
+    rows = []
+    for p in s["people"][:12]:
+        parts = [f"大成功 {p['crit']}" if p["crit"] else "", f"成功 {p['ok']}" if p["ok"] else "",
+                 f"失败 {p['bad']}" if p["bad"] else "", f"大失败 {p['fumble']}" if p["fumble"] else ""]
+        detail = "、".join(x for x in parts if x)
+        rows.append(f"· {p['name']}：骰 {p['dice']} 次" + (f"（{detail}）" if detail else ""))
+    return "\n".join(rows)
 
 
 def stats_text(log: dict) -> str:
     s = stats(log["id"])
-    return (f"「{log['name']}」（{STATUS_TEXT[log['status']]}）\n共 {s['lines']} 条，{s['speakers']} 位发言人\n"
+    text = (f"「{log['name']}」（{STATUS_TEXT[log['status']]}）\n共 {s['lines']} 条，{s['speakers']} 位发言人\n"
             f"骰点 {s['dice']} 次，其中检定成功 {s['success']}、失败 {s['fail']}\n属性变动 {s['changes']} 次")
+    if s["people"]:
+        text += "\n\n【每个人】\n" + people_text(s)
+    hl = highlights(s)
+    if hl:
+        text += "\n\n【本场之最】\n" + "\n".join(hl)
+    return text
 
 
 def export_txt(log_id: int) -> str:

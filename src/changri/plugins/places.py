@@ -6,7 +6,7 @@ from nonebot.params import CommandArg
 from changri.core import roles, rpg
 from changri.core.qqsend import reply_long
 
-NEED_ROLE = "请先在你的个人群里发「创建新角色 名字」绑定角色。"
+NEED_ROLE = "你还没有角色。在你的个人群里发「创建新角色 名字」就能创建。"
 
 
 def _me(bot: Bot, event: GroupMessageCreateEvent):

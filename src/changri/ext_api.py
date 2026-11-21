@@ -29,6 +29,7 @@ from changri.core import announce as _announce
 from changri.core import entrance as _entrance
 from changri.core import relations as _relations
 from changri.core import rpg as _rpg
+from changri.core import trpg as _trpg
 from changri.core.announce import get_announce as _get_announce
 from changri.core.db import get_config as _get_config
 from changri.core.db import get_conn as _get_conn
@@ -47,6 +48,13 @@ def sender_role(bot: Bot, event: GroupMessageCreateEvent):
     """发这条消息的人绑定的角色，没有返回 None。返回的对象可以用 role["id"]、role["name"]。
     例：role = sender_role(bot, event)"""
     return _roles.find_role_for_sender(bot.self_id, event.group_openid, event.author.member_openid)
+
+
+def sender_player(bot: Bot, event: GroupMessageCreateEvent) -> int:
+    """发这条消息的「玩家本人」的编号（版本 4）：跟角色无关，换季、重建角色都不变，配合 player_data_get / player_data_set 做长期的东西。
+    同一个人在不同群里，有恋综角色的自动认成同一位；没有角色的，每个群先各算一位（跑团角色卡也是这样认人的）。
+    例：pid = sender_player(bot, event)"""
+    return _trpg.player_for_sender(bot.self_id, event.group_openid, event.author.member_openid)
 
 
 def role_by_name(name: str):
@@ -326,6 +334,46 @@ def season_data_keys(ext_id: str, prefix: str = "") -> list[str]:
     例：for k in season_data_keys(EXT_ID, "积分_"): ..."""
     with _data_lock:
         return sorted(k for k in _data_load(ext_id, True) if k.startswith(prefix))
+
+
+def player_data_get(ext_id: str, player_id: int, key: str, default=None):
+    """读按玩家本人存的数据（版本 4）。跨季度一直留着，「收尾」也不清，跟着人走，不跟着角色走。player_id 用 sender_player 拿。
+    适合「总共签到多少天」「历史最高分」这类不想每季清零的东西。没存过返回 default。
+    例：days = player_data_get(EXT_ID, sender_player(bot, event), "总签到天数", 0)"""
+    with _data_lock:
+        return _data_load(ext_id, player=True).get(str(int(player_id)), {}).get(str(key), default)
+
+
+def player_data_set(ext_id: str, player_id: int, key: str, value) -> None:
+    """存一条按玩家本人的数据（版本 4），跨季度一直留着。value 写 None 就是删掉这条。和别的数据分开存，最多 2MB。
+    例：player_data_set(EXT_ID, pid, "总签到天数", days + 1)"""
+    json.dumps(value)
+    pk = str(int(player_id))
+    with _data_lock:
+        d = _data_load(ext_id, player=True)
+        mine = d.get(pk) if isinstance(d.get(pk), dict) else {}
+        if value is None:
+            mine.pop(str(key), None)
+        else:
+            mine[str(key)] = value
+        if mine:
+            d[pk] = mine
+        else:
+            d.pop(pk, None)
+        _data_save(ext_id, d, player=True)
+
+
+def player_data_all(ext_id: str, key: str) -> dict:
+    """所有玩家的某一项（版本 4），返回 {玩家编号: 值}，做「历史总榜」时用。
+    例：for pid, days in sorted(player_data_all(EXT_ID, "总签到天数").items(), key=lambda kv: -kv[1]): ..."""
+    with _data_lock:
+        return {int(pk): v[str(key)] for pk, v in _data_load(ext_id, player=True).items() if isinstance(v, dict) and str(key) in v}
+
+
+def player_name(player_id: int) -> str:
+    """玩家本人现在的名字（版本 4）：这一季有恋综角色就是角色名，否则是跑团里起的名字，都没有返回空串。做历史总榜时显示用。
+    例：name = player_name(pid)"""
+    return _trpg.display_name(int(player_id))
 
 
 def today_count(ext_id: str, name: str, role_id: int) -> int:

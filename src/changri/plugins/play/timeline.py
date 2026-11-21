@@ -58,7 +58,7 @@ del_slot = _cmd("删除时间线")
 @del_slot.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     if not _is_admin(bot, event):
-        await del_slot.finish("❌ 权限不足，仅管理员可用。")
+        await del_slot.finish("❌ 这条指令只有管理员能用。")
     p = args.extract_plain_text().split()
     if len(p) != 2 or not _room_arg(p[1]):
         await del_slot.finish("用法：删除时间线 角色名 R房间号（房间号在「时间线 角色名」里看）\n会把这个房间连同所有人的时间线和复盘记录一起删掉。")

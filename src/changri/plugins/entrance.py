@@ -9,7 +9,7 @@ from changri.core import admins, entrance, roles
 from changri.core.announce import PUSH_HINT
 from changri.core.qqsend import download_images, make_send, make_send_image, reply_long
 
-NO = "❌ 权限不足，仅管理员可用。"
+NO = "❌ 这条指令只有管理员能用。"
 
 
 def _cmd(name: str, aliases: set[str] | None = None):

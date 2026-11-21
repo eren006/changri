@@ -70,6 +70,39 @@ def _may_manage(event: GroupMessageCreateEvent, log: dict) -> bool:
     return log["started_by"] == event.author.member_openid or admins.is_admin(current_bot.get().self_id, event.author.member_openid)
 
 
+async def _link_warning(log: dict, notify: bool = True) -> str:
+    """分享链接玩家打不开（小手机没开、没在跑、外网端口没放行）：群里加一句，再发到后台群提醒管理员。
+    没设后台群就只在这里说，不退回公告群（工作人员的提醒不进公告群）。notify=False（/log get）只在群里说，不重复打扰后台群。
+    没问题或测不了返回空串。"""
+    import asyncio
+
+    import nonebot
+    from changri.core import announce, netcheck
+    from changri.core.qqsend import send_to_group
+    url = trpglog.share_url(log)
+    if not url:
+        return ""
+    try:
+        why = await asyncio.to_thread(netcheck.share_link_problem, url)
+    except Exception as e:  # noqa: BLE001 检查出错不能影响结束 log
+        logger.warning(f"[跑团log] 检查分享链接出错：{e}")
+        return ""
+    if not why:
+        return ""
+    sent = False
+    bs = announce.get_backstage()
+    bot = nonebot.get_bots().get(bs[0]) if bs and notify else None
+    if bot:
+        try:
+            await send_to_group(bot, bs[1], f"⚠️ 跑团 log「{log['name']}」的分享链接，玩家现在可能打不开：{why}\n"
+                                            "请到后台「小手机」页处理（放行端口后点「检查玩家能不能打开」），通了玩家用 /log get 再拿一次链接就行。")
+            sent = True
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[跑团log] 提醒后台群失败：{e}")
+    return ("\n⚠️ 这个链接现在外网可能打不开，已经告诉管理员了，修好后用 /log get 再拿一次。" if sent
+            else f"\n⚠️ 这个链接现在外网可能打不开：{why}。请管理员到后台「小手机」页检查。")
+
+
 def _link_text(log: dict) -> str:
     url = trpglog.share_url(log)
     return f"网页查看（有链接的人都能看）：{url}" if url else "网页链接：还没设置玩家访问网址，先在后台「小手机」页开启并填好网址。"
@@ -104,7 +137,7 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
         tail = f"\n接着记：/log on {log['name']}　文字全文：/log export {log['name']}"
         if not halt:
             trpglog.mark_shared(log["id"])
-            tail = "\n" + _link_text(log) + tail
+            tail = "\n" + _link_text(log) + await _link_warning(log) + tail
         await reply_long(log_cmd, ("已强制停止（不生成网页链接）。" if halt else "已结束。") + "\n" + trpglog.stats_text(log) + tail)
         return
     if sub in ("list", "列表"):
@@ -125,7 +158,7 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
         if not log:
             await log_cmd.finish("格式：/log get 名字（看 /log list）。")
         trpglog.mark_shared(log["id"])
-        await log_cmd.finish(f"「{log['name']}」\n" + _link_text(log))
+        await log_cmd.finish(f"「{log['name']}」\n" + _link_text(log) + await _link_warning(log, notify=False))
     if sub in ("export", "导出"):
         log = trpglog.find(scope, rest) if rest else None
         if not log:

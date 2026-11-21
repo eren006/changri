@@ -306,12 +306,13 @@ tr:last-child td{border-bottom:0}
         ('通用', [('noat_page','不用 @ 也能回'),('autoreply_page','自定义回复'),('dice_lines_page','个性化骰子'),('extensions_page','功能与设置'),('admins_page','QQ 管理员'),('images_page','图片管理'),('msgmon_page','消息监听'),('tools_page','小工具')]),
         ('恋综', [('god_page','角色'),('season_page','季度与出场'),('lovemail_page','心动信'),('relations_page','公知、二表与关系线'),('collect_page','官约 · 收集 · 复盘'),('rpg_attrs_page','属性与货币')]),
         ('跑团', [('trpg_page','角色库'),('trpglog_page','日志'),('decks_page','牌堆')]),
+        ('长期群', [('longterm_page','长期群')] if 'longterm_page' not in disabled_nav else []),
       ] if in_bot else [] %}
       {% set extras = [('forum_page','论坛'),('rpg_page','物品与商城'),('rpg_places_page','地点'),('rewards_page','结戏奖励'),('alarm_page','群体闹钟'),('phone_page','小手机'),('giftshop_page','礼品店'),('gacha_page','抽取池'),('sighting_page','目击'),('bottles_page','漂流瓶记录'),('precall_admin','前置电话')] %}
-      {% for title, items in groups %}
+      {% for title, items in groups if items %}
       <div>
         {% if title %}<h3>{{ title }}</h3>{% endif %}
-        <ul>{% for ep, label in items %}{% if ep not in disabled_nav %}<li><a href="{{ url_for(ep) }}" {% if request.endpoint == ep or (ep == 'collect_page' and request.endpoint in ('official_page', 'reviews_page', 'review_day', 'review_view')) %}aria-current="page"{% endif %}>{{ label }}</a></li>{% endif %}{% endfor %}</ul>
+        <ul>{% for ep, label in items %}{% if ep not in disabled_nav %}<li><a href="{{ url_for(ep) }}" {% if request.endpoint == ep or (ep == 'collect_page' and request.endpoint in ('official_page', 'reviews_page', 'review_day', 'review_view')) or (ep == 'longterm_page' and request.endpoint and request.endpoint.startswith('longterm_')) %}aria-current="page"{% endif %}>{{ label }}</a></li>{% endif %}{% endfor %}</ul>
       </div>
       {% endfor %}
       {% if in_bot %}

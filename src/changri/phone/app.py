@@ -1042,7 +1042,9 @@ self.addEventListener('notificationclick', function (e) {
         log = trpglog.by_token(token)
         if not log:
             abort(404)
-        resp = make_response(trpgrender.render_html(log, trpglog.lines(log["id"]), download_url=url_for("trpg_log_zip", token=token)))
+        st = trpglog.stats(log["id"])
+        resp = make_response(trpgrender.render_html(log, trpglog.lines(log["id"]), download_url=url_for("trpg_log_zip", token=token),
+                                                    stats=st, highlights=trpglog.highlights(st)))
         resp.headers["Cache-Control"] = "no-store"
         resp.headers["Referrer-Policy"] = "no-referrer"
         resp.headers["X-Robots-Tag"] = "noindex"

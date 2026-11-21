@@ -11,8 +11,9 @@ import time
 from . import dice
 from .db import get_config, get_conn, set_config
 
-MODES = {"romance": "恋综", "trpg": "跑团"}
-MODE_ALIASES = {"恋综": "romance", "romance": "romance", "跑团": "trpg", "trpg": "trpg", "coc": "trpg"}
+MODES = {"romance": "恋综", "trpg": "跑团", "longterm": "长期群"}
+MODE_ALIASES = {"恋综": "romance", "romance": "romance", "跑团": "trpg", "trpg": "trpg", "coc": "trpg",
+                "长期群": "longterm", "长期": "longterm", "longterm": "longterm"}
 MAX_CARDS = 20
 MAX_ATTRS = 80
 MAX_NAME = 12
@@ -52,7 +53,14 @@ def alias_names(name: str) -> list[str]:
 
 def get_mode(group_openid: str) -> str:
     m = get_config(f"play_mode:{group_openid}", "") or get_config("play_mode_default", "romance")
+    if m == "longterm" and not longterm_enabled():          # 长期群是个性化模块：关着时这个群按恋综走，数据留着
+        return "romance"
     return m if m in MODES else "romance"
+
+
+def longterm_enabled() -> bool:
+    from .extensions import is_enabled                      # 放函数里：extensions 加载时会读 features，免得循环引用
+    return is_enabled("longterm")
 
 
 def set_mode(group_openid: str, mode: str) -> None:
@@ -73,6 +81,88 @@ def player_for(member_openid: str, group_openid: str = "", create: bool = True) 
         c.execute("INSERT INTO trpg_identities(member_openid,player_id,group_openid,created_ts) VALUES (?,?,?,?)",
                   (member_openid, pid, group_openid, now))
         return pid
+
+
+def player_for_sender(bot_id: str, group_openid: str, member_openid: str) -> int:
+    """说话的人是哪位「玩家」（跟跑团角色卡、插件的长期数据用的是同一套编号，跨季度不变）。
+    官方机器人给的 member_openid 每个群不一样，同一个人在两个群里是两个 openid。这里按顺序认：
+    ① 这个 openid 认过 → 就是那位；② 他有恋综角色：角色绑过的个人群里那个 openid 认过 → 把这个 openid 也认到同一位名下
+    （个人群是本人绑的，能证明是同一个人；角色每季重建，但个人群的 openid 不变，所以换季也认得上）；③ 都没有 → 新建一位。"""
+    pid = player_for(member_openid, group_openid, create=False)
+    if pid:
+        return pid
+    from .roles import find_role_for_sender
+    role = find_role_for_sender(bot_id, group_openid, member_openid)
+    if role:
+        with get_conn() as c:
+            row = c.execute("SELECT i.player_id FROM role_groups g JOIN trpg_identities i ON i.member_openid=g.member_openid "
+                            "WHERE g.role_id=? AND g.bot_id=? ORDER BY g.id LIMIT 1", (role["id"], bot_id)).fetchone()
+            if not row:                                     # 个人群那个 openid 也还没认过：先给它建一位，再把这个认过去
+                first = c.execute("SELECT member_openid, group_openid FROM role_groups WHERE role_id=? AND bot_id=? ORDER BY id LIMIT 1",
+                                  (role["id"], bot_id)).fetchone()
+            else:
+                first = None
+        if row:
+            pid = row["player_id"]
+        elif first and first["member_openid"] != member_openid:
+            pid = player_for(first["member_openid"], first["group_openid"])
+        if pid:
+            with get_conn() as c:
+                c.execute("INSERT OR IGNORE INTO trpg_identities(member_openid,player_id,group_openid,created_ts) VALUES (?,?,?,?)",
+                          (member_openid, pid, group_openid, int(time.time())))
+            return pid
+    return player_for(member_openid, group_openid)
+
+
+LINK_TTL = 300                   # 认人码几秒内有效
+_LINK_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"          # 去掉了 0/O、1/I/L 这些容易看错的
+
+
+def make_link_code(player_id: int) -> str:
+    """「认人」第一步：给这位玩家发一个一次性的码（5 分钟有效），拿到另一个群里发「认人 码」，两边就认成同一个人。
+    跟 QQ 号无关，没有恋综角色也能用。"""
+    import json
+    import secrets
+    from .db import set_config
+    code = "".join(secrets.choice(_LINK_CHARS) for _ in range(6))
+    set_config(f"link_code:{code}", json.dumps({"pid": int(player_id), "exp": int(time.time()) + LINK_TTL}))
+    return code
+
+
+def use_link_code(member_openid: str, group_openid: str, code: str) -> tuple[bool, str]:
+    """「认人」第二步：把这个群里的这个人认到码的主人名下。码用一次就作废。
+    这个群里的他要是已经有自己的跑团卡（或者还认了别的群），不自动合并，免得把两份记录搅在一起，请管理员处理。"""
+    import json
+    from .db import get_config, set_config
+    code = code.strip().upper()
+    raw = get_config(f"link_code:{code}", "")
+    if raw:
+        set_config(f"link_code:{code}", "")
+    try:
+        d = json.loads(raw) if raw else None
+    except ValueError:
+        d = None
+    if not d or d.get("exp", 0) < time.time():
+        return False, "这个码不对或者过期了（5 分钟内有效，用一次就作废）。回原来那个群重新发「认人」拿一个。"
+    target = int(d["pid"])
+    with get_conn() as c:
+        if not c.execute("SELECT 1 FROM trpg_players WHERE id=?", (target,)).fetchone():
+            return False, "这个码的主人已经不在了。"
+        row = c.execute("SELECT player_id FROM trpg_identities WHERE member_openid=?", (member_openid,)).fetchone()
+        if row and row["player_id"] == target:
+            return True, "本来就认成同一个人了，不用再认。"
+        if row:
+            old = row["player_id"]
+            busy = (c.execute("SELECT COUNT(*) AS n FROM trpg_cards WHERE player_id=?", (old,)).fetchone()["n"]
+                    or c.execute("SELECT COUNT(*) AS n FROM trpg_identities WHERE player_id=? AND member_openid!=?", (old, member_openid)).fetchone()["n"])
+            if busy:
+                return False, "你在这个群里已经有自己的跑团卡或别的记录了，自动合并会搅在一起。请管理员帮你处理。"
+            c.execute("UPDATE trpg_identities SET player_id=? WHERE member_openid=?", (target, member_openid))
+            c.execute("DELETE FROM trpg_players WHERE id=?", (old,))
+        else:
+            c.execute("INSERT INTO trpg_identities(member_openid,player_id,group_openid,created_ts) VALUES (?,?,?,?)",
+                      (member_openid, target, group_openid, int(time.time())))
+    return True, "好，认上了：两个群里的你现在是同一个人，跑团卡、插件里按人存的记录都通用。"
 
 
 def set_player_name(player_id: int, name: str) -> tuple[bool, str]:
@@ -105,6 +195,17 @@ def player_name(player_id: int) -> str:
     with get_conn() as c:
         row = c.execute("SELECT name FROM trpg_players WHERE id=?", (player_id,)).fetchone()
     return (row["name"] if row else "") or f"玩家{player_id}"
+
+
+def display_name(player_id: int) -> str:
+    """给插件看的名字：认到这位名下的 openid 绑着这一季的恋综角色就用角色名，否则用跑团里起的名字；都没有返回空串。"""
+    with get_conn() as c:
+        row = c.execute("SELECT r.name FROM trpg_identities i JOIN role_groups g ON g.member_openid=i.member_openid "
+                        "JOIN roles r ON r.id=g.role_id WHERE i.player_id=? ORDER BY r.id DESC LIMIT 1", (player_id,)).fetchone()
+        if row:
+            return row["name"]
+        row = c.execute("SELECT name FROM trpg_players WHERE id=?", (player_id,)).fetchone()
+    return row["name"] if row else ""
 
 
 def list_cards(player_id: int) -> list[dict]:

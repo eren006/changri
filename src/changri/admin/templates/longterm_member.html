@@ -1,0 +1,101 @@
+{% extends "base.html" %}{% block title %}{{ m.name }} · 长期群{% endblock %}
+{% block head %}<style>
+.lt-two{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:24px}
+.lt-kv{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:0}
+.lt-kv dt{color:var(--mute)}
+.lt-kv dd{margin:0;font-variant-numeric:tabular-nums}
+.lt-form p{margin:0 0 14px}
+.lt-form .wide{width:100%;max-width:440px}
+details.lt-more{margin-top:8px;border-top:1px solid var(--line);padding-top:12px}
+details.lt-more>summary{cursor:pointer;font-weight:600;margin-bottom:10px}
+.lt-feed .row{justify-content:space-between;gap:12px}
+.lt-feed .t{color:var(--mute);font-size:12.5px;white-space:nowrap;margin-left:auto;padding-top:2px}
+</style>{% endblock %}
+{% block body %}
+<p><a href="{{ url_for('longterm_group', gid=g.id, tab='players') }}">← {{ g.name }} · 玩家</a></p>
+<h1>{{ m.name }}</h1>
+<p class="lede">{{ 'QQ 已认' if m.member_openid else 'QQ 还没认：本人用这个名字「/注册」就认上' }} · 注册于 {{ m.created_ts|ts }}{% if m.alias_list %} · 也叫 {{ m.alias_list|join('、') }}{% endif %}</p>
+
+<div class="stats">
+  <div class="stat"><b>{{ m.coins }}</b><span>{{ g.currency }}</span></div>
+  <div class="stat"><b>{{ m.chars }}</b><span>累计字数{% if m.chars_left %}（{{ m.chars_left }} 字零头）{% endif %}</span></div>
+  <div class="stat"><b>{{ m.paras }}</b><span>累计段数</span></div>
+  {% if kpi %}<div class="stat"><b>{{ '✅' if kpi.ok else '还差' }}</b><span>{{ kpi_label }} KPI{% if g.kpi_chars %} · {{ kpi.chars }}/{{ g.kpi_chars }} 字{% endif %}{% if g.kpi_paras %} · {{ kpi.paras }}/{{ g.kpi_paras }} 段{% endif %}</span></div>{% endif %}
+  {% if pending_chars %}<div class="stat"><b>{{ pending_chars }}</b><span>字等批准</span></div>{% endif %}
+</div>
+
+<section>
+  <div class="sec-head"><h2>调整</h2></div>
+  <form class="lt-form" method="post" action="{{ url_for('longterm_member_adjust', mid=m.id) }}">{{ csrf() }}
+    <p><input class="wide" type="text" name="text" required placeholder="{{ g.currency }}+50　HP-3　回血药水+2　字数+300　段数+5" aria-label="调整内容"></p>
+    <p><input class="wide" type="text" name="note" maxlength="60" placeholder="原因（可不填，会记进动态）" aria-label="原因"></p>
+    <p><button class="btn">调整</button></p>
+  </form>
+  <p class="note">可以一次写好几项。「{{ g.currency }}」改货币，「字数」改字数（加的照常换{{ g.currency }}），属性名改属性，其余是背包物品；写「=」是直接改成这个数（{{ g.currency }}=100）。</p>
+</section>
+
+<section>
+  <div class="lt-two">
+    <div>
+      <div class="sec-head"><h2>属性</h2></div>
+      {% if attrs %}<dl class="lt-kv">{% for n, v in attrs %}<dt>{{ n }}</dt><dd>{{ v }}</dd>{% endfor %}</dl>
+      {% else %}<p class="empty">还没有属性（在长期群「设置 → 属性面板」里定义）。</p>{% endif %}
+    </div>
+    <div>
+      <div class="sec-head"><h2>背包</h2></div>
+      {% if bag %}<dl class="lt-kv">{% for n, q in bag %}<dt>{{ n }}</dt><dd>×{{ q }}</dd>{% endfor %}</dl>
+      {% else %}<p class="empty">空的。</p>{% endif %}
+    </div>
+  </div>
+</section>
+
+<section>
+  <details class="lt-more" open><summary>动态</summary>
+    {% if events %}<div class="rowlist lt-feed">{% for e in events %}
+      <div class="row"><div>{{ e.text }}{% if e.ref_id %} <a href="{{ url_for('longterm_submission', sid=e.ref_id) }}">看原文</a>{% endif %}</div><span class="t">{{ e.ts|ts }}</span></div>
+    {% endfor %}</div>{% else %}<p class="empty">还没有。</p>{% endif %}
+  </details>
+
+  <details class="lt-more"><summary>记在 TA 名下的发言（{{ lines|length }} 条）</summary>
+    {% if lines %}<div class="tablewrap"><table class="rt">
+      <tr><th>交于</th><th>转发里的名字</th><th>内容</th><th>字数</th></tr>
+      {% for l in lines %}
+      <tr><td class="tabular"><a href="{{ url_for('longterm_submission', sid=l.submission_id) }}">#{{ l.submission_id }}</a><div class="muted">{{ l.ts|ts }}</div></td><td>{{ l.sender }}</td>
+        <td style="white-space:pre-wrap;max-width:420px">{{ l.text }}</td>
+        <td class="tabular">{{ l.chars }}{% if not l.counted %} <span class="tag">重复没算</span>{% endif %}</td></tr>
+      {% endfor %}
+    </table></div>{% else %}<p class="empty">还没有。</p>{% endif %}
+  </details>
+
+  <details class="lt-more"><summary>每一笔流水（{{ ledger|length }}）</summary>
+    {% if ledger %}<div class="tablewrap"><table class="rt">
+      <tr><th>时间</th><th>变化</th><th>说明</th></tr>
+      {% for r in ledger %}
+      <tr><td class="tabular">{{ r.ts|ts }}</td>
+        <td class="tabular">{% if r.kind == '字数' %}{% if r.chars %}{{ '%+d' % r.chars }} 字{% endif %}{% if r.paras %} {{ '%+d' % r.paras }} 段{% endif %}{% if r.coins %}，+{{ r.coins }} {{ g.currency }}{% endif %}{% elif r.kind == '货币' %}{{ '%+d' % r.coins }} {{ g.currency }}{% else %}{{ r.item }} {{ '%+d' % r.qty }}{% endif %}</td>
+        <td>{{ r.note }}</td></tr>
+      {% endfor %}
+    </table></div>{% else %}<p class="empty">还没有。</p>{% endif %}
+  </details>
+
+  <details class="lt-more"><summary>注册信息</summary>
+    <form method="post" action="{{ url_for('longterm_member_edit', mid=m.id) }}" class="lt-form">{{ csrf() }}
+      <p><label>名字<br><input type="text" name="name" value="{{ m.name }}" maxlength="16" required></label></p>
+      {% for k in fields %}<p><label>{{ k }}<br><input class="wide" type="text" name="info_{{ k }}" value="{{ m.info.get(k, '') }}" maxlength="200"></label></p>{% endfor %}
+      {% for k, v in m.info.items() if k not in fields %}<p class="note">{{ k }}：{{ v }}（这一项后台已经不要了）</p>{% endfor %}
+      <p><label>别名（合并转发里 TA 可能显示的名字，逗号分开）<br><input class="wide" type="text" name="aliases" value="{{ m.alias_list|join('，') }}"></label></p>
+      <p><button class="btn">保存</button></p>
+    </form>
+  </details>
+
+  <details class="lt-more"><summary>其他</summary>
+    {% if m.member_openid %}
+    <form class="inline" method="post" action="{{ url_for('longterm_member_unbind', mid=m.id) }}">{{ csrf() }}<button class="btn ghost sm">解开 QQ</button>
+      <span class="note">换号、认错人时用：数据留着，本人再用这个名字「/注册」就认回来。</span></form>
+    {% endif %}
+    {% if attrs %}<p class="note">删掉某项属性：{% for n, v in attrs %}<form method="post" action="{{ url_for('longterm_member_attr_delete', mid=m.id) }}" style="display:inline">{{ csrf() }}<input type="hidden" name="name" value="{{ n }}"><button class="linkbtn">{{ n }}</button></form>{{ '、' if not loop.last }}{% endfor %}</p>{% endif %}
+    <form method="post" action="{{ url_for('longterm_member_delete', mid=m.id) }}" onsubmit="return confirm('删除「{{ m.name }}」？字数、货币、属性、背包一起删掉，不能恢复。')" style="margin-top:12px">{{ csrf() }}
+      <button class="btn danger sm">删除这位玩家</button></form>
+  </details>
+</section>
+{% endblock %}

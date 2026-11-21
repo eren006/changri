@@ -34,9 +34,11 @@ def register(app, login_required):
         ls = trpglog_core.lines(log_id)
         style = trpgrender_core.parse_style(log["palette"])
         cmap = trpgrender_core.color_map(ls, style)
-        return render_template("trpglog_view.html", log=log, stats=trpglog_core.stats(log_id), status=trpglog_core.STATUS_TEXT,
+        st = trpglog_core.stats(log_id)
+        return render_template("trpglog_view.html", log=log, stats=st, highlights=trpglog_core.highlights(st), status=trpglog_core.STATUS_TEXT,
                                style=style, themes=trpgrender_core.THEMES, colors=[(n, c[0]) for n, c in cmap.items()],
-                               preview=trpgrender_core.render_html(log, ls, style), url=trpglog_core.share_url(log))
+                               preview=trpgrender_core.render_html(log, ls, style, stats=st, highlights=trpglog_core.highlights(st)),
+                               url=trpglog_core.share_url(log))
 
     @app.post("/trpglog/<int:log_id>/style")
     @login_required

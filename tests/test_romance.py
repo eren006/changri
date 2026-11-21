@@ -82,7 +82,7 @@ class LovemailTests(Base):
         self.assertFalse(lovemail.revoke(self.a, 9)[0])
         self.assertFalse(lovemail.add_mail(self.a, self.b, "x" * 21, "内容")[0])    # 署名超 20 字
         set_config("lovemail_default_limit", "0")
-        self.assertIn("关闭", lovemail.add_mail(self.a, self.b, "匿名", "内容")[1])
+        self.assertIn("不收投稿", lovemail.add_mail(self.a, self.b, "匿名", "内容")[1])
         set_config("lovemail_default_limit", "3"); set_config("lovemail_enabled", "0")
         self.assertIn("没有开放", lovemail.add_mail(self.a, self.b, "匿名", "内容")[1])
 
@@ -238,13 +238,13 @@ class RelationTests(Base):
         self.assertFalse(relations.add_detail(self.a, self.b, "乙", "123456")[0])
         set_config("max_detail_chars", "500"); set_config("max_detail_count", "2")
         relations.add_detail(self.a, self.b, "乙", "1"); relations.add_detail(self.a, self.b, "乙", "2")
-        self.assertIn("段数上限", relations.add_detail(self.a, self.b, "乙", "3")[1])
+        self.assertIn("已经写满", relations.add_detail(self.a, self.b, "乙", "3")[1])
         set_config("max_detail_count", "20"); set_config("max_rel_total_chars", "4")
-        self.assertIn("总字数上限", relations.add_detail(self.a, self.b, "乙", "12345")[1])
+        self.assertIn("超过总字数", relations.add_detail(self.a, self.b, "乙", "12345")[1])
         set_config("max_rel_total_chars", "3000"); set_config("max_relationships_per_user", "1")
-        self.assertIn("发起额度", relations.add_detail(self.a, self.c, "丙", "x")[1])
+        self.assertIn("你发起的关系线", relations.add_detail(self.a, self.c, "丙", "x")[1])
         set_config("max_relationships_per_user", "20"); set_config("max_relationships_total", "1")
-        self.assertIn("总数已满", relations.add_detail(self.c, self.b, "乙", "x")[1])  # 乙已有一条，对方满了
+        self.assertIn("已经满了", relations.add_detail(self.c, self.b, "乙", "x")[1])  # 乙已有一条，对方满了
         set_config("rel_enabled", "0")
         self.assertFalse(relations.add_detail(self.c, self.b, "乙", "x")[0])
 

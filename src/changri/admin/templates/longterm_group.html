@@ -1,0 +1,253 @@
+{% extends "base.html" %}{% block title %}{{ g.name }} · 长期群{% endblock %}
+{% block head %}<style>
+.lt-feed .row{align-items:flex-start}
+.lt-feed .k{display:inline-block;min-width:3em;margin-right:10px;padding:1px 8px;border-radius:999px;font-size:12px;text-align:center;background:var(--soft);color:var(--mute)}
+.lt-feed .k.字数{background:color-mix(in srgb,var(--dusk) 14%,transparent);color:var(--ink)}
+.lt-feed .k.商城,.lt-feed .k.合成{background:color-mix(in srgb,var(--ok) 14%,transparent);color:var(--ink)}
+.lt-feed .k.管理{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--ink)}
+.lt-feed .row{justify-content:space-between;gap:12px}
+.lt-feed .t{color:var(--mute);font-size:12.5px;white-space:nowrap;margin-left:auto;padding-top:2px}
+.lt-filter{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px}
+.lt-filter a{padding:4px 12px;border:1px solid var(--card-line);border-radius:999px;font-size:13px;text-decoration:none;color:var(--ink)}
+.lt-filter a[aria-current]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.lt-form p{margin:0 0 14px}
+.lt-form .wide{width:100%;max-width:440px}
+details.lt-add{margin-top:14px}
+details.lt-add>summary{cursor:pointer;display:inline-block}
+</style>{% endblock %}
+{% block body %}
+<p><a href="{{ url_for('longterm_page') }}">← 所有长期群</a></p>
+<h1>{{ g.name }}</h1>
+<p class="lede">货币「{{ g.currency }}」· 每 {{ g.chars_per_step }} 字换 {{ g.coins_per_step }} {{ g.currency }}{% if g.count_review %} · 字数要批准{% endif %}{% if g.checkin_on %} · 签到开着{% endif %}</p>
+
+<nav class="tabs" aria-label="长期群分页">
+  {% for key, label in tabs %}<a href="{{ url_for('longterm_group', gid=g.id, tab=key) }}" {% if tab == key %}aria-current="page"{% endif %}>{{ label }}{% if key == 'words' and pending %} <span class="tag">{{ pending|length }}</span>{% endif %}</a>{% endfor %}
+</nav>
+
+{# ---------- 等批准：总览和字数页都放在最上面 ---------- #}
+{% macro pending_block(back) %}
+{% if pending %}
+<div class="callout">
+  <b>{{ pending|length }} 次字数统计等你批准</b>
+  <div class="muted">批准时按现在的比例换：每 {{ g.chars_per_step }} 字换 {{ g.coins_per_step }} {{ g.currency }}，不够一档的零头留着下次凑。比例在 <a href="{{ url_for('longterm_group', gid=g.id, tab='settings') }}">设置</a> 里改。</div>
+  <div class="rowlist" style="margin-top:10px">{% for s in pending %}
+    <div class="row"><div><a href="{{ url_for('longterm_submission', sid=s.id) }}"><b>#{{ s.id }}</b></a> {{ s.submitter_name or '管理员' }} 交的 · {{ s.total_chars }} 字<div class="muted">{{ s.ts|ts }} · {{ s.n_counted }}/{{ s.n_lines }} 条算数</div></div>
+      <div class="acts">
+        <form method="post" action="{{ url_for('longterm_review', sid=s.id) }}" style="display:inline">{{ csrf() }}<input type="hidden" name="act" value="approve"><input type="hidden" name="back" value="{{ back }}"><button class="btn sm">批准</button></form>
+        <form method="post" action="{{ url_for('longterm_review', sid=s.id) }}" style="display:inline" onsubmit="return confirm('驳回 #{{ s.id }}？不入账，玩家可以重新交。')">{{ csrf() }}<input type="hidden" name="act" value="reject"><input type="hidden" name="back" value="{{ back }}"><button class="btn sm ghost">驳回</button></form>
+      </div></div>
+  {% endfor %}</div>
+  {% if pending|length > 1 %}<form method="post" action="{{ url_for('longterm_review_all', gid=g.id) }}" style="margin-top:10px" onsubmit="return confirm('批准全部 {{ pending|length }} 次？')">{{ csrf() }}<input type="hidden" name="back" value="{{ back }}"><button class="btn sm">全部批准</button></form>{% endif %}
+</div>
+{% endif %}
+{% endmacro %}
+
+{% if tab == 'home' %}
+{{ pending_block('home') }}
+<div class="stats">
+  <div class="stat"><b>{{ stats.members }}</b><span>注册玩家</span></div>
+  <div class="stat"><b>{{ stats.today_chars }}</b><span>今天入账字数</span></div>
+  <div class="stat"><b>{{ stats.coins }}</b><span>大家手里的{{ g.currency }}</span></div>
+  {% if stats.kpi_ok is not none %}<div class="stat"><b>{{ stats.kpi_ok }}/{{ stats.members }}</b><span><a href="{{ url_for('longterm_group', gid=g.id, tab='players', kpi='no') }}">KPI 达标</a></span></div>{% endif %}
+  {% if g.checkin_on %}<div class="stat"><b>{{ stats.today_checkins }}</b><span>今天签到</span></div>{% endif %}
+</div>
+{% if stats.unclaimed %}<p class="note" style="margin:0 0 24px">有 {{ stats.unclaimed }} 个转发里的名字没对上玩家，<a href="{{ url_for('longterm_group', gid=g.id, tab='words') }}#unclaimed">去认领</a>。</p>{% endif %}
+
+<section>
+  <div class="sec-head"><h2>动态</h2></div>
+  <div class="lt-filter">
+    <a href="{{ url_for('longterm_group', gid=g.id, mid=mid or None) }}" {% if not kind %}aria-current="true"{% endif %}>全部</a>
+    {% for k in kinds %}<a href="{{ url_for('longterm_group', gid=g.id, kind=k, mid=mid or None) }}" {% if kind == k %}aria-current="true"{% endif %}>{{ k }}</a>{% endfor %}
+    {% if all_members %}<form method="get" style="margin-left:auto">{% if kind %}<input type="hidden" name="kind" value="{{ kind }}">{% endif %}
+      <select name="mid" onchange="this.form.submit()" aria-label="只看某位玩家"><option value="">所有玩家</option>{% for m in all_members %}<option value="{{ m.id }}" {{ 'selected' if mid == m.id|string }}>{{ m.name }}</option>{% endfor %}</select></form>{% endif %}
+  </div>
+  {% if events %}
+  <div class="rowlist lt-feed">{% for e in events %}
+    <div class="row"><div><span class="k {{ e.kind }}">{{ e.kind }}</span>{{ e.text }}{% if e.ref_id %} <a href="{{ url_for('longterm_submission', sid=e.ref_id) }}">看原文</a>{% endif %}</div><span class="t">{{ e.ts|ts }}</span></div>
+  {% endfor %}</div>
+  {% if more %}<p><a class="btn ghost sm" href="{{ url_for('longterm_group', gid=g.id, kind=kind or None, mid=mid or None, before=more) }}">更早的</a></p>{% endif %}
+  {% else %}<p class="empty">{% if kind or mid %}没有符合的动态。{% else %}还没有动态。玩家注册、交字数、买东西、签到……都会记在这里。{% endif %}</p>{% endif %}
+</section>
+
+{% elif tab == 'players' %}
+<section>
+  <div class="sec-head"><h2>注册玩家<span class="n">{{ all_members|length }} 人</span></h2></div>
+  <form class="inline" method="get" style="margin:0 0 12px"><input type="hidden" name="tab" value="players">{% if kpi %}<input type="hidden" name="kpi" value="{{ kpi }}">{% endif %}<label>搜索<input name="q" value="{{ q }}" placeholder="名字、别名、注册内容"></label><button class="btn ghost sm">搜索</button>{% if q or kpi %}<a href="{{ url_for('longterm_group', gid=g.id, tab='players') }}">清除</a>{% endif %}</form>
+  {% if prog %}<div class="lt-filter">
+    <span class="muted">{{ kpi_label }} KPI{% if g.kpi_chars %} · 字数 {{ g.kpi_chars }}{% endif %}{% if g.kpi_paras %} · 段数 {{ g.kpi_paras }}{% endif %}：</span>
+    <a href="{{ url_for('longterm_group', gid=g.id, tab='players') }}" {% if not kpi %}aria-current="true"{% endif %}>全部</a>
+    <a href="{{ url_for('longterm_group', gid=g.id, tab='players', kpi='ok') }}" {% if kpi == 'ok' %}aria-current="true"{% endif %}>达标</a>
+    <a href="{{ url_for('longterm_group', gid=g.id, tab='players', kpi='no') }}" {% if kpi == 'no' %}aria-current="true"{% endif %}>没达标</a>
+  </div>{% endif %}
+  {% if members %}
+  <div class="tablewrap"><table class="rt">
+    <tr><th>名字</th>{% for k in fields %}<th>{{ k }}</th>{% endfor %}<th>字数 / 段数</th><th>{{ g.currency }}</th>{% if prog %}<th>{{ kpi_label }} KPI</th>{% endif %}<th>注册于</th><th></th></tr>
+    {% for m in members %}
+    <tr><td>{{ m.name }}{% if not m.member_openid %} <span class="tag">没认 QQ</span>{% endif %}{% if m.alias_list %}<div class="muted">也叫 {{ m.alias_list|join('、') }}</div>{% endif %}</td>
+      {% for k in fields %}<td>{{ m.info.get(k, '') or '—' }}</td>{% endfor %}
+      <td class="tabular">{{ m.chars }} / {{ m.paras }}</td><td class="tabular">{{ m.coins }}</td>
+      {% if prog %}{% set p = prog[m.id] %}<td class="tabular">{{ '✅' if p.ok else '—' }}{% if g.kpi_chars %} {{ p.chars }}/{{ g.kpi_chars }} 字{% endif %}{% if g.kpi_paras %} {{ p.paras }}/{{ g.kpi_paras }} 段{% endif %}</td>{% endif %}
+      <td class="tabular">{{ m.created_ts|ts }}</td>
+      <td><a class="btn sm ghost" href="{{ url_for('longterm_member', mid=m.id) }}">详情</a></td></tr>
+    {% endfor %}
+  </table></div>
+  {% else %}<p class="empty">{% if q %}没有匹配的玩家。{% else %}还没有人注册。玩家在接好的 QQ 群里发「/注册 名字」。{% endif %}</p>{% endif %}
+  <details class="lt-add"><summary class="btn ghost sm">手动加一位</summary>
+    <form class="inline" method="post" action="{{ url_for('longterm_member_add', gid=g.id) }}" style="margin-top:10px">{{ csrf() }}
+      <label>名字<input type="text" name="name" maxlength="16" required></label><button class="btn sm">加</button></form>
+    <p class="note">本人以后在群里用同一个名字「/注册」就认上。</p></details>
+</section>
+
+<section id="grant">
+  <div class="sec-head"><h2>批量发放</h2></div>
+  <form method="post" action="{{ url_for('longterm_grant', gid=g.id) }}" class="lt-form">{{ csrf() }}
+    <p><input class="wide" type="text" name="text" required placeholder="{{ g.currency }}+50 回血药水+1" aria-label="发放内容">
+      <br><span class="note">跟群里「/调整」一样：属性名改属性，「{{ g.currency }}」改货币，「字数」改字数，其余当物品。</span></p>
+    <p><input class="wide" type="text" name="note" maxlength="60" placeholder="原因（可不填，会记进动态）" aria-label="原因"></p>
+    <p><label class="check"><span class="sw"><input type="checkbox" name="all" value="1"><i></i></span>发给全员（{{ all_members|length }} 人）</label></p>
+    {% if all_members %}<details style="margin:0 0 14px"><summary>或者只勾几位</summary><p style="display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:8px">
+      {% for m in all_members %}<label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" name="member" value="{{ m.id }}">{{ m.name }}</label>{% endfor %}</p></details>{% endif %}
+    <p><button class="btn">发放</button></p>
+  </form>
+</section>
+
+{% elif tab == 'words' %}
+{{ pending_block('words') }}
+<section id="unclaimed">
+  <div class="sec-head"><h2>没对上的名字<span class="n">{{ unclaimed|length }}</span></h2></div>
+  <p class="note" style="margin:0 0 12px">合并转发里的发送者是 QQ 昵称，跟注册名对不上时字数先挂在这里。认领后字数转给那位玩家，这个名字以后自动算 TA 的。</p>
+  {% if unclaimed %}
+  <div class="rowlist">{% for u in unclaimed %}
+    <div class="row"><div><b>{{ u.name }}</b><div class="muted">{{ u.chars }} 字 · 最近 {{ u.last_ts|ts }}</div></div>
+      <div class="acts"><form class="inline" method="post" action="{{ url_for('longterm_claim', gid=g.id) }}">{{ csrf() }}<input type="hidden" name="name" value="{{ u.name }}">
+        <select name="member_id" aria-label="认领给哪位玩家"><option value="">认领给…</option>{% for m in all_members %}<option value="{{ m.id }}">{{ m.name }}</option>{% endfor %}</select><button class="btn sm">认领</button></form>
+        <form method="post" action="{{ url_for('longterm_unclaimed_drop', gid=g.id) }}" style="display:inline" onsubmit="return confirm('丢掉「{{ u.name }}」的 {{ u.chars }} 字？')">{{ csrf() }}<input type="hidden" name="name" value="{{ u.name }}"><button class="linkbtn">丢掉</button></form></div></div>
+  {% endfor %}</div>
+  {% else %}<p class="empty">没有。</p>{% endif %}
+</section>
+
+<section>
+  <div class="sec-head"><h2>所有字数统计<span class="n">最近 {{ subs|length }} 次</span></h2></div>
+  {% if subs %}
+  <div class="tablewrap"><table class="rt">
+    <tr><th>编号</th><th>时间</th><th>谁交的</th><th>新记字数</th><th>状态</th></tr>
+    {% for s in subs %}
+    <tr><td class="tabular"><a href="{{ url_for('longterm_submission', sid=s.id) }}">#{{ s.id }}</a></td><td class="tabular">{{ s.ts|ts }}</td><td>{{ s.submitter_name or '管理员' }}</td>
+      <td class="tabular">{{ s.total_chars }}</td><td>{{ {'pending':'等批准','approved':'已入账','rejected':'驳回'}[s.status] }}</td></tr>
+    {% endfor %}
+  </table></div>
+  {% else %}<p class="empty">还没有人交过。玩家长按合并转发 →「回复」→ 发「/字数统计」。</p>{% endif %}
+</section>
+
+{% elif tab == 'items' %}
+<section>
+  <div class="sec-head"><h2>道具<span class="n">{{ items|length }} 种 · {{ items|selectattr('on_sale')|list|length }} 种在卖</span></h2></div>
+  {% if items %}
+  <div class="tablewrap"><table class="rt">
+    <tr><th>道具</th><th>使用效果</th><th>商城</th><th></th></tr>
+    {% for d in items %}
+    <tr><td><b>{{ d.name }}</b>{% if d.description %}<div class="muted">{{ d.description }}</div>{% endif %}</td>
+      <td>{{ d.effects or '—' }}</td>
+      <td>{% if d.on_sale %}{{ d.price }} {{ g.currency }}<div class="muted">库存 {{ '不限' if d.stock < 0 else d.stock }}{% if d.limit_total %} · 每人限 {{ d.limit_total }}{% endif %}{% if d.limit_daily %} · 每天限 {{ d.limit_daily }}{% endif %}</div>{% else %}<span class="muted">没上架</span>{% endif %}</td>
+      <td><a class="btn sm ghost" href="{{ url_for('longterm_group', gid=g.id, tab='items', item=d.name) }}#itemform">编辑</a></td></tr>
+    {% endfor %}
+  </table></div>
+  {% else %}<p class="empty">还没有道具。在下面登记一个：写了效果的玩家能 /使用，勾了上架的能在 /商城 买。</p>{% endif %}
+
+  {% set e = edit_item %}
+  <details class="lt-add" id="itemform" {{ 'open' if e }}><summary class="btn {{ '' if e else 'ghost' }} sm">{{ '编辑「' ~ e.name ~ '」' if e else '登记新道具' }}</summary>
+  <form method="post" action="{{ url_for('longterm_item_save', gid=g.id) }}" class="lt-form" style="margin-top:14px">{{ csrf() }}
+    <input type="hidden" name="old_name" value="{{ e.name if e else '' }}">
+    <p><label>名字<br><input type="text" name="name" value="{{ e.name if e else '' }}" maxlength="20" required placeholder="回血药水"></label></p>
+    <p><label>说明<br><input class="wide" type="text" name="description" value="{{ e.description if e else '' }}" maxlength="200" placeholder="可不填"></label></p>
+    <p><label>使用效果<br><input class="wide" type="text" name="effects" value="{{ e.effects if e else '' }}" placeholder="HP+10 理智+5（空着 = 不能使用）"></label>
+      <br><span class="note">效果里的属性要先在「设置 → 属性面板」里定义。</span></p>
+    <p><label class="check"><span class="sw"><input type="checkbox" name="on_sale" value="1" {{ 'checked' if e and e.on_sale }}><i></i></span>在商城上架</label></p>
+    <p>价格 <input type="number" name="price" min="0" value="{{ e.price if e else 0 }}" style="width:96px" aria-label="价格"> {{ g.currency }}
+       库存 <input type="number" name="stock" min="0" value="{{ e.stock if e and e.stock >= 0 else '' }}" placeholder="不限" style="width:96px" aria-label="库存"></p>
+    <p>每人限购 <input type="number" name="limit_total" min="0" value="{{ e.limit_total if e and e.limit_total else '' }}" placeholder="不限" style="width:96px" aria-label="每人一共限购">
+       每人每天 <input type="number" name="limit_daily" min="0" value="{{ e.limit_daily if e and e.limit_daily else '' }}" placeholder="不限" style="width:96px" aria-label="每人每天限购"></p>
+    <p><button class="btn">保存</button>{% if e %} <a href="{{ url_for('longterm_group', gid=g.id, tab='items') }}">取消</a>{% endif %}</p>
+  </form>
+  {% if e %}<form method="post" action="{{ url_for('longterm_item_delete', gid=g.id) }}" onsubmit="return confirm('删掉「{{ e.name }}」的登记？玩家背包里已有的留着。')">{{ csrf() }}<input type="hidden" name="name" value="{{ e.name }}"><button class="linkbtn">删除这个道具</button></form>{% endif %}
+  </details>
+</section>
+
+<section id="recipes">
+  <div class="sec-head"><h2>合成 / 兑换<span class="n">{{ recipes|length }} 个配方</span></h2></div>
+  {% if recipes %}
+  <div class="rowlist">{% for r in recipes %}
+    <div class="row"><div><b>{{ r.name }}</b><div class="muted">{{ r.inputs }} → {{ r.outputs }}</div></div>
+      <div class="acts"><a class="btn sm ghost" href="{{ url_for('longterm_group', gid=g.id, tab='items', recipe=r.name) }}#recipeform">编辑</a></div></div>
+  {% endfor %}</div>
+  {% else %}<p class="empty">还没有配方。玩家 /合成表 看、/合成 配方名 做；写货币名就是兑换（「{{ g.currency }}×100 → 金钥匙×1」）。</p>{% endif %}
+  {% set r = edit_recipe %}
+  <details class="lt-add" id="recipeform" {{ 'open' if r }}><summary class="btn {{ '' if r else 'ghost' }} sm">{{ '编辑「' ~ r.name ~ '」' if r else '添加配方' }}</summary>
+  <form method="post" action="{{ url_for('longterm_recipe_save', gid=g.id) }}" class="lt-form" style="margin-top:14px">{{ csrf() }}
+    <input type="hidden" name="old_name" value="{{ r.name if r else '' }}">
+    <p><label>配方名<br><input type="text" name="name" value="{{ r.name if r else '' }}" maxlength="20" required placeholder="稀有剑"></label></p>
+    <p><label>用掉<br><input class="wide" type="text" name="inputs" value="{{ r.inputs if r else '' }}" required placeholder="碎片×3 {{ g.currency }}×10"></label></p>
+    <p><label>得到<br><input class="wide" type="text" name="outputs" value="{{ r.outputs if r else '' }}" required placeholder="稀有剑×1"></label></p>
+    <p><button class="btn">保存</button>{% if r %} <a href="{{ url_for('longterm_group', gid=g.id, tab='items') }}#recipes">取消</a>{% endif %}</p>
+  </form>
+  {% if r %}<form method="post" action="{{ url_for('longterm_recipe_delete', gid=g.id) }}" onsubmit="return confirm('删掉配方「{{ r.name }}」？')">{{ csrf() }}<input type="hidden" name="name" value="{{ r.name }}"><button class="linkbtn">删除这个配方</button></form>{% endif %}
+  </details>
+</section>
+
+{% else %}
+<section>
+  <div class="sec-head"><h2>基本</h2></div>
+  <form method="post" action="{{ url_for('longterm_settings', gid=g.id) }}" class="lt-form">{{ csrf() }}
+    <p><label>长期群名字<br><input type="text" name="name" value="{{ g.name }}" maxlength="16" required></label></p>
+    <p><label>货币名<br><input type="text" name="currency" value="{{ g.currency }}" maxlength="8" required></label></p>
+    <p>每 <input type="number" name="chars_per_step" value="{{ g.chars_per_step }}" min="1" style="width:110px" aria-label="多少字"> 字换
+       <input type="number" name="coins_per_step" value="{{ g.coins_per_step }}" min="1" style="width:90px" aria-label="多少货币"> {{ g.currency }}
+       <br><span class="note">按入账时的比例换，零头留着下次凑；改了不重算以前的。</span></p>
+    <p><label>注册时还要填的项目（名字之外，一行一个）<br><textarea class="wide" name="reg_fields" rows="3" placeholder="角色&#10;CP">{{ g.reg_fields }}</textarea></label></p>
+    <p><label class="check"><span class="sw"><input type="checkbox" name="count_review" value="1" {{ 'checked' if g.count_review }}><i></i></span>玩家交的字数要管理员批准才入账</label></p>
+    <p><label class="check"><span class="sw"><input type="checkbox" name="count_admin_only" value="1" {{ 'checked' if g.count_admin_only }}><i></i></span>只有管理员能交字数统计</label></p>
+    <p><label class="check"><span class="sw"><input type="checkbox" name="self_attrs" value="1" {{ 'checked' if g.self_attrs }}><i></i></span>玩家可以自己用 /st 改属性</label></p>
+    <p><b>KPI</b>　按 <select name="kpi_period" aria-label="KPI 周期">{% for k, v in kpi_periods.items() %}<option value="{{ k }}" {{ 'selected' if g.kpi_period == k }}>{{ {'week':'每周（周一起）','month':'每月','all':'累计'}[k] }}</option>{% endfor %}</select> 算，
+       字数至少 <input type="number" name="kpi_chars" min="0" value="{{ g.kpi_chars or '' }}" placeholder="不考核" style="width:100px" aria-label="KPI 字数">，
+       段数至少 <input type="number" name="kpi_paras" min="0" value="{{ g.kpi_paras or '' }}" placeholder="不考核" style="width:90px" aria-label="KPI 段数">
+       <br><span class="note">合并转发里一条消息算一段；按入账（批准）的时间算进哪一期，后台加减的字数、段数也算。两项都空着 = 不考核。</span></p>
+    <p><label class="check"><span class="sw"><input type="checkbox" name="checkin_on" value="1" {{ 'checked' if g.checkin_on }}><i></i></span>每日签到（/签到）{% if g.checkin_on %}<span class="muted">　今天 {{ checkins_today }} 人签了</span>{% endif %}</label></p>
+    <p><label>签到奖励（一行一项，「名字 数量」或「名字 最少-最多」随机）<br>
+       <textarea class="wide" name="checkin_rewards" rows="3" placeholder="{{ g.currency }} 10-30&#10;回血药水 1&#10;幸运 0-2">{{ g.checkin_rewards }}</textarea></label>
+       <br><span class="note">货币名给货币、属性名加属性，其余放进背包；随机到 0 的那项这次不给。</span></p>
+    <p><button class="btn">保存</button></p>
+  </form>
+</section>
+
+<section id="attrs">
+  <div class="sec-head"><h2>属性面板<span class="n">{{ defs|length }} 项</span></h2></div>
+  <p class="note" style="margin:0 0 12px">每个玩家都有这些属性，注册时给默认值；/ra、/rt 等检定读它。力量、敏捷、理智等认 STR、DEX、SAN 这些别名。名字相同就是修改。</p>
+  {% if defs %}
+  <div class="rowlist">{% for d in defs %}
+    <div class="row"><div><b>{{ d.name }}</b><div class="muted">默认 {{ d.default_value }} · 范围 {{ d.min_value if d.min_value is not none else '不限' }} 到 {{ d.max_value if d.max_value is not none else '不限' }}</div></div>
+      <div class="acts"><form method="post" action="{{ url_for('longterm_attr_delete', gid=g.id) }}" onsubmit="return confirm('删掉「{{ d.name }}」？所有玩家的这一项会一起删掉。')">{{ csrf() }}<input type="hidden" name="name" value="{{ d.name }}"><button class="linkbtn">删除</button></form></div></div>
+  {% endfor %}</div>
+  {% else %}<p class="empty">还没有属性。</p>{% endif %}
+  <details class="lt-add"><summary class="btn ghost sm">添加 / 修改属性</summary>
+  <form class="inline" method="post" action="{{ url_for('longterm_attr_save', gid=g.id) }}" style="margin-top:12px">{{ csrf() }}
+    <label>名称<input type="text" name="name" required maxlength="12" placeholder="力量" style="width:100px"></label>
+    <label>默认<input type="number" name="default" value="0" style="width:80px"></label>
+    <label>下限<input type="number" name="min" placeholder="不限" style="width:80px"></label>
+    <label>上限<input type="number" name="max" placeholder="不限" style="width:80px"></label>
+    <button class="btn sm">保存</button></form>
+  </details>
+</section>
+
+<section>
+  <div class="sec-head"><h2>接到 QQ 群</h2></div>
+  <p class="note" style="margin:0">QQ 群里机器人管理员发「/模式 长期群」，再发「/切换长期群 {{ g.name }}」。一个长期群可以接好几个 QQ 群。群里发「/长期群帮助」看所有指令。</p>
+</section>
+
+<section>
+  <details><summary class="linkbtn">删除这个长期群</summary>
+  <form class="inline" method="post" action="{{ url_for('longterm_delete', gid=g.id) }}" style="margin-top:12px">{{ csrf() }}
+    <label>填名字确认<input type="text" name="confirm" placeholder="{{ g.name }}" style="width:200px"></label><button class="btn danger sm">删除</button></form>
+  <p class="note">玩家、字数、货币、属性、背包、留底、动态全部删掉，不能恢复。</p></details>
+</section>
+{% endif %}
+{% endblock %}

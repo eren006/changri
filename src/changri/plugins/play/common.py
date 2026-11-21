@@ -10,8 +10,8 @@ from changri.core import admins, messaging, pool, qqmanager, qqpool, roles, room
 from changri.core.qqsend import make_send, send_to_group
 
 
-NEED_ROLE = "请先在你的个人群里发「创建新角色 名字」绑定角色。"
-NOT_ADMIN = "❌ 权限不足，仅管理员可用。"
+NEED_ROLE = "你还没有角色。在你的个人群里发「创建新角色 名字」就能创建。"
+NOT_ADMIN = "❌ 这条指令只有管理员能用。"
 SEP = re.compile(r"[/、，,]")
 
 
@@ -80,7 +80,7 @@ async def _to_group(bot_id: str, group_openid: str, text: str) -> bool:
 from changri.core.overview import group_line as _group_line, slot_text as _slot  # noqa: E402
 
 
-RP_FORMAT_TIP = "✍️ 戏文格式：首行「角色名」+ 换行/空格/冒号（：或:）+ 正文，其余视为闲聊，不计入存档与字数"
+RP_FORMAT_TIP = "✍️ 写戏的格式：先写角色名，再写正文，中间用冒号、空格或换行隔开都行。不按这个格式写的算闲聊，不进存档，也不算字数"
 
 
 def _room_text(room, who_from: str = "") -> str:

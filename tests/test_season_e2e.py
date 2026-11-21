@@ -80,7 +80,7 @@ class SeasonE2E(unittest.TestCase):
 
     def test_admin_only(self):
         for t in ("开始季度", "结束季度", "收尾", "季度状态", "设置天数 D1", "开始出场", "设为戏群"):
-            self.assertIn("权限不足", self.say(t, member="PLAYER")[0], t)
+            self.assertIn("只有管理员能用", self.say(t, member="PLAYER")[0], t)
 
     def test_season_commands(self):
         self.assertIn("没有季度", self.say("季度状态")[0])

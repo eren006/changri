@@ -6,10 +6,10 @@
 <form method="post" action="{{ url_for('dice_lines_save') }}" class="form">{{ csrf() }}
 <section>
   <div class="sec-head keep"><h2>成功等级的表情</h2></div>
-  <p class="note">检定卡片标题前面的那个表情。COC、绿色三角洲的检定和 COC 的理智检定都用这一套；成长检定用「成功」「失败」的。等级的名字不能改。空着保存 = 用默认。</p>
+  <p class="note">检定卡片标题前面的那个表情。COC、绿色三角洲的检定和 COC 的理智检定都用这一套；成长检定用「成功」「失败」的；难度骰（/rt）单独一组。一格可以写好几个表情，<b>用空格隔开</b>，每次随机挑一个。等级的名字不能改。空着保存 = 用默认。</p>
   <div class="marks">
   {% for m in mark_rows %}
-    <label class="markslot" for="m-{{ m.level }}"><span>{{ m.level }}{% if m.custom %} <span class="tag">已改</span>{% endif %}</span>
+    <label class="markslot" for="m-{{ m.level }}"><span>{{ m.label }}{% if m.custom %} <span class="tag">已改</span>{% endif %}</span>
       <input type="text" id="m-{{ m.level }}" name="mark.{{ m.level }}" value="{{ m.mark }}" maxlength="{{ mark_max }}" placeholder="{{ m.default }}" autocomplete="off"></label>
   {% endfor %}
   </div>

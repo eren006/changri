@@ -22,6 +22,49 @@ class TrpgCore(unittest.TestCase):
             for t in ("trpg_attr_history", "trpg_active", "trpg_card_attrs", "trpg_cards", "trpg_identities", "trpg_players", "config"):
                 c.execute(f"DELETE FROM {t}")
 
+    def test_link_code_joins_two_groups(self):
+        from unittest import mock
+        a = trpg.player_for("MA", "G1")
+        code = trpg.make_link_code(a)
+        self.assertRegex(code, r"^[A-HJ-NP-Z2-9]{6}$")
+        ok, msg = trpg.use_link_code("MB", "G2", code.lower())                        # 不分大小写
+        self.assertTrue(ok, msg)
+        self.assertEqual(trpg.player_for("MB", "G2", create=False), a)
+        self.assertFalse(trpg.use_link_code("MC", "G3", code)[0])                       # 用过就作废
+        self.assertTrue(trpg.use_link_code("MB", "G2", trpg.make_link_code(a))[0])       # 本来就是同一位
+        c = trpg.player_for("MC", "G3")                                                  # 新群里先有了一位空的：合并过去，空的删掉
+        self.assertTrue(trpg.use_link_code("MC", "G3", trpg.make_link_code(a))[0])
+        self.assertEqual(trpg.player_for("MC", "G3", create=False), a)
+        with get_conn() as conn:
+            self.assertIsNone(conn.execute("SELECT 1 FROM trpg_players WHERE id=?", (c,)).fetchone())
+        d = trpg.player_for("MD", "G4")                                                  # 这边已经有卡：不自动合并
+        trpg.new_card(d, "老卡")
+        ok, msg = trpg.use_link_code("MD", "G4", trpg.make_link_code(a))
+        self.assertFalse(ok); self.assertIn("管理员", msg)
+        code = trpg.make_link_code(a)
+        with mock.patch("time.time", return_value=__import__("time").time() + trpg.LINK_TTL + 5):
+            self.assertIn("过期", trpg.use_link_code("ME", "G5", code)[1])
+        self.assertIn("不对", trpg.use_link_code("ME", "G5", "ZZZZZZ")[1])
+
+    def test_player_for_sender_follows_role_to_new_group(self):
+        """换了个人群（角色多了一条群绑定、openid 也换了）：靠角色认回原来那位玩家。"""
+        import time as _t
+        from changri.core import roles
+        with get_conn() as c:
+            c.execute("DELETE FROM roles")
+        roles.create_role("甲", "B1", "G1", "M1")
+        p = trpg.player_for_sender("B1", "G1", "M1")
+        self.assertEqual(trpg.player_for_sender("B1", "G1", "M1"), p)
+        rid = roles.get_role_by_name("甲")["id"]
+        with get_conn() as c:
+            c.execute("INSERT INTO role_groups(role_id,bot_id,group_openid,member_openid,kind,created_ts) VALUES (?,?,?,?,'backup',?)",
+                      (rid, "B1", "G9", "M9", int(_t.time())))
+        self.assertEqual(trpg.player_for_sender("B1", "G9", "M9"), p)
+        self.assertEqual(trpg.display_name(p), "甲")
+        self.assertNotEqual(trpg.player_for_sender("B1", "GX", "MX"), p)                 # 没角色、没认过：新的一位
+        q = trpg.player_for_sender("B1", "G1", "MZ")
+        self.assertEqual(trpg.display_name(q), "")
+
     def test_mode_default_and_per_group(self):
         self.assertEqual(trpg.get_mode("G1"), "romance")
         trpg.set_mode("G1", "trpg")

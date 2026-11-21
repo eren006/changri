@@ -8,8 +8,12 @@
 再把共用的文件夹改名成 ext_data_共用备份/ 留底。之后新加的机器人从空的开始，不会拿到别的团的数据。
 一个机器人都没有、或者测试用的单库（CHANGRI_DB_PATH）时，照旧用 DATA_DIR/ext_data/。
 
+按玩家本人存的（player_data_*，接口版本 4）放在 <扩展id>.player.json，{玩家编号: {键: 值}}，跨季度一直留着，收尾不清。
 按季度存的（season_data_*）放在旁边的 <扩展id>.season.json，「收尾」时 clear_season() 整个删掉：
 本季角色的连签、积分这类东西不会带进下一季，也不会一季季堆到 2MB 上限。扩展 id 里不能有点，不会和别的扩展撞名。
+老插件（接口版本 3 之前写的）按角色存进 data_set 的记录（streak_3、连签:张三……），收尾时 clear_role_keys() 也清掉：
+键拆开以后有一段正好是这季某个角色的编号或名字，就算这个角色的。猜错的可能有（比如 奖池_3），所以删之前先存进
+<扩展id>.上季清理备份.json（每次收尾覆盖上一份）。下划线开头的键（today_count 的 _today:…）不动。
 """
 import json
 import re
@@ -65,14 +69,14 @@ def _split_shared() -> None:
         shared.rename(backup)
 
 
-def path(ext_id: str, season: bool = False) -> Path:
+def path(ext_id: str, season: bool = False, player: bool = False) -> Path:
     if not ID_RE.match(str(ext_id)):
         raise ValueError(f"扩展 id 不对：{ext_id!r}")
-    return folder() / (f"{ext_id}.season.json" if season else f"{ext_id}.json")
+    return folder() / (f"{ext_id}.season.json" if season else f"{ext_id}.player.json" if player else f"{ext_id}.json")
 
 
-def load(ext_id: str, season: bool = False) -> dict:
-    p = path(ext_id, season)                    # 扩展 id 不对直接报错（在 try 外面，不能当成「没存过」吞掉）
+def load(ext_id: str, season: bool = False, player: bool = False) -> dict:
+    p = path(ext_id, season, player)                    # 扩展 id 不对直接报错（在 try 外面，不能当成「没存过」吞掉）
     try:
         d = json.loads(p.read_text(encoding="utf-8"))
         return d if isinstance(d, dict) else {}
@@ -80,8 +84,8 @@ def load(ext_id: str, season: bool = False) -> dict:
         return {}
 
 
-def save(ext_id: str, d: dict, season: bool = False) -> None:
-    p = path(ext_id, season)
+def save(ext_id: str, d: dict, season: bool = False, player: bool = False) -> None:
+    p = path(ext_id, season, player)
     raw = json.dumps(d, ensure_ascii=False)
     if len(raw.encode("utf-8")) > MAX_BYTES:
         raise ValueError("扩展数据超过 2MB，请清理旧数据")
@@ -105,3 +109,41 @@ def clear_season() -> int:
             except OSError:
                 pass
     return n
+
+
+BACKUP_SUFFIX = ".上季清理备份.json"
+_SPLIT = re.compile(r"[\s_:\-#@./|，、]+")
+
+
+def _is_role_key(key: str, ids: set[str], names: set[str]) -> bool:
+    if key.startswith("_"):
+        return False
+    return any(t in ids or t in names for t in _SPLIT.split(key) if t)
+
+
+def clear_role_keys(role_ids, role_names) -> dict[str, int]:
+    """收尾时调用（角色删掉之前把编号、名字传进来）：删掉当前机器人各扩展 data_set 里属于这些角色的记录，删之前先备份。
+    返回 {扩展id: 删了几条}。"""
+    ids = {str(i) for i in role_ids}
+    names = {str(n) for n in role_names if n}
+    out: dict[str, int] = {}
+    if not ids and not names:
+        return out
+    with lock:
+        d = folder()
+        if not d.is_dir():
+            return out
+        for p in sorted(d.glob("*.json")):
+            if p.name.endswith((".season.json", ".player.json", BACKUP_SUFFIX)):       # 按玩家存的是长期的，收尾不碰
+                continue
+            ext_id = p.name[:-len(".json")]
+            if not ID_RE.match(ext_id):
+                continue
+            data = load(ext_id)
+            gone = {k: v for k, v in data.items() if _is_role_key(k, ids, names)}
+            if not gone:
+                continue
+            (d / f"{ext_id}{BACKUP_SUFFIX}").write_text(json.dumps(gone, ensure_ascii=False, indent=1), encoding="utf-8")
+            save(ext_id, {k: v for k, v in data.items() if k not in gone})
+            out[ext_id] = len(gone)
+    return out

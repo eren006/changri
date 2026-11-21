@@ -1,6 +1,8 @@
 {% extends "base.html" %}{% block title %}{{ log.name }}{% endblock %}
 {% block head %}<style>
 .lv-form .row{display:flex;align-items:center;gap:10px;margin:6px 0}.lv-form .row>label:first-child{white-space:nowrap}.lv-form select{width:auto}.lv-form input[type=color]{width:38px;height:30px;padding:0;border:1px solid var(--line);border-radius:6px;background:none}
+.lv-people{border-collapse:collapse;width:100%}.lv-people th,.lv-people td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.lv-people .num{text-align:right;font-variant-numeric:tabular-nums}
+.table-wrap{overflow-x:auto;max-width:100%;min-width:0}@media(max-width:520px){.lv-people th,.lv-people td{padding:6px 4px;font-size:13px}}
 .pv{width:100%;height:560px;border:1px solid var(--line);border-radius:8px;background:#fff}
 @media(max-width:520px){.pv{height:440px}}
 </style>{% endblock %}
@@ -8,6 +10,18 @@
 <p><a href="{{ url_for('trpglog_page') }}">← 跑团日志</a></p>
 <h1>{{ log.name }}</h1>
 <p class="lede">{{ status[log.status] }}　·　{{ stats.lines }} 条，{{ stats.speakers }} 位发言人，骰点 {{ stats.dice }} 次（成功 {{ stats.success }} / 失败 {{ stats.fail }}），属性变动 {{ stats.changes }} 次。</p>
+
+{% if stats.people %}
+<section>
+  <h2>每个人</h2>
+  <div class="table-wrap"><table class="lv-people">
+    <thead><tr><th>发言人</th><th class="num">骰点</th><th class="num">大成功</th><th class="num">成功</th><th class="num">失败</th><th class="num">大失败</th><th class="num">成功率</th></tr></thead>
+    <tbody>{% for p in stats.people %}<tr><td>{{ p.name }}</td><td class="num">{{ p.dice }}</td><td class="num">{{ p.crit }}</td><td class="num">{{ p.ok }}</td><td class="num">{{ p.bad }}</td><td class="num">{{ p.fumble }}</td><td class="num">{{ '%d%%' % p.rate if p.rate is not none else '—' }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% if highlights %}<p class="note" style="white-space:pre-line">{{ highlights | join('\n') }}</p>{% endif %}
+  <p class="note">骰点算在发指令的人头上（@ 别人代骰也算发指令的人）；成功率只算有成败的检定，/rd 这种普通掷骰不算。</p>
+</section>
+{% endif %}
 
 <section>
   <h2>分享链接</h2>

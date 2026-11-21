@@ -59,7 +59,7 @@ async def _(args=CommandArg()):
 @grant.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     if not _is_admin(bot, event):
-        await grant.finish("❌ 权限不足，仅管理员可用。")
+        await grant.finish("❌ 这条指令只有管理员能用。")
     parts = args.extract_plain_text().split()
     usage = "用法：发放抽取 角色名 次数 [池子]\n例：发放抽取 乙 3\n给所有玩家发：发放抽取 全体 1 新年池"
     if len(parts) < 2 or not re.fullmatch(r"-?\d+", parts[1]):

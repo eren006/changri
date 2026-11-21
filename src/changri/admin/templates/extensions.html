@@ -14,6 +14,7 @@
 .ext .head h3{margin:0;font-size:16px}
 .ext .ver{color:var(--mute);font-size:13.5px}
 .tag{font-size:12px;border:1px solid var(--line);border-radius:4px;padding:1px 7px;color:var(--mute)}
+.tag.dk-season{color:var(--warn);border-color:currentColor}.tag.dk-player{color:var(--ok, var(--ink));border-color:currentColor}
 .ext dl{display:grid;grid-template-columns:auto 1fr;gap:6px 18px;margin:12px 0 0;font-size:14px}
 .ext dt{color:var(--mute)} .ext dd{margin:0}
 .acts{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 0}
@@ -115,6 +116,7 @@
   <div class="card">
     <h3>{{ r.name }}</h3>
     <p>{{ r.description }}</p>
+    {% if r.data_kinds %}<p style="margin:4px 0 0;display:flex;gap:6px;flex-wrap:wrap">{% for dk in r.data_kinds %}<span class="tag dk-{{ dk.key }}">{{ dk.text }}</span>{% endfor %}</p>{% endif %}
     <div class="acts">
       {% if owner %}
       <form method="post" action="{{ url_for('extensions_ready_install', ext_id=r.id) }}" style="margin:0"{% if r.installed %} onsubmit="return confirm('已经装过「{{ r.name }}」。用现成的版本覆盖？你改过的代码会被换掉，设置和存的数据会保留。')"{% endif %}>{{ csrf() }}
@@ -183,7 +185,7 @@ function copyEx(b){var t=b.previousElementSibling.textContent;if(navigator.clipb
         <button type="submit" aria-label="{{ '关闭' if it.enabled else '打开' }}{{ it.name }}" {% if not owner %}disabled{% endif %}></button></form>
     </span>{% endif %}
     <h3>{{ it.name }}</h3><span class="ver">{{ it.version }}</span>
-    <span class="tag">{{ {'core': '核心', 'official': '官方'}.get(it.kind, '自己的') }}</span>
+    <span class="tag">{{ {'core': '核心', 'official': '官方'}.get(it.kind, '自己的') }}</span>{% for dk in it.data_kinds or [] %}<span class="tag dk-{{ dk.key }}" title="看代码里用了哪种存数据的接口自动标的">{{ dk.text }}</span>{% endfor %}
     {% if it.load_error %}<span class="dot bad"></span><span style="color:var(--bad)">{{ it.load_error }}</span>{% endif %}
     {% if it.warnings %}<details style="flex-basis:100%"><summary style="color:var(--warn);cursor:pointer">代码里有 {{ it.warnings|length }} 处要留意</summary><ul style="margin:6px 0 0;padding-left:20px;font-size:13px">{% for w in it.warnings %}<li>{{ w }}</li>{% endfor %}</ul></details>{% endif %}
     {% if it.kind == 'user' and owner %}

@@ -1,12 +1,12 @@
 {
   "id": "daily_signin",
   "name": "每日签到",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "author": "长日将尽",
-  "description": "玩家发「签到」领金币，每天一次；连续签到每天多给一点。「我的待回」里会提醒今天还没签。",
+  "description": "玩家发「签到」，每天一次。连签和总签到天数跟着人走，换季不清零；有恋综角色的发金币，连签每天多给一点，「我的待回」里会提醒今天还没签。没有角色的人也能签（只记天数）。换个群签要先「认人」。",
   "homepage": "",
   "license": "MIT",
-  "api": 3,
+  "api": 4,
   "settings": [
     {"key": "currency", "label": "发什么", "type": "string", "default": "金币", "desc": "物品名或物品码，要在「物品与商城」的物品库里有"},
     {"key": "reward", "label": "每次给多少", "type": "int", "default": 10, "unit": "个", "desc": "第一天签到给的数量"},

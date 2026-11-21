@@ -20,7 +20,7 @@ def register(app, login_required):
                              "default": dice.POOLS[pool][key]})
             groups.append((title, rows))
         marks = dicecard.custom_marks()
-        mark_rows = [{"level": lv, "mark": marks.get(lv, m), "default": m, "custom": lv in marks} for lv, m in dicecard.MARKS.items()]
+        mark_rows = [{"level": lv, "label": lv.replace("难度骰", "难度骰 · "), "mark": marks.get(lv, m), "default": m, "custom": lv in marks} for lv, m in dicecard.MARKS.items()]
         return render_template("dice_lines.html", line_groups=groups, mark_rows=mark_rows, any_custom=bool(custom or marks),
                                line_max=LINE_MAX, lines_max=LINES_MAX, mark_max=dicecard.MARK_MAX)
 

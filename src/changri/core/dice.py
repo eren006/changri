@@ -268,51 +268,58 @@ def double_dice(node):
 
 # ======================== 点评（中性口吻，可以整块换成自己的） ========================
 
+# 台词要一眼看懂在说什么：直接说点数高低、成没成，不用「顶格」「有点薄」这类要猜的说法（2026-11-21 作者）。
 RD_REMARKS = {
-    "max": ["满点，漂亮。", "顶格了。", "最大值，运气全在这儿。"],
-    "high": ["数字不错。", "偏高，挺好。", "这把站在你这边。"],
-    "mid": ["中规中矩。", "不高不低。", "正常发挥。"],
-    "low": ["偏低了点。", "不太理想。", "这把有点薄。"],
-    "min": ["触底了。", "最小值，下一把会好的。", "碰到谷底，往上就是了。"],
+    "max": ["正好是最大值。", "最大值，运气不错。", "满点。"],
+    "high": ["点数偏高。", "比较大的数。", "点数不错。"],
+    "mid": ["不高不低。", "中间的数。", "点数一般。"],
+    "low": ["点数偏低。", "比较小的数。", "点数不太理想。"],
+    "min": ["正好是最小值。","最小值，下一把会好的。", "最小的数，只能往上了。"],
 }
 LEVEL_REMARKS = {
-    "大成功": ["漂亮，干净利落。", "完美。", "无可挑剔。"],
-    "极难成功": ["这也行？极其漂亮。", "几乎不可能的事，办到了。", "稳得惊人。"],
-    "困难成功": ["险险过关。", "有点勉强，但成了。", "过了，别回头看。"],
+    "大成功": ["大成功，漂亮。", "完美。", "再好不过了。"],
+    "极难成功": ["这么难也成了。", "极难都过了，厉害。", "稳得惊人。"],
+    "困难成功": ["险险过关。", "有点勉强，但成了。", "难是难，还是过了。"],
     "成功": ["顺利。", "按计划进行。", "稳妥。"],
     "失败": ["没成，还有别的办法。", "差了一点。", "换个思路再来。"],
-    "大失败": ["糟了，这下麻烦了。", "彻底搞砸。", "运气到头了，先稳住。"],
+    "大失败": ["糟了，这下麻烦了。", "彻底搞砸。", "大失败，先稳住。"],
 }
 UPSET = {
     "high_fail": ["这么高的数值还失手，可惜了。", "本来以为稳了。"],
-    "low_success": ["底子这么低还成功，全靠运气。", "逆风翻盘。"],
+    "low_success": ["数值这么低还成功，全靠运气。", "逆风翻盘。"],
 }
 MULTI_ROLL = {
-    "spread_big": ["起伏很大。", "忽高忽低。"],
-    "spread_small": ["数字很接近，很稳定。", "几轮差不多。"],
+    "spread_big": ["几轮差得很多。", "忽高忽低。"],
+    "spread_small": ["几轮的数很接近。", "几轮差不多。"],
     "all_same": ["每轮结果一样，罕见。", "同一个数连着出现。"],
 }
 DND_REMARKS = {
-    "nat20": ["自然 20，漂亮。", "二十点满，这把写进回忆里。"],
-    "nat1": ["自然 1，运气不在这边。", "一点，命运开了个玩笑。"],
-    "pass": ["够了，往前走。", "数字站在你这边。"],
-    "fail": ["差了一口气。", "没够上，想想别的办法。"],
+    "nat20": ["自然 20，漂亮。", "掷出 20，最好的结果。"],
+    "nat1": ["自然 1，运气不在这边。", "掷出 1，最坏的结果。"],
+    "pass": ["够了，往前走。", "过了，继续。"],
+    "fail": ["差了一点。", "没够上，想想别的办法。"],
 }
 SAN_REMARKS = {
     "pass": ["还撑得住。"],
-    "fail": ["失去的总得想办法找回来。"],
+    "fail": ["理智掉了一些，缓一缓。"],
     "fumble": ["……请先坐下。"],
 }
+RT_REMARKS = {
+    "edge": ["正好压线，过了。", "踩着线过去的。", "一点不多，刚刚好。"],
+    "pass": ["成了。", "顺利过关。", "这把稳。"],
+    "near": ["就差 1 点。", "擦着线没过，可惜。", "只差一点点。"],
+    "fail": ["没成。", "这次不行，换个办法。", "运气没站在这边。"],
+}
 GROWTH_REMARKS = {
-    "grow": ["经验积累，终于开窍了。"],
-    "none": ["经验急不得。"],
+    "grow": ["经验积累，技能长进了。"],
+    "none": ["这次没长进，下回再说。"],
 }
 
 
 # 后台「个性化骰子」可以改上面每一组的句子（一组可以写好几句，掷骰时随机挑一句；清空 = 恢复成这里的默认）。
 # 改过的存在设置 dice_lines（JSON：{"coc.大成功": ["…", "…"], …}），没改过的照旧用上面的默认。
 POOLS = {"coc": LEVEL_REMARKS, "upset": UPSET, "rd": RD_REMARKS, "multi": MULTI_ROLL, "dnd": DND_REMARKS,
-         "sc": SAN_REMARKS, "en": GROWTH_REMARKS}
+         "sc": SAN_REMARKS, "en": GROWTH_REMARKS, "rt": RT_REMARKS}
 _POOL_OF = {id(v): k for k, v in POOLS.items()}
 LINE_GROUPS = [
     ("COC / 绿色三角洲 检定（/ra）", "coc", [("大成功", "大成功"), ("极难成功", "极难成功"), ("困难成功", "困难成功"),
@@ -321,6 +328,7 @@ LINE_GROUPS = [
     ("理智检定（/sc）", "sc", [("pass", "通过"), ("fail", "没通过"), ("fumble", "大失败")]),
     ("成长检定（/en）", "en", [("grow", "成长了"), ("none", "没有成长")]),
     ("通用掷骰（/rd）", "rd", [("max", "掷出最大值"), ("high", "偏高"), ("mid", "中间"), ("low", "偏低"), ("min", "掷出最小值")]),
+    ("难度骰（/rt）", "rt", [("edge", "正好压线成功"), ("pass", "成功"), ("near", "只差 1 点失败"), ("fail", "失败")]),
     ("连掷几轮（/rd 3#…）", "multi", [("all_same", "每轮一样"), ("spread_big", "起伏大"), ("spread_small", "很接近")]),
     ("DND 检定 / 攻击", "dnd", [("nat20", "自然 20"), ("nat1", "自然 1"), ("pass", "通过 DC"), ("fail", "没通过 / 没命中")]),
 ]
@@ -380,7 +388,8 @@ def _rd_token(tok: str):
     return (int(m.group(1)) if m.group(1) else 1), parsed
 
 
-def rd(text: str) -> str:
+def rd(text: str, who: str = "") -> str:
+    """who：掷骰的人的角色名（插件给；没有就空，句子省掉主语）。"""
     text = text.strip()
     times, terms, reason = 1, None, text
     first, _, rest = text.partition(" ")
@@ -399,15 +408,15 @@ def rd(text: str) -> str:
     if not 1 <= times <= MAX_TIMES:
         return f"一次最多掷 {MAX_TIMES} 轮。"
     et = expr_text(terms)
-    head = f"{reason}：" if reason else ""
     if times == 1:
         detail, total = roll_terms(terms)
         simple = terms[0] == "dice" and terms[1] == 1 and not terms[3] and not terms[5]
-        body = f"D{terms[2]} = {total}" if simple else f"{et} = {detail} = {total}"
+        expr = f"D{terms[2]}" if simple else et
+        body = dicecard.rd_sentence(who, expr, detail, total, simple, reason=reason)
         remark = _rd_remark(terms, total)
-        card = dicecard.rd_card(reason, f"D{terms[2]}" if simple else et, detail, total, remark, simple)
-        return Rolled(f"{head}{body}" + (f"。{remark}" if remark else ""), card)
-    lines, totals, rounds = [f"{head}{et} 掷 {times} 轮："], [], []
+        card = dicecard.rd_card(reason, expr, detail, total, remark, simple, who)
+        return Rolled(f"{body}。" + remark, card)
+    lines, totals, rounds = [f"{who}{f'为「{reason}」' if reason else ''}把 {et} 掷了 {times} 轮："], [], []
     for i in range(1, times + 1):
         detail, total = roll_terms(terms)
         totals.append(total)
@@ -416,7 +425,7 @@ def rd(text: str) -> str:
     tail = (_pick(MULTI_ROLL, "all_same") if len(set(totals)) == 1
             else _pick(MULTI_ROLL, "spread_big") if max(totals) - min(totals) >= 15 else _pick(MULTI_ROLL, "spread_small"))
     lines.append(f"最高 {max(totals)}，最低 {min(totals)}，合计 {sum(totals)}。{tail}")
-    return Rolled("\n".join(lines), dicecard.rd_multi_card(reason, et, rounds, tail))
+    return Rolled("\n".join(lines), dicecard.rd_multi_card(reason, et, rounds, tail, who))
 
 
 # ======================== rt：难度骰（自定面数 + 成功线） ========================
@@ -452,9 +461,11 @@ def rt(text: str, lookup: Lookup | None = None) -> str:
         return "成功线至少是 1。"
     roll = random.randint(1, sides)
     verdict = "成功" if roll <= target else "失败"
+    key = ("edge" if roll == target < sides else "pass") if roll <= target else ("near" if roll == target + 1 else "fail")
+    remark = _pick(RT_REMARKS, key)
     head = f"{reason}：" if reason else ""
-    plain = f"{head}D{sides}={roll}/{target} —— {verdict}。"
-    card = dicecard.rt_card(reason, sides, roll, target, verdict)
+    plain = f"{head}D{sides}={roll}/{target} —— {verdict}。{remark}"
+    card = dicecard.rt_card(reason, sides, roll, target, verdict, remark)
     return Rolled(plain, card, roll=roll, target=target, sides=sides, verdict=verdict)
 
 
@@ -531,7 +542,7 @@ def roll_d100(extra: int) -> tuple[int, str]:
         return values[0], ""
     chosen = min(values) if extra > 0 else max(values)
     kind = "奖励骰" if extra > 0 else "惩罚骰"
-    return chosen, f"（{kind}×{abs(extra)}：{'/'.join(map(str, values))} 取{chosen}）"
+    return chosen, f"（{kind} {abs(extra)} 颗：{'、'.join(map(str, values))} 里取{'小' if extra > 0 else '大'}的 {chosen}）"
 
 
 COC_USAGE = ("格式：/ra [b奖励/p惩罚] [困难|极难] [技能名] 数值\n例：/ra 侦查 70、/ra b2 困难 射击 60、/rb 70、/rp 45\n"
@@ -582,11 +593,11 @@ def _coc_parse(raw: str, extra: int, lookup: Lookup, proxy: bool):
         tag = got[2] if len(got) > 2 else ""
         label, target = rest, min(val + mod, 100)
         if val + mod > 100:
-            note_cap = f"（{role}的{label}{val}{mod_text}{tag}，按100算）"
+            note_cap = f"（{role}的{label} {val}{mod_text}{tag}，按 100 算）"
         elif proxy:
-            note_cap = f"（代{role}投，{label}{val}{mod_text}{tag}）"
+            note_cap = f"（替{role}掷，{label} {val}{mod_text}{tag}）"
         else:
-            note_cap = f"（{role}的{label}{val}{mod_text}{tag}）"
+            note_cap = f"（{role}的{label} {val}{mod_text}{tag}）"
         if target < 1:
             return f"「{role}」的{label}是 {val}{mod_text}，掷不出成功。"
     if mod and target < 1:
@@ -693,7 +704,7 @@ def coc_sanity(raw: str, lookup: Lookup, house: str = DEFAULT_HOUSE) -> str:
         if isinstance(got, str):
             return got
         san, from_card, who = got[1], True, got[0]
-        note = f"（取自{who}的 SAN）"
+        note = f"（{who}的理智）"
     ok_loss, bad_loss = _roll_loss(m.group(1)), _roll_loss(m.group(2))
     if ok_loss is None or bad_loss is None:
         return "损失的写法看不懂，数字或 1d6 这类即可。"
@@ -713,7 +724,8 @@ def coc_sanity(raw: str, lookup: Lookup, house: str = DEFAULT_HOUSE) -> str:
         hints.append("理智归零，角色陷入永久疯狂。")
     elif loss >= 5:
         hints.append(f"单次损失 {loss} 点（≥5），需要做一次智力检定（/ra 智力），通过则陷入临时疯狂（/ti 看症状）。")
-    plain = f"理智检定：D100={roll}/{san} —— {verdict}\n损失 {loss}（{process}），理智 {san} → {left}。{tail}{note}"
+    how = f"（{process}）" if process != str(loss) else ""          # 「损失 1（1）」这种重复的不写
+    plain = f"理智检定：D100={roll}/{san} —— {verdict}\n损失 {loss}{how}，理智 {san} → {left}。{tail}{note}"
     if hints:
         plain += "\n" + "\n".join(hints)
     card = dicecard.sc_card(roll, san, verdict, loss, process, left, tail, "　".join(x for x in [note.strip("（）")] + hints if x))
@@ -959,9 +971,9 @@ def _sub_table(kind: str) -> str:
     n = random.randint(1, 100)
     if kind == "恐惧":
         name, desc = PHOBIAS[n - 1]
-        return f"恐惧症状：1D100={n} {name}（害怕：{desc}）"
+        return f"恐惧症状（1D100={n}）：{name}，害怕{desc}"
     name, desc = MANIAS[n - 1]
-    return f"狂躁症状：1D100={n} {name}（{desc}）"
+    return f"狂躁症状（1D100={n}）：{name}，{desc}"
 
 
 def phobia() -> str:
@@ -979,9 +991,9 @@ def madness(raw: str, summary: bool) -> str:
     last = random.randint(1, 10)
     table = SUMMARY_MADNESS if summary else TEMP_MADNESS
     unit = "小时" if summary else "轮"
-    kind = "总结疯狂（li）" if summary else "临时疯狂（ti）"
-    head = f"{who} 的{kind}" if who else kind
-    out = f"{head}：1D10={idx}\n{table[idx - 1]}\n持续 1D10={last} {unit}。"
+    kind = "总结疯狂" if summary else "临时疯狂"
+    head = f"{who}的{kind}" if who else kind
+    out = f"{head}（1D10={idx}）\n{table[idx - 1]}\n持续 {last} {unit}（1D10）。"
     if idx in (9, 10):                      # 抽到恐惧 / 狂躁：自动再掷一次具体症状
         out += "\n" + _sub_table("恐惧" if idx == 9 else "狂躁")
     return out
@@ -1018,8 +1030,10 @@ def dnd_check(raw: str, adv: int, lookup: Lookup) -> str:
             has_dis = True
         elif MOD_RE.match(t):
             mod += int(t)
-        elif t.isdigit() and dc is None:
-            dc = int(t)
+        elif (t.isdigit() or re.fullmatch(r"(?i)dc\d{1,3}", t)) and dc is None:     # 15、dc15、DC15 都算难度
+            dc = int(t.lstrip("dDcC"))
+        elif t.lower() == "dc":                       # 「DC 15」分开写
+            continue
         else:
             labels.append(t)
     if abs(mod) > 30 or (dc is not None and dc > 60):
@@ -1033,17 +1047,17 @@ def dnd_check(raw: str, adv: int, lookup: Lookup) -> str:
             role, val = got[:2]
             if label.upper() in DND_ABILITIES:       # 属性值（力量16）换算成调整值
                 cm = ability_mod(val)
-                card_note = f"（{role}的{label}{val}→{cm:+d}）"
+                card_note = f"（{role}的{label} {val}，调整值 {cm:+d}）"
             else:                                      # 技能（运动、侦察）存的就是加值，不再换算
                 cm = val
-                card_note = f"（{role}的{label}加值{cm:+d}）"
+                card_note = f"（{role}的{label}加值 {cm:+d}）"
             mod += cm
             if abs(mod) > 30:
                 return "修正最多 ±30，再核对一下角色卡里这个数。"
     rolls = [random.randint(1, 20) for _ in range(2 if adv else 1)]
     chosen = max(rolls) if adv >= 0 else min(rolls)
     total = chosen + mod
-    note = f"（{'优势' if adv > 0 else '劣势'}：{'/'.join(map(str, rolls))} 取{chosen}）" if adv else ""
+    note = f"（{'优势' if adv > 0 else '劣势'}：{'、'.join(map(str, rolls))} 里取{'大' if adv > 0 else '小'}的 {chosen}）" if adv else ""
     prefix = f"{label} " if label else ""
     mod_text = f"{mod:+d}" if mod else ""
     line = f"{prefix}检定：D20={chosen}{mod_text}{'=' + str(total) if mod else ''}{card_note}{note}"
@@ -1073,12 +1087,83 @@ def dnd_stats(raw: str) -> str:
     return "\n".join(lines)
 
 
-def initiative(table: dict, raw: str) -> str:
-    """table 是这个群的先攻表 {名字: (总值, 修正)}，原地修改。"""
+_INIT_NEXT = {"下一个", "下一位", "下", "next", "n", "轮到"}
+_INIT_START = {"开始", "开打", "start"}
+_INIT_DEL = {"删", "删除", "移除", "rm", "del"}
+_INIT_SET = {"改", "设", "set"}
+_INIT_CLEAR = {"清空", "重置", "clear"}
+
+
+def _init_order(table: dict) -> list[str]:
+    return [n for n, _v in sorted(table.items(), key=lambda kv: (-kv[1][0], -kv[1][1]))]
+
+
+def _init_list(table: dict, turn: dict) -> str:
+    order = _init_order(table)
+    cur = turn.get("cur")
+    head = f"先攻顺序（第 {turn['round']} 轮）：" if turn.get("round") else "先攻顺序："
+    rows = [f"{'▶ ' if n == cur else ''}{i}. {n} {table[n][0]}" for i, n in enumerate(order, 1)]
+    return head + "\n" + "\n".join(rows)
+
+
+def _init_now(table: dict, turn: dict) -> str:
+    order = _init_order(table)
+    cur = turn["cur"]
+    nxt = order[(order.index(cur) + 1) % len(order)] if len(order) > 1 else ""
+    return f"第 {turn['round']} 轮 · 轮到 {cur}（{table[cur][0]}）" + (f"\n下一个：{nxt}" if nxt else "")
+
+
+def initiative(table: dict, raw: str, turn: dict | None = None) -> str:
+    """table 是这个群的先攻表 {名字: (总值, 修正)}，turn 是回合进度 {"round": 第几轮, "cur": 轮到谁}，都原地修改。
+    /ri 名字 +2 加人（掷 D20+修正）；/ri 开始、/ri 下一个 推进回合；/ri 删 名字；/ri 改 名字 15；/ri 清空。
+    turn 跟着名字走，不跟着位置：中途加人、改值，轮到的还是那个人。"""
+    turn = {} if turn is None else turn
     tokens = raw.split()
-    if tokens and tokens[0] in ("清空", "重置", "clear"):
+    word = tokens[0].lower() if tokens else ""
+    if word in _INIT_CLEAR:
         table.clear()
+        turn.clear()
         return "先攻表清掉了，下一场。"
+    if word in _INIT_START or word in _INIT_NEXT:
+        if not table:
+            return "先攻表是空的，先 /ri 名字 +修正 把人加进来。"
+        order = _init_order(table)
+        if word in _INIT_START or turn.get("cur") not in table:
+            turn.update(round=1, cur=order[0])
+        else:
+            i = order.index(turn["cur"]) + 1
+            if i >= len(order):
+                turn["round"] = turn.get("round", 1) + 1
+                i = 0
+            turn["cur"] = order[i]
+        return _init_now(table, turn)
+    if word in _INIT_DEL:
+        name = " ".join(tokens[1:])
+        if name not in table:
+            return f"先攻表里没有「{name}」。" if name else "要删谁？/ri 删 名字"
+        note = ""
+        if turn.get("cur") == name:                         # 删的正好是轮到的人：轮到他后面那位
+            order = _init_order(table)
+            rest = [n for n in order if n != name]
+            if rest:
+                i = order.index(name)
+                after = order[i + 1:] + order[:i]
+                if i + 1 >= len(order):
+                    turn["round"] = turn.get("round", 1) + 1
+                turn["cur"] = after[0]
+                note = f"\n现在轮到 {after[0]}。"
+            else:
+                turn.clear()
+        del table[name]
+        return f"{name} 移出先攻表了。{note}" + ("\n" + _init_list(table, turn) if table else "")
+    if word in _INIT_SET:
+        if len(tokens) < 3 or not re.fullmatch(r"-?\d{1,2}", tokens[-1]):
+            return "改先攻值这么写：/ri 改 名字 15"
+        name = " ".join(tokens[1:-1])
+        if name not in table:
+            return f"先攻表里没有「{name}」。"
+        table[name] = (int(tokens[-1]), table[name][1])
+        return f"{name} 的先攻改成 {tokens[-1]}。\n" + _init_list(table, turn)
     head = ""
     if tokens:
         mod = sum(int(t) for t in tokens if MOD_RE.match(t))
@@ -1087,11 +1172,75 @@ def initiative(table: dict, raw: str) -> str:
             return "修正最多 ±30，先攻表最多 30 个。"
         roll = random.randint(1, 20)
         table[name] = (roll + mod, mod)
-        head = f"{name} 先攻：D20={roll}{f'{mod:+d}' if mod else ''}={roll + mod}。\n"
+        head = f"{name} 先攻：D20={roll}" + (f"{mod:+d}={roll + mod}" if mod else "") + "。\n"
     if not table:
         return "先攻表是空的。/ri 名字 +修正 加入，/ri 清空 重来。"
-    order = sorted(table.items(), key=lambda kv: (-kv[1][0], -kv[1][1]))
-    return head + "先攻顺序：\n" + "\n".join(f"{i}. {n} {v[0]}" for i, (n, v) in enumerate(order, 1))
+    tail = "" if turn.get("cur") in table else "\n人齐了发 /ri 开始，之后每人行动完发 /ri 下一个。"
+    return head + _init_list(table, turn) + tail
+
+
+# ======================== 黑暗世界（ww 骰池）、FATE（rf） ========================
+
+WW_MAX_DICE = 40
+WW_MAX_TOTAL = 200                 # 加骰加出来的一共最多掷几颗
+_WW_RE = re.compile(r"^(\d{1,3})(?:\s*a\s*(\d{1,2}))?(?:\s*(?:难度|成功线|k)\s*(\d{1,2}))?(?:\s+(.*))?$", re.I)
+
+
+def ww(raw: str, rng: random.Random | None = None) -> str | None:
+    """/ww 5：黑暗世界骰池，5 颗 D10，每颗 ≥8 算一个成功，掷出 10 再加一颗（加骰线）。
+    /ww 5a8：8 及以上就加骰；/ww 5 难度6：6 及以上算成功；后面能写原因。看不懂返回 None（插件决定要不要提示）。"""
+    rng = rng or random.Random()
+    m = _WW_RE.match(raw.strip())
+    if not m:
+        return None
+    n, again, diff, reason = int(m.group(1)), int(m.group(2) or 10), int(m.group(3) or 8), (m.group(4) or "").strip()
+    if not 1 <= n <= WW_MAX_DICE:
+        return f"骰池写 1～{WW_MAX_DICE} 颗。"
+    if not 5 <= again <= 10:
+        return "加骰线写 5～10（a8 = 8 及以上加骰；写 a10 就是只有 10 加骰）。"
+    if not 2 <= diff <= 10:
+        return "难度写 2～10。"
+    groups, total, pending = [], 0, n
+    while pending and total < WW_MAX_TOTAL:
+        rolls = [rng.randint(1, 10) for _ in range(min(pending, WW_MAX_TOTAL - total))]
+        total += len(rolls)
+        groups.append(rolls)
+        pending = sum(1 for r in rolls if r >= again)
+    succ = sum(1 for g in groups for r in g if r >= diff)
+    shown = " + ".join("[" + ",".join(str(r) for r in g) + "]" for g in groups)
+    head = f"{reason} " if reason else ""
+    rule = f"≥{diff} 成功" + (f"，≥{again} 加骰" if again < 10 else "，10 加骰")
+    verdict = f"{succ} 个成功" if succ else "失败，一个成功都没有"      # 「失败」放最前：log 统计按它认成败
+    return f"{head}骰池 {n}D10（{rule}）：{shown} —— {verdict}。"
+
+
+FATE_LADDER = {8: "传奇", 7: "史诗", 6: "惊人", 5: "极佳", 4: "很好", 3: "好", 2: "尚可", 1: "一般", 0: "平庸", -1: "差", -2: "糟糕"}
+_RF_RE = re.compile(r"^([+-]\s*\d{1,2})?\s*(.*)$")
+
+
+def fate_word(v: int) -> str:
+    if v > 8:
+        return f"超越传奇（+{v}）"
+    if v < -2:
+        return f"惨不忍睹（{v}）"
+    return f"{FATE_LADDER[v]}（{v:+d}）"
+
+
+def rf(raw: str, rng: random.Random | None = None) -> str:
+    """/rf：FATE 骰，4 颗 Fate 骰（每颗 -1 / 0 / +1），对照阶梯给结果。/rf +2 运动：加技能等级，后面能写原因。"""
+    rng = rng or random.Random()
+    m = _RF_RE.match(raw.strip())
+    mod = int(re.sub(r"\s", "", m.group(1))) if m and m.group(1) else 0
+    reason = (m.group(2) if m else raw).strip()
+    if abs(mod) > 12:
+        return "修正最多 ±12。"
+    faces = [rng.choice((-1, 0, 1)) for _ in range(4)]
+    roll = sum(faces)
+    shown = " ".join({-1: "−", 0: "□", 1: "+"}[f] for f in faces)
+    total = roll + mod
+    head = f"{reason} " if reason else ""
+    mod_s = f" {mod:+d}" if mod else ""
+    return f"{head}FATE：[{shown}] = {roll:+d}{mod_s} → {total:+d}，{fate_word(total)}。"
 
 
 def dnd_attack(raw: str) -> str:
@@ -1105,8 +1254,10 @@ def dnd_attack(raw: str) -> str:
             has_dis = True
         elif MOD_RE.match(t):
             mod += int(t)
-        elif t.isdigit() and ac is None:
-            ac = int(t)
+        elif (t.isdigit() or re.fullmatch(r"(?i)ac\d{1,3}", t)) and ac is None:     # 15、ac15、AC15 都算护甲
+            ac = int(t.lstrip("aAcC"))
+        elif t.lower() == "ac":                       # 「AC 15」分开写
+            continue
         elif dmg is None and re.search(r"[dD]", t) and (node := parse_expr(t)) is not None:
             dmg = node
         else:
@@ -1117,7 +1268,7 @@ def dnd_attack(raw: str) -> str:
     rolls = [random.randint(1, 20) for _ in range(2 if adv else 1)]
     chosen = max(rolls) if adv >= 0 else min(rolls)
     total = chosen + mod
-    note = f"（{'优势' if adv > 0 else '劣势'}：{'/'.join(map(str, rolls))} 取{chosen}）" if adv else ""
+    note = f"（{'优势' if adv > 0 else '劣势'}：{'、'.join(map(str, rolls))} 里取{'大' if adv > 0 else '小'}的 {chosen}）" if adv else ""
     label = " ".join(labels)
     line = f"{label + ' ' if label else ''}攻击：D20={chosen}{f'{mod:+d}' if mod else ''}={total}{note} vs AC{ac}"
     crit = chosen == 20
@@ -1174,7 +1325,16 @@ HELP_DND = (
     "/rb 优势、/rp 劣势　也可以在 /ra 后面写 优势/劣势\n"
     "/at 长剑 +5 15 1d8+3　攻击：命中、AC、伤害；自然20暴击\n"
     "/ri 名字 +2　先攻；/ri 看顺序；/ri 清空\n"
+    "/ri 开始　从第 1 轮最前面开始；/ri 下一个　轮到下一位（转一圈自动进下一轮）\n"
+    "/ri 删 名字　移出先攻（倒下、逃跑）；/ri 改 名字 15　直接改先攻值\n"
     "/dnd 3　属性生成：6 项各 4D6 取高 3"
+)
+HELP_MORE = (
+    "【黑暗世界 / FATE】（不用切换规则，哪个群都能用）\n"
+    "/ww 5　黑暗世界骰池：5 颗 D10，≥8 算一个成功，掷出 10 再加一颗\n"
+    "/ww 5a8　8 及以上就加骰；/ww 5 难度6　6 及以上算成功；后面可以写原因\n"
+    "/rf　FATE 骰：4 颗 Fate 骰（− □ +），按阶梯说结果（平庸、好、极佳……）\n"
+    "/rf +2 运动　加上技能等级"
 )
 HELP_DG = (
     "【绿色三角洲】\n"
@@ -1191,7 +1351,8 @@ HELP_CARD = (
     "/st del 力量、/st clr　删一项 / 清空\n"
     "/pc new 名字 [coc|dnd|dg]　多建一张；/pc list；/pc 切换 名字；/pc del 名字\n"
     "/nn 名字　设你在 log 里显示的名字\n"
-    "/en list　看成长标记；/en+ 侦查、/en- 侦查　手动加减；/en clr　清空"
+    "/en list　看成长标记；/en+ 侦查、/en- 侦查　手动加减；/en clr　清空\n"
+    "/认人　换了个群卡对不上？在原来的群发「认人」拿码，5 分钟内到新群发「认人 码」（有恋综角色的不用认）"
 )
 HELP_TEAM = (
     "【队伍】跑团模式的群里用\n"
@@ -1229,6 +1390,7 @@ HELP_SECTIONS = [
     ("COC理智", ("理智", "成长", "sc", "en", "制卡", "coc2"), "COC7 的 /sc、疯狂、/en、/coc 制卡", HELP_COC2, "coc"),
     ("DND", ("dnd", "dnd5e", "5e"), "DND5e 的检定、攻击、先攻", HELP_DND, "dnd"),
     ("绿色三角洲", ("dg", "三角洲", "deltagreen"), "绿色三角洲的检定、理智、成长", HELP_DG, "dg"),
+    ("黑暗世界和FATE", ("ww", "rf", "wod", "fate", "黑暗世界"), "/ww 骰池、/rf FATE 骰", HELP_MORE, ""),
     ("角色卡", ("卡", "st", "pc", "nn"), "跑团模式的 /st、/pc、/nn、成长标记", HELP_CARD, ""),
     ("队伍", ("team",), "/team 全队查数值、一起掷", HELP_TEAM, ""),
     ("log", ("记录", "跑团log"), "/log 记录一场跑团", HELP_LOG, ""),

@@ -89,7 +89,7 @@ details.edit>summary::-webkit-details-marker{display:none}
       <div><label>冷却（秒，同一个群内这条规则两次触发的最短间隔，0 = 不限）</label><input type="text" name="cooldown" value="{{ R.cooldown }}" inputmode="numeric"></div>
     </div>
   </details>
-  <div class="save"><span class="hint" style="margin:0">回复里写 <code>{角色}</code>，会换成说话人的角色名。</span><button class="btn" type="submit">保存</button></div>
+  <div class="save"><span class="hint" style="margin:0">回复里写 <code>{角色}</code> 换成说话人的角色名；写 <code>{牌堆名}</code> 从那个牌堆抽一张（牌堆在「跑团 → 牌堆」里）；写 <code>[1d6]</code> 掷骰；写 <code>{检定:侦查}</code> 用说话人的角色卡做一次检定（跟 /ra 一样，最多 3 次）。</span><button class="btn" type="submit">保存</button></div>
 </form>
 {% endmacro %}
 

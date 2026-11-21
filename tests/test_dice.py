@@ -30,15 +30,41 @@ class DiceTests(unittest.TestCase):
         self.assertIsNone(dice.parse_expr("d6d6d6d6d6d6d6d6d6d6"))      # 项数超限
 
     def test_rd_basic_and_limits(self):
-        self.assertIn("D100 =", dice.rd(""))
-        self.assertIn("D20 =", dice.rd("d20"))
-        self.assertIn("伤害：", dice.rd("2d6+3 伤害"))
+        self.assertIn("掷了 D100，出了", dice.rd(""))
+        self.assertIn("掷了 D20，出了", dice.rd("d20"))
+        self.assertIn("为「伤害」", dice.rd("2d6+3 伤害"))
         self.assertIn("5 轮", dice.rd("5#2d6"))
         self.assertIn("最多", dice.rd("11#d6"))
         self.assertIn("超出范围", dice.rd("101d6"))
         self.assertIn("弃", dice.rd("4d6k3"))
-        self.assertIn("D100 =", dice.rd("100"))
-        self.assertIn("D6 =", dice.rd("ｄ6"))                            # 全角
+        self.assertIn("掷了 D100，出了", dice.rd("100"))
+        self.assertIn("掷了 D6，出了", dice.rd("ｄ6"))                            # 全角
+
+    def test_rd_reads_like_a_person_said_it(self):
+        """2026-11-21：「D2　2」看不懂 → 有角色名时名字打头，点数带「点」，卡片同一句话。"""
+        r = dice.rd("d2", "绵绵面")
+        self.assertTrue(r.startswith("绵绵面掷了 D2，出了 "), r)
+        self.assertIn(" 点。", r)
+        self.assertIn("**绵绵面**掷了 D2，出了 **", r.card)
+        self.assertTrue(dice.rd("d2").startswith("掷了 D2，出了 "))                    # 没角色的人不写名字
+        self.assertIn("：", dice.rd("2d6+3", "甲").split("掷了 2D6+3")[1][:1])
+        self.assertIn("一共", dice.rd("2d6+3", "甲"))
+        self.assertIn("甲把 1D6 掷了 3 轮", dice.rd("3#d6", "甲"))
+
+    def test_dc_ac_written_the_usual_ways(self):
+        """2026-11-21：玩家常写 dc15 / DC 15 / ac14，以前被当成检定名，不判过没过。"""
+        for raw in ("敏捷 15", "敏捷 dc15", "敏捷 DC15", "敏捷 DC 15"):
+            out = dice.dnd_check(raw, 0, lookup_none)
+            self.assertIn("vs DC15", out, raw)
+            self.assertTrue(out.startswith("敏捷 检定"), out)
+        for raw in ("长剑 +5 14 1d8+3", "长剑 +5 ac14 1d8+3", "长剑 +5 AC 14 1d8+3"):
+            self.assertIn("vs AC14", dice.dnd_attack(raw), raw)
+
+    def test_initiative_without_mod_no_double_equals(self):
+        with mock.patch.object(dice.random, "randint", return_value=17):
+            out = dice.initiative({}, "乙")
+        self.assertIn("乙 先攻：D20=17。", out)
+        self.assertNotIn("=17=17", out)
 
     def test_roll_always_in_range(self):
         for _ in range(300):
@@ -46,7 +72,7 @@ class DiceTests(unittest.TestCase):
             _, v = dice.roll_terms(node)
             self.assertTrue(5 <= v <= 15)
         for _ in range(100):
-            v = int(dice.rd("d100").split("=")[1].split("。")[0])
+            v = int(dice.rd("d100").split("出了 ")[1].split(" 点")[0])
             self.assertTrue(1 <= v <= 100)
 
     def test_judge_success_table(self):
@@ -63,7 +89,7 @@ class DiceTests(unittest.TestCase):
     def test_bonus_penalty_dice(self):
         for _ in range(200):
             v, note = dice.roll_d100(2)
-            self.assertTrue(1 <= v <= 100 and "奖励骰×2" in note)
+            self.assertTrue(1 <= v <= 100 and "奖励骰 2 颗" in note and "取小的" in note)
             v, note = dice.roll_d100(-1)
             self.assertTrue(1 <= v <= 100 and "惩罚骰" in note)
 
@@ -75,8 +101,8 @@ class DiceTests(unittest.TestCase):
         self.assertEqual(dice.coc_check("力量", 0, lookup_none), "没有属性")
         self.assertIn("最多 5 颗", dice.coc_check("b9 侦查 60", 0, lookup_none))
         self.assertIn("数值有误", dice.coc_check("侦查 0", 0, lookup_none))
-        self.assertIn("按100算", dice.coc_check("力量", 0, lambda n: ("某人", 150)))
-        self.assertIn("代某人投", dice.coc_check("力量", 0, lambda n: ("某人", 60), proxy=True))
+        self.assertIn("按 100 算", dice.coc_check("力量", 0, lambda n: ("某人", 150)))
+        self.assertIn("替某人掷", dice.coc_check("力量", 0, lambda n: ("某人", 60), proxy=True))
 
     def test_difficulty_verdict(self):
         random.seed(1)
@@ -89,7 +115,7 @@ class DiceTests(unittest.TestCase):
         self.assertIn("理智 60 →", out)
         self.assertIn("格式", dice.coc_sanity("乱写", lookup_none))
         self.assertIn("看不懂", dice.coc_sanity("x/y 60", lookup_none))
-        self.assertIn("取自某人的 SAN", dice.coc_sanity("1/1d6", lambda n: ("某人", 55)))
+        self.assertIn("（某人的理智）", dice.coc_sanity("1/1d6", lambda n: ("某人", 55)))
 
     def test_growth(self):
         outs = {dice.coc_growth("侦查 55")[:10] for _ in range(1)}
@@ -103,7 +129,7 @@ class DiceTests(unittest.TestCase):
         self.assertIn("优势", dice.dnd_check("优势 +2", 0, lookup_none))
         self.assertIn("劣势", dice.dnd_check("", -1, lookup_none))
         self.assertIn("修正最多", dice.dnd_check("+99", 0, lookup_none))
-        self.assertIn("力量16→+3", dice.dnd_check("力量 15", 0, lambda n: ("某人", 16)))
+        self.assertIn("力量 16，调整值 +3", dice.dnd_check("力量 15", 0, lambda n: ("某人", 16)))
         stats = dice.dnd_stats("2")
         self.assertIn("第2组", stats)
         self.assertIn("一次最多", dice.dnd_stats("9"))
@@ -118,6 +144,51 @@ class DiceTests(unittest.TestCase):
         crit = next(o for o in outs if "暴击" in o)
         self.assertIn("2D8+3", crit)                                    # 暴击骰子翻倍，加值不变
         self.assertIn("格式", dice.dnd_attack("长剑"))
+
+    def test_initiative_turns(self):
+        t, u = {}, {}
+        self.assertIn("空的", dice.initiative(t, "下一个", u))
+        t.update({"甲": (18, 0), "乙": (13, 0), "丙": (5, 0)})
+        self.assertIn("/ri 开始", dice.initiative(t, "", u))
+        self.assertTrue(dice.initiative(t, "开始", u).startswith("第 1 轮 · 轮到 甲（18）\n下一个：乙"))
+        dice.initiative(t, "下一个", u)
+        self.assertEqual(u, {"round": 1, "cur": "乙"})
+        dice.initiative(t, "丁 +0", u)                                                # 中途加人：轮到的还是乙
+        self.assertEqual(u["cur"], "乙")
+        self.assertIn("▶", dice.initiative(t, "", u))
+        dice.initiative(t, "删 丁", u)
+        dice.initiative(t, "next", u)
+        out = dice.initiative(t, "下一个", u)
+        self.assertTrue(out.startswith("第 2 轮 · 轮到 甲"), out)                      # 转一圈进下一轮
+        out = dice.initiative(t, "删 甲", u)
+        self.assertIn("现在轮到 乙", out)                                              # 删的是轮到的人：轮到他后面那位
+        self.assertIn("改成 30", dice.initiative(t, "改 丙 30", u))
+        self.assertEqual(t["丙"][0], 30)
+        self.assertIn("没有「戊」", dice.initiative(t, "删 戊", u))
+        self.assertIn("这么写", dice.initiative(t, "改 丙", u))
+        dice.initiative(t, "清空", u)
+        self.assertEqual((t, u), ({}, {}))
+
+    def test_ww_and_rf(self):
+        import random
+        r = random.Random(3)
+        out = dice.ww("5", r)
+        self.assertRegex(out, r"^骰池 5D10（≥8 成功，10 加骰）：\[\d+(,\d+){4}\]")
+        self.assertIn("潜行 骰池 6D10（≥6 成功", dice.ww("6 难度6 潜行", r))
+        self.assertIn("≥8 加骰", dice.ww("5a8", r))
+        self.assertIsNone(dice.ww("abc"))
+        self.assertIn("1～40", dice.ww("0"))
+        self.assertIn("5～10", dice.ww("5a3"))
+        with mock.patch("random.Random.randint", return_value=10):                    # 一直掷 10：加骰有上限，不会停不下来
+            self.assertLess(len(dice.ww("40", random.Random())), 3000)
+        with mock.patch("random.Random.randint", return_value=1):
+            self.assertIn("—— 失败", dice.ww("3", random.Random()))
+        out = dice.rf("+2 运动", r)
+        self.assertRegex(out, r"^运动 FATE：\[[−□+]( [−□+]){3}\] = [+-]\d \+2 → [+-]\d+，")
+        self.assertIn("±12", dice.rf("+20"))
+        self.assertEqual(dice.fate_word(3), "好（+3）")
+        self.assertIn("超越传奇", dice.fate_word(10))
+        self.assertIn("/ww 5", dice.help_text("ww", "coc"))
 
     def test_initiative(self):
         t = {}
@@ -153,6 +224,28 @@ class FixRegressionTests(unittest.TestCase):
             self.assertIn(f"D12={res.roll}/7", res)
             self.assertIn("难度骰", res.card)
         self.assertEqual(dice.rt("1 1").verdict, "成功")                   # D1 永远掷 1
+
+    def test_rt_remark_and_marks(self):
+        from changri.core import dicecard
+        with mock.patch("random.randint", return_value=7):
+            r = dice.rt("12 7")                                          # 正好压线
+        self.assertTrue(any(x in r for x in dice.RT_REMARKS["edge"]))
+        self.assertTrue(any(x in r.card for x in dice.RT_REMARKS["edge"]))
+        self.assertIn(r.card.split()[1], dicecard.MARKS["难度骰成功"].split())
+        with mock.patch("random.randint", return_value=8):
+            r = dice.rt("12 7")                                          # 只差 1
+        self.assertIn("—— 失败。", r)                                    # 跑团记录靠这个认结果
+        self.assertTrue(any(x in r for x in dice.RT_REMARKS["near"]))
+        self.assertIn(r.card.split()[1], dicecard.MARKS["难度骰失败"].split())
+        with mock.patch("random.randint", return_value=12):
+            r = dice.rt("12 7")
+        self.assertTrue(any(x in r for x in dice.RT_REMARKS["fail"]))
+        with mock.patch("random.randint", return_value=1):
+            r = dice.rt("1 1")
+        self.assertTrue(any(x in r for x in dice.RT_REMARKS["pass"]))    # 面数 ≤ 成功线不算压线
+        seen = {dicecard.mark_for("难度骰成功") for _ in range(200)}
+        self.assertGreater(len(seen), 1)                                 # 表情会换
+        self.assertEqual({dicecard.mark_for("大成功") for _ in range(20)}, {"🎉"})   # 别的等级照旧一个
         self.assertEqual(dice.rt("16 0 x"), "成功线至少是 1。")
         self.assertIn("撬锁：D16=", dice.rt("d16 7 撬锁"))                 # 面数前可以带 d，后面是原因
         self.assertIn("D16=", dice.rt("１６ ７"))                          # 全角数字
@@ -173,20 +266,20 @@ class FixRegressionTests(unittest.TestCase):
 
     def test_rd_reason_before_expression(self):
         out = dice.rd("伤害 2d6+3")
-        self.assertIn("伤害：2D6+3 =", out)
+        self.assertIn("为「伤害」掷了 2D6+3：", out)
         self.assertNotIn("D100", out)
-        self.assertIn("2D6+3 =", dice.rd("2d6+3 伤害"))                    # 写后面的老写法不变
-        self.assertIn("D100 =", dice.rd("第 3 轮"))                          # 末尾没有 d 的词不会被当成 D3
-        self.assertIn("攻击：", dice.rd("3#d6 攻击"))
-        self.assertIn("掷 3 轮", dice.rd("攻击 3#d6"))
+        self.assertIn("掷了 2D6+3：", dice.rd("2d6+3 伤害"))                    # 写后面的老写法不变
+        self.assertIn("掷了 D100，出了", dice.rd("第 3 轮"))                          # 末尾没有 d 的词不会被当成 D3
+        self.assertIn("为「攻击」", dice.rd("3#d6 攻击"))
+        self.assertIn("掷了 3 轮", dice.rd("攻击 3#d6"))
         self.assertIn("超出范围", dice.rd("伤害 101d6"))
 
     def test_coc_modifier_glued_to_skill(self):
-        self.assertIn("/70（阿明的侦查60+10）", dice.coc_check("侦查+10", 0, lookup_60))
-        self.assertIn("/50（阿明的侦查60-10）", dice.coc_check("侦查-10", 0, lookup_60))
+        self.assertIn("/70（阿明的侦查 60+10）", dice.coc_check("侦查+10", 0, lookup_60))
+        self.assertIn("/50（阿明的侦查 60-10）", dice.coc_check("侦查-10", 0, lookup_60))
         self.assertIn("/50（70-20）", dice.coc_check("侦查 70-20", 0, lookup_none))
-        self.assertIn("/45（阿明的侦查60-15）", dice.coc_check("侦查-10 -5", 0, lookup_60))      # 连着写几个
-        self.assertIn("/100（阿明的侦查60+60，按100算）", dice.coc_check("侦查+60", 0, lookup_60))
+        self.assertIn("/45（阿明的侦查 60-15）", dice.coc_check("侦查-10 -5", 0, lookup_60))      # 连着写几个
+        self.assertIn("/100（阿明的侦查 60+60，按 100 算）", dice.coc_check("侦查+60", 0, lookup_60))
         self.assertIn("掷不出成功", dice.coc_check("侦查-70", 0, lookup_60))
         self.assertIn("只剩", dice.coc_check("侦查 30-40", 0, lookup_none))
         self.assertIn("数值有误", dice.coc_check("侦查 99+999", 0, lookup_none))
@@ -213,10 +306,10 @@ class FixRegressionTests(unittest.TestCase):
         self.assertRegex(out, r"D20=\d+\+3=")
 
     def test_dnd_ability_vs_skill_bonus(self):
-        self.assertIn("力量16→+3", dice.dnd_check("力量", 0, lambda n: ("某人", 16)))
-        self.assertIn("STR16→+3", dice.dnd_check("STR", 0, lambda n: ("某人", 16)))
+        self.assertIn("力量 16，调整值 +3", dice.dnd_check("力量", 0, lambda n: ("某人", 16)))
+        self.assertIn("STR 16，调整值 +3", dice.dnd_check("STR", 0, lambda n: ("某人", 16)))
         out = dice.dnd_check("运动", 0, lambda n: ("某人", 5))                               # 技能存的是加值
-        self.assertIn("运动加值+5", out)
+        self.assertIn("运动加值 +5", out)
         self.assertRegex(out, r"D20=\d+\+5=")
         self.assertIn("修正最多", dice.dnd_check("运动", 0, lambda n: ("某人", 45)))
 
@@ -366,9 +459,9 @@ class HouseRuleAndMadnessTests(unittest.TestCase):
             for summary in (False, True):
                 with mock.patch.object(dice.random, "randint", side_effect=[idx, 3, 42]):
                     out = dice.madness("", summary)
-                self.assertIn(f"{kind}：1D100=42 {table[41][0]}", out)
+                self.assertIn(f"{kind}（1D100=42）：{table[41][0]}，", out)
         with mock.patch.object(dice.random, "randint", side_effect=[5, 3]):
-            self.assertNotIn("症状：1D100", dice.madness("", False))                  # 别的症状不带子表
+            self.assertNotIn("症状（1D100", dice.madness("", False))                  # 别的症状不带子表
         for _ in range(100):                                                         # 边界点数 1 和 100 都取得到
             self.assertIn("1D100=", dice.phobia())
             self.assertIn("1D100=", dice.mania())
@@ -388,7 +481,7 @@ class HouseRuleAndMadnessTests(unittest.TestCase):
         self.assertIn("临时疯狂", t)
         self.assertIn("轮", t)
         s = dice.madness("甲", True)
-        self.assertIn("甲 的总结疯狂", s)
+        self.assertIn("甲的总结疯狂", s)
         self.assertIn("小时", s)
         self.assertEqual(len(dice.TEMP_MADNESS), 10)
         self.assertEqual(len(dice.SUMMARY_MADNESS), 10)

@@ -17,7 +17,7 @@ nonebot.require("nonebot_plugin_apscheduler")
 from nonebot_plugin_apscheduler import scheduler  # noqa: E402
 from changri.core.textutil import parse_id
 
-NEED_ROLE = "请先在你的个人群里发「创建新角色 名字」绑定角色。"
+NEED_ROLE = "你还没有角色。在你的个人群里发「创建新角色 名字」就能创建。"
 
 
 def _bid() -> str:
@@ -46,7 +46,7 @@ def _name_args(args) -> list[str]:
 
 
 def _admin_only(matcher_name: str):
-    return "❌ 权限不足，仅管理员可用。"
+    return "❌ 这条指令只有管理员能用。"
 
 
 # ================= 心动信 =================
@@ -58,7 +58,7 @@ post_mail = _cmd("发送心动信", {"心动信"})
 async def _(event: GroupMessageCreateEvent, args=CommandArg()):
     me = _me(event)
     if not me:
-        await post_mail.finish("✨ 你还不是本系统的会员，请先使用「创建新角色」来认领你的身份吧。")
+        await post_mail.finish("你还没有角色。在你的个人群里发「创建新角色 名字」就能创建。")
     text = args.extract_plain_text()
     images, img_note = [], ""
     if any(seg.type == "image" for seg in event.get_message()):         # 附图：当场下载（QQ 的图片链接会过期）
@@ -72,11 +72,11 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
     if not receiver and images and len(text.split()) == 1 and "【" not in text:     # 只附图不写字：发送心动信 收信人 + 图
         receiver = text.strip()
     if not receiver:
-        await post_mail.finish("⚠️ 格式错误！请指定发送对象。\n简单写法（署名是你的真名）：发送心动信 角色名 想说的话\n"
+        await post_mail.finish("⚠️ 要写清楚寄给谁。\"简单写法（署名是你的真名）：发送心动信 角色名 想说的话\n"
                                "想换署名用这种：\n发送心动信\n【发送对象】角色名\n【内容】想说的话\n【署名】自定义昵称（不写就是「匿名」）")
     target = roles.get_role_by_name(receiver)
     if not target:
-        await post_mail.finish(f"⚠️ 找不到角色「{receiver}」的投递地址，请确认名字是否正确。")
+        await post_mail.finish(f"⚠️ 找不到叫「{receiver}」的角色，核对一下名字。")
     signature = signature or me["name"]
     ok, msg, left = lovemail.add_mail(me["id"], target["id"], signature, content, images)
     if not ok:
@@ -112,11 +112,11 @@ revoke_mail = _cmd("撤回心动信")
 async def _(event: GroupMessageCreateEvent, args=CommandArg()):
     me = _me(event)
     if not me:
-        await revoke_mail.finish("✨ 你还不是本系统的会员，请先使用「创建新角色」来认领你的身份吧。")
+        await revoke_mail.finish("你还没有角色。在你的个人群里发「创建新角色 名字」就能创建。")
     parts = _name_args(args)
     n = parse_id(parts[0]) if parts else None
     if not n:
-        await revoke_mail.finish("⚠️ 请输入正确的序号，例如：撤回心动信 1")
+        await revoke_mail.finish("⚠️ 序号不对，要写信的序号，例如：撤回心动信 1")
     _, msg = lovemail.revoke(me["id"], n)
     await revoke_mail.finish(msg)
 

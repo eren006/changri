@@ -162,6 +162,35 @@ class Store(unittest.TestCase):
         self.assertEqual(decks.get_file(fid)["raw"], "【签】\n2*吉\n凶\n")
 
 
+class SealMeta(unittest.TestCase):
+    """2026-11-21 线上：两份海豹牌堆都带 _author，第二份报「已经有叫「_author」的牌堆了」。"""
+    def setUp(self):
+        _reset()
+
+    def test_meta_fields_are_not_decks(self):
+        a = '{"_title": ["KPC欢乐餐厅"], "_author": ["甲"], "_version": ["1"], "_keys": ["KPC欢乐餐厅"], "KPC欢乐餐厅": ["汉堡"]}'
+        d, _ = decks.from_sealdice(a)
+        self.assertEqual(set(d), {"KPC欢乐餐厅"})
+        ok, msg, _ = decks.save(None, a)
+        self.assertTrue(ok, msg)
+        self.assertIn("共 1 张牌", msg)
+        b = '{"_author": ["乙"], "_brief": ["x"], "邪神召唤": ["召唤出了{%邪神名}"], "邪神名": ["克苏鲁"]}'
+        ok, msg, _ = decks.save(None, b)
+        self.assertTrue(ok, msg)
+        self.assertIn("克苏鲁", decks.draw("邪神召唤"))
+
+    def test_old_saved_meta_does_not_block(self):
+        with get_conn() as c:        # 老版本导入时存下来的 _author 辅助牌堆
+            fid = c.execute("INSERT INTO deck_files(owner_id, title, raw, created_ts, updated_ts) VALUES(NULL,'KPC','【KPC】\n汉堡\n\n【_author】\n甲\n',0,0)").lastrowid
+            c.execute("INSERT INTO decks(file_id, name, hidden, cards) VALUES(?,'KPC',0,'[[1,\"汉堡\"]]')", (fid,))
+            c.execute("INSERT INTO decks(file_id, name, hidden, cards) VALUES(?,'_author',1,'[[1,\"甲\"]]')", (fid,))
+        ok, msg, _ = decks.save(None, '{"_author": ["乙"], "抽签": ["大吉"]}')
+        self.assertTrue(ok, msg)
+        ok, msg, _ = decks.save(None, decks.get_file(fid)["raw"], file_id=fid)    # 再编辑老的那份，【_author】顺手去掉
+        self.assertTrue(ok, msg)
+        self.assertNotIn("_author", decks.get_file(fid)["raw"])
+
+
 class AdminPage(unittest.TestCase):
     """后台「跑团 → 牌堆」页：模板下载、贴内容保存、上传文件、试抽、改、删。牌堆跟小手机没有关系。"""
     def setUp(self):

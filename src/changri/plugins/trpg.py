@@ -28,8 +28,9 @@ def _in_trpg_group(event) -> bool:
 
 @run_preprocessor
 async def _mute_romance(matcher: Matcher, event):
-    if matcher.plugin_name in ROMANCE_PLUGINS and _in_trpg_group(event):
-        raise IgnoredException("跑团模式的群里不响应恋综指令")
+    if matcher.plugin_name in ROMANCE_PLUGINS and isinstance(event, GroupMessageCreateEvent) \
+            and trpg.get_mode(event.group_openid) in ("trpg", "longterm"):
+        raise IgnoredException("跑团 / 长期群模式的群里不响应恋综指令")
 
 
 async def _trpg_rule(event: MessageEvent) -> bool:
@@ -65,18 +66,29 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
     text = args.extract_plain_text().strip().lower()
     cur = trpg.get_mode(event.group_openid)
     if not text:
-        await mode_cmd.finish(f"这个群现在是「{trpg.MODES[cur]}模式」。\n切换：/模式 跑团 或 /模式 恋综（需要机器人管理员）。\n"
-                              "跑团模式：用 /st 录角色卡属性，恋综的指令（短信、礼物、约会……）不响应。")
+        await mode_cmd.finish(f"这个群现在是「{trpg.MODES[cur]}模式」。\n切换：/模式 恋综、/模式 跑团" + ("、/模式 长期群" if trpg.longterm_enabled() else "") + "（需要机器人管理员）。\n"
+                              "跑团模式：用 /st 录角色卡属性，恋综的指令（短信、礼物、约会……）不响应。\n"
+                              + ("长期群模式：接到后台建的长期群，玩家注册、交字数换货币、属性面板、背包。" if trpg.longterm_enabled() else ""))
     new = trpg.MODE_ALIASES.get(text)
     if new is None:
-        await mode_cmd.finish("只有「跑团」和「恋综」两种。")
+        await mode_cmd.finish("只有「恋综」「跑团」「长期群」三种。")
+    if new == "longterm" and not trpg.longterm_enabled():
+        await mode_cmd.finish("长期群模式没打开：在设置平台「功能与设置 → 个性化模块」里打开「长期群」，重启后再切。")
     if not admins.is_admin(current_bot.get().self_id, event.author.member_openid):
         await mode_cmd.finish("切换模式需要机器人管理员。")
     if new == cur:
         await mode_cmd.finish(f"本来就是「{trpg.MODES[cur]}模式」。")
     trpg.set_mode(event.group_openid, new)
-    tail = ("用 /st 力量60 敏捷70 录属性，/ra 侦查 检定；恋综的指令在这个群里先收起来。" if new == "trpg"
-            else "恋综的指令恢复；角色卡和属性都保留着，切回跑团还在。")
+    if new == "trpg":
+        tail = "用 /st 力量60 敏捷70 录属性，/ra 侦查 检定；恋综的指令在这个群里先收起来。"
+    elif new == "longterm":
+        from changri.core import longterm
+        g = longterm.bound_group(event.group_openid)
+        names = "、".join(x["name"] for x in longterm.list_groups())
+        tail = (f"现在接的是长期群「{g['name']}」，换一个用 /切换长期群 名字。" if g
+                else "下一步：/切换长期群 名字" + (f"（现有：{names}）" if names else "（先在后台「长期群」页建一个）")) + "\n恋综的指令在这个群里先收起来。"
+    else:
+        tail = "恋综的指令恢复；角色卡和属性都保留着，切回去还在。"
     await mode_cmd.finish(f"好，这个群改成「{trpg.MODES[new]}模式」。{tail}")
 
 
@@ -109,6 +121,23 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
         from changri.core import formats
         await bindqq_cmd.finish(formats.welcome(role, f"✅ 第 2 步完成：QQ {text} 认到「{role['name']}」名下了。\n\n第 3 步：这是你的完整回执，收好～"))
     await bindqq_cmd.finish(f"好，QQ {text} 认到你的" + "、".join(done) + "名下了。" if done else "这里认不出你是谁：恋综要先有角色，跑团的群要先 /st 或 /pc new 建过卡。")
+
+
+# ---------- 认人：同一个人在不同群里认成一位（跟 QQ 号无关，没有恋综角色也能用）----------
+
+link_cmd = _cmd("认人", {"认我"}, rule=_group_rule)
+
+
+@link_cmd.handle()
+async def _(event: GroupMessageCreateEvent, args=CommandArg()):
+    code = args.extract_plain_text().strip()
+    if not code:
+        pid = trpg.player_for_sender(current_bot.get().self_id, event.group_openid, event.author.member_openid)
+        c = trpg.make_link_code(pid)
+        await link_cmd.finish(f"你的认人码：{c}\n5 分钟内到另一个群发「认人 {c}」，两个群里的你就认成同一个人"
+                              "（跑团卡、插件里按人记的东西都通用）。码只能用一次，别给别人。\n有恋综角色的人不用认，机器人自己认得。")
+    ok, msg = trpg.use_link_code(event.author.member_openid, event.group_openid, code)
+    await link_cmd.finish(("✅ " if ok else "") + msg)
 
 
 # ---------- 我是谁（认人实验）----------

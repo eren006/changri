@@ -602,8 +602,8 @@ article h2 .n::after{top:-9px;width:6px;height:7px}
       <a href="#/season" data-r="season">恋综指南</a>
       <a href="#/commands" data-r="commands">指令大全</a>
       <a href="#/dice" data-r="dice">跑团骰子</a>
-      <a href="#/faq" data-r="faq">常见问题</a>
-      <a href="#/wishes" data-r="wishes">许愿池</a>
+      <a href="#/plugins" data-r="plugins">插件</a>
+      <a href="#/faq" data-r="faq">问答与许愿</a>
       <a href="#/app" data-r="app">申请 App</a>
     </nav>
     <span class="sp"></span>
@@ -614,7 +614,7 @@ article h2 .n::after{top:-9px;width:6px;height:7px}
   </div>
 </header>
 <div class="drawer" id="drawer">
-  <a href="#/">首页</a><a href="#/install" class="glow">安装</a><a href="#/how">工作原理</a><a href="#/season">恋综指南</a><a href="#/commands">指令大全</a><a href="#/dice">跑团骰子</a><a href="#/faq">常见问题</a><a href="#/wishes">许愿池</a><a href="#/app">申请专属 App</a>
+  <a href="#/">首页</a><a href="#/install" class="glow">安装</a><a href="#/how">工作原理</a><a href="#/season">恋综指南</a><a href="#/commands">指令大全</a><a href="#/dice">跑团骰子</a><a href="#/plugins">插件</a><a href="#/faq">问答与许愿</a><a href="#/app">申请专属 App</a>
 </div>
 
 <main>
@@ -1119,6 +1119,7 @@ article h2 .n::after{top:-9px;width:6px;height:7px}
         <div class="feat"><h3>申请加入</h3><p><code>申请加入 小满 14:00</code> 想加入别人正在进行的约会；对方 <code>加入请求</code> 查看，<code>同意加入 编号</code> / <code>拒绝加入 编号</code>。没开时这几条都不响应。</p></div>
         <div class="feat"><h3>晚餐</h3><p>管理员 <code>开始晚餐 8</code>，玩家 <code>入座 3</code>，相邻的人可以 <code>戳你一下 名字</code>。</p></div>
         <div class="feat"><h3>小玩意</h3><p>漂流瓶、抽取池、点歌、提醒、收集……完整列表见 <a href="#/commands">指令大全</a>。</p></div>
+        <div class="feat"><h3>插件和自定义回复</h3><p>签到、摇汽水、今日运势这些现成插件，还有自定义回复，在 <a href="#/plugins">插件</a> 页。</p></div>
       </div>
 
       <h2 id="s-end"><span class="n">09</span>结季与收尾</h2>
@@ -1160,7 +1161,7 @@ article h2 .n::after{top:-9px;width:6px;height:7px}
     <aside class="toc"></aside>
     <article>
       <h1 class="ptitle">跑团骰子</h1>
-      <p class="psub">同一个机器人，把群切到跑团模式，就是一颗完整的跑团骰子：COC7、DND5e、绿色三角洲三套规则，还有角色卡、队伍和跑团 log。恋综的指令在跑团群里自动静音，两边互不打扰。点表格里的指令可以直接复制。</p>
+      <p class="psub">同一个机器人，把群切到跑团模式，就是一颗完整的跑团骰子：COC7、DND5e、绿色三角洲三套规则，黑暗世界的骰池和 FATE 骰也能掷，还有角色卡、队伍和跑团 log。恋综的指令在跑团群里自动静音，两边互不打扰。点表格里的指令可以直接复制。</p>
 
       <div class="rules">
         <div class="rule"><span class="orbic"></span><h4>COC7</h4><p>克苏鲁的呼唤第七版。D100 检定、奖励 / 惩罚骰、困难与极难、理智、疯狂、成长。</p><code data-copy="/切换规则 COC">/切换规则 COC</code></div>
@@ -1194,7 +1195,7 @@ article h2 .n::after{top:-9px;width:6px;height:7px}
 
       <h2 id="d-basic"><span class="n">03</span>通用掷骰</h2>
       <p>所有规则都能用。不写表达式就是一颗 D100。</p>
-      <div class="tblwrap"><table class="tbl dt"><tr><th>写法</th><th>说明</th></tr><tr><td><code data-copy="/rd 3d6+2d4-1">/rd 3d6+2d4-1</code></td><td>加减和常数</td></tr><tr><td><code data-copy="/rd (1d6+2)×2">/rd (1d6+2)×2</code></td><td>乘法和括号</td></tr><tr><td><code data-copy="/rd 4d6k3">/rd 4d6k3</code></td><td>掷 4 颗取最高 3 颗；<code>2d20kl1</code> 取最低 1 颗</td></tr><tr><td><code data-copy="/rd 3d6!">/rd 3d6!</code></td><td>爆骰：掷出最大值再掷一次</td></tr><tr><td><code data-copy="/rd 5#2d6">/rd 5#2d6</code></td><td>连掷 5 轮</td></tr><tr><td><code data-copy="/rd 伤害 2d6+3">/rd 伤害 2d6+3</code></td><td>在前面写原因</td></tr><tr><td><code data-copy="/rh 1d100">/rh 1d100</code></td><td>暗骰：结果私聊给你，群里只说一声（要先把你加进机器人白名单）</td></tr></table></div>
+      <div class="tblwrap"><table class="tbl dt"><tr><th>写法</th><th>说明</th></tr><tr><td><code data-copy="/rd 3d6+2d4-1">/rd 3d6+2d4-1</code></td><td>加减和常数</td></tr><tr><td><code data-copy="/rd (1d6+2)×2">/rd (1d6+2)×2</code></td><td>乘法和括号</td></tr><tr><td><code data-copy="/rd 4d6k3">/rd 4d6k3</code></td><td>掷 4 颗取最高 3 颗；<code>2d20kl1</code> 取最低 1 颗</td></tr><tr><td><code data-copy="/rd 3d6!">/rd 3d6!</code></td><td>爆骰：掷出最大值再掷一次</td></tr><tr><td><code data-copy="/rd 5#2d6">/rd 5#2d6</code></td><td>连掷 5 轮</td></tr><tr><td><code data-copy="/rd 伤害 2d6+3">/rd 伤害 2d6+3</code></td><td>在前面写原因</td></tr><tr><td><code data-copy="/rt 12 7">/rt 12 7</code></td><td>难度骰：掷 D12，≤ 7 算成功；面数越大越难（<code>/rt 16 7</code> 更难）。后面可以写原因：<code>/rt 16 7 撬锁</code>；成功线写技能名就取卡上的数值：<code>/rt 12 侦查</code>。也可以发 <code>/难度骰</code></td></tr><tr><td><code data-copy="/rh 1d100">/rh 1d100</code></td><td>暗骰：结果私聊给你，群里只说一声（要先把你加进机器人白名单）</td></tr><tr><td><code data-copy="/ww 5">/ww 5</code></td><td>黑暗世界骰池：5 颗 D10，≥8 算一个成功，掷出 10 再加一颗；<code>/ww 5a8</code> 8 及以上就加骰，<code>/ww 5 难度6</code> 6 及以上算成功</td></tr><tr><td><code data-copy="/rf +2 运动">/rf +2 运动</code></td><td>FATE 骰：4 颗 Fate 骰加技能等级，按阶梯说结果（平庸、好、极佳……）；只发 <code>/rf</code> 不加修正</td></tr></table></div>
 
       <h2 id="d-coc"><span class="n">04</span>COC7</h2>
       <h3>检定</h3>
@@ -1203,7 +1204,7 @@ article h2 .n::after{top:-9px;width:6px;height:7px}
       <div class="tblwrap"><table class="tbl dt"><tr><th>写法</th><th>说明</th></tr><tr><td><code data-copy="/sc 1/1d6">/sc 1/1d6</code></td><td>理智检定；扣完自动写回卡上，一次掉 5 点以上会提醒做智力检定</td></tr><tr><td><code data-copy="/ti">/ti</code></td><td>临时疯狂症状；<code>/li</code> 总结疯狂症状</td></tr><tr><td><code data-copy="/恐惧症状">/恐惧症状</code></td><td>单掷一个恐惧症状；<code>/狂躁症状</code> 同理</td></tr><tr><td><code data-copy="/en 侦查">/en 侦查</code></td><td>成长检定，成长了自动写回</td></tr><tr><td><code data-copy="/en">/en</code></td><td>跑团模式下检定成功会记成长标记，团后发 <code>/en</code> 一次掷完</td></tr><tr><td><code data-copy="/coc 3">/coc 3</code></td><td>制卡：一次掷 3 组属性，带生命、魔法、理智、DB、体格、移动</td></tr></table></div>
 
       <h2 id="d-dnd"><span class="n">05</span>DND5e</h2>
-      <div class="tblwrap"><table class="tbl dt"><tr><th>写法</th><th>说明</th></tr><tr><td><code data-copy="/ra 运动 +3 15">/ra 运动 +3 15</code></td><td>D20 + 修正对 DC（DC 可不写）；属性名会自动换算成调整值</td></tr><tr><td><code data-copy="/rb 运动">/rb 运动</code></td><td>优势；<code>/rp</code> 劣势，也可以在 /ra 后面写「优势」「劣势」</td></tr><tr><td><code data-copy="/at 长剑 +5 15 1d8+3">/at 长剑 +5 15 1d8+3</code></td><td>攻击：命中加值、AC、伤害；自然 20 暴击</td></tr><tr><td><code data-copy="/ri 名字 +2">/ri 名字 +2</code></td><td>加入先攻；<code>/ri</code> 看顺序，<code>/ri 清空</code></td></tr><tr><td><code data-copy="/dnd 3">/dnd 3</code></td><td>属性生成：6 项各 4D6 取高 3，掷 3 组</td></tr></table></div>
+      <div class="tblwrap"><table class="tbl dt"><tr><th>写法</th><th>说明</th></tr><tr><td><code data-copy="/ra 运动 +3 15">/ra 运动 +3 15</code></td><td>D20 + 修正对 DC（DC 可不写）；属性名会自动换算成调整值</td></tr><tr><td><code data-copy="/rb 运动">/rb 运动</code></td><td>优势；<code>/rp</code> 劣势，也可以在 /ra 后面写「优势」「劣势」</td></tr><tr><td><code data-copy="/at 长剑 +5 15 1d8+3">/at 长剑 +5 15 1d8+3</code></td><td>攻击：命中加值、AC、伤害；自然 20 暴击</td></tr><tr><td><code data-copy="/ri 名字 +2">/ri 名字 +2</code></td><td>加入先攻；<code>/ri</code> 看顺序，<code>/ri 清空</code> 下一场</td></tr><tr><td><code data-copy="/ri 开始">/ri 开始</code></td><td>从第 1 轮最前面开始；之后每人行动完发 <code>/ri 下一个</code>，转一圈自动进下一轮</td></tr><tr><td><code data-copy="/ri 删 名字">/ri 删 名字</code></td><td>倒下、逃跑的移出先攻；<code>/ri 改 名字 15</code> 直接改先攻值。中途加人、改值，轮到的还是那个人</td></tr><tr><td><code data-copy="/dnd 3">/dnd 3</code></td><td>属性生成：6 项各 4D6 取高 3，掷 3 组</td></tr></table></div>
 
       <h2 id="d-dg"><span class="n">06</span>绿色三角洲</h2>
       <p>Delta Green 用的也是 D100，但判定和成长方式和 COC 不一样。切到这套规则后，机器人会按它的规矩判定。</p>
@@ -1218,18 +1219,70 @@ article h2 .n::after{top:-9px;width:6px;height:7px}
 
       <h2 id="d-card"><span class="n">07</span>角色卡</h2>
       <p>卡跟着人走，换个跑团群也能用。一个人可以有多张卡，每个群各自选用哪一张。</p>
-      <div class="tblwrap"><table class="tbl dt"><tr><th>写法</th><th>说明</th></tr><tr><td><code data-copy="/st 力量60 敏捷70">/st 力量60 敏捷70</code></td><td>录属性</td></tr><tr><td><code data-copy="/st 生命-3">/st 生命-3</code></td><td>增减数值</td></tr><tr><td><code data-copy="/st">/st</code></td><td>看卡（含上限、DB）</td></tr><tr><td><code data-copy="/st del 力量">/st del 力量</code></td><td>删一项；<code>/st clr</code> 清空</td></tr><tr><td><code data-copy="/pc new 名字 coc">/pc new 名字 coc</code></td><td>再建一张卡，规则可写 coc / dnd / dg，不写就跟群规则</td></tr><tr><td><code data-copy="/pc list">/pc list</code></td><td>看自己的卡；<code>/pc 切换 名字</code>、<code>/pc del 名字</code></td></tr><tr><td><code data-copy="/nn 名字">/nn 名字</code></td><td>设你在 log 里显示的名字</td></tr><tr><td><code data-copy="/en list">/en list</code></td><td>看成长标记；<code>/en+ 侦查</code>、<code>/en- 侦查</code> 手动加减</td></tr><tr><td><code data-copy="/我是谁">/我是谁</code></td><td>看自己在这个群里用的是哪张卡</td></tr></table></div>
+      <div class="callout"><p><b>换了个群卡对不上？</b>官方机器人给每个群的同一个人一个不同的标识，所以第一次到新群时，机器人还不知道是你。在原来的群发 <code>/认人</code> 拿一个码，5 分钟内到新群发 <code>/认人 码</code>，两边就认成同一个人（跟绑定 QQ 无关）。有恋综角色的不用认，机器人自己认得。</p></div>
+      <div class="tblwrap"><table class="tbl dt"><tr><th>写法</th><th>说明</th></tr><tr><td><code data-copy="/st 力量60 敏捷70">/st 力量60 敏捷70</code></td><td>录属性</td></tr><tr><td><code data-copy="/st 生命-3">/st 生命-3</code></td><td>增减数值</td></tr><tr><td><code data-copy="/st">/st</code></td><td>看卡（含上限、DB）</td></tr><tr><td><code data-copy="/st del 力量">/st del 力量</code></td><td>删一项；<code>/st clr</code> 清空</td></tr><tr><td><code data-copy="/pc new 名字 coc">/pc new 名字 coc</code></td><td>再建一张卡，规则可写 coc / dnd / dg，不写就跟群规则</td></tr><tr><td><code data-copy="/pc list">/pc list</code></td><td>看自己的卡；<code>/pc 切换 名字</code>、<code>/pc del 名字</code></td></tr><tr><td><code data-copy="/nn 名字">/nn 名字</code></td><td>设你在 log 里显示的名字</td></tr><tr><td><code data-copy="/en list">/en list</code></td><td>看成长标记；<code>/en+ 侦查</code>、<code>/en- 侦查</code> 手动加减</td></tr><tr><td><code data-copy="/我是谁">/我是谁</code></td><td>看自己在这个群里用的是哪张卡</td></tr><tr><td><code data-copy="/认人">/认人</code></td><td>拿认人码；到另一个群发 <code>/认人 码</code>，两个群里的你认成同一个人</td></tr></table></div>
 
       <h2 id="d-team"><span class="n">08</span>队伍</h2>
       <div class="tblwrap"><table class="tbl dt"><tr><th>写法</th><th>说明</th></tr><tr><td><code data-copy="/team 调查员 add @甲 @乙">/team 调查员 add @甲 @乙</code></td><td>加人；不 @ 就是加自己，队伍不存在会自动建</td></tr><tr><td><code data-copy="/team 调查员 侦查 聆听">/team 调查员 侦查 聆听</code></td><td>列出全队的数值，按第一项排序</td></tr><tr><td><code data-copy="/team 调查员 ra 聆听">/team 调查员 ra 聆听</code></td><td>全队各掷一次</td></tr><tr><td><code data-copy="/team list">/team list</code></td><td>看本群的队伍；<code>/team 调查员 del @甲</code>、<code>/team 调查员 clear</code> 解散</td></tr></table></div>
 
       <h2 id="d-log"><span class="n">09</span>跑团 log</h2>
       <p>把一场团完整记下来，结束后给一个网页链接，有链接的人都能看。</p>
-      <div class="tblwrap"><table class="tbl dt"><tr><th>写法</th><th>说明</th></tr><tr><td><code data-copy="/log new 第一章">/log new 第一章</code></td><td>开始记；<code>/log off</code> 暂停，<code>/log on</code> 继续</td></tr><tr><td><code data-copy="/log on 第一章">/log on 第一章</code></td><td>接着记以前的一场</td></tr><tr><td><code data-copy="/log end">/log end</code></td><td>结束并生成网页链接；<code>/log halt</code> 强制停止，不给链接</td></tr><tr><td><code data-copy="/log stat 第一章">/log stat 第一章</code></td><td>发言统计；<code>/log list</code>、<code>/log get</code>、<code>/log export</code>、<code>/log del</code></td></tr><tr><td><code data-copy="/说 台词">/说 台词</code></td><td>记一条角色发言；别名 <code>/s</code>、<code>/演</code></td></tr><tr><td><code data-copy="/ob">/ob</code></td><td>切换旁观，旁观者不进 log</td></tr></table></div>
-      <div class="callout"><p><b>自动记录：</b>log 开着的时候，群里的发言会自动记下来，不用每句都发 <code>/说</code>；<code>/说</code> 适合想单独补记一句台词的时候。如果这个群也接了 QQ 小号，两边收到的同一句会自动去重。括号开头的话默认不记。网页链接要先在后台「小手机」页填好玩家访问网址。</p></div>
+      <div class="tblwrap"><table class="tbl dt"><tr><th>写法</th><th>说明</th></tr><tr><td><code data-copy="/log new 第一章">/log new 第一章</code></td><td>开始记；<code>/log off</code> 暂停，<code>/log on</code> 继续</td></tr><tr><td><code data-copy="/log on 第一章">/log on 第一章</code></td><td>接着记以前的一场</td></tr><tr><td><code data-copy="/log end">/log end</code></td><td>结束并生成网页链接，附上每个人的骰点和「本场之最」；<code>/log halt</code> 强制停止，不给链接</td></tr><tr><td><code data-copy="/log stat 第一章">/log stat 第一章</code></td><td>发言统计；<code>/log list</code>、<code>/log get</code>、<code>/log export</code>、<code>/log del</code></td></tr><tr><td><code data-copy="/说 台词">/说 台词</code></td><td>记一条角色发言；别名 <code>/s</code>、<code>/演</code></td></tr><tr><td><code data-copy="/ob">/ob</code></td><td>切换旁观，旁观者不进 log</td></tr></table></div>
+      <div class="callout"><p><b>自动记录：</b>log 开着的时候，群里的发言会自动记下来，不用每句都发 <code>/说</code>；<code>/说</code> 适合想单独补记一句台词的时候。如果这个群也接了 QQ 小号，两边收到的同一句会自动去重。括号开头的话默认不记。</p></div>
+      <div class="callout"><p><b>网页链接：</b>链接挂在小手机的网站上，所以要先在后台「小手机」页开启小手机、填好玩家访问网址。网页最上面是「本场战报」：每个人骰了几次、大成功和大失败各几次、成功率，还有大成功最多、骰运最好最差、理智掉得最多。发链接前机器人会先看一眼玩家能不能打开，打不开会在群里说一声，并提醒后台群的管理员去「小手机」页处理。</p></div>
 
       <h2 id="d-fun"><span class="n">10</span>小工具</h2>
       <div class="tblwrap"><table class="tbl dt"><tr><th>写法</th><th>说明</th></tr><tr><td><code data-copy="/name 日 3 女">/name 日 3 女</code></td><td>随机人名：中 / 英 / 日、男 / 女、数量</td></tr><tr><td><code data-copy="/who 甲 乙 丙">/who 甲 乙 丙</code></td><td>随机排顺序</td></tr><tr><td><code data-copy="/draw 塔罗 3">/draw 塔罗 3</code></td><td>抽牌：塔罗、扑克、遭遇；不带参数看牌堆</td></tr><tr><td><code data-copy="/jrrp">/jrrp</code></td><td>今日人品</td></tr><tr><td><code data-copy="/录属性 力量60">/录属性 力量60</code></td><td>恋综模式的群里也能给角色记属性，检定时直接写属性名</td></tr></table></div>
+    </article>
+  </div>
+</section>
+
+<!-- ================= PLUGINS ================= -->
+<section class="page" data-page="plugins">
+  <div class="wrap doc">
+    <aside class="toc"></aside>
+    <article>
+      <h1 class="ptitle">插件</h1>
+      <p class="psub">主程序之外的小功能，按需装、按需开。现成的插件点一下就装好；想要别的，可以让 AI 帮你写一个。插件和自定义回复不只恋综群能用，跑团群、闲聊群也行。</p>
+
+      <h2 id="p-install"><span class="n">01</span>怎么装</h2>
+      <ol class="steps">
+        <li><b>装上</b>后台「功能与设置 → 插件接口」，最上面是现成插件，点「安装」。也可以点「下载」拿到插件的文件，照着改成自己的。</li>
+        <li><b>打开</b>到「功能与设置 → 辅助功能」找到它，打开开关。装上默认是关着的。</li>
+        <li><b>重启一次</b>页面上方会提示需要重启，点一下，大约 20 秒后生效。</li>
+        <li><b>按需调设置</b>每个插件能调的东西（发多少金币、摇几下必喷……）在开关旁边。</li>
+      </ol>
+
+      <h2 id="p-ready"><span class="n">02</span>现成插件</h2>
+      <div class="grid3" style="grid-template-columns:repeat(2,1fr)">
+        <div class="feat"><h3>每日签到 <span class="tag x">换季不清零</span></h3><p>每天发一次 <code>签到</code>。连签和总天数跟着人走，<b>换季不清零</b>；有恋综角色的还会领金币，连签每天多给一点，没签时「我的待回」里会提醒。没有角色的人也能签，只记天数。</p></div>
+        <div class="feat"><h3>摇汽水</h3><p><code>摇汽水</code> 拿出一瓶，大家轮流 <code>摇一下</code>，不知道第几下会喷，喷到谁谁中招，随机领一个小惩罚（真心话之类，可改可清空）。<code>不摇了</code> 收走。不涉及金币和道具。</p></div>
+        <div class="feat"><h3>今日运势</h3><p>发 <code>运势</code> 抽一条今天的运势，同一天抽到的都一样，第二天重抽。运势内容可以在设置里自己写。</p></div>
+        <div class="feat"><h3>富豪榜</h3><p>发 <code>富豪榜</code> 看谁的金币最多。按哪种货币排、显示前几名、是不是只有管理员能看，都能设。</p></div>
+        <div class="feat"><h3>群播报</h3><p><span class="tag a">管理员</span> 在任意群发 <code>播报 戏群 内容</code>，机器人把内容发到戏群；也能发到公告群、水群、后台群。</p></div>
+      </div>
+
+      <h2 id="p-long"><span class="n">03</span>长期插件与认人</h2>
+      <p>插件记的东西分三种：</p>
+      <ul>
+        <li><b>跟着人走、一直保留</b>：比如签到的连签天数，换季、收尾都不清，同一个人在不同群也算一份。插件卡片上标「按玩家长期存」。</li>
+        <li><b>跟着这一季</b>：只在本季有用的数据，发 <code>收尾 确认</code> 时清掉。卡片上标「本季数据，收尾清空」。</li>
+        <li><b>插件自己记的</b>：比如摇汽水桌上那瓶，按群记，一直保留，插件用完会自己清。卡片上标「长期保留」。</li>
+      </ul>
+      <div class="callout"><p><b>换了个群，记录对不上？</b>官方机器人给每个群的同一个人一个不同的标识，第一次到新群时，机器人还不知道是你。在原来的群发 <code>/认人</code> 拿一个码，5 分钟内到新群发 <code>/认人 码</code>，两边就算同一个人。有恋综角色的不用认，机器人自己认得。认人和「绑定 QQ」是两回事，不在恋综里也能用。</p></div>
+
+      <h2 id="p-reply"><span class="n">04</span>自定义回复</h2>
+      <p>不用装插件，后台「通用 → 自定义回复」里直接设：群里有人说了某个词，机器人自动回一句。可以选匹配方式（包含、完全等于、开头、结尾、正则），限定谁能触发、在哪种群、冷却多久；同一条写几句回复，随机发一句或按顺序全发。页面上方的「试一试」能先看效果。游戏指令永远优先，不会被自定义回复抢走。</p>
+      <div class="tblwrap"><table class="tbl dt"><tr><th>回复里写</th><th>发出去变成</th></tr><tr><td><code>{角色}</code></td><td>说话人的角色名，没有角色就是「朋友」</td></tr><tr><td><code>{塔罗}</code></td><td>从叫「塔罗」的牌堆里抽一张；牌堆在后台「跑团 → 牌堆」里管</td></tr><tr><td><code>[1d6]</code></td><td>掷骰，写法和 <code>/rd</code> 一样，要带 d</td></tr><tr><td><code>{检定:侦查}</code></td><td>用说话人这个群的角色卡做一次检定，和 <code>/ra 侦查</code> 一样，按群的规则判定；一条回复最多 3 次</td></tr></table></div>
+      <div class="callout"><p><b>例子：</b>触发词「今天运势」，回复写 <code>{角色}今天抽到了{塔罗}，幸运数字 [1d100]。</code>；触发词「我去看看」，回复写 <code>{角色}四处张望……{检定:侦查}</code>，跑团时就能顺手掷一次侦查。</p></div>
+
+      <h2 id="p-write"><span class="n">05</span>自己写一个</h2>
+      <ol class="steps">
+        <li><b>复制模板</b>后台「功能与设置 → 给 AI 的模板」，点「复制全部」，把最后「我想要的扩展」那几项改成你想要的，比如「做一个每天抽一张塔罗的插件，连抽 7 天送一个徽章」。</li>
+        <li><b>发给 AI</b>发给 DeepSeek 或别的 AI 助手。模板里写好了能用哪些接口、数据怎么存、要不要提醒玩家认人，AI 会写出两个文件。</li>
+        <li><b>装上试试</b>把两个文件放进一个文件夹打成 zip，在「功能与设置 → 辅助功能」点「上传扩展」，上传时会自动检查，有问题会告诉你哪一行。然后打开开关、重启。哪里不对，把群里的回复或后台的报错截图发回给 AI 改。</li>
+      </ol>
+      <div class="callout"><p><b>只装信得过的插件。</b>插件是 Python 代码，装上就有和主程序一样的权限。别人发来的插件，先让 AI 帮你看一遍它做了什么。能用的接口都列在「功能与设置 → 插件接口」里，主程序更新后会自动跟着变。</p></div>
     </article>
   </div>
 </section>
@@ -1239,8 +1292,8 @@ article h2 .n::after{top:-9px;width:6px;height:7px}
   <div class="wrap doc">
     <aside class="toc"></aside>
     <article>
-      <h1 class="ptitle">常见问题</h1>
-      <p class="psub">遇到问题先跑一次自检：Linux <code>sudo /opt/changri-bot/changri doctor</code>，Windows 双击 <code>Doctor.bat</code>。</p>
+      <h1 class="ptitle">问答与许愿</h1>
+      <p class="psub">遇到问题先跑一次自检：Linux <code>sudo /opt/changri-bot/changri doctor</code>，Windows 双击 <code>Doctor.bat</code>。这里没找到答案、或者想要新功能，到下面的 <a href="#/faq#f-wish">许愿池</a> 说一声。</p>
       <h2 id="f-run"><span class="n">01</span>运行</h2>
       <details class="qa"><summary>机器人一直不在线 / 不回话</summary><div>多半是 IP 白名单没加对，照<a href="#/install#i-ip">这一节</a>加。后台「机器人接入」点「检查连接」，它会告诉你该加哪个 IP。</div></details>
       <details class="qa"><summary>打不开设置平台</summary><div>检查云服务商安全组是否放行了 TCP 5091；Linux 用 <code>systemctl status changri-bot</code> 看服务是否在跑。</div></details>
@@ -1249,29 +1302,20 @@ article h2 .n::after{top:-9px;width:6px;height:7px}
       <details class="qa"><summary>怎么升级到新版本？</summary><div>设置平台「更新」页，点「检查更新」，再点「立即更新」，一键完成，大约一分钟。不用重新安装、不用传文件。见<a href="#/install#i-update">更新到新版本</a>。</div></details>
       <details class="qa"><summary>升级失败会不会丢数据？</summary><div>升级前会先备份所有数据库；新版本起不来会自动退回旧版本。</div></details>
       <h2 id="f-play"><span class="n">02</span>玩法</h2>
-      <details class="qa"><summary>发了指令机器人没反应</summary><div>① 对应的扩展可能没开（后台「功能与设置」）；② 后台开了「指令必须带前缀」，需要在前面加 <code>/</code>；③ 这个群是跑团模式，恋综指令会静音；④ 你还没在个人群「创建新角色」。</div></details>
+      <details class="qa"><summary>发了指令机器人没反应</summary><div>① 对应的扩展可能没开（后台「功能与设置」）；② 后台开了「指令必须带前缀」，需要在前面加 <code>/</code>；③ 这个群是跑团或长期群模式，恋综指令会静音（<code>/模式</code> 看现在是哪种）；④ 你还没在个人群「创建新角色」。</div></details>
       <details class="qa"><summary>回复下面没有按钮</summary><div>按钮要机器人在 QQ 开放平台有群 Markdown 和按钮权限，没有的话会自动发纯文字，照文字提示手打指令就行。也可能是主持人在后台「功能与设置 → 基础」关掉了「列表下面挂按钮」。</div></details>
       <details class="qa"><summary>短信发错人了</summary><div>2 分钟内在自己群里发 <code>撤回</code>，对方群里那条一起删，次数返还。超过 2 分钟请联系管理员。</div></details>
       <details class="qa"><summary>复盘说「没有记到戏文」</summary><div>房间群里要有监听的 QQ 号，说话的人要用 <code>绑定qq 你的QQ号</code> 绑过，戏文要按「角色名：正文」写。漏记的可以用 <code>补录 R房间号</code> 补。</div></details>
       <details class="qa"><summary>群池用完了怎么办</summary><div>新的约会、电话会无法开启，机器人会告知玩家，不会排队。主持人可以多准备几个群，在里面发 <code>设为备用群 群号</code>。</div></details>
-    </article>
-  </div>
-</section>
-<!-- ================= WISHES ================= -->
-<section class="page" data-page="wishes">
-  <div class="wrap doc">
-    <aside class="toc"></aside>
-    <article>
-      <h1 class="ptitle">许愿池</h1>
-      <p class="psub">想要什么功能？许个愿。审核通过后会出现在下面的墙上；看到别人许的愿你也想要，点「我也想要」，想要的人越多越靠前。</p>
-      <h2 id="w-make"><span class="n">01</span>许个愿</h2>
+      <h2 id="f-wish"><span class="n">03</span>许个愿</h2>
+      <p>想要什么功能？许个愿。审核通过后会出现在下面的墙上；看到别人许的愿你也想要，点「我也想要」，想要的人越多越靠前。</p>
       <form id="wishf" class="form glass" autocomplete="off">
         <div class="row"><label for="wtext">想要的功能 <small>一两句话就行，最多 200 字</small></label><textarea id="wtext" rows="3" maxlength="200" required placeholder="例如：心动信能定时在第二天早上送达"></textarea></div>
         <div class="row"><label for="wname">怎么称呼你 <small>选填，会显示在墙上</small></label><input id="wname" type="text" maxlength="12" placeholder="例如：某团主持人"></div>
         <button class="btn pri" type="submit">许愿 <span aria-hidden="true">→</span></button>
         <p class="wmsg" id="wmsg" role="status"></p>
       </form>
-      <h2 id="w-wall"><span class="n">02</span>大家的愿望</h2>
+      <h2 id="f-wall"><span class="n">04</span>大家的愿望</h2>
       <ul class="wl" id="wl"><li class="wempty">正在加载……</li></ul>
     </article>
   </div>
@@ -1426,10 +1470,11 @@ var G = [
  ["date","约会与时间线","约会 / 电话 / 踩点 / 官约","发起后从群池领房间，聊完结束，自动写进时间线。"],
  ["love","心动信与关系线","夜间派送 · 关系细节",""],
  ["season","季度与出场","主持人主导","季度推进、游戏天数、出场顺序、NPC。"],
- ["ext","扩展玩法","在后台按需开启","论坛、心愿、物品商城、抽取池、漂流瓶等。前置电话在小手机「发现」里玩。"],
+ ["ext","扩展玩法","在后台按需开启","论坛、心愿、物品商城、抽取池、漂流瓶、签到、摇汽水等。前置电话在小手机「发现」里玩。"],
  ["dinner","晚餐与小游戏","开了晚餐就能玩","晚餐座位、围猎、巡逻、喝酒游戏。"],
  ["letters","写信综","个性化模块，默认关","正式信件、写信币赏金、望远镜和羽毛笔。"],
  ["paidan","排单","个性化模块，默认关","给接稿的人管理排单：业务、客户额度、散单兑换码、交付。只在排单绑定的群里响应，跟恋综的数据完全分开。"],
+ ["longterm","长期群","个性化模块，默认关","恋综、跑团之外的第三种群模式，没有季度和时间线：注册、交字数换货币、属性面板、背包、签到、商城、合成、KPI。只在长期群模式的群里响应，跟恋综、跑团的数据分开。"],
  ["dice","跑团骰子","跑团模式的群","COC7 / DND5e / 绿色三角洲 掷骰与角色卡。"]
 ];
 var C = [
@@ -1516,6 +1561,13 @@ var C = [
  ["查看出场状态","","查看出场状态","","p","season"],
  ["提交出场","","提交出场 角色名 内容","预存出场戏，轮到时自动发。","p","season"],
  // ext
+ ["运势","今日运势","运势","抽一条今天的运势（现成插件「今日运势」）。","p","ext"],
+ ["富豪榜","","富豪榜","看谁的金币最多（现成插件「富豪榜」）。","p","ext"],
+ ["播报","","播报 戏群 内容","把内容发到戏群、公告群、水群或后台群（现成插件「群播报」）。","a","ext"],
+ ["签到","","签到","每天一次；连签和总天数换季不清零，有角色的领金币（现成插件「每日签到」）。","p","ext"],
+ ["摇汽水","来瓶汽水、拿汽水","摇汽水","拿出一瓶汽水，大家轮流摇，喷到谁谁中招（现成插件「摇汽水」）。","p","ext"],
+ ["摇一下","摇一摇、摇摇","摇一下","摇一下桌上的汽水。","p","ext"],
+ ["不摇了","收走汽水、放下汽水","不摇了","把汽水收走。","p","ext"],
  ["发帖","","发帖 署名 内容","在论坛匿名发帖。","p","ext"],
  ["回复帖子","","回复帖子 001 [引用2|署名] 内容","","p","ext"],
  ["点赞 / 点踩","点赞楼层、点踩楼层","点赞 001","","p","ext"],
@@ -1569,6 +1621,7 @@ var C = [
  ["写信综指南","","写信综指南","玩法说明。","p","letters"],
  // dice
  ["rd","r","r 3d6+2 原因","通用掷骰。","p","dice"],
+ ["rt","难度骰","rt 12 7 [原因]","自定面数和成功线，掷出 ≤ 成功线算成功；成功线可写技能名，取卡上的数值。","p","dice"],
  ["rh","暗骰","rh 1d100","结果私发。","p","dice"],
  ["ra","检定","ra 侦查 [60]","技能检定。COC 可带 b/p 奖惩骰，绿色三角洲用 ±20。","p","dice"],
  ["rah","暗检定","rah 聆听","","p","dice"],
@@ -1581,18 +1634,21 @@ var C = [
  ["coc","制卡、车卡","coc 5","COC7 随机属性。","p","dice"],
  ["dnd","属性生成","dnd 3","DND 属性生成。","p","dice"],
  ["dg","","dg [组数]","绿色三角洲制卡。","p","dice"],
- ["ri","先攻","ri +2","先攻。","p","dice"],
+ ["ri","先攻","ri 名字 +2","先攻；ri 开始、ri 下一个 推进回合，ri 删 名字、ri 改 名字 15。","p","dice"],
+ ["ww","骰池","ww 5","黑暗世界骰池：≥8 成功，10 加骰；ww 5a8、ww 5 难度6。","p","dice"],
+ ["rf","fate","rf +2 运动","FATE 骰，按阶梯说结果。","p","dice"],
  ["at","攻击","at 长剑","","p","dice"],
  ["st","录卡、看卡","st 力量60 敏捷70","录入当前角色卡。","p","dice"],
  ["录属性 / 属性","设置属性、我的属性","录属性 力量60 敏捷70","恋综角色的属性（跑团检定用）；「属性」看。","p","dice"],
  ["删属性 / 清空属性","删除属性","删属性 力量","","p","dice"],
  ["pc / nn","改名","pc new 名字 [coc|dnd|dg]","建卡、pc list 看卡、切换；nn 改名。","p","dice"],
  ["我是谁","whoami","我是谁","","p","dice"],
+ ["认人","认我","认人 [码]","不带码：拿认人码；到另一个群发「认人 码」，两个群里的你认成同一个人。","p","dice"],
  ["team","队伍","team 调查员 ra 聆听","整队一起检定。","p","dice"],
- ["log","","log new|on|off|end|get","跑团记录。","p","dice"],
+ ["log","","log new|on|off|end|get","跑团记录；end 时附本场战报和网页链接。","p","dice"],
  ["说 / ob","s、演、旁观","说 内容","以角色身份说话 / 旁观。","p","dice"],
  ["jrrp / draw / name / who","今日人品、抽牌、随机名字、随机顺序","jrrp","小工具。","p","dice"],
- ["模式","切换模式","模式 跑团","在恋综 / 跑团模式间切换（需要机器人管理员）。","a","dice"],
+ ["模式","切换模式","模式 跑团","在恋综 / 跑团 / 长期群模式间切换（需要机器人管理员；长期群要先在后台打开）。","a","dice"],
  ["切换规则","规则、setrule","切换规则 dnd","","a","dice"],
  ["setcoc","房规","setcoc 1","COC 房规。","a","dice"],
  ["骰子帮助","骰子、dicehelp","骰子帮助","机器人内的骰子说明。","p","dice"],
@@ -1603,7 +1659,23 @@ var C = [
  ["发送图包","","发送图包","请 owner 把图包发给你。","p","paidan"],
  ["我的额度","","我的额度","看还剩几张、什么时候到期。","p","paidan"],
  ["绑定","","绑定 绑定码","把客户群、工作群、散单群或 owner 绑到排单；绑定码在后台「额外 → 附属功能 → 排单」里生成。","a","paidan"],
- ["发送","","发送 A-0012","owner 在工作群回复成品图写单号交付，再到网页上填扣几张。","a","paidan"]
+ ["发送","","发送 A-0012","owner 在工作群回复成品图写单号交付，再到网页上填扣几张。","a","paidan"],
+ // longterm（长期群模式的群里才响应；名字写成组合，免得盖住恋综同名指令的卡片）
+ ["切换长期群","","切换长期群 名字","把这个群接到后台建好的某个长期群；不带名字看现在接的是哪个。","a","longterm"],
+ ["长期群帮助","帮助、菜单","长期群帮助","在群里列出全部长期群指令；管理员看到的多一节管理指令。","p","longterm"],
+ ["注册","登记","注册 名字","注册成这个长期群的玩家；后台设了注册项的，换行写「项目：内容」。再发一次 = 改资料。","p","longterm"],
+ ["改名","修改名字","改名 新名字","名字写错了就改；旧名字留着当别名，合并转发里写旧名字的发言照样算你的。","p","longterm"],
+ ["我的 / 属性 / 背包","面板、角色卡","我的","看自己的资料、字数、段数、货币、属性、背包、KPI；后面写名字或 @ 人看别人。","p","longterm"],
+ ["长期群 st","录属性","st 力量60","改自己的属性（后台可以关掉，改成只由管理员改）。","p","longterm"],
+ ["字数统计","统计字数、交字数","字数统计","长按合并转发 →「回复」→ 发这条：按转发里的名字记字数和段数，换成货币。","p","longterm"],
+ ["字数榜","货币榜","字数榜","字数排行；「字数榜 货币」按货币排。","p","longterm"],
+ ["KPI","考核","KPI","看这一期的字数、段数达没达标；后面写名字看别人。","p","longterm"],
+ ["长期群 签到","打卡","签到","每天一次领奖励。","p","longterm"],
+ ["长期群 商城 / 购买 / 使用","","购买 回血药水 2","看上架的道具、用货币买、用掉一个按效果改属性。","p","longterm"],
+ ["长期群 赠送","转账","赠送 小白 苹果 2","把背包里的东西送人；物品写货币名就是转账。","p","longterm"],
+ ["合成表 / 合成","兑换表、兑换","合成 宝剑","按后台的配方用掉材料、得到东西。","p","longterm"],
+ ["调整","加减","调整 阿青 力量+5 银两-10 苹果+2","加减一个玩家的属性、货币、字数、段数、物品；写「=」是直接改成。","a","longterm"],
+ ["发放","批量发放","发放 全员 银两+50","一次发给全员，或者写好几个名字（顿号分开）、@ 好几个人。","a","longterm"]
 ];
 // ---------- 玩法块：同一个功能的指令放在一块，按先后顺序写清谁来做、做什么 ----------
 // [分组, 名称, 小字, 一句话说明, 步骤[[谁 p/a, 做什么, [可复制的写法...]]], 底部补充, 覆盖的指令名（C 里的第一列，这些不再单独成卡）]
@@ -1697,6 +1769,15 @@ var F = [
    ["p","给帖子点赞、点踩（楼层用「点赞楼层」「点踩楼层」）",["点赞 001","点踩 001"]],
    ["a","删帖或删某一楼",["删帖 001"]]],
   "",["发帖","回复帖子","点赞 / 点踩","查看帖子","删帖 / 删楼层"]],
+ ["ext","摇汽水","现成插件「摇汽水」","大家轮流摇一瓶汽水，不知道第几下会喷，喷到谁谁领一个小惩罚。",
+  [["p","拿出一瓶汽水（一个群同时只有一瓶）",["摇汽水"]],
+   ["p","轮流摇；默认同一个人不能连着摇",["摇一下"]],
+   ["p","不玩了就收走",["不摇了"]]],
+  "最多摇几下、中招后的小惩罚、多久没人摇自动收走，都在后台「功能与设置」里改。",["摇汽水","摇一下","不摇了"]],
+ ["ext","每日签到","现成插件「每日签到」","每天签一次，连签和总天数跟着人走，换季不清零。",
+  [["p","签到；有恋综角色的会领金币，连签每天多给一点",["签到"]],
+   ["p","换个群签到前，先把两个群里的你认成同一个人",["认人","认人 码"]]],
+  "没有角色的人也能签，只记天数。发什么、给多少、连签加成在后台改。",["签到"]],
  ["ext","加百列闹钟","扩展「加百列闹钟」","个人提醒：到点加百列在你的个人群里叫你。管理员的群体闹钟（到点发给每位玩家的个人群，NPC 不收）在后台「加百列闹钟」页里设。",
   [["p","设一个提醒；时间可以写 30分钟后、2小时后、21:00、明天08:00、每天08:00、每周一20:00、9月14日 20:00",["提醒 30分钟后 喝水","提醒 每天08:00 起床"]],
    ["p","看自己设了哪些",["我的提醒"]],
@@ -1757,7 +1838,34 @@ var F = [
    ["p","看今天还能寄几封、写信币多少",["信件状态"]],
    ["p","望远镜：对方寄出的下一封信抄一份给你；羽毛笔：对方的下一封信先截到你手里",["使用望远镜 小满","使用羽毛笔 小满"]],
    ["p","改截下来的信，改完照常寄出",["羽毛笔修改 1 新内容"]]],
-  "完整玩法：「写信综指南」。写信币、望远镜、羽毛笔第一次用到时自动建好，不用手动注册。",["发送信件","信件状态","使用望远镜 / 使用羽毛笔","羽毛笔修改","写信综指南"]]
+  "完整玩法：「写信综指南」。写信币、望远镜、羽毛笔第一次用到时自动建好，不用手动注册。",["发送信件","信件状态","使用望远镜 / 使用羽毛笔","羽毛笔修改","写信综指南"]],
+ ["longterm","开一个长期群","管理员先做这个","长期群是个性化模块：先在后台「功能与设置 → 个性化模块」打开，再到后台「长期群」页起个名字建一个。可以建好几个，彼此不相通。",
+  [["a","在要用的 QQ 群里切到长期群模式（恋综指令在这个群里收起来）",["模式 长期群"]],
+   ["a","接到后台建好的那个长期群；一个长期群可以接好几个 QQ 群",["切换长期群 春日长期群"]],
+   ["p","谁都可以看全部指令",["长期群帮助"]]],
+  "兑换比例、货币名、注册项、属性、道具、商城、配方、签到奖励、KPI 都在后台「长期群」页设置。",["切换长期群","长期群帮助"]],
+ ["longterm","注册和面板","每个玩家先注册","注册以后就有自己的面板：字数、段数、货币、属性、背包。属性由后台定义，/ra、/rt 等检定直接读它。",
+  [["p","注册（后台设了注册项的，换行接着写）",["注册 阿青\n角色：剑客"]],
+   ["p","看自己；写名字或 @ 人看别人",["我的","属性","背包"]],
+   ["p","名字写错了：改名，旧名字留成别名",["改名 新名字"]],
+   ["p","改自己的属性（后台可以关掉）",["st 力量60"]],
+   ["p","检定读你的属性",["ra 力量","rt 100 侦查"]]],
+  "",["注册","改名","我的 / 属性 / 背包","长期群 st"]],
+ ["longterm","交字数换货币","回复合并转发","把写好的戏或聊天记录合并转发到群里，再回复它交字数。转发里写的是谁，就记到谁名下（对不上的名字后台认领）。",
+  [["p","长按那条合并转发 →「回复」→ 发：",["字数统计"]],
+   ["a","默认要管理员在后台批准才入账；批准时按当时设的「每多少字换多少货币」换，零头留着下次凑",[]],
+   ["p","看排行、看这一期 KPI 达没达标",["字数榜","KPI"]]],
+  "同一条发言重复交不会重复算；每次交的原文后台都留着，能逐条追溯。",["字数统计","字数榜","KPI"]],
+ ["longterm","签到、商城、送人、合成","花货币和道具","货币和道具都按长期群分开记，换了长期群就是另一套。",
+  [["p","每天一次领奖励（后台定奖励，可以好几样、可以随机）",["签到"]],
+   ["p","看在卖什么、买、用掉一个（按登记的效果改属性）",["商城","购买 回血药水 2","使用 回血药水"]],
+   ["p","送人东西；物品写货币名就是转账",["赠送 小白 苹果 2","赠送 小白 银两 10"]],
+   ["p","按配方合成或兑换",["合成表","合成 宝剑"]]],
+  "道具可以设库存、每人限购、每人每天限购。",["长期群 签到","长期群 商城 / 购买 / 使用","长期群 赠送","合成表 / 合成"]],
+ ["longterm","管理员加减","群里直接改","属性名改属性，货币名改货币，「字数」「段数」改字数段数，其余当背包物品；写「=」是直接改成这个数。",
+  [["a","改一个人（也可以 @ 他）",["调整 阿青 力量+5 银两-10 苹果+2"]],
+   ["a","发给全员或好几个人",["发放 全员 银两+50","发放 阿青、小白 苹果+1"]]],
+  "后台「长期群」页的总览能看到所有人的动态：谁交了字数、批准了多少、谁买了什么、用了什么、送了谁。",["调整","发放"]]
 ];
 var FCOVER = {};F.forEach(function(f){f[6].forEach(function(n){FCOVER[n]=1})});
 var DICE = {coc:["ra","rah","rb / rp","sc","en","ti / li","coc","rav"],dnd:["dnd","ri","at","ra"],card:["st","pc / nn","我是谁","team","log","说 / ob"]};
@@ -1971,15 +2079,16 @@ function route(){
     h="#/";
   }
   var parts=h.slice(2).split("#"),r=parts[0];
+  if(r==="wishes"){r="faq";parts[1]=parts[1]||"f-wish"}   // 许愿池并进了问答页，旧链接照样能用
   if(!$('.page[data-page="'+r+'"]'))r="";
   if(r!==current){
     $$(".page").forEach(function(p){p.classList.toggle("on",p.dataset.page===r)});
     $$("#nav a").forEach(function(a){a.classList.toggle("on",a.dataset.r===r)});
     current=r;window.scrollTo(0,0);buildToc();
     if(r==="")runDemo();else clearTimeout(demoTimer);
-    if(r==="wishes")wishLoad();
+    if(r==="faq")wishLoad();
     if(r==="wishes-admin")wadmLoad();
-    document.title=(r?{install:"安装",season:"恋综指南",commands:"指令大全",dice:"跑团骰子",faq:"常见问题",app:"申请专属 App",how:"工作原理",wishes:"许愿池","wishes-admin":"许愿池审核"}[r]+" · 长日系统":"长日系统 · 把恋综装进自己的 QQ 群");
+    document.title=(r?{install:"安装",season:"恋综指南",commands:"指令大全",dice:"跑团骰子",faq:"问答与许愿",plugins:"插件",app:"申请专属 App",how:"工作原理","wishes-admin":"许愿池审核"}[r]+" · 长日系统":"长日系统 · 把恋综装进自己的 QQ 群");
   }
   if(parts[1]){var el=document.getElementById(parts[1]);el&&setTimeout(function(){el.scrollIntoView()},30)}
   $("#drawer").classList.remove("on");
@@ -1995,8 +2104,8 @@ $("#menu").onclick=function(){$("#drawer").classList.toggle("on");this.classList
 
 // ---------- command palette ----------
 var PI=[];
-[["#/install","安装","Linux / Windows / 第一次使用"],["#/how","工作原理","官方机器人和 QQ 小号怎么配合"],["#/season","恋综指南","一季从头到尾"],["#/commands","指令大全","全部群指令"],["#/dice","跑团骰子","COC7 / DND5e / 绿色三角洲"],["#/wishes","许愿池","想要什么功能，许个愿"],["#/faq","常见问题","不在线、打不开小手机…"],["#/app","申请专属 App","专属安卓 App 打包"]].forEach(function(p){PI.push({k:"页面",t:p[1],s:p[2],go:p[0]})});
-$$("[data-page] article h2[id]").forEach(function(h){var pg=h.closest("[data-page]").dataset.page;PI.push({k:"章节",t:h.textContent.replace(/^\d+/,""),s:{install:"安装",season:"恋综指南",dice:"跑团骰子",faq:"常见问题",app:"申请 App",how:"工作原理",wishes:"许愿池"}[pg],go:"#/"+pg+"#"+h.id})});
+[["#/install","安装","Linux / Windows / 第一次使用"],["#/how","工作原理","官方机器人和 QQ 小号怎么配合"],["#/season","恋综指南","一季从头到尾"],["#/commands","指令大全","全部群指令"],["#/dice","跑团骰子","COC7 / DND5e / 绿色三角洲"],["#/plugins","插件","签到、摇汽水、自定义回复、自己写插件"],["#/faq","问答与许愿","不在线、打不开小手机…；想要什么功能，许个愿"],["#/app","申请专属 App","专属安卓 App 打包"]].forEach(function(p){PI.push({k:"页面",t:p[1],s:p[2],go:p[0]})});
+$$("[data-page] article h2[id]").forEach(function(h){var pg=h.closest("[data-page]").dataset.page;PI.push({k:"章节",t:h.textContent.replace(/^\d+/,""),s:{install:"安装",season:"恋综指南",dice:"跑团骰子",plugins:"插件",faq:"问答与许愿",app:"申请 App",how:"工作原理"}[pg],go:"#/"+pg+"#"+h.id})});
 C.forEach(function(c){PI.push({k:c[4]==="a"?"管理":"指令",t:c[0],s:c[2].split("\n")[0]+(c[1]?" · "+c[1]:""),cp:c[2],f:c[0]+c[1]+c[3]})});
 var sel=0,res=[];
 function palRender(){

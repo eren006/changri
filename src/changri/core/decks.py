@@ -70,6 +70,16 @@ AI_PROMPT = f"""请帮我写一份「长日牌堆」文件，内容是：（在�
 
 {TEMPLATE}"""
 
+# 海豹牌堆文件头的说明字段（作者、版本、更新地址……），不是牌堆。以前当成辅助牌堆存了，
+# 两份海豹牌堆都带 _author 就撞名存不进去；现在导入时丢掉，撞名也不算它们（老数据里存过的留着无害）。
+SEAL_META = {"_author", "_title", "_date", "_updatedate", "_update_date", "_brief", "_version", "_license",
+             "_updateurls", "_etag", "_keys", "_exports", "_help", "_description", "_desc", "_meta", "_sign"}
+
+
+def _is_meta(name: str) -> bool:
+    return str(name).strip().lower() in SEAL_META
+
+
 _NAME_RE = re.compile(r"^_?[^\s{}\[\]【】#*]{1,%d}$" % MAX_NAME)
 _HEAD_RE = re.compile(r"^【\s*(.+?)\s*】$")
 _WEIGHT_RE = re.compile(r"^(\d{1,3})\s*[*＊×]\s*(.+)$")
@@ -169,6 +179,8 @@ def from_sealdice(raw: str) -> tuple[dict[str, list[tuple[int, str]]] | None, st
     pool = {**pool, **{k: v for k, v in data.items() if k not in ("decks", "meta", "_meta")}}
     decks: dict[str, list[tuple[int, str]]] = {}
     for key, val in pool.items():
+        if _is_meta(key):
+            continue
         if isinstance(val, dict):                      # toml 的复杂牌组：options 是牌，export=false 当辅助牌堆
             hidden = val.get("export") is False or val.get("visible") is False
             val = val.get("options")
@@ -201,6 +213,11 @@ def read_any(raw: str) -> tuple[dict[str, list[tuple[int, str]]], list[str], str
         decks, errs = parse(text)
         return decks, errs, text
     decks, errs = parse(raw)
+    meta = [n for n in decks if _is_meta(n)]
+    if meta and len(meta) < len(decks):        # 以前从海豹导入、存下来的原文里还有【_author】这种，再编辑时顺手去掉
+        for n in meta:
+            decks.pop(n)
+        raw = to_text(decks)
     return decks, errs, raw
 
 
@@ -238,7 +255,7 @@ def save(owner_id: int | None, raw: str, file_id: int = 0, title: str = "") -> t
             n = c.execute("SELECT COUNT(*) FROM deck_files WHERE owner_id=?", (owner_id,)).fetchone()[0]
             if n >= MAX_FILES_PER_ROLE:
                 return False, f"每人最多上传 {MAX_FILES_PER_ROLE} 份牌堆，先删掉一份不用的。", 0
-        names = list(decks)
+        names = [n for n in decks if not _is_meta(n)] or list(decks)
         taken = c.execute(f"SELECT d.name, f.title FROM decks d JOIN deck_files f ON f.id=d.file_id WHERE d.file_id!=? AND d.name IN ({','.join('?' * len(names))})",
                           (file_id, *names)).fetchall()
         if taken:
@@ -382,21 +399,23 @@ def _roll(expr: str) -> str | None:
     return str(dice.roll_terms(node)[1])
 
 
-def expand(text: str, rng: random.Random, depth: int = 0, budget: list[int] | None = None) -> str:
+def expand(text: str, rng: random.Random, depth: int = 0, budget: list[int] | None = None, dice_need_d: bool = False, keep: tuple[str, ...] = ()) -> str:
     """把一张牌里的 {牌堆} 和 [骰子] 换掉。套太深、找不到的牌堆、超过展开次数的原样留着，不报错。
-    budget = [还能展开几次]，同一次抽卡的几张共用一个（默认 MAX_EXPAND）。"""
+    budget = [还能展开几次]，同一次抽卡的几张共用一个（默认 MAX_EXPAND）。
+    dice_need_d：只把带 d 的 [..] 当骰子（[1d6] 算，[1]、[2+3] 不算）。自定义回复用：旧回复里本来写的方括号不能被算掉。
+    keep：这些名字的 {…} 不当牌堆，原样留着（自定义回复的 {角色}）。"""
     budget = [MAX_EXPAND] if budget is None else budget
 
     def ref(m):
-        if depth >= MAX_DEPTH or budget[0] <= 0:
+        if depth >= MAX_DEPTH or budget[0] <= 0 or m.group(1).strip() in keep:
             return m.group(0)
         budget[0] -= 1
         cards = _cards(m.group(1))
         if not cards:
             return m.group(0)
-        return expand(_pick(cards, 1, rng)[0], rng, depth + 1, budget)
+        return expand(_pick(cards, 1, rng)[0], rng, depth + 1, budget, dice_need_d, keep)
     text = _REF_RE.sub(ref, text)
-    text = _DICE_RE.sub(lambda m: _roll(m.group(1)) or m.group(0), text)
+    text = _DICE_RE.sub(lambda m: m.group(0) if dice_need_d and not re.search(r"[dD]", m.group(1)) else _roll(m.group(1)) or m.group(0), text)
     return text.replace("\\n", "\n")
 
 

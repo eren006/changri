@@ -21,7 +21,7 @@ from .db import get_config, set_config
 
 from ..paths import APP_ROOT as ROOT, DATA_DIR, EXT_DOCS_DIR, PKG_DIR
 USER_DIR = Path(os.environ.get("CHANGRI_EXT_DIR") or DATA_DIR / "extensions")     # 用户扩展算数据：更新程序不碰
-API_VERSION = 3
+API_VERSION = 4
 
 # 核心：别的功能的地基，不能关
 CORE_MODULES = ["changri.plugins.ping", "changri.plugins.botsync", "changri.plugins.social", "changri.plugins.charcard", "changri.plugins.core_admin", "changri.plugins.season", "changri.plugins.play", "changri.plugins.autoreply", "changri.plugins.trpg", "changri.plugins.trpglog", "changri.plugins.prefix", "changri.plugins.qqwatch", "changri.plugins.msgmon", "changri.plugins.decks"]  # 季度与游戏天数是地基：短信礼物、心动信的每日次数都按它算「今天」
@@ -146,12 +146,19 @@ def validate_manifest(d: dict, folder: str | None = None) -> str:
 _RESERVED: set[str] | None = None
 
 
+# 只在自己的群模式里响应的插件：它的指令不占名字。长期群的 /签到 /注册 /商城 只在长期群模式的群里有用，
+# 占了的话用户已经装的签到、商城类扩展会装不上 / 被拒（现成的签到插件就叫 /签到）。
+UNRESERVED_PLUGINS = {"longterm.py"}
+
+
 def reserved_commands() -> set[str]:
     """主程序（核心 + 官方扩展）已经占用的指令名和别名，用户扩展不许重名，否则会劫持主程序的指令。"""
     global _RESERVED
     if _RESERVED is None:
         names: set[str] = set()
         for f in (PKG_DIR / "plugins").rglob("*.py"):      # rglob：plugins/play/ 是拆成多个文件的包
+            if f.name in UNRESERVED_PLUGINS:
+                continue
             try:
                 tree = ast.parse(f.read_text(encoding="utf-8"))
             except Exception:  # noqa: BLE001
@@ -186,6 +193,7 @@ def _dotted(n) -> str:
 # 角色每季重建：按角色编号存进 data_set 的数据新一季没人用、一直堆到 2MB；按角色名存的会被新一季同名的人接上。
 _ROLE_WORDS = {"rid", "role_id", "roleid", "role_name", "uid", "target_id", "who_id"}
 _SEASON_FUNCS = {"season_data_get", "season_data_set", "season_data_keys"}
+_PLAYER_FUNCS = {"sender_player", "player_data_get", "player_data_set", "player_data_all", "player_name"}
 
 
 def _mentions_role(expr) -> bool:
@@ -233,7 +241,35 @@ def _data_rule_issues(path: str, tree, api: int | None) -> list[str]:
                            "不然上一季的数据会一直留着、新一季同名的人还会接上；真要跨季度留着的，别按角色存")
         elif name in _SEASON_FUNCS and api is not None and api < 3:
             out.append(f"{path} 第 {n.lineno} 行用了 {name}：这是接口版本 3 的，manifest.json 要写 \"api\": 3")
+        elif name in _PLAYER_FUNCS and api is not None and api < 4:
+            out.append(f"{path} 第 {n.lineno} 行用了 {name}：这是接口版本 4 的，manifest.json 要写 \"api\": 4")
     return out
+
+
+DATA_LABELS = [("season", "本季数据，收尾清空"), ("player", "按玩家长期存"), ("long", "长期保留")]
+_SETTERS = {"season_data_set": ("season", 2), "player_data_set": ("player", 3), "data_set": ("long", 2)}     # 函数 → (标签, 值是第几个参数)
+
+
+def data_kinds(files: dict[str, bytes]) -> list[dict]:
+    """看插件代码往哪种地方存数据，给插件列表自动打标签（不用作者自己填）：只看 *_set 真正往里写的（写 None 是删旧记录，不算），
+    season_data_set = 本季的，收尾清空；player_data_set = 按玩家本人存，跨季度跟着人走；data_set = 长期保留（不按人）。"""
+    used = set()
+    for data in files.values():
+        try:
+            tree = ast.parse(data.decode("utf-8"))
+        except (SyntaxError, UnicodeDecodeError, ValueError):
+            continue
+        for n in ast.walk(tree):
+            if not isinstance(n, ast.Call):
+                continue
+            name = _dotted(n.func).rsplit(".", 1)[-1]
+            kind, pos = _SETTERS.get(name, (None, 0))
+            if not kind:
+                continue
+            val = n.args[pos] if len(n.args) > pos else next((k.value for k in n.keywords if k.arg == "value"), None)
+            if not (isinstance(val, ast.Constant) and val.value is None):          # 写 None 只是删旧记录，不算往里存
+                used.add(kind)
+    return [{"key": k, "text": t} for k, t in DATA_LABELS if k in used]
 
 
 def check_code(files: dict[str, bytes], api: int | None = None, strict: bool = True) -> tuple[list[str], list[str]]:
@@ -323,7 +359,9 @@ def scan_user() -> list[dict]:
         m = dict(m)
         st = mf.stat()
         m.update(kind="user", path=str(d), error=err, installed_ts=int(d.stat().st_ctime), updated_ts=int(st.st_mtime))
-        m["code_errors"], m["warnings"] = check_code(_folder_files(d), _api_of(m), strict=False)
+        files = _folder_files(d)
+        m["code_errors"], m["warnings"] = check_code(files, _api_of(m), strict=False)
+        m["data_kinds"] = data_kinds(files)
         if m["code_errors"] and not err:
             err = "代码检查没通过：" + m["code_errors"][0]
             m["error"] = err
@@ -558,10 +596,10 @@ def ai_prompt() -> str:
         "- 玩家发什么指令触发（写出完整的例子）：\n"
         "- 发了之后机器人怎么回（成功、失败、参数不对时各回什么）：\n"
         "- 需要在设置平台里调的选项（每项写：人话名字、类型 string/text/int/bool/choice、默认值、一句说明；数字可以写单位）：\n"
-        "- 需要用到的角色信息、属性、天数、定时任务等（只能用 changri_api 里有的：玩家清单 all_roles、属性 get_attr/set_attr、金币和道具 item_count/give_item/take_item、地点、关系线、每日次数 today_count/today_add、自己存数据 data_get/data_set（跨季度一直留着）和 season_data_get/season_data_set（本季的，收尾清空；跟角色有关的存这里）、天数等；商城上架、心动信目前没有接口，不要自己读数据库）：\n\n"
+        "- 需要用到的角色信息、属性、天数、定时任务等（只能用 changri_api 里有的：玩家清单 all_roles、属性 get_attr/set_attr、金币和道具 item_count/give_item/take_item、地点、关系线、每日次数 today_count/today_add、自己存数据 data_get/data_set（跨季度一直留着）、season_data_get/season_data_set（本季的，收尾清空；跟角色有关的存这里）和 player_data_get/player_data_set（按玩家本人存，跨季度跟着人走；玩家编号用 sender_player 拿）、天数等；商城上架、心动信目前没有接口，不要自己读数据库）：\n\n"
         "========== 输出要求 ==========\n"
         "1. 只输出两个代码块，分别标明文件名 manifest.json 和 __init__.py，不要多余的解释（第 8 条的提醒除外）。\n"
-        "2. manifest.json 的 id 用小写字母、数字、下划线，字母开头；用到规范里标 ★ 的接口时写 \"api\": 2，用到 season_data_get / season_data_set / season_data_keys / each_team 时写 \"api\": 3。\n"
+        "2. manifest.json 的 id 用小写字母、数字、下划线，字母开头；用到规范里标 ★ 的接口时写 \"api\": 2，用到 season_data_get / season_data_set / season_data_keys / each_team 时写 \"api\": 3，用到 sender_player / player_data_get / player_data_set / player_data_all / player_name 时写 \"api\": 4。\n"
         "3. 只从 changri_api 导入，不要 import core / plugins / admin。\n"
         "4. 不能用 sys.exit / os._exit / time.sleep / requests；等待用 await asyncio.sleep，联网用 httpx 异步。\n"
         "5. 指令名不要和主程序已有的重名（约会、私约、电话、时间线、心愿、发帖、短信、送礼 等）。\n"
@@ -571,7 +609,11 @@ def ai_prompt() -> str:
         "8. 扩展没有沙盒，写错会改坏全体玩家数据或让机器人卡死：改数据要限定范围、检查 set_attr 的返回值，不要写一条指令改全员的东西；不要读 .env、不要碰数据库文件；回答最后用一两句话提醒我「装之前先备份、先在测试群试」。\n"
         "9. 存数据分两种，按「管理员收尾、换下一季以后还要不要」选：跟角色有关的（按角色编号、角色名记的连签、积分、次数、本季排行……）一律用 "
         "season_data_get / season_data_set / season_data_keys，收尾时自动清空；data_get / data_set 只存不指向具体角色、要跨季度留着的东西（比如整个团的累计次数）。"
-        "键名用角色编号 role[\"id\"]，不要用角色名。装的时候会检查：用 data_set 按角色存数据会被拒绝安装。\n"
+        "键名用角色编号 role[\"id\"]，不要用角色名。装的时候会检查：用 data_set 按角色存数据会被拒绝安装。"
+        "要跨季度跟着人走的（总签到天数、历史最高分……）用 player_data_get / player_data_set，玩家编号用 sender_player(bot, event) 拿（\"api\": 4）。"
+        "注意认人：官方机器人给的玩家标识每个群不一样，同一个人在两个群里本来是两个人。有恋综角色的会自动认成同一位；没有角色的，"
+        "要先在一个群发「认人」拿码、5 分钟内到另一个群发「认人 码」，两边才算同一个人（跟「绑定QQ」无关）。"
+        "用了 player_data_* 的插件，manifest 的 description 和找不到记录时的回复里都要提醒玩家这一步。\n"
         "10. 一台服务器可能接了好几个机器人（好几个团），数据各存各的。不要用全局变量、自己写文件来记玩家的东西，一律用上面的存数据接口。"
         "定时任务一律在 @scheduler.scheduled_job(...) 下面一行加 @each_team（manifest 写 \"api\": 3），这样每个团各跑一遍；不加、或者两行顺序反了，装的时候会被拒绝。\n"
     )
@@ -606,7 +648,7 @@ _BASICS = [
      "await reply_long(cmd, \"很长的一段……\")"),
     ("scheduler", "@scheduler.scheduled_job(...)", "定时任务。下面一行一定加 @each_team（每个团各跑一遍），不加装不上。别在里面写 time.sleep。",
      "@scheduler.scheduled_job(\"cron\", hour=20, minute=0)\n@each_team\nasync def nightly(): ..."),
-    ("API_VERSION", "", "当前接口版本号。用到版本 2、3 新加的接口时，在 manifest.json 写对应的 \"api\": 2 或 3，旧版主程序会提示先更新。版本 3 加了 season_data_get / season_data_set / season_data_keys（本季数据，收尾时清空）和 each_team（定时任务每个团各跑一遍）。", ""),
+    ("API_VERSION", "", "当前接口版本号。用到版本 2、3、4 新加的接口时，在 manifest.json 写对应的 \"api\": 2、3 或 4，旧版主程序会提示先更新。版本 3 加了 season_data_get / season_data_set / season_data_keys（本季数据，收尾时清空）和 each_team（定时任务每个团各跑一遍）；版本 4 加了 sender_player 和 player_data_get / player_data_set / player_data_all / player_name（按玩家本人存，跨季度不清）。", ""),
 ]
 
 
@@ -643,7 +685,7 @@ def ready_made() -> list[dict]:
         except (OSError, ValueError):
             continue
         if m.get("id") == d.name:
-            out.append({**m, "installed": (USER_DIR / d.name).exists()})
+            out.append({**m, "installed": (USER_DIR / d.name).exists(), "data_kinds": data_kinds(_folder_files(d))})
     return out
 
 
@@ -663,7 +705,8 @@ def ready_zip(ext_id: str) -> bytes | None:
 # 现成插件以前发过的版本：__init__.py 的 sha256。装着的那份跟其中一个一模一样（用户没改过），启动时自动换成随包的新版本；
 # 改过的不动（列表里会标黄提醒）。发新版现成插件时，把旧版的 sha256 加进来。
 _READY_OLD = {
-    "daily_signin": {"8927722c75eaa52f919cbcabbb87dd172c6b0095dca54f06212c73f98edc8cba"},       # 1.0.0：连签存在 data_set 里
+    "daily_signin": {"8927722c75eaa52f919cbcabbb87dd172c6b0095dca54f06212c73f98edc8cba",       # 1.0.0：连签存在 data_set 里
+                     "79615d390c397b5e619511b26c1609fa6a7c16824fa62e687afb18f99deb8231"},      # 1.1.0：连签存在本季数据里（收尾清零）
 }
 
 

@@ -29,7 +29,7 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
     from changri.plugins.play import _push
     me = _sender_role(event)
     if not me:
-        await steal_cmd.finish("你还没有角色。")
+        await steal_cmd.finish("你还没有角色。在你的个人群里发「创建新角色 名字」就能创建。")
     if not gifts.steal_enabled():
         await steal_cmd.finish("偷取礼物没有开放。")
     name = args.extract_plain_text().strip()
@@ -49,7 +49,7 @@ async def _(event: GroupMessageCreateEvent):
     import time as _t
     me = _sender_role(event)
     if not me:
-        await steal_log_cmd.finish("你还没有角色。")
+        await steal_log_cmd.finish("你还没有角色。在你的个人群里发「创建新角色 名字」就能创建。")
     rows = gifts.steal_log(me["id"])
     if not rows:
         await steal_log_cmd.finish("还没有偷盗记录。")

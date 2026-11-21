@@ -1,5 +1,6 @@
 """设置平台 · 小手机。由 changri.admin.create_app 调用 register(app, login_required) 挂上路由（路由名不变，模板里的 url_for 照常用）。"""
 import json
+import time
 from flask import flash, redirect, render_template, request, url_for
 from changri.core import extensions as ext_core, netcheck, phonecodes, roles as roles_core
 from changri.core.db import current_bot, get_config, set_config
@@ -151,6 +152,7 @@ def register(app, login_required):
     def phone_check():
         from changri.core import phoneserver
         res = netcheck.probe_outside(phoneserver.port())
+        res.update(port=phoneserver.port(), ts=time.time())                 # /log end 发链接前会看这个结果（netcheck.cached_probe）
         set_config("phone_net_last", json.dumps(res, ensure_ascii=False))
         return redirect(url_for("phone_page"))
 

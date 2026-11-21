@@ -121,7 +121,7 @@ def add_mail(from_id: int, to_id: int, signature: str, content: str, images: lis
     if closed:
         return False, closed, 0
     if len(signature) > SIGNATURE_MAX:
-        return False, f"⚠️ 署名不得超过 {SIGNATURE_MAX} 个字（当前 {len(signature)} 个字），请修改后重新投递。", 0
+        return False, f"⚠️ 署名最多 {SIGNATURE_MAX} 个字，现在是 {len(signature)} 个字，改短一点再投。", 0
     limit_len = get_int("lovemail_max_len", 500)
     for data in images:
         why = msgimages.mail_check(data)
@@ -135,11 +135,11 @@ def add_mail(from_id: int, to_id: int, signature: str, content: str, images: lis
     late = key != today()
     limit = limit_for(key)
     if limit <= 0:
-        return False, ("📪 今天的心动信已经派送过了，明天的投稿没有开放。" if late else "📪 当前的心动信投稿已关闭。"), 0
+        return False, ("📪 今天的心动信已经派送过了，明天的投稿没有开放。" if late else "📪 心动信现在不收投稿。"), 0
     used = day_count(from_id, key)
     if used >= limit:
         return False, (f"📪 今天的心动信已经派送过了，现在投的算明天，明天的 {limit} 封你已经投满了。" if late
-                       else f"📪 今天你已投稿 {used} 封（上限 {limit} 封）。请等明天再试。"), 0
+                       else f"📪 今天已经投了 {used} 封（上限 {limit} 封），明天再来吧。"), 0
     blk = blocks.get_block(to_id, from_id)
     if blk and not blk["silent"]:
         from . import roles
@@ -167,12 +167,12 @@ def revoke(role_id: int, index: int) -> tuple[bool, str]:
     """撤回自己信池里的第 index 封（从 1 开始）。删除后当天次数自然恢复。"""
     mine = my_pool(role_id)
     if index < 1 or index > len(mine):
-        return False, "⚠️ 请输入正确的序号，例如：撤回心动信 1"
+        return False, "⚠️ 序号不对，要写信的序号，例如：撤回心动信 1"
     m = mine[index - 1]
     with get_conn() as conn:
         conn.execute("DELETE FROM lovemail_images WHERE mail_id=?", (m["id"],))
         conn.execute("DELETE FROM lovemails WHERE id=?", (m["id"],))
-    return True, f"✅ 已成功撤回发送给「{m['to_name']}」的信件。\n📪 已恢复你 {day_label(m['day'])} 的 1 次发送机会。"
+    return True, f"✅ 撤回了寄给「{m['to_name']}」的信，{day_label(m['day'])} 的 1 次机会还给你了。"
 
 
 def pool_all() -> list:
@@ -312,7 +312,7 @@ def state(role_id: int) -> dict:
     else:
         why = windows.check("lovemail") or godmode.check(role_id, "lovemail")
         if not why and limit_for(post_key()) <= 0:
-            why = "当前的心动信投稿已关闭。"
+            why = "心动信现在不收投稿。"
     key = post_key()
     limit, used = limit_for(key), day_count(role_id, key)
     if not why and used >= limit:

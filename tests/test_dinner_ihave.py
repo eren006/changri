@@ -166,7 +166,7 @@ class IHaveE2E(unittest.TestCase):
         self.assertEqual(self.say("补折", "M3"), [])
         self.assertEqual(I.active()["fingers"]["丙"], 9)
         self.assertIn("第 2 轮", self.say("我有你没有状态", "M3")[0])
-        self.assertIn("权限不足", self.say("结束我有你没有", "M2")[0])
+        self.assertIn("只有管理员能用", self.say("结束我有你没有", "M2")[0])
 
     def test_dessert_commands_only_in_own_group(self):
         self.assertIn("个人群", self.say("领取甜点")[0])                     # 在晚餐群发：拒绝

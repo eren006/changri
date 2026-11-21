@@ -64,18 +64,51 @@ class DiceE2E(unittest.TestCase):
 
     def test_prefix_optional_by_default_and_required_when_set(self):
         for text in ("/rd d20", ".rd d20", "。rd d20", "rd d20", "r d6"):               # 默认带不带前缀都行
-            self.assertTrue(self.say(text)[0].startswith(("D20 =", "D6 =")), text)
+            out = self.say(text)[0]
+            self.assertTrue("掷了 D20，出了" in out or "掷了 D6，出了" in out, text)              # 有角色的人名字打头
         self.assertEqual(self.say("hello"), [])
         set_config("require_prefix", "1")                                              # 设置里勾上「必须带前缀」
         for text in ("rd d20", "r d6", "at 你好", "en 路上", "hello"):
             self.assertEqual(self.say(text), [], text)
         for p in ("/", ".", "。"):
-            self.assertTrue(self.say(f"{p}rd d20")[0].startswith("D20 ="))
+            self.assertIn("掷了 D20，出了", self.say(f"{p}rd d20")[0])
+
+    def test_check_inside_custom_reply(self):
+        from changri.core import autoreply
+        with get_conn() as c:
+            c.execute("DELETE FROM autoreplies")
+        autoreply._last_hit.clear()
+        ok, msg = autoreply.save_rule({"mode": "exact", "words": "偷看", "replies": ["{角色}偷看了一眼：{检定:侦查}"]})
+        self.assertTrue(ok, msg)
+        out = self.say("偷看")
+        self.assertEqual(len(out), 1, out)
+        self.assertTrue(out[0].startswith("甲偷看了一眼：（侦查检定："), out)          # 没录侦查：短提示，不塞 /ra 的长说明
+        self.assertNotIn("\n", out[0])
+        self.say("/录属性 侦查60")
+        out = self.say("偷看")
+        self.assertTrue(out[0].startswith("甲偷看了一眼：侦查 检定：D100="), out)
+        self.assertIn("/60", out[0])
+        set_config("dice_enabled", "0")                                              # 骰子关着：不掷
+        self.assertIn("骰子功能没开", self.say("偷看")[0])
+
+    def test_ww_rf_commands_and_chat_not_swallowed(self):
+        self.assertIn("骰池 5D10", self.say("ww 5")[0])
+        self.assertIn("骰池 5D10", self.say("ww5")[0])
+        self.assertIn("FATE", self.say("rf +1 运动")[0])
+        self.assertIn("FATE", self.say("rf")[0])
+        self.assertIn("这么写", self.say("/ww 好困")[0])
+        from changri.core import autoreply
+        with get_conn() as c:
+            c.execute("DELETE FROM autoreplies")
+        autoreply._last_hit.clear()
+        autoreply.save_rule({"mode": "contains", "words": "www\nrfc", "replies": ["哈哈"]})
+        self.assertEqual(self.say("www"), ["哈哈"])                                     # 聊天里的 www 不当骰池，自定义回复照常
+        self.assertEqual(self.say("rfc怎么写"), ["哈哈"])
 
     def test_rt_is_its_own_command(self):
         for text in ("/rt 12 7", "/难度骰 12 7", "rt 12 7"):                              # 不会被当成 /r t…
             out = self.say(text)[0]
-            self.assertRegex(out, r"^D12=\d+/7 —— (成功|失败)。$", text)
+            self.assertRegex(out, r"^D12=\d+/7 —— (成功|失败)。\S+$", text)
 
     def test_usage_counts_by_command_word(self):
         """匿名上报按指令词计数：只记指令词（别名照实记），不记后面写的内容；不是指令的话不算。"""
@@ -92,9 +125,9 @@ class DiceE2E(unittest.TestCase):
     def test_attrs_flow_and_rule_switch(self):
         self.assertIn("已记下", self.say("/录属性 力量60 SAN55")[0])
         self.assertIn("力量　60", self.say("/属性")[0])
-        self.assertIn("甲的力量60", self.say("/ra 力量")[0])
+        self.assertIn("甲的力量 60", self.say("/ra 力量")[0])
         self.assertIn("还没有「敏捷」", self.say("/ra 敏捷")[0])
-        self.assertIn("取自甲的 SAN", self.say("/sc 1/1d6")[0])
+        self.assertIn("（甲的理智）", self.say("/sc 1/1d6")[0])
         self.assertIn("已写回", self.say("/sc 1/1d6")[0])
         self.assertIn("DND5e", self.say("/切换规则 dnd")[0])
         self.assertIn("DC12", self.say("/ra 力量 12")[0])
@@ -117,8 +150,8 @@ class DiceE2E(unittest.TestCase):
 
     def test_attr_alias_and_modifier_via_command(self):
         self.say("/录属性 力量60")
-        self.assertIn("甲的STR60", self.say("/ra STR")[0])                       # 恋综角色存的是「力量」，写 STR 也读得到
-        self.assertIn("甲的力量60+10", self.say("/ra 力量+10")[0])
+        self.assertIn("甲的STR 60", self.say("/ra STR")[0])                       # 恋综角色存的是「力量」，写 STR 也读得到
+        self.assertIn("甲的力量 60+10", self.say("/ra 力量+10")[0])
         self.assertIn("连续检定 ×3", self.say("/ra 3#力量")[0])
 
     def test_rav_and_initiative_persist(self):
@@ -131,7 +164,12 @@ class DiceE2E(unittest.TestCase):
         self.assertIn("阿尔", get_config("initiative:B1|G1", ""))              # 先攻表落库，重启不丢
         out = self.say("/ri 贝塔")[0]
         self.assertTrue("阿尔" in out and "贝塔" in out)
+        self.assertIn("第 1 轮", self.say("/ri 开始")[0])
+        self.say("/ri 下一个")
+        self.assertIn('"round": 1', get_config("initiative_turn:B1|G1", ""))            # 回合进度也落库
+        self.assertIn("第 2 轮", self.say("/ri 下一个")[0])
         self.assertIn("清掉", self.say("/ri 清空")[0])
+        self.assertEqual(get_config("initiative_turn:B1|G1", ""), "")
         self.assertIn("空的", self.say("/ri")[0])
         self.assertIn("vs DC15", self.say("/ra 优势 劣势 运动+2 15")[0])         # DND 里优势劣势抵消、修正连写
         self.assertNotIn("（优势", self.say("/ra 优势 劣势 运动+2 15")[0])
@@ -152,12 +190,12 @@ class DiceE2E(unittest.TestCase):
         self.assertEqual(get_config("coc_house:B1|G1"), "3")
         self.assertEqual(get_config("coc_house:B1|G2"), "")                        # 每个群各记各的
         self.assertIn("临时疯狂", self.say("/ti")[0])
-        self.assertIn("恐惧症状：1D100=", self.say("/恐惧症状")[0])
-        self.assertIn("狂躁症状：1D100=", self.say("/狂躁症状")[0])
+        self.assertIn("恐惧症状（1D100=", self.say("/恐惧症状")[0])
+        self.assertIn("狂躁症状（1D100=", self.say("/狂躁症状")[0])
         self.assertIn("总结疯狂", self.say("/li 甲")[0])
         out = self.say("/rh d20")                                                  # 甲有个人群 G1，结果私发，群里只有一句
         self.assertIn("暗骰", out[0])
-        self.assertNotIn("D20 =", "".join(out))
+        self.assertNotIn("掷了 D20，出了", "".join(out))
         self.assertIn("发不出去", out[0])                                          # 测试里没有真机器人，投递失败时结果不能露在群里
         self.assertIn("白名单", out[0])                                            # 并且告诉他怎么办：把 KP 加进机器人白名单
         from changri.plugins import dice as dice_plugin
@@ -171,8 +209,8 @@ class DiceE2E(unittest.TestCase):
         try:
             out = self.say("/rh d20")
             self.assertIn("已私下发给 TA", out[0])
-            self.assertIn("D20 =", sent[0])
-            self.assertNotIn("D20 =", "".join(out))
+            self.assertIn("掷了 D20，出了", sent[0])
+            self.assertNotIn("掷了 D20，出了", "".join(out))
             self.say("/rah 力量 60")
             self.assertIn("暗骰结果", sent[-1])
             self.assertIn("检定", sent[-1])
@@ -183,9 +221,9 @@ class DiceE2E(unittest.TestCase):
         self.assertIn("COC 的指令", self.say("/恐惧症状")[0])
 
     def test_no_role_gets_hint_but_explicit_value_works(self):
-        self.assertIn("绑定角色", self.say("/录属性 力量60", member="M9")[0])
+        self.assertIn("创建新角色", self.say("/录属性 力量60", member="M9")[0])
         self.assertIn("检定：D100=", self.say("/ra 侦查 70", member="M9")[0])
-        self.assertIn("绑定角色", self.say("/ra 力量", member="M9")[0])
+        self.assertIn("创建新角色", self.say("/ra 力量", member="M9")[0])
 
     def test_switch_off(self):
         set_config("dice_enabled", "0")
@@ -338,8 +376,8 @@ class TrpgE2E(unittest.TestCase):
             self.assertEqual(pushed, [])                              # 没有往个人群发
             self.assertIn("白名单", out[0])
             self.assertNotIn("个人群", out[0])
-            self.assertNotIn("绑定角色", out[0])
-            self.assertNotIn("D20 =", "".join(out))                   # 结果也没露在群里
+            self.assertNotIn("创建新角色", out[0])
+            self.assertNotIn("掷了 D20，出了", "".join(out))                   # 结果也没露在群里
             self.assertNotIn("甲", out[0])                            # 称呼不用恋综的角色名
         finally:
             dice_plugin.messaging.push_to_role = orig
@@ -395,11 +433,11 @@ class TrpgE2E(unittest.TestCase):
         self.assertNotIn("初始值", out)                                                  # 自己写了数值
         with mock.patch("changri.core.dice.random.randint", lambda a, b: 1):
             out = self.say("ra 侦查")[0]
-        self.assertIn("侦查25，初始值", out)
+        self.assertIn("侦查 25，初始值", out)
         self.assertIn("记下成长标记", out)                                               # 初始值技能也能标
         self.assertIn("还没有「闪避」", self.say("ra 闪避")[0])                         # 闪避=敏捷/2，敏捷还没录
         self.say("st 敏捷60")
-        self.assertIn("闪避30，初始值", self.say("ra 闪避")[0])
+        self.assertIn("闪避 30，初始值", self.say("ra 闪避")[0])
         self.assertIn("上限 11", self.say("st 生命20")[0])                             # (50+60)/10
         self.assertIn("10 +5 → 10（上限 10）", self.say("st 魔法+5")[0])               # 没录过：按初始值 意志/5 增减
         self.say("st 克苏鲁神话30")
@@ -466,7 +504,7 @@ class TrpgE2E(unittest.TestCase):
         with mock.patch("changri.core.dice.random.randint", lambda a, b: 30):
             self.assertIn("力量12×5", self.say("ra 力量")[0])                              # 60 对 30：成功
             out = self.say("ra 搜索")[0]                                                   # 初始值 20，掷 30：失败
-        self.assertIn("搜索20，初始值", out)
+        self.assertIn("搜索 20，初始值", out)
         self.assertIn("记下成长标记", out)                                               # 失败才记
         with mock.patch("changri.core.dice.random.randint", lambda a, b: 11):
             self.assertIn("大成功", self.say("ra 枪械")[0])                               # 11 ≤ 20 且两位相同
@@ -493,10 +531,54 @@ class TrpgE2E(unittest.TestCase):
         self.assertEqual(self.say("dg 那个团"), [])
         self.assertIn("绿色三角洲", self.say("骰子帮助 dg")[0])
 
+    def test_log_end_warns_when_link_unreachable(self):
+        """/log end 发链接前看一眼：外网打不开就在群里说一句，并提醒后台群；/log get 只在群里说，不重复打扰后台群。"""
+        from unittest import mock
+        from changri.core import announce, phoneserver
+        group_sent = []
+
+        async def fake_group_send(**kw):
+            group_sent.append((kw["group_openid"], str(kw["message"])))
+        port = phoneserver.port()
+        set_config("phone_enabled", "1")
+        set_config("phone_base_url", f"http://1.2.3.4:{port}")
+        announce.set_backstage("B1", "GBACK")
+        nonebot.get_bots()["B1"] = self.bot
+        try:
+            with mock.patch("changri.core.netcheck.listening", return_value=True), \
+                    mock.patch("changri.core.netcheck._http", return_value=(200, '{"state": "timeout"}')) as probe, \
+                    mock.patch.object(self.bot, "send_to_group", side_effect=fake_group_send, create=True):
+                self.say("log new 外网")
+                out = self.say("log end")[0]
+                self.assertIn(f"http://1.2.3.4:{port}/l/", out)
+                self.assertIn("已经告诉管理员了", out)
+                self.assertEqual(len(group_sent), 1)
+                self.assertEqual(group_sent[0][0], "GBACK")
+                self.assertIn("外网连不上", group_sent[0][1])
+                out = self.say("log get 外网")[0]
+                self.assertIn("外网可能打不开", out)
+                self.assertEqual(len(group_sent), 1)                                    # get 不再打扰后台群
+                self.assertEqual(probe.call_count, 1)                                   # 10 分钟内用上次的结果，不重测
+            set_config("phone_net_last", "")
+            with mock.patch("changri.core.netcheck.listening", return_value=True), \
+                    mock.patch("changri.core.netcheck._http", return_value=(200, '{"state": "ok"}')):
+                self.assertNotIn("打不开", self.say("log get 外网")[0])                 # 通了就什么都不说
+            set_config("phone_base_url", "https://phone.example.com")                     # 域名 + HTTPS：测不了，不乱报
+            with mock.patch("changri.core.netcheck.listening", return_value=True), \
+                    mock.patch("changri.core.netcheck._http") as probe:
+                self.assertNotIn("打不开", self.say("log get 外网")[0])
+                probe.assert_not_called()
+            with mock.patch("changri.core.netcheck.listening", return_value=False):     # 小手机没在跑：域名也照样报
+                self.assertIn("没在运行", self.say("log get 外网")[0])
+            set_config("phone_enabled", "0")
+            self.assertIn("小手机没开", self.say("log get 外网")[0])
+        finally:
+            nonebot.get_bots().pop("B1", None)
+
     def test_flow(self):
         from changri.core import trpglog
         self.assertIn("力量：60", self.say("st 力量60 理智55")[0])
-        self.assertIn("力量60", self.say("ra 力量")[0])                                   # 骰子读当前角色卡
+        self.assertIn("力量 60", self.say("ra 力量")[0])                                   # 骰子读当前角色卡
         self.assertEqual(self.say("我的角色"), [])                                         # 恋综指令在跑团群里不响应
         self.assertIn("开始记录", self.say("log new 测试")[0])
         self.say("大家好")

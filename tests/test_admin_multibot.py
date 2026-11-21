@@ -263,7 +263,7 @@ class AdminMultiBot(unittest.TestCase):
         from changri.core import dice
         base = "/b/111111"
         page = self.c.get(f"{base}/dice/lines").get_data(as_text=True)
-        self.assertIn("漂亮，干净利落。", page)
+        self.assertIn("大成功，漂亮。", page)
         tok = self._csrf(f"{base}/dice/lines")
         form = {"_csrf": tok}
         for _t, pool, keys in dice.LINE_GROUPS:
@@ -299,7 +299,7 @@ class AdminMultiBot(unittest.TestCase):
         page = self.c.get(f"{base}/dice/lines").get_data(as_text=True)
         self.assertIn("个性化骰子", page)
         self.assertIn("还撑得住。", page)
-        self.assertIn("经验急不得。", page)
+        self.assertIn("这次没长进，下回再说。", page)
         tok = self._csrf(f"{base}/dice/lines")
         form = {"_csrf": tok, "mark.大成功": "🌟", "mark.失败": "  ", "en.none": "下次一定"}
         self.c.post(f"{base}/dice/lines", data=form)

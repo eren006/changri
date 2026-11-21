@@ -59,7 +59,7 @@
       <form method="post" action="{{ url_for('season_end') }}" onsubmit="return confirm('结束这个季度？')">{{ csrf() }}<button class="btn ghost danger" type="submit">结束季度</button></form>
     </div>
   {% elif phase == 'ended' %}
-    <div class="callout">上一季已结束，还没收尾。收尾会清空：{% for k, v in preview.items() %}{{ k }} {{ v }}{{ '、' if not loop.last }}{% endfor %}，还有晚餐小游戏、没执行的计划官约、插件的本季数据。房间的戏录会先存进往季档案；论坛帖子、信件、心愿不存档，要留的先自己存。管理员、设置、季度记录保留。</div>
+    <div class="callout">上一季已结束，还没收尾。收尾会清空：{% for k, v in preview.items() %}{{ k }} {{ v }}{{ '、' if not loop.last }}{% endfor %}，还有晚餐小游戏、没执行的计划官约、插件的本季数据和按角色记的旧数据（会先备份）。房间的戏录会先存进往季档案；论坛帖子、信件、心愿不存档，要留的先自己存。管理员、设置、季度记录保留。</div>
     <div class="btns"><details class="panel"><summary class="btn">收尾</summary>
       <form class="form" method="post" action="{{ url_for('season_wipe') }}">{{ csrf() }}
         <div class="fields"><div><label for="wc">输入「收尾」确认</label><input id="wc" name="confirm" autocomplete="off"></div></div>

@@ -12,8 +12,8 @@ from changri.core.buttons import Btn
 from changri.core.qqsend import reply_buttons, send_to_group
 from changri.core.textutil import parse_id
 
-NEED_ROLE = "请先在你的个人群里发「创建新角色 名字」绑定角色。"
-NOT_ADMIN = "❌ 权限不足，仅管理员可用。"
+NEED_ROLE = "你还没有角色。在你的个人群里发「创建新角色 名字」就能创建。"
+NOT_ADMIN = "❌ 这条指令只有管理员能用。"
 
 
 def _cmd(name: str, aliases: set[str] | None = None):

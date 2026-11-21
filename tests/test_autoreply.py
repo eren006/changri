@@ -56,6 +56,32 @@ class AutoReply(unittest.TestCase):
         self.assertIn(self.pick("早安", role_name="小明")[0], {"早，小明", "早上好，小明"})
         self.assertIn("朋友", self.pick("早", role_name="")[0])
 
+    def test_deck_and_dice_in_reply(self):
+        import random
+        from changri.core import decks
+        with get_conn() as c:
+            c.execute("DELETE FROM decks")
+        ok, msg, _f = decks.save(None, "【运势】\n大吉，{角色} 今天走运\n\n【角色】\n不该抽到这里")
+        self.assertTrue(ok, msg)
+        A.save_rule(rule(words="运势", replies=["{角色}：{运势}，幸运数字 [1d1]，房间号[3]、[2+3]，{没有这个牌堆}"]))
+        out = self.pick("今日运势", role_name="小明")[0]
+        self.assertEqual(out, "小明：大吉，小明 今天走运，幸运数字 1，房间号[3]、[2+3]，{没有这个牌堆}")
+        self.assertEqual(A.render("[2d1] 和 [1]", "", random.Random(1)), "2 和 [1]")
+        self.assertEqual(A.preview("运势")[0]["replies"][0].split("：")[0], "小明")
+
+    def test_check_placeholder(self):
+        calls = []
+
+        def check(what):
+            calls.append(what)
+            return f"<{what}>"
+        self.assertEqual(A.render("{检定:侦查}、{ra：聆听 50}、{RA:图书馆}、{检定:说服}", "小明", check=check), "<侦查>、<聆听 50>、<图书馆>、{检定:说服}")
+        self.assertEqual(calls, ["侦查", "聆听 50", "图书馆"])                     # 一条最多 3 次
+        self.assertEqual(A.render("{检定:侦查}", "小明"), "〔侦查检定结果〕")          # 后台试一试：不掷
+        self.assertEqual(A.render("{检定:侦查}", "小明", check=lambda w: 1 / 0), "（侦查检定没掷成）")
+        A.save_rule(rule(words="看", replies=["{检定:侦查}"]))
+        self.assertEqual(self.pick("看", check=lambda w: "ok")[0], "ok")
+
     def test_scope_and_cooldown(self):
         A.save_rule(rule(who="admin"))
         self.assertIsNone(self.pick("祝晓是谁"))

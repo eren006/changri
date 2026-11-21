@@ -97,6 +97,6 @@ async def _():
 @register_items.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent):
     if not _is_admin(bot, event):
-        await register_items.finish("❌ 权限不足，仅管理员可用。")
+        await register_items.finish("❌ 这条指令只有管理员能用。")
     letters.ensure_items()
     await register_items.finish("✅ 写信币、望远镜、羽毛笔都在物品库里了（已有的跳过）。可以在后台「物品与商城」上架或发放。")

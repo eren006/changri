@@ -10,7 +10,7 @@ from changri.core.buttons import Btn
 from changri.core import admins, messaging, relations, roles, season
 from changri.core.db import get_config, get_int
 
-NEED_ROLE = "请先在你的个人群里发「创建新角色 名字」绑定角色。"
+NEED_ROLE = "你还没有角色。在你的个人群里发「创建新角色 名字」就能创建。"
 
 
 def _bid() -> str:
@@ -39,7 +39,7 @@ def _name_args(args) -> list[str]:
 
 
 def _admin_only(matcher_name: str):
-    return "❌ 权限不足，仅管理员可用。"
+    return "❌ 这条指令只有管理员能用。"
 
 
 # ================= 关系线 =================
@@ -56,24 +56,24 @@ add_rel = _cmd("拉线")
 async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     me = _me(event)
     if not me:
-        await add_rel.finish("⚠️ 找不到你的角色登记信息，请先在个人群里「创建新角色」。")
+        await add_rel.finish("你还没有角色。在你的个人群里发「创建新角色 名字」就能创建。")
     parts = args.extract_plain_text().strip().split(None, 1)
     if len(parts) != 2:
         await add_rel.finish("格式：拉线 对方名 内容")
     target = roles.get_role_by_name(parts[0])
     if not target:
-        await add_rel.finish("❌ 找不到角色")
+        await add_rel.finish(f"❌ 找不到叫「{parts[0]}」的角色。")
     ok, hint = relations.add_detail(me["id"], target["id"], target["name"], parts[1].strip())
     if not ok:
         await add_rel.finish(hint)
     new_line, _, stat = hint.partition("\n") if hint.startswith("✨") else ("", "", hint)
-    delivered = await _notify(bot, target["id"], f"📝 来自「{me['name']}」的新关系细节：\n{parts[1].strip()}\n\n（使用「查看关系线 {me['name']}」查看完整记录）",
+    delivered = await _notify(bot, target["id"], f"📝 「{me['name']}」在你们的关系线上写了一段：\n{parts[1].strip()}\n\n（发「查看关系线 {me['name']}」看全部）",
                               buttons=[Btn("回一段", f"拉线 {me['name']} ", enter=False),          # 填进输入框，接着写
                                        Btn("看全部", f"查看关系线 {me['name']}", style="secondary")])
     head = (new_line + "\n") if new_line else ""
     if delivered:
-        await add_rel.finish(f"{head}✅ 细节已同步至「{target['name']}」的绑定群\n{stat}" + season.prep_note("关系线"))
-    await add_rel.finish(f"{head}✅ 细节已记录，但「{target['name']}」尚未绑定可用的群，无法实时同步。\n{stat}" + season.prep_note("关系线"))
+        await add_rel.finish(f"{head}✅ 已经发给「{target['name']}」了。\n{stat}" + season.prep_note("关系线"))
+    await add_rel.finish(f"{head}✅ 记下了。不过「{target['name']}」还没有能收消息的个人群，TA 暂时收不到提醒。\n{stat}" + season.prep_note("关系线"))
 
 
 confirm_rel = _cmd("确认关系线")
@@ -85,8 +85,8 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
     parts = _name_args(args)
     target = roles.get_role_by_name(parts[0]) if parts else None
     if not me or not target or not relations.confirm(me["id"], target["id"]):
-        await confirm_rel.finish("未找到该关系线")
-    await confirm_rel.finish(f"✅ 你已确认与「{target['name']}」的关系线为完成状态。")
+        await confirm_rel.finish(f"你和「{parts[0]}」之间还没有关系线。" if parts else "用法：确认关系线 对方名")
+    await confirm_rel.finish(f"✅ 你和「{target['name']}」的关系线标成完成了。")
 
 
 withdraw_rel = _cmd("撤回关系")
@@ -100,14 +100,14 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
         await withdraw_rel.finish("格式：撤回关系 对方角色名 要撤回的内容")
     target = roles.get_role_by_name(parts[0])
     if not target:
-        await withdraw_rel.finish("没有可撤回的细节记录。")
+        await withdraw_rel.finish(f"❌ 找不到叫「{parts[0]}」的角色。")
     res = relations.withdraw(me["id"], target["id"], parts[1].strip())
     if res == "":
-        await withdraw_rel.finish("没有可撤回的细节记录。")
+        await withdraw_rel.finish(f"你还没给「{target['name']}」写过关系线，没有能撤回的。")
     if res is None:
-        await withdraw_rel.finish(f"未找到你发送的匹配内容：「{parts[1].strip()}」\n可使用「查看关系线 {target['name']}」查看所有细节。")
-    await _notify(bot, target["id"], f"🗑️ 「{me['name']}」撤回了一条发给你的关系细节：\n\"{res}\"")
-    await withdraw_rel.finish(f"✅ 已成功撤回你发送的细节：\n\"{res}\"")
+        await withdraw_rel.finish(f"没找到你写过的这段：「{parts[1].strip()}」\n发「查看关系线 {target['name']}」看全部。")
+    await _notify(bot, target["id"], f"🗑️ 「{me['name']}」撤回了关系线上的一段：\n\"{res}\"")
+    await withdraw_rel.finish(f"✅ 撤回了这段：\n\"{res}\"")
 
 
 view_rel = _cmd("查看关系线")
@@ -117,17 +117,17 @@ view_rel = _cmd("查看关系线")
 async def _(event: GroupMessageCreateEvent, args=CommandArg()):
     me = _me(event)
     if not me:
-        await view_rel.finish("请先绑定角色")
+        await view_rel.finish("你还没有角色。在你的个人群里发「创建新角色 名字」就能创建。")
     parts = _name_args(args)
     if parts:
         target = roles.get_role_by_name(parts[0])
         rel = relations.get_rel(me["id"], target["id"]) if target else None
         if not rel:
-            await view_rel.finish(f"你与「{parts[0]}」之间暂无关系记录。")
+            await view_rel.finish(f"你和「{parts[0]}」之间还没有关系线。")
         ds = relations.details(rel["id"])
         if not ds:
-            await view_rel.finish(f"你与「{target['name']}」虽有关系线，但尚未添加任何细节。")
-        text = f"📖 你与「{target['name']}」的关系线（{len(ds)} 段）\n" + "\n".join(f"\n【{d['from_name']}】\n{d['text']}" for d in ds)
+            await view_rel.finish(f"你和「{target['name']}」的关系线还没写内容。")
+        text = f"📖 你和「{target['name']}」的关系线（{len(ds)} 段）\n" + "\n".join(f"\n【{d['from_name']}】\n{d['text']}" for d in ds)
         await reply_long(view_rel, text)
         await view_rel.finish()
     items = relations.list_for(me["id"])
@@ -162,7 +162,7 @@ async def _(event: GroupMessageCreateEvent):
         await rel_stats.finish(_admin_only("关系线统计"))
     rows = relations.stats()
     if not rows:
-        await rel_stats.finish("📭 当前没有任何关系线记录")
+        await rel_stats.finish("📭 现在还没有人拉过关系线")
     await rel_stats.finish("📊 关系线数量\n" + "\n".join(f"{r['name']}：{r['n']}" for r in rows[:50]))
 
 

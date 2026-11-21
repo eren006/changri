@@ -89,6 +89,13 @@ h1{font-size:24px;line-height:1.3;margin:8px 0 4px}.meta{color:var(--mute);font-
 .hl .ln.dice .txt{border-left-width:4px}
 :root[data-theme=print] .chip,:root[data-theme=print] .tools{display:none}
 .meta a{color:inherit}.hidden{display:none!important}.empty{color:var(--mute);padding:30px 0;text-align:center}
+.report{margin:0 0 14px;border:1px solid var(--line);border-radius:10px;background:var(--card);padding:4px 14px}
+.report summary{cursor:pointer;font-weight:700;padding:8px 0}.report .tw{overflow-x:auto}
+.report table{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+.report th,.report td{padding:5px 6px;border-top:1px solid var(--line);text-align:right;white-space:nowrap}
+.report th:first-child,.report td:first-child{text-align:left;white-space:normal}.report th{color:var(--mute);font-weight:400;font-size:13px}
+.report ul{list-style:none;margin:10px 0 8px;padding:0;font-size:14px;line-height:1.8}
+@media(max-width:420px){.report th,.report td{padding:5px 3px;font-size:13px}}
 @media print{.tools{display:none}}
 """
 
@@ -103,7 +110,25 @@ var d=document.getElementById('only');d&&d.addEventListener('click',function(){o
 """
 
 
-def render_html(log: dict, lines: list[dict], style: dict | None = None, download_url: str = "") -> str:
+def _report(stats: dict | None, highlights: list[str] | None, cls: dict[str, str]) -> str:
+    """按人战报（trpglog.stats 的 people + highlights）。没有对得上人的骰点就不出这一块。名字用发言人自己的颜色。"""
+    people = (stats or {}).get("people") or []
+    if not any(p["name"] != "（不明）" for p in people):        # 一个骰点都对不上人（比如导入的聊天记录）：表里只有「不明」，不出
+        return ""
+    esc = html.escape
+    rows = "".join(
+        f'<tr><td><span class="who {cls.get(p["name"], "")}">{esc(p["name"])}</span></td><td>{p["dice"]}</td><td>{p["crit"]}</td>'
+        f'<td>{p["ok"]}</td><td>{p["bad"]}</td><td>{p["fumble"]}</td><td>{"—" if p.get("rate") is None else str(p["rate"]) + "%"}</td></tr>'
+        for p in people)
+    hl = "".join(f"<li>{esc(h)}</li>" for h in highlights or [])
+    return ('<details class="report" open><summary>本场战报</summary><div class="tw"><table><thead><tr><th>发言人</th><th>骰点</th>'
+            '<th>大成功</th><th>成功</th><th>失败</th><th>大失败</th><th>成功率</th></tr></thead>'
+            f'<tbody>{rows}</tbody></table></div>' + (f"<ul>{hl}</ul>" if hl else "") + "</details>")
+
+
+def render_html(log: dict, lines: list[dict], style: dict | None = None, download_url: str = "",
+                stats: dict | None = None, highlights: list[str] | None = None) -> str:
+    """stats / highlights 是 trpglog.stats() 和 trpglog.highlights() 的结果：给了就在最上面加「本场战报」（这里不读数据库）。"""
     st = style or parse_style(log.get("palette", ""))
     cmap = color_map(lines, st)
     esc = html.escape
@@ -147,7 +172,7 @@ def render_html(log: dict, lines: list[dict], style: dict | None = None, downloa
     page = (f'<!doctype html><html lang="zh-CN" data-theme="{st["theme"]}"><head><meta charset="utf-8">'
             f'<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">'
             f'<title>{esc(log["name"])}</title><style>{CSS}{colors_css}</style></head><body><div class="wrap {classes}">'
-            f'<h1>{esc(log["name"])}</h1><p class="meta">{status}　{len(lines)} 条　{first}{dl}</p>'
+            f'<h1>{esc(log["name"])}</h1><p class="meta">{status}　{len(lines)} 条　{first}{dl}</p>{_report(stats, highlights, cls)}'
             f'<div class="tools"><input id="q" type="search" placeholder="搜索内容"><div class="chips">{chips}'
             f'<button class="chip tog" id="only" type="button" aria-pressed="false">只看骰点</button></div></div>'
             f'<main>{"".join(body) or "<p class=empty>这个 log 还没有内容。</p>"}</main></div><script>{JS}</script></body></html>')

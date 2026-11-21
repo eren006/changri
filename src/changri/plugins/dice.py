@@ -10,13 +10,14 @@ from nonebot.adapters.qq.exception import ActionFailed
 from nonebot.matcher import current_bot
 from nonebot.params import CommandArg
 from nonebot.rule import Rule
+from nonebot.typing import T_State
 
-from changri.core import attrs, dice, dicefun, messaging, roles, trpg, trpglog
+from changri.core import attrs, dice, dicefun, longterm, messaging, roles, trpg, trpglog
 from changri.core.db import get_config, set_config
 from changri.core import dicecard
 from changri.core.qqsend import make_send, reply_long
 
-NEED_ROLE = "请先在你的个人群里发「创建新角色 名字」绑定角色。"
+NEED_ROLE = "你还没有角色。在你的个人群里发「创建新角色 名字」就能创建。"
 MD_MAX_CHARS = 1500                       # 卡片再长就按纯文字发
 _md_off_until = 0.0                       # QQ 拒绝过 Markdown（多半是没权限）后，这个时间点之前不再试
 
@@ -92,12 +93,34 @@ def _card_lookup(card: dict, name: str):
     return (card["name"], val, "，初始值") if is_default else (card["name"], val)
 
 
+def _lt_member(event: GroupMessageCreateEvent, member: str | None = None):
+    """长期群模式：这个群接的长期群里，发消息（或被 @）的人注册的玩家。没接、没注册返回 (长期群, None)。"""
+    g = longterm.bound_group(event.group_openid)
+    return g, (longterm.member_of(g["id"], member or event.author.member_openid) if g else None)
+
+
+def _lt_lookup(event: GroupMessageCreateEvent, proxy: str | None, name: str):
+    """长期群模式：读注册玩家的属性面板（后台定义的属性、默认值都算）。"""
+    g, m = _lt_member(event, proxy)
+    if not g:
+        return "这个群还没接到长期群（/切换长期群 名字），数值取不到。可以直接写数值。"
+    if not m:
+        return ("被 @ 的这位还没在长期群注册，数值取不到。" if proxy else "你还没注册：发「/注册 名字」。") + "或者直接写数值。"
+    val = longterm.get_attr(m["id"], name)
+    if val is None:
+        have = "、".join(n for n, _ in longterm.list_attrs(m["id"])) or "（没有）"
+        return f"「{m['name']}」没有「{name}」这个属性。现有：{have}"
+    return m["name"], val
+
+
 def _lookup(event: MessageEvent):
     proxy = _proxy_openid(event)
 
     def lookup(name: str):
         if isinstance(event, GroupMessageCreateEvent) and trpg.get_mode(event.group_openid) == "trpg":
             return _trpg_lookup(event, proxy, name)
+        if isinstance(event, GroupMessageCreateEvent) and trpg.get_mode(event.group_openid) == longterm.MODE:
+            return _lt_lookup(event, proxy, name)
         if not isinstance(event, GroupMessageCreateEvent):
             return "读角色属性只能在群里用，请在群里发，或者直接写数值。"
         role = _role_of(event, proxy)
@@ -124,6 +147,19 @@ def _init_load(scope: str) -> dict:
 
 def _init_save(scope: str, table: dict) -> None:
     set_config(f"initiative:{scope}", json.dumps(table, ensure_ascii=False))
+
+
+def _turn_load(scope: str) -> dict:
+    """先攻的回合进度 {"round": 第几轮, "cur": 轮到谁}，跟先攻表分开存。"""
+    try:
+        d = json.loads(get_config(f"initiative_turn:{scope}", "") or "{}")
+    except ValueError:
+        return {}
+    return d if isinstance(d, dict) and isinstance(d.get("round"), int) and isinstance(d.get("cur"), str) else {}
+
+
+def _turn_save(scope: str, turn: dict) -> None:
+    set_config(f"initiative_turn:{scope}", json.dumps(turn, ensure_ascii=False) if turn else "")
 
 
 # ---------- 发送：优先发 Markdown 小卡片，发不了就退回文字 ----------
@@ -177,6 +213,9 @@ def _write_attr(event: MessageEvent, name: str, value: int, source: str) -> bool
             return False
         ok, _ = trpg.apply_st(card["id"], [(trpg.canon(name), str(value))], source=source, log_id=trpglog.recording_id(event.group_openid))
         return ok
+    if trpg.get_mode(event.group_openid) == longterm.MODE:
+        _, m = _lt_member(event)
+        return bool(m) and longterm.set_attrs(m["id"], [(name, value)])[0]
     role = _role_of(event)
     if not role:
         return False
@@ -209,10 +248,33 @@ setcoc_cmd = _cmd("setcoc", {"房规"}, short=True)
 
 @rd_cmd.handle()
 async def _(event: MessageEvent, args=CommandArg()):
-    await _reply(rd_cmd, dice.rd(args.extract_plain_text()))
+    await _reply(rd_cmd, dice.rd(args.extract_plain_text(), _who(event)))
 
 
 rt_cmd = _cmd("rt", {"难度骰"}, short=True)
+async def _not_loose(state: T_State) -> bool:
+    """不带前缀、指令词后面又直接连着字（「www」「rfc」「ww好困」）多半是在聊天：不算这条指令，消息照常往下走（自定义回复、记 log）。
+    ww 后面直接连数字（ww5）还算。"""
+    pf = state.get("_prefix") or {}
+    arg = str(pf.get("command_arg") or "").strip()
+    return bool(pf.get("command_start") or pf.get("command_whitespace") or not arg or arg[:1].isdigit())
+
+
+ww_cmd = on_command("ww", aliases={"骰池"}, rule=Rule(_on, _not_loose), priority=20, block=True)
+rf_cmd = on_command("rf", aliases={"fate"}, rule=Rule(_on, _not_loose), priority=20, block=True)
+
+
+@ww_cmd.handle()
+async def _(args=CommandArg()):
+    res = dice.ww(args.extract_plain_text())
+    if res is None:
+        await ww_cmd.finish("骰池这么写：/ww 5（5 颗 D10），/ww 5a8（8 及以上加骰），/ww 5 难度6。")
+    await _reply(ww_cmd, res)
+
+
+@rf_cmd.handle()
+async def _(args=CommandArg()):
+    await _reply(rf_cmd, dice.rf(args.extract_plain_text()))
 
 
 @rt_cmd.handle()
@@ -263,10 +325,14 @@ def _in_trpg(event: MessageEvent) -> bool:
     return isinstance(event, GroupMessageCreateEvent) and trpg.get_mode(event.group_openid) == "trpg"
 
 
+def _in_lt(event: MessageEvent) -> bool:
+    return isinstance(event, GroupMessageCreateEvent) and trpg.get_mode(event.group_openid) == longterm.MODE
+
+
 async def _whisper(event: MessageEvent, text: str) -> bool:
     """把暗骰结果私下发给本人。恋综模式的群：先发到 TA 的个人群，没有角色就试官方的单聊；
     跑团模式的群：恋综的角色和个人群跟跑团没关系，只走官方单聊。都发不出去返回 False（结果不会在群里露出来）。"""
-    role = None if _in_trpg(event) else _role_of(event)
+    role = None if _in_trpg(event) or _in_lt(event) else _role_of(event)
     if role:
         ok, _ = await messaging.push_to_role(role["id"], text, make_send())
         if ok:
@@ -278,19 +344,28 @@ async def _whisper(event: MessageEvent, text: str) -> bool:
         return False
 
 
+def _who(event: MessageEvent) -> str:
+    """掷骰的人怎么称呼：跑团群用当前角色卡的名字，恋综群用角色名；都没有（或者私聊）返回空。
+    官方机器人拿不到群昵称，所以没建角色的人只能不写名字。"""
+    if not isinstance(event, GroupMessageCreateEvent):
+        return ""
+    if _in_trpg(event):
+        pid = trpg.player_for(event.author.member_openid, event.group_openid, create=False)
+        card = trpg.active_card(event.group_openid, pid) if pid else None
+        return card["name"] if card else ""
+    if _in_lt(event):
+        _, m = _lt_member(event)
+        return m["name"] if m else ""
+    role = _role_of(event)
+    return role["name"] if role else ""
+
+
 async def _hidden(matcher, event: MessageEvent, text: str) -> None:
     if not isinstance(event, GroupMessageCreateEvent):      # 本来就是私聊，直接回
         await reply_long(matcher, text)
         return
-    if _in_trpg(event):                                      # 跑团：称呼用当前角色卡的名字，没有就「有人」
-        pid = trpg.player_for(event.author.member_openid, event.group_openid, create=False)
-        card = trpg.active_card(event.group_openid, pid) if pid else None
-        who = card["name"] if card else "有人"
-        hint = ""
-    else:                                                    # 恋综：有个人群的角色，也可以发到个人群
-        role = _role_of(event)
-        who = role["name"] if role else "有人"
-        hint = "有个人群的话，结果会发到个人群；"
+    who = _who(event) or "有人"
+    hint = "" if _in_trpg(event) else "有个人群的话，结果会发到个人群；"     # 恋综：有个人群的角色，也可以发到个人群
     if await _whisper(event, "🎲 暗骰结果（只有你看得到）\n" + text):
         await matcher.finish(f"🎲 {who} 掷了一次暗骰，结果已私下发给 TA。")
     await matcher.finish(f"🎲 {who} 想掷暗骰，但私下发不出去，所以没掷。{hint}官方机器人只能私聊白名单里的人：请把执行暗骰的人（KP）加进机器人的白名单，加好后就能收到私聊。")
@@ -544,9 +619,10 @@ async def _(event: MessageEvent, args=CommandArg()):
 async def _(event: MessageEvent, args=CommandArg()):
     await _need_dnd(ri_cmd, event)
     scope = _scope(event)
-    table = _init_load(scope)
-    text = dice.initiative(table, args.extract_plain_text())
+    table, turn = _init_load(scope), _turn_load(scope)
+    text = dice.initiative(table, args.extract_plain_text(), turn)
     _init_save(scope, table)
+    _turn_save(scope, turn)
     await reply_long(ri_cmd, text)
 
 

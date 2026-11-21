@@ -67,7 +67,7 @@ def _make_profile_cmd(prefix: str):
     async def _(event: GroupMessageCreateEvent, args=CommandArg()):
         role = _sender_role(event)
         if not role:
-            await m.finish("你还没有角色。在你的个人群里发「创建新角色 名字」。")
+            await m.finish("你还没有角色。在你的个人群里发「创建新角色 名字」就能创建。")
         await m.finish(charprofile.edit(role, prefix + " " + args.extract_plain_text().strip()))
     return m
 
@@ -99,7 +99,7 @@ my_role = _cmd("我的角色", {"我的群"})
 async def _(event: GroupMessageCreateEvent):
     role = _sender_role(event)
     if not role:
-        await my_role.finish("你还没有角色。在你的个人群里发「创建新角色 名字」。")
+        await my_role.finish("你还没有角色。在你的个人群里发「创建新角色 名字」就能创建。")
     lines = [f"角色：{role['name']}", *charprofile.summary_lines(role)]
     for i, g in enumerate(roles.list_groups(role["id"]), 1):
         kind = "个人群"
@@ -119,7 +119,7 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
         await mine.finish()
     role = _sender_role(event)
     if not role:
-        await mine.finish("你还没有角色。在你的个人群里发「创建新角色 名字」。")
+        await mine.finish("你还没有角色。在你的个人群里发「创建新角色 名字」就能创建。")
     items = formats.mine()
     await reply_buttons(mine, f"「{role['name']}」自查速查（点按钮，或者直接发指令）：\n" + formats.mine_text(),
                         [Btn(label, cmd) for label, cmd in items], per_row=4)
@@ -133,7 +133,7 @@ change_code = _cmd("换绑码")
 async def _(event: GroupMessageCreateEvent):
     role = _sender_role(event)
     if not role:
-        await change_code.finish("你还没有角色。")
+        await change_code.finish("你还没有角色。在你的个人群里发「创建新角色 名字」就能创建。")
     if not roles.is_own_group(role["id"], _bid(), event.group_openid):
         await change_code.finish("换绑码只能在你自己的个人群里要：这里别人也看得到，拿到码就能把你的角色认走。")
     code = roles.make_player_code(role["id"])
@@ -197,7 +197,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, state: T_State):
         await social_msg.finish(forms.TEMPLATES["短信" if kind == "sms" else "送礼"])
     me = roles.find_role_for_sender(bot.self_id, event.group_openid, event.author.member_openid)
     if not me:
-        await social_msg.finish("你还没有角色，先在个人群里「创建新角色 名字」。")
+        await social_msg.finish("你还没有角色。在你的个人群里发「创建新角色 名字」就能创建。")
     target = roles.get_role_by_name(p["to"])
     if not target:
         await social_msg.finish(f"没有叫「{p['to']}」的角色。")
@@ -215,7 +215,7 @@ recall = _cmd("撤回")
 async def _(event: GroupMessageCreateEvent):
     me = _sender_role(event)
     if not me:
-        await recall.finish("你还没有角色。")
+        await recall.finish("你还没有角色。在你的个人群里发「创建新角色 名字」就能创建。")
     m = messaging.last_recallable(me["id"])
     if not m:
         await recall.finish("没有可以撤回的：只能撤回自己 2 分钟内发出的最近一条短信/礼物。")
@@ -264,7 +264,7 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
     """礼品店开着：图鉴 = 逛礼品店收集到的礼物（「图鉴 #编号」看详细）；关着：图鉴 = 收到过的礼物（老样子）。"""
     me = _sender_role(event)
     if not me:
-        await album.finish("你还没有角色。")
+        await album.finish("你还没有角色。在你的个人群里发「创建新角色 名字」就能创建。")
     if not gifts.enabled():
         await reply_long(album, _received_text(me).replace("还没有人送过你礼物。", "图鉴还是空的，还没有人送过你礼物。"))
         return
@@ -291,7 +291,7 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
 async def _(event: GroupMessageCreateEvent):
     me = _sender_role(event)
     if not me:
-        await my_gifts.finish("你还没有角色。")
+        await my_gifts.finish("你还没有角色。在你的个人群里发「创建新角色 名字」就能创建。")
     await reply_long(my_gifts, _received_text(me))
 
 

@@ -135,6 +135,48 @@ class LogRecording(unittest.TestCase):
         self.assertEqual(trpglog.lines(log["id"]), [])
 
 
+class LogPeople(unittest.TestCase):
+    def setUp(self):
+        clear()
+
+    def test_per_person_stats_and_highlights(self):
+        log, _ = trpglog.new_log("G1", "战报", "M1")
+        lid = log["id"]
+
+        def roll(who, name, *results):
+            say = trpglog.add_line(lid, who, name, "say", "/ra 侦查")
+            for r in results:
+                trpglog.add_line(lid, "", "骰子", "dice", f"侦查 检定：D100=1/50 —— {r}。", say)
+        roll("M1", "小明", "大成功", "成功", "成功", "失败")
+        roll("M2", "小红", "大失败", "失败", "失败", "成功")
+        trpglog.add_line(lid, "", "骰子", "dice", "D20 = 7", None)                    # 对不上人的普通掷骰
+        card = trpg.active_card("G1", trpg.player_for("M2", "G1"), create=True)
+        trpg.apply_st(card["id"], [("理智", "60")], log_id=lid)
+        trpg.apply_st(card["id"], [("理智", "-5")], log_id=lid)
+        trpg.apply_st(card["id"], [("理智", "+1")], log_id=lid)                     # 回升的不算损失
+        other = trpg.active_card("G1", trpg.player_for("M3", "G1"), create=True)       # 同名的另一张卡，损失不能混进来
+        self.assertEqual(other["name"], card["name"])
+        trpg.apply_st(other["id"], [("理智", "60")], log_id=lid)
+        trpg.apply_st(other["id"], [("理智", "-1")], log_id=lid)
+        s = trpglog.stats(lid)
+        self.assertEqual(sorted(x["理智"] for x in s["losses"]), [1, 5])
+        ppl = {p["name"]: p for p in s["people"]}
+        self.assertEqual((ppl["小明"]["crit"], ppl["小明"]["ok"], ppl["小明"]["bad"], ppl["小明"]["rate"]), (1, 2, 1, 75))
+        self.assertEqual((ppl["小红"]["fumble"], ppl["小红"]["rate"]), (1, 25))
+        self.assertEqual((ppl["（不明）"]["dice"], ppl["（不明）"]["rate"]), (1, None))
+        text = trpglog.stats_text(trpglog.get(lid))
+        for want in ("【每个人】", "小明：骰 4 次（大成功 1、成功 2、失败 1）", "大成功最多：小明", "大失败最多：小红",
+                     "骰运最好：小明", "骰运最差：小红", "理智掉得最多：", "（-5）"):
+            self.assertIn(want, text)
+
+    def test_no_forced_highlights(self):
+        log, _ = trpglog.new_log("G1", "安静", "M1")
+        trpglog.add_line(log["id"], "M1", "小明", "say", "大家好")
+        text = trpglog.stats_text(trpglog.get(log["id"]))
+        self.assertNotIn("【每个人】", text)
+        self.assertNotIn("【本场之最】", text)
+
+
 class LogAdmin(unittest.TestCase):
     def test_pages_and_rules(self):
         clear()
@@ -146,6 +188,11 @@ class LogAdmin(unittest.TestCase):
         c.post("/login", data={"username": "boss", "password": "longenough1", "_csrf": tok("/login")})
         self.assertIn("测试", c.get("/trpglog").get_data(as_text=True))
         self.assertIn("你好", c.get(f"/trpglog/{log['id']}").get_data(as_text=True))
+        say = trpglog.add_line(log["id"], "M1", "小明", "say", "/ra 侦查")
+        trpglog.add_line(log["id"], "", "骰子", "dice", "侦查 检定：D100=1/50 —— 大成功。", say)
+        page = c.get(f"/trpglog/{log['id']}").get_data(as_text=True)
+        self.assertIn("<h2>每个人</h2>", page)
+        self.assertIn("大成功最多：小明", page)
         c.post("/trpglog/rules", data={"_csrf": tok("/trpglog"), "prefixes": "//\n!!"})
         r = trpglog.rules()
         self.assertEqual((r["brackets"], r["cmds"], r["prefixes"]), (False, False, ["//", "!!"]))   # 没勾选 = 关
@@ -205,6 +252,15 @@ class LogRender(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertIn("我也来了", r.get_data(as_text=True))
         self.assertIn("script-src", r.headers["Content-Security-Policy"])
+        self.assertNotIn("本场战报", r.get_data(as_text=True))                         # 骰点都对不上人（没有 ref）：表里只有「不明」，不出
+        say = trpglog.add_line(log["id"], "M3", "<b>小绿</b>", "say", "/ra 侦查")
+        trpglog.add_line(log["id"], "", "骰子", "dice", "侦查 检定：D100=2/50 —— 大成功。", say)
+        page = c.get(f"/l/{log['token']}").get_data(as_text=True)
+        self.assertIn("本场战报", page)
+        self.assertIn("&lt;b&gt;小绿&lt;/b&gt;", page)                                   # 名字照样转义
+        self.assertIn("大成功最多：&lt;b&gt;小绿&lt;/b&gt;", page)
+        from changri.core import trpgexport
+        self.assertIn("本场战报", trpgexport.build(trpglog.get(log["id"]), "html")[0].decode())   # 下载的 html 也有
         self.assertEqual(c.get("/l/" + "0" * 32).status_code, 404)
         set_config("phone_enabled", "0")
         self.assertEqual(c.get(f"/l/{log['token']}").status_code, 404)       # 小手机关了就打不开

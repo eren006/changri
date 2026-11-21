@@ -5,7 +5,7 @@ from nonebot.adapters.qq import Bot, GroupMessageCreateEvent, MessageSegment
 
 from changri.core import roles, rpgcard
 
-NEED_ROLE = "请先在你的个人群里发「创建新角色 名字」绑定角色。"
+NEED_ROLE = "你还没有角色。在你的个人群里发「创建新角色 名字」就能创建。"
 
 card = on_command("角色卡", aliases={"名片", "我的名片", "角色名片"}, priority=10, block=True)
 

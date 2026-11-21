@@ -81,3 +81,51 @@ def public_ip_cached() -> str:
     if time.time() - _ip_cache["ts"] > 600:
         _ip_cache.update(ip=public_ip(), ts=time.time())
     return _ip_cache["ip"]
+
+
+# ---------- 发分享链接前看一眼（/log end 用） ----------
+
+PROBE_OK_FOR = 6 * 3600          # 上次外网检查通过，6 小时内不再测
+PROBE_BAD_FOR = 600              # 上次没通过，10 分钟内直接用上次的结果（别每次都等 15 秒）
+
+
+def cached_probe(port: int, now: float | None = None) -> dict:
+    """外网能不能打开小手机：有新鲜的上次结果就用（后台「检查」按钮和这里共用 phone_net_last），否则现测一次并记下。"""
+    from .db import set_config
+    now = now or time.time()
+    try:
+        last = json.loads(get_config("phone_net_last", "") or "{}")
+    except ValueError:
+        last = {}
+    if last.get("port") == port and "ts" in last:
+        age = now - last["ts"]
+        if (last.get("state") == "ok" and age < PROBE_OK_FOR) or (last.get("state") != "ok" and age < PROBE_BAD_FOR):
+            return last
+    res = probe_outside(port)
+    res.update(port=port, ts=now)
+    set_config("phone_net_last", json.dumps(res, ensure_ascii=False))
+    return res
+
+
+def share_link_problem(url: str) -> str:
+    """玩家拿到这个分享链接能不能打开。空串 = 没发现问题（或者没法判断）；否则是给管理员看的原因。
+    只在网址就是「http://IP:小手机端口」这种直连时测外网：用域名、HTTPS 反向代理的，探测服务测不了（只测 1024 以上的端口），不乱报。
+    会联网，最多等十几秒，插件里要放到线程里调。"""
+    from urllib.parse import urlparse
+    from . import phoneserver
+    if get_config("phone_enabled", "0") != "1":
+        return "小手机没开（后台「小手机」页），分享链接打不开"
+    port = phoneserver.port()
+    if not listening(port):
+        return f"小手机没在运行（端口 {port} 没有在监听），可能被关掉了或端口被占用"
+    try:
+        u = urlparse(url)
+        url_port = u.port
+    except ValueError:
+        return ""
+    if u.scheme != "http" or not url_port or url_port < 1024:
+        return ""
+    res = cached_probe(url_port)
+    if res.get("state") in ("closed", "timeout", "not_phone"):
+        return f"外网连不上 {url_port} 端口：{res.get('msg', '')}"
+    return ""

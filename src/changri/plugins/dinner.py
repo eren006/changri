@@ -26,7 +26,7 @@ poke_cmd = _cmd("戳你一下")
 @start_cmd.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     if not _is_admin(bot, event):
-        await start_cmd.finish("❌ 权限不足，仅管理员可用。")
+        await start_cmd.finish("❌ 这条指令只有管理员能用。")
     p = args.extract_plain_text().split()
     if not p or not p[0].isdigit():
         await start_cmd.finish("用法：开始晚餐 座位数 [风格]\n风格：" + "、".join(dinner.MENUS) + "、无菜\n例：开始晚餐 5 现代西餐")
@@ -49,7 +49,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
 @end_cmd.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent):
     if not _is_admin(bot, event):
-        await end_cmd.finish("❌ 权限不足，仅管理员可用。")
+        await end_cmd.finish("❌ 这条指令只有管理员能用。")
     hunted = games.hunt_end()
     ihave_on = ihave.active() is not None
     also = "、".join(x for x, on in (("围猎", hunted), ("我有你没有", ihave_on)) if on)
@@ -120,7 +120,7 @@ async def _hunt_push(bot_id: str, group: str, text: str) -> None:
 @hunt_start.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     if not _is_admin(bot, event):
-        await hunt_start.finish("❌ 权限不足，仅管理员可用。")
+        await hunt_start.finish("❌ 这条指令只有管理员能用。")
     a = args.extract_plain_text().split()
     if a and a[0] in ("帮助", "?", "？"):
         await hunt_start.finish(HUNT_HELP)
@@ -170,7 +170,7 @@ async def _():
 @hunt_rank_reset.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent):
     if not _is_admin(bot, event):
-        await hunt_rank_reset.finish("❌ 权限不足，仅管理员可用。")
+        await hunt_rank_reset.finish("❌ 这条指令只有管理员能用。")
     games.hunt_rank_reset()
     await hunt_rank_reset.finish("🧹 已清空围猎排行榜。")
 
@@ -178,7 +178,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent):
 @hunt_skip.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent):
     if not _is_admin(bot, event):
-        await hunt_skip.finish("❌ 权限不足，仅管理员可用。")
+        await hunt_skip.finish("❌ 这条指令只有管理员能用。")
     ok, text, _ended = games.hunt_skip()
     if not ok:
         await hunt_skip.finish("❌ " + text)
@@ -188,7 +188,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent):
 @hunt_end.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent):
     if not _is_admin(bot, event):
-        await hunt_end.finish("❌ 权限不足，仅管理员可用。")
+        await hunt_end.finish("❌ 这条指令只有管理员能用。")
     await hunt_end.finish("🏁 围猎已结束，这一局不计分。" if games.hunt_end() else "现在没有进行中的围猎。")
 
 
@@ -221,7 +221,7 @@ guard_end = _cmd("巡逻结束")
 @guard_open.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent):
     if not _is_admin(bot, event):
-        await guard_open.finish("❌ 权限不足，仅管理员可用。")
+        await guard_open.finish("❌ 这条指令只有管理员能用。")
     ok, text = games.guard_open(bot.self_id, event.group_openid)
     await guard_open.finish(text if ok else "❌ " + text)
 
@@ -229,7 +229,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent):
 @guard_places.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     if not _is_admin(bot, event):
-        await guard_places.finish("❌ 权限不足，仅管理员可用。")
+        await guard_places.finish("❌ 这条指令只有管理员能用。")
     locs = args.extract_plain_text().split()
     if not locs:
         cur = games.guard_locations()
@@ -262,7 +262,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
 @guard_call.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent):
     if not _is_admin(bot, event):
-        await guard_call.finish("❌ 权限不足，仅管理员可用。")
+        await guard_call.finish("❌ 这条指令只有管理员能用。")
     ok, r = games.guard_call()
     if not ok:
         await guard_call.finish("❌ " + r)
@@ -292,7 +292,7 @@ async def _():
 @guard_end.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent):
     if not _is_admin(bot, event):
-        await guard_end.finish("❌ 权限不足，仅管理员可用。")
+        await guard_end.finish("❌ 这条指令只有管理员能用。")
     await guard_end.finish("🧹 已清空巡逻赛。" if games.guard_end() else "现在没有巡逻赛。")
 
 
@@ -354,14 +354,14 @@ async def _(bot: Bot, event: GroupMessageCreateEvent):
 @dessert_all.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent):
     if not _is_admin(bot, event):
-        await dessert_all.finish("❌ 权限不足，仅管理员可用。")
+        await dessert_all.finish("❌ 这条指令只有管理员能用。")
     await reply_long(dessert_all, dessert.all_text())
 
 
 @dessert_reveal.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent):
     if not _is_admin(bot, event):
-        await dessert_reveal.finish("❌ 权限不足，仅管理员可用。")
+        await dessert_reveal.finish("❌ 这条指令只有管理员能用。")
     ok, text = dessert.reveal()
     if not ok:
         await dessert_reveal.finish("❌ " + text)
@@ -474,7 +474,7 @@ async def _():
 @ihave_end.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent):
     if not _is_admin(bot, event):
-        await ihave_end.finish("❌ 权限不足，仅管理员可用。")
+        await ihave_end.finish("❌ 这条指令只有管理员能用。")
     ok, text = ihave.end()
     await ihave_end.finish(text if ok else "❌ " + text)
 
@@ -551,7 +551,7 @@ async def _(event: GroupMessageCreateEvent):
 @drink_reset.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent):
     if not _is_admin(bot, event):
-        await drink_reset.finish("❌ 权限不足，仅管理员可用。")
+        await drink_reset.finish("❌ 这条指令只有管理员能用。")
     drinking.reset(event.group_openid)
     await drink_reset.finish("🧹 这个群的喝酒游戏已重置。")
 
@@ -559,7 +559,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent):
 @drink_limit.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     if not _is_admin(bot, event):
-        await drink_limit.finish("❌ 权限不足，仅管理员可用。")
+        await drink_limit.finish("❌ 这条指令只有管理员能用。")
     t = args.extract_plain_text().strip()
     if not t.isdigit():
         await drink_limit.finish(f"用法：设定醉酒阈值 500（现在是 {drinking.threshold()}）")

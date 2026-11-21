@@ -78,7 +78,9 @@ def as_json(log: dict, lines: list[dict]) -> str:
 
 
 def html(log: dict, lines: list[dict]) -> str:
-    return render_html(log, lines, parse_style(log.get("palette", "")))
+    from . import trpglog
+    st = trpglog.stats(log["id"])
+    return render_html(log, lines, parse_style(log.get("palette", "")), stats=st, highlights=trpglog.highlights(st))
 
 
 def build(log: dict, fmt: str) -> tuple[bytes, str, str]:

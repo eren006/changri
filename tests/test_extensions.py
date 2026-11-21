@@ -132,7 +132,7 @@ class ExtensionCoreTests(_PatchedDir):
         self.assertFalse(E.delete_user("../x"))
 
     def test_nav_and_groups_follow_switches(self):
-        self.assertEqual(E.disabled_nav(), {"rewards_page", "alarm_page", "giftshop_page", "gacha_page", "sighting_page", "bottles_page", "precall_admin", "paidan_page"})      # 结戏奖励、加百列闹钟默认关（小手机 0.22.4 起默认开）；排单是个性化模块，默认关
+        self.assertEqual(E.disabled_nav(), {"rewards_page", "alarm_page", "giftshop_page", "gacha_page", "sighting_page", "bottles_page", "precall_admin", "paidan_page", "longterm_page"})      # 结戏奖励、加百列闹钟默认关（小手机 0.22.4 起默认开）；排单、长期群是个性化模块，默认关
         E.set_enabled("rewards", True)
         E.set_enabled("alarm", True)
         E.set_enabled("phone", True)
@@ -144,6 +144,7 @@ class ExtensionCoreTests(_PatchedDir):
         E.set_enabled("precall", True)
         E.set_enabled("bottle", True)
         E.set_enabled("paidan", True)
+        E.set_enabled("longterm", True)
         self.assertEqual(E.disabled_nav(), set())
         self.assertEqual(E.disabled_groups(), {"心愿", "混乱短信", "晚餐", "点歌", "写信综", "踩点", "申请加入", "超时提醒"})   # 这些默认关（朋友圈、目击已在上面打开）
         E.set_enabled("lovemail", False)
@@ -188,6 +189,21 @@ class ExtensionCoreTests(_PatchedDir):
             files = {f.name: f.read_bytes() for f in (E.READY_DIR / r["id"]).glob("*.py")}
             self.assertEqual(E.check_code(files, int(r.get("api", 1)))[0], [], r["id"])
 
+    def test_player_funcs_need_api4_and_data_labels(self):
+        code = ("from changri_api import sender_player, player_data_get, player_data_set, season_data_set, data_set\n"
+                "def f(bot, event):\n    pid = sender_player(bot, event)\n    player_data_set('x', pid, '总', player_data_get('x', pid, '总', 0) + 1)\n").encode()
+        errs, _ = E.check_code({"__init__.py": code}, 3)
+        self.assertTrue(any('"api": 4' in e for e in errs))
+        self.assertEqual(E.check_code({"__init__.py": code}, 4), ([], []))
+        self.assertEqual([k["key"] for k in E.data_kinds({"__init__.py": code})], ["player"])
+        both = code + b"    season_data_set('x', 'k', 1)\n    data_set('x', '\u7d2f\u8ba1', 1)\n"
+        self.assertEqual([k["text"] for k in E.data_kinds({"a.py": both})], ["本季数据，收尾清空", "按玩家长期存", "长期保留"])
+        self.assertEqual(E.data_kinds({"a.py": b"def broken(:"}), [])                   # 读不懂的不报错，只是不标
+        kinds = {r["id"]: [k["key"] for k in r["data_kinds"]] for r in E.ready_made()}
+        self.assertEqual(kinds["daily_signin"], ["player"])                          # season_data_set / data_set 只是删 1.x 的旧记录
+        self.assertEqual(kinds["soda_shake"], ["long"])
+        self.assertEqual(kinds["daily_fortune"], [])
+
     def test_scheduled_job_needs_each_team(self):
         head = "from changri_api import scheduler, each_team\n"
         none = head + "@scheduler.scheduled_job('cron', hour=20)\nasync def nightly():\n    pass\n"
@@ -211,7 +227,8 @@ class ExtensionCoreTests(_PatchedDir):
         with mock.patch.dict(E._READY_OLD, {"daily_signin": {hashlib.sha256(old).hexdigest()}}):
             self.assertEqual(E.upgrade_ready_made(), ["daily_signin"])
             self.assertIn("season_data_set", (d / "__init__.py").read_text(encoding="utf-8"))
-            self.assertIn('"api": 3', (d / "manifest.json").read_text(encoding="utf-8"))
+            self.assertIn('"api": 4', (d / "manifest.json").read_text(encoding="utf-8"))
+            self.assertIn("player_data_set", (d / "__init__.py").read_text(encoding="utf-8"))
             (d / "__init__.py").write_bytes(b"# user edited\n")                       # 改过的不动
             self.assertEqual(E.upgrade_ready_made(), [])
             self.assertEqual((d / "__init__.py").read_bytes(), b"# user edited\n")
@@ -479,7 +496,7 @@ class ExtensionAdminTests(_PatchedDir):
     def test_api_tab_and_ready_made_install(self):
         self.login()
         page = self.c.get("/extensions?tab=api").get_data(as_text=True)
-        for word in ("插件接口", "现成插件", "每日签到", "富豪榜", "stage_group", "give_item", "today_count", "data_set", "接口版本 3"):
+        for word in ("插件接口", "现成插件", "每日签到", "富豪榜", "stage_group", "give_item", "today_count", "data_set", "接口版本 4", "player_data_get", "sender_player"):
             self.assertIn(word, page)
         self.assertIn('aria-current="page">插件接口', page)
         self.assertNotIn('aria-current="page">核心功能', page)

@@ -1,0 +1,24 @@
+{% extends "base.html" %}{% block title %}字数统计 #{{ s.id }}{% endblock %}
+{% block body %}
+<p><a href="{{ url_for('longterm_group', gid=s.group_id) }}#subs">← {{ g.name if g else '长期群' }}</a></p>
+<h1>字数统计 #{{ s.id }}</h1>
+<p class="lede">{{ s.ts|ts }} · {{ s.submitter_name or '管理员' }} 交的 · {{ s.n_lines }} 条，算了 {{ s.n_counted }} 条，新记 {{ s.total_chars }} 字 ·
+  <b>{{ {'pending':'等批准','approved':'已入账','rejected':'已驳回'}[s.status] }}</b>{% if s.reviewed_ts %}（{{ s.reviewed_ts|ts }}）{% endif %}</p>
+{% if s.status == 'pending' %}
+<p><form method="post" action="{{ url_for('longterm_review', sid=s.id) }}" style="display:inline">{{ csrf() }}<input type="hidden" name="act" value="approve"><input type="hidden" name="back" value="sub"><button class="btn">批准入账</button></form>
+   <form method="post" action="{{ url_for('longterm_review', sid=s.id) }}" style="display:inline" onsubmit="return confirm('驳回？不入账，玩家可以重新交。')">{{ csrf() }}<input type="hidden" name="act" value="reject"><input type="hidden" name="back" value="sub"><button class="btn ghost">驳回</button></form></p>
+{% endif %}
+
+<section>
+  <div class="tablewrap"><table class="rt">
+    <tr><th>#</th><th>转发里的名字</th><th>记给</th><th>内容</th><th>字数</th></tr>
+    {% for l in lines %}
+    <tr><td class="tabular">{{ l.seq }}</td><td>{{ l.sender }}</td>
+      <td>{% if l.member_id %}<a href="{{ url_for('longterm_member', mid=l.member_id) }}">{{ l.member_name }}</a>{% else %}<span class="muted">没对上</span>{% endif %}</td>
+      <td style="white-space:pre-wrap;max-width:480px">{{ l.text }}</td>
+      <td class="tabular">{{ l.chars }}{% if not l.counted and l.chars %}<span class="tag">以前算过</span>{% endif %}</td></tr>
+    {% endfor %}
+  </table></div>
+  <p class="note">「记给」是现在的归属：没对上的名字在后台认领以后，这里会显示认领到的玩家。</p>
+</section>
+{% endblock %}

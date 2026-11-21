@@ -1,5 +1,5 @@
 """changri_api 版本 2 新加的接口（戏群、物品、地点、关系线、扩展自己存数据、每日次数），
-以及 extdocs/现成插件/ 里的四个插件：按用户扩展的方式装上、打开，走真正的 NoneBot 事件分发跑一遍。"""
+以及 extdocs/现成插件/ 里的五个插件：按用户扩展的方式装上、打开，走真正的 NoneBot 事件分发跑一遍。"""
 import asyncio
 import os
 import sys
@@ -24,7 +24,7 @@ from changri.core import entrance, roles, rpg  # noqa: E402
 from changri.core import extensions as E  # noqa: E402
 from changri.core.db import get_conn, init_db, set_config  # noqa: E402
 
-READY = ["daily_signin", "daily_fortune", "group_broadcast", "gold_rank"]
+READY = ["daily_signin", "daily_fortune", "group_broadcast", "gold_rank", "soda_shake"]
 
 try:
     nonebot.get_driver()
@@ -85,7 +85,7 @@ class ApiV2Tests(unittest.TestCase):
         self.b = roles.get_role_by_name("乙")["id"]
 
     def test_version(self):
-        self.assertEqual(api.API_VERSION, 3)
+        self.assertEqual(api.API_VERSION, 4)
 
     def test_role_by_id(self):
         self.assertEqual(api.role_by_id(self.a)["name"], "甲")
@@ -183,6 +183,29 @@ class ApiV2Tests(unittest.TestCase):
         with self.assertRaises(ValueError):
             api.season_data_get("../evil", "k")
 
+    def test_player_data_long_term(self):
+        """按玩家本人存（版本 4）：单独一个文件，收尾不清，老插件按角色清理也不碰它。"""
+        from changri.core import extdata, season
+        api.player_data_set("my_ext", 7, "总天数", 3)
+        api.player_data_set("my_ext", 8, "总天数", 5)
+        api.player_data_set("my_ext", 8, "最高分", 99)
+        api.player_data_set("my_ext", str(self.a), str(self.a), "看起来像角色编号的键")
+        self.assertEqual(api.player_data_get("my_ext", 7, "总天数"), 3)
+        self.assertEqual(api.player_data_get("my_ext", 9, "总天数", 0), 0)
+        self.assertEqual(api.player_data_all("my_ext", "总天数"), {7: 3, 8: 5})
+        self.assertIsNone(api.data_get("my_ext", "总天数"))                             # 跟 data_set 的分开
+        self.assertTrue((extdata.folder() / "my_ext.player.json").is_file())
+        season.wipe()
+        self.assertEqual(api.player_data_all("my_ext", "总天数"), {7: 3, 8: 5})          # 收尾不清
+        self.assertEqual(api.player_data_get("my_ext", self.a, str(self.a)), "看起来像角色编号的键")
+        api.player_data_set("my_ext", 7, "总天数", None)
+        self.assertEqual(api.player_data_all("my_ext", "总天数"), {8: 5})
+        for pk, k in ((8, "总天数"), (8, "最高分"), (self.a, str(self.a))):
+            api.player_data_set("my_ext", pk, k, None)
+        self.assertEqual(api.player_data_all("my_ext", "最高分"), {})
+        with self.assertRaises(TypeError):
+            api.player_data_set("my_ext", 1, "bad", object())
+
     def test_each_team_runs_once_per_bot(self):
         """定时任务加 @each_team：每个启用的机器人各跑一遍，里面读到的是那个机器人的；同步函数也行，一个出错不影响别的。"""
         from unittest import mock
@@ -198,6 +221,24 @@ class ApiV2Tests(unittest.TestCase):
         with mock.patch("changri.core.db.list_bot_ids", return_value=["111", "222", "333"]):
             asyncio.run(job())
         self.assertEqual(seen, ["111", "222", "333"])
+
+    def test_wrap_up_clears_old_role_keys(self):
+        """老插件按角色存进 data_set 的记录：收尾时清掉，先备份；不带角色的、下划线开头的不动。"""
+        import json as _json
+        from changri.core import extdata, season
+        api.data_set("old_ext", f"streak_{self.a}", 5)
+        api.data_set("old_ext", str(self.b), {"x": 1})
+        api.data_set("old_ext", "连签:乙", 2)
+        api.data_set("old_ext", "累计", 9)
+        api.data_set("old_ext", "奖池_999999", 1)                                     # 不是这季角色的编号：不动
+        api.today_add("old_ext", "签到", self.a)
+        season.wipe()
+        self.assertEqual(api.data_keys("old_ext"), ["_today:签到", "奖池_999999", "累计"])
+        backup = extdata.folder() / ("old_ext" + extdata.BACKUP_SUFFIX)
+        self.assertEqual(set(_json.loads(backup.read_text(encoding="utf-8"))), {f"streak_{self.a}", str(self.b), "连签:乙"})
+        for k in api.data_keys("old_ext"):
+            api.data_set("old_ext", k, None)
+        backup.unlink()
 
 
 class ApiReferenceTests(unittest.TestCase):
@@ -259,11 +300,13 @@ class ReadyMadeE2E(unittest.TestCase):
 
     def test_signin(self):
         out = self.say("签到")
-        self.assertIn("签到成功", out[-1]); self.assertIn("金币×10", out[-1])
+        self.assertIn("签到成功", out[-1]); self.assertIn("金币×10", out[-1]); self.assertIn("一共签到 1 天", out[-1])
         self.assertIn("已经签过", self.say("签到")[-1])
         a = roles.get_role_by_name("甲")["id"]
         self.assertEqual(api.item_count(a, "金币"), 10)
-        self.assertIn("还没有角色", self.say("签到", member="M9", group="G9")[-1])
+        out = self.say("签到", member="M9", group="G9")[-1]                              # 没有角色也能签：只记天数，不发金币
+        self.assertIn("你签到成功", out); self.assertNotIn("金币", out)
+        self.assertIn("已经签过", self.say("签到", member="M9", group="G9")[-1])
         from changri.core import pending
         self.assertIn("签到", "\n".join(pending.collect(roles.get_role_by_name("乙"))))           # 没签的人「我的待回」里有提醒
         self.assertNotIn("还没「签到」", "\n".join(pending.collect(roles.get_role_by_name("甲"))))
@@ -271,13 +314,29 @@ class ReadyMadeE2E(unittest.TestCase):
     def test_signin_streak(self):
         from unittest import mock
         mod = nonebot.get_plugin("daily_signin").module
-        with mock.patch.object(mod, "_today_no", return_value="#100"):
+        with mock.patch.object(mod, "_today_no", return_value=100):
             self.say("签到")
-        with mock.patch("changri.core.season.day_key", return_value="次日"), mock.patch.object(mod, "_today_no", return_value="#101"):
+        with mock.patch("changri.core.season.day_key", return_value="次日"), mock.patch.object(mod, "_today_no", return_value=101):
             out = self.say("签到")
         self.assertIn("金币×12", out[-1]); self.assertIn("连续签到 2 天", out[-1])
-        with mock.patch("changri.core.season.day_key", return_value="隔了一天"), mock.patch.object(mod, "_today_no", return_value="#103"):
-            self.assertIn("金币×10", self.say("签到")[-1])                                # 断签从头算
+        from changri.core import season
+        season.wipe()                                                                  # 收尾：连签和总天数不清
+        roles.create_role("甲", "B1", "G1", "M1")                                      # 新一季，同一个人重建角色
+        with mock.patch("changri.core.season.day_key", return_value="新季第一天"), mock.patch.object(mod, "_today_no", return_value=102):
+            out = self.say("签到")[-1]
+        self.assertIn("连续签到 3 天", out); self.assertIn("一共签到 3 天", out)
+        with mock.patch("changri.core.season.day_key", return_value="隔了一天"), mock.patch.object(mod, "_today_no", return_value=104):
+            out = self.say("签到")[-1]
+        self.assertIn("金币×10", out); self.assertIn("一共签到 4 天", out)              # 断签从头算，总天数照加
+
+    def test_signin_carries_old_streak(self):
+        """1.x 存在本季数据里的连签：第一次用 2.0 签到时接过来，旧记录删掉。"""
+        a = roles.get_role_by_name("甲")["id"]
+        api.season_data_set("daily_signin", f"streak_{a}", 4)
+        api.season_data_set("daily_signin", f"last_{a}", "S1#3")
+        out = self.say("签到")[-1]
+        self.assertIn("连续签到 5 天", out); self.assertIn("金币×18", out)
+        self.assertIsNone(api.season_data_get("daily_signin", f"streak_{a}"))
 
     def test_signin_bad_currency_setting(self):
         set_config(E.setting_key("daily_signin", "currency"), "不存在的币")
@@ -286,6 +345,27 @@ class ReadyMadeE2E(unittest.TestCase):
             self.assertEqual(api.today_count("daily_signin", "签到", roles.get_role_by_name("甲")["id"]), 0)   # 没发成不算签过
         finally:
             set_config(E.setting_key("daily_signin", "currency"), "金币")
+
+    def test_soda_shake(self):
+        from unittest import mock
+        self.assertIn("没有汽水", self.say("摇一下")[-1])
+        with mock.patch("random.randint", return_value=3):                          # 第 3 下喷
+            self.assertIn("甲 拿出一瓶汽水。最多 6 下", self.say("摇汽水")[-1])
+        self.assertIn("已经有一瓶了", self.say("来瓶汽水")[-1])
+        self.assertIn("第 1 下，甲 摇了摇", self.say("摇一下")[-1])
+        self.assertIn("换个人", self.say("摇一下")[-1])                                # 不能连着摇
+        self.assertIn("第 2 下，一位路人 摇了摇", self.say("摇一摇", member="M3")[-1])
+        self.assertEqual(self.say("摇一下", group="G2", member="M2")[-1], "桌上没有汽水。发「摇汽水」拿一瓶。")   # 每个群各一瓶
+        out = self.say("摇一下")[-1]
+        self.assertIn("第 3 下——噗！汽水喷了 甲 一身！", out)
+        self.assertIn("中招：", out)
+        self.assertIn("没有汽水", self.say("摇一下", member="M3")[-1])                  # 喷完这瓶就没了
+        self.say("摇汽水")
+        self.assertIn("收走了", self.say("不摇了")[-1])
+        api.data_set("soda_shake", "bottle_G1", {"pop": 5, "total": 6, "n": 1, "last": "", "ts": 0})
+        self.assertIn("没有汽水", self.say("摇一下")[-1])                                # 放太久没人摇：作废
+        api.data_set("soda_shake", "bottle_G1", {"pop": 6, "total": 6, "n": 4, "last": "", "ts": __import__("time").time()})
+        self.assertIn("只剩最后一下", self.say("摇一下")[-1])
 
     def test_fortune_same_within_day(self):
         first = self.say("运势")[-1]

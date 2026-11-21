@@ -198,7 +198,7 @@ class PlayE2E(unittest.TestCase):
         self.assertEqual(pool.counts()["free"], 0)
         set_config("pool_auto_free", "1")                                                        # 这个设置只管小号的群
         self.assertEqual(pool.counts()["free"], 0)
-        self.assertIn("权限不足", self.say("放回备用群", member="M1", group="POOL0")[0])
+        self.assertIn("只有管理员能用", self.say("放回备用群", member="M1", group="POOL0")[0])
         self.assertIn("不是官方机器人的备用群", self.say("放回备用群 999999", member="ADMIN", group="ADM")[0])
         self.assertIn("已放回备用群", self.say("放回备用群", member="ADMIN", group="POOL0")[0])       # 管理员确认人退光了
         self.assertEqual(pool.counts()["free"], 1)
@@ -689,7 +689,7 @@ class PlayE2E(unittest.TestCase):
 
     def test_official_and_cancel(self):
         self.add_pool(1)
-        self.assertIn("权限不足", self.say("发起官约 1400-1500 后山 乙/丙")[0])
+        self.assertIn("只有管理员能用", self.say("发起官约 1400-1500 后山 乙/丙")[0])
         out = self.say("发起官约 1400-1500 后山 乙/丙", member="ADMIN", group="ADM")
         self.assertTrue(any("官约已发起" in o for o in out))
         self.assertTrue(any("[P1]" in o and "官约" in o for o in out) and any("[P2]" in o for o in out))
@@ -973,7 +973,7 @@ class PlayE2E(unittest.TestCase):
 
     # ---------- 群池 ----------
     def test_pool_admin_commands_and_conflict(self):
-        self.assertIn("权限不足", self.say("设为群池 A组 111", group="X1")[0])
+        self.assertIn("只有管理员能用", self.say("设为群池 A组 111", group="X1")[0])
         self.assertIn("已放进备用群池", self.say("设为备用群池 A组 111", member="ADMIN", group="X1")[0])
         self.assertIn("空闲 1", self.say("查看备用群池", member="ADMIN", group="ADM")[0])
         # 个人群不能放进池
@@ -988,7 +988,7 @@ class PlayE2E(unittest.TestCase):
         with get_conn() as c:
             c.execute("DELETE FROM qq_groups")
         self.assertIn("用法", self.say("设为备用群", member="ADMIN", group="X1")[0])
-        self.assertIn("权限不足", self.say("设为备用群 234567", group="X1")[0])
+        self.assertIn("只有管理员能用", self.say("设为备用群 234567", group="X1")[0])
         self.assertEqual(qqpool.join_set("B1", "234567", "A组"), "")
         self.assertEqual(handover.owner("B1", "234567"), "qq")
         out = self.say("设为备用群 234567", member="ADMIN", group="X1")[0]
@@ -1020,7 +1020,7 @@ class PlayE2E(unittest.TestCase):
         with get_conn() as c:
             c.execute("DELETE FROM qq_groups"); c.execute("DELETE FROM qq_links")
         self.say("设为备用群 456789", member="ADMIN", group="X3")
-        self.assertIn("权限不足", self.say("转为小号群", group="X3")[0])
+        self.assertIn("只有管理员能用", self.say("转为小号群", group="X3")[0])
         self.assertIn("还没有连 QQ 小号", self.say("转为小号群", member="ADMIN", group="X3")[0])
         lid, _ = qqpool.add_link("小号", "ws://127.0.0.1:3001")
         def _clean():
@@ -1344,7 +1344,7 @@ class PlayE2E(unittest.TestCase):
     # ---------- 官电 / 计划官约 / 我的数量 / 删帖 ----------
     def test_official_phone_and_plans(self):
         self.add_pool(4)
-        self.assertIn("权限不足", self.say("发起官电 2000-2100 乙/丙")[0])
+        self.assertIn("只有管理员能用", self.say("发起官电 2000-2100 乙/丙")[0])
         out = self.say("发起官电 2000-2100 乙/丙", member="ADMIN", group="ADM")
         self.assertTrue(any("官电已发起" in o for o in out) and any("[P1]" in o and "官电" in o for o in out))
         self.assertIn("还没有计划", self.say("计划官约", member="ADMIN", group="ADM")[0])
@@ -1368,7 +1368,7 @@ class PlayE2E(unittest.TestCase):
         from changri.core import forum
         self.say("发帖 路人甲 一楼内容")
         self.say("回复帖子 001 二楼内容", member="M1", group="P1")
-        self.assertIn("权限不足", self.say("删楼层 001 2")[0])
+        self.assertIn("只有管理员能用", self.say("删楼层 001 2")[0])
         self.assertIn("已删除", self.say("删楼层 001 2", member="ADMIN", group="ADM")[0])
         view = self.say("查看帖子 001")[0]
         self.assertIn("该楼层已被删除", view); self.assertNotIn("二楼内容", view)

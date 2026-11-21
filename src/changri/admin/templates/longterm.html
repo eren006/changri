@@ -1,0 +1,41 @@
+{% extends "base.html" %}{% block title %}长期群{% endblock %}
+{% block body %}
+<h1>长期群</h1>
+<p class="lede">恋综、跑团之外的第三种群模式：没有季度和时间线，玩家注册后交字数换货币，有属性面板、背包、商城。可以建好几个，彼此不相通。</p>
+
+<section>
+  <div class="sec-head"><h2>我的长期群<span class="n">{{ groups|length }}</span></h2>
+    <details class="panel"><summary class="btn sm">新建</summary>
+      <form class="inline" method="post" action="{{ url_for('longterm_new') }}" style="margin-top:10px">{{ csrf() }}
+        <label>名字<input type="text" name="name" required maxlength="16" placeholder="春日长期群" style="width:200px"></label><button class="btn sm">建好</button></form>
+    </details></div>
+  {% if groups %}
+  <div class="rowlist">{% for g in groups %}
+    <div class="row"><div><a href="{{ url_for('longterm_group', gid=g.id) }}"><b>{{ g.name }}</b></a>{% if g.n_pending %} <span class="tag">{{ g.n_pending }} 次字数等批准</span>{% endif %}
+      <div class="muted">{{ g.n_members }} 人 · {{ g.currency }} · 每 {{ g.chars_per_step }} 字换 {{ g.coins_per_step }}</div></div>
+      <div class="acts"><a class="btn sm ghost" href="{{ url_for('longterm_group', gid=g.id) }}">打开</a></div></div>
+  {% endfor %}</div>
+  {% else %}<p class="empty">还没有长期群。点「新建」起个名字。</p>{% endif %}
+</section>
+
+<section>
+  <div class="sec-head"><h2>怎么接到 QQ 群</h2></div>
+  <p class="note" style="margin:0">QQ 群里机器人管理员发「/模式 长期群」，再发「/切换长期群 名字」。之后谁都可以发「/长期群帮助」看全部指令（管理员看到的多一节管理指令）。</p>
+  <details style="margin-top:12px"><summary>群里的指令一览</summary>
+  <div class="tablewrap" style="margin-top:10px"><table class="rt">
+    <tr><th>指令</th><th>做什么</th></tr>
+    <tr><td>/注册 名字</td><td>注册；后台设了注册项的，换行写「项目：内容」。再发一次就是改资料</td></tr>
+    <tr><td>/我的　/属性　/背包</td><td>看自己（后面写名字或 @ 人看别人）</td></tr>
+    <tr><td>/st 力量60</td><td>改自己的属性（后台可以关掉）</td></tr>
+    <tr><td>/签到</td><td>每天一次领奖励（后台开、定奖励）</td></tr>
+    <tr><td>/字数统计</td><td>长按合并转发 →「回复」→ 发这条；开了「要批准」的等后台批准后入账</td></tr>
+    <tr><td>/字数榜</td><td>排行（/字数榜 货币 按货币排）</td></tr>
+    <tr><td>/赠送 名字 物品 数量</td><td>送东西；物品写货币名就是转账</td></tr>
+    <tr><td>/商城　/购买　/使用</td><td>买道具、用道具（按登记的效果改属性）</td></tr>
+    <tr><td>/合成表　/合成 配方名</td><td>按配方合成或兑换</td></tr>
+    <tr><td>/ra　/rt　/sc …</td><td>检定读注册玩家的属性</td></tr>
+    <tr><td>/调整 名字 力量+5 银两-10</td><td>管理员：加减一个人的属性、货币、字数、物品</td></tr>
+    <tr><td>/发放 全员 银两+50</td><td>管理员：一次发给全员或好几个人</td></tr>
+  </table></div></details>
+</section>
+{% endblock %}

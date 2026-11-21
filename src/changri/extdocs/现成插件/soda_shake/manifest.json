@@ -1,0 +1,16 @@
+{
+  "id": "soda_shake",
+  "name": "摇汽水",
+  "version": "1.0.0",
+  "author": "长日将尽",
+  "description": "群里的小游戏：发「摇汽水」拿出一瓶汽水，大家轮流发「摇一下」，不知道第几下会喷，喷到谁谁中招（可以设一条随机的小惩罚，比如真心话）。不涉及金币和道具。",
+  "homepage": "",
+  "license": "MIT",
+  "api": 2,
+  "settings": [
+    {"key": "shakes", "label": "最多摇几下必喷", "type": "int", "default": 6, "unit": "下", "desc": "2～12。会在第 1 下到这个数之间随机一下喷出来，越大越能撑"},
+    {"key": "no_twice", "label": "同一个人不能连着摇", "type": "bool", "default": true, "desc": "打开后要等别人摇过一下才能再摇"},
+    {"key": "penalties", "label": "中招以后", "type": "text", "default": "真心话：回答下一个人提的一个问题\n给群里你最想认识的人发一句「早点休息」\n用三个词形容自己今天的心情\n接下来三句话都要加「喵」\n说一件最近让你开心的小事", "desc": "一行一条，中招时随机挑一条；不想要惩罚就清空"},
+    {"key": "timeout", "label": "多久没人摇就收走", "type": "int", "default": 30, "unit": "分钟", "desc": "一瓶汽水放着没人摇，过了这么久就算作废，可以重新拿一瓶"}
+  ]
+}
