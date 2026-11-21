@@ -2,24 +2,37 @@
     主题只重新定义颜色变量（各页面都用变量，不用改），外加侧栏背景 --rail-bg、侧栏选中色 --rail-accent、页底纹理 --page-bg。
     选了主题就固定用这一套，不再跟着系统深色模式变；「默认」和「樱花」照旧跟随系统（樱花有浅色、深色两套）。对比度：正文/次要文字/强调色 ≥4.5:1，输入框边线 ≥3:1。 -#}
 {% macro theme_css() %}
-/* ---------- 睡莲：莫奈《睡莲》——明亮的蓝紫色池水，倒映着天光；花和叶只在边角轻轻晕开 ---------- */
-/* 侧栏是浅色的蓝紫，和页面柔和地连在一起；字用深色，晕染都放在没有文字的边角，不压字。 */
+/* ---------- 睡莲：莫奈《睡莲》——侧栏是一片用半透明短色块罩出来的池水（tools/paint_lily.py 生成 static/lily-pond.webp）：
+   上面是暖白的天光，往下转成水绿，右上角垂柳的倒影，一簇簇睡莲叶和粉白的花；上面一层光在水面上慢慢横着漂 ---------- */
+/* 侧栏是浅色的，字用深色：左边（菜单文字在的地方）再铺一层薄薄的浅色，笔触不抢字。 */
 :root[data-theme="lily"]{
-  --paper:#eef0f7; --surface:#fafbfe; --ink:#1f2238; --mute:#4f536f; --line:#d8dbec; --soft:#e4e6f3;
-  --field:#7f84a3; --card-line:#dcdfee; --shadow-sm:0 1px 3px 0 rgb(50 50 110 / .07),0 1px 2px -1px rgb(50 50 110 / .07);
-  --night:#dfe1f3; --night-ink:#242844; --night-mute:#4a4f72; --night-line:#c9cde6;
-  --dusk:#5b4c9e; --dusk-ink:#fff; --ok:#2b6e57; --warn:#88591a; --bad:#b0343a;
-  --rail-accent:#5b4c9e; --rail-hover:rgb(70 70 140 / .06); --rail-active:rgb(70 70 140 / .10);
+  --paper:#eef1f4; --surface:#fbfcfd; --ink:#1f2a33; --mute:#4c5966; --line:#d6dee3; --soft:#e3eaee;
+  --field:#7c8a94; --card-line:#dae2e6; --shadow-sm:0 1px 3px 0 rgb(40 70 80 / .07),0 1px 2px -1px rgb(40 70 80 / .07);
+  --night:#d9e6e6; --night-ink:#1f2f36; --night-mute:#3f5560; --night-line:rgb(60 100 110 / .22);
+  --dusk:#4f6fa0; --dusk-ink:#fff; --ok:#2b6e57; --warn:#88591a; --bad:#b0343a;
+  --rail-accent:#c06a8a; --rail-hover:rgb(255 255 255 / .38); --rail-active:rgb(255 255 255 / .58);
   --rail-bg:
-    radial-gradient(80% 10% at 100% 0%, rgb(236 206 222 / .60), transparent 100%),
-    radial-gradient(70% 8% at 0% 100%, rgb(186 210 196 / .55), transparent 100%),
-    radial-gradient(16% 2.4% at 86% 97%, rgb(236 184 204 / .55), transparent 100%),
-    linear-gradient(180deg, #e9e6f3 0%, #dfe1f3 50%, #d3d9f0 100%);
+    linear-gradient(90deg, rgb(244 246 247 / .62) 0%, rgb(244 246 247 / .45) 55%, rgb(244 246 247 / .08) 100%),
+    url("{{ url_for('static', filename='lily-pond.webp') }}") center top / 100% auto no-repeat,
+    #cfe0e0;
   --page-bg:
-    radial-gradient(45% 30% at 100% 0%, rgb(222 214 242 / .45), transparent 70%),
-    radial-gradient(40% 26% at 35% 100%, rgb(206 222 236 / .40), transparent 70%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.3 0 0 0 0 0.4 0 0 0 0 0.45 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    radial-gradient(48% 30% at 100% 0%, rgb(214 206 236 / .40), transparent 70%),
+    radial-gradient(42% 28% at 20% 100%, rgb(176 214 206 / .34), transparent 70%),
     var(--paper);
 }
+:root[data-theme="lily"] .rail a,:root[data-theme="lily"] .rail h3,:root[data-theme="lily"] .brand,:root[data-theme="lily"] .who,:root[data-theme="lily"] .themes summary{text-shadow:0 0 6px rgb(244 246 247 / .9)}
+@media (max-width:860px){
+  :root[data-theme="lily"] .msheet{background:linear-gradient(180deg, rgb(244 246 247 / .72), rgb(244 246 247 / .6)),
+    url("{{ url_for('static', filename='lily-pond.webp') }}") center 30% / cover no-repeat, #cfe0e0}
+}
+/* 页面大标题上方一道粉到水绿的短线（睡莲花 → 水） */
+:root[data-theme="lily"] main h1::before{content:"";display:block;width:28px;height:3px;border-radius:2px;background:linear-gradient(90deg,#d58aa6,#7fb3ad);margin:0 0 16px}
+/* 总览的大卡片：用这片池水，上面压一层蓝紫到水绿，白字看得清 */
+:root[data-theme="lily"] .ios .hero{background:linear-gradient(120deg, rgb(72 82 150 / .80) 0%, rgb(58 104 124 / .72) 60%, rgb(46 92 96 / .62) 100%),
+  url("{{ url_for('static', filename='lily-pond.webp') }}") center 22% / cover no-repeat;box-shadow:0 12px 28px -12px rgb(50 80 110 / .45)}
+:root[data-theme="lily"] .ios .hero::after{display:none}
+:root[data-theme="lily"] ::selection{background:rgb(192 106 138 / .2);color:inherit}
 /* ---------- 芭蕾：德加的粉彩舞者——粉蜡笔纸、舞裙的珊瑚粉、后台的炭灰与舞台脚灯 ---------- */
 :root[data-theme="ballet"]{
   --paper:#f6ece8; --surface:#fffaf8; --ink:#2b2228; --mute:#6a5862; --line:#ead8d2; --soft:#f1e1dc;
@@ -116,14 +129,67 @@
 /* 总览的大卡片：朱红到深红，右上角一枚淡金铜钱纹代替圆 */
 :root[data-theme="newyear"] .ios .hero{background:linear-gradient(135deg,#c42a30 0%,#951c22 55%,#5e1015 100%);box-shadow:0 12px 28px -12px rgb(150 28 34 / .5)}
 :root[data-theme="newyear"] .ios .hero::after{border-radius:0;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%23ffe7a0' stroke-opacity='.22'%3E%3Ccircle cx='50' cy='50' r='46' stroke-width='3'/%3E%3Ccircle cx='50' cy='50' r='38' stroke-width='1.5'/%3E%3Crect x='38' y='38' width='24' height='24' stroke-width='3'/%3E%3C/g%3E%3C/svg%3E") center / contain no-repeat;transform:rotate(12deg)}
-/* 选主题的小圆点 */
-.themes{margin:18px 8px 0;display:flex;align-items:center;gap:8px;white-space:nowrap;font-size:13px;color:var(--night-mute)}
-.themes form{display:flex;gap:6px;margin:0}
-.themes button{width:21px;height:21px;border-radius:50%;padding:0;cursor:pointer;border:2px solid var(--night-line);background:var(--sw);
-  transition:transform .12s ease}
-.themes button:hover{transform:scale(1.12)}
-.themes button[aria-pressed="true"]{border-color:var(--night-ink)}
-@media (prefers-reduced-motion: reduce){.themes button{transition:none}.themes button:hover{transform:none}}
+/* ---------- 星夜：梵高《星月夜》——侧栏是一幅用短笔触画出来的夜空（tools/paint_starry.py 生成 static/starry-sky.webp）：
+   顺着气流和漩涡走的钴蓝笔触、一圈圈光晕的星星和月亮、右下角深绿的柏树、底下的山丘和窗灯。
+   上面再叠一层流动的笔触（theme_js 里的画布），漩涡一直在慢慢转。页面是暖白的画布纹，群青强调色，金色点缀 ---------- */
+/* 画本身很亮：左边（菜单文字在的地方）压一层夜色，字才看得清；右边留着星星和柏树。 */
+:root[data-theme="starry"]{
+  --paper:#f4f1ea; --surface:#fdfbf6; --ink:#1d2233; --mute:#525a73; --line:#e3ddd0; --soft:#ece6da;
+  --field:#878372; --card-line:#e6e0d3; --shadow-sm:0 1px 3px 0 rgb(24 34 74 / .08),0 1px 2px -1px rgb(24 34 74 / .08);
+  --night:#13204e; --night-ink:#f1f3fc; --night-mute:#c3cbea; --night-line:rgb(190 205 255 / .22);
+  --dusk:#2f4ea0; --dusk-ink:#fff; --ok:#2a6b4f; --warn:#8a5d12; --bad:#b0352e;
+  --rail-accent:#f0c54e; --rail-hover:rgb(8 14 42 / .38); --rail-active:rgb(8 14 42 / .55);
+  --rail-bg:
+    linear-gradient(90deg, rgb(7 12 38 / .70) 0%, rgb(7 12 38 / .58) 55%, rgb(7 12 38 / .22) 100%),
+    linear-gradient(180deg, rgb(7 12 38 / .20) 0%, rgb(7 12 38 / .05) 35%, rgb(7 12 38 / .30) 100%),
+    url("{{ url_for('static', filename='starry-sky.webp') }}") center top / 100% auto no-repeat,
+    #13204e;
+  --page-bg:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.3 0 0 0 0 0.3 0 0 0 0 0.45 0 0 0 0.06 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    radial-gradient(48% 30% at 100% 0%, rgb(47 78 160 / .09), transparent 70%),
+    radial-gradient(40% 26% at 0% 100%, rgb(227 179 65 / .08), transparent 70%),
+    var(--paper);
+}
+/* 菜单项的字：夜空上加一点点阴影，笔触亮的地方也读得清 */
+:root[data-theme="starry"] .rail a,:root[data-theme="starry"] .rail h3,:root[data-theme="starry"] .brand,:root[data-theme="starry"] .who,:root[data-theme="starry"] .themes summary{text-shadow:0 1px 2px rgb(5 8 28 / .55)}
+/* 流动的画布在菜单文字下面：只在电脑宽度把文字那几块抬上去（手机上侧栏是顶栏 + 弹出菜单，画布不画，也别动它们的定位） */
+@media (min-width:861px){:root[data-theme="starry"] .rail .brand,:root[data-theme="starry"] .msheet > *,:root[data-theme="lily"] .rail .brand,:root[data-theme="lily"] .msheet > *{position:relative;z-index:1}}
+#flow{position:fixed;left:0;top:0;pointer-events:none;z-index:0}
+/* 手机上的弹出菜单是宽的：整幅画铺满，压暗得多一些 */
+@media (max-width:860px){
+  :root[data-theme="starry"] .msheet{background:
+    linear-gradient(180deg, rgb(7 12 38 / .72), rgb(7 12 38 / .62)),
+    url("{{ url_for('static', filename='starry-sky.webp') }}") center 20% / cover no-repeat, #13204e}
+}
+/* 页面大标题上方一道金色短线 */
+:root[data-theme="starry"] main h1::before{content:"";display:block;width:28px;height:3px;border-radius:2px;background:linear-gradient(90deg,#c99a2e,#ecc35a);margin:0 0 16px}
+/* 总览的大卡片：直接用这幅夜空，上面压一层群青 */
+:root[data-theme="starry"] .ios .hero{background:linear-gradient(120deg, rgb(26 44 120 / .78) 0%, rgb(14 22 62 / .70) 60%, rgb(8 12 36 / .55) 100%),
+  url("{{ url_for('static', filename='starry-sky.webp') }}") center 12% / cover no-repeat;box-shadow:0 12px 28px -12px rgb(24 34 90 / .5)}
+:root[data-theme="starry"] .ios .hero::after{display:none}
+/* 选中文字、滚动条也跟着配色 */
+:root[data-theme="starry"] ::selection{background:rgb(47 78 160 / .22);color:inherit}
+:root[data-theme="starry"]{scrollbar-color:#b9b2a2 transparent}
+:root[data-theme="starry"] .rail{scrollbar-color:rgb(190 205 255 / .35) transparent}
+/* 选主题：平时折成一行（当前主题的色块 + 名字），点开才列出全部 */
+.themes{margin:18px 0 0;font-size:13px;color:var(--night-mute)}
+.themes summary{display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:8px;cursor:pointer;list-style:none;color:var(--night-mute);
+  transition:background-color .15s ease,color .15s ease}
+.themes summary::-webkit-details-marker{display:none}
+.themes summary:hover{background:var(--rail-hover,rgba(255,255,255,.06));color:var(--night-ink)}
+.themes summary:focus-visible,.themes button:focus-visible{outline:2px solid var(--rail-accent,var(--night-ink));outline-offset:2px}
+.themes .now{color:var(--night-ink);font-weight:500}
+.themes .chev{margin-left:auto;width:14px;height:14px;flex:none;transition:transform .2s cubic-bezier(.22,1,.36,1)}
+.themes[open] .chev{transform:rotate(180deg)}
+.themes .dot{width:18px;height:18px;border-radius:50%;flex:none;background:var(--sw);box-shadow:inset 0 0 0 1.5px var(--night-line)}
+.themes form{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:6px 0 0}
+.themes button{display:flex;align-items:center;gap:8px;min-height:36px;padding:6px 8px;border:1px solid transparent;border-radius:8px;cursor:pointer;
+  background:none;color:var(--night-ink);font:inherit;font-size:13px;text-align:left;transition:background-color .15s ease,border-color .15s ease}
+.themes button:hover{background:var(--rail-hover,rgba(255,255,255,.06))}
+.themes button[aria-pressed="true"]{border-color:var(--night-line);background:var(--rail-active,rgba(255,255,255,.08));font-weight:600}
+.themes button[aria-pressed="true"] .dot{box-shadow:inset 0 0 0 1.5px var(--night-line),0 0 0 2px var(--rail-accent,var(--night-ink))}
+@media (prefers-reduced-motion: reduce){.themes summary,.themes button,.themes .chev{transition:none}}
+@media (max-width:860px){.themes summary,.themes button{min-height:44px}}
 #snow,#petals,#fortune{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:60}
 /* 新春的元宝、红包个头大，盖在字上挡视线（作者 2026-11-20 反馈）：压到内容后面，只在页面空白处飘，卡片、侧栏、字都在它上面 */
 #fortune{z-index:0}
@@ -132,22 +198,107 @@
 
 {% macro theme_picker(current) %}
 {%- set opts = [("", "默认", "conic-gradient(#1d1f33 0 50%, #c43a63 0)"),
-                ("lily", "睡莲", "conic-gradient(#d3d9f0 0 33%, #5b4c9e 0 66%, #e2a9bc 0)"),
+                ("starry", "星夜", "conic-gradient(#18224a 0 40%, #2f4ea0 0 72%, #e8bd4f 0)"),
+                ("lily", "睡莲", "conic-gradient(#cfe0e0 0 40%, #4f6fa0 0 70%, #d58aa6 0)"),
                 ("ballet", "芭蕾", "conic-gradient(#2b2630 0 33%, #f4ba84 0 66%, #e8a4b4 0)"),
-                ("xmas", "圣诞", "conic-gradient(#15301f 0 33%, #a8233a 0 66%, #d9b44a 0)"),
                 ("sakura", "樱花", "conic-gradient(#231c20 0 33%, #a8355a 0 66%, #f3c6d3 0)"),
+                ("xmas", "圣诞", "conic-gradient(#15301f 0 33%, #a8233a 0 66%, #d9b44a 0)"),
                 ("newyear", "新春", "conic-gradient(#7a1b20 0 33%, #c42a30 0 66%, #f0c860 0)")] -%}
-<div class="themes"><span id="themes-label">外观</span>
-  <form method="post" action="{{ url_for('theme_set') }}" aria-labelledby="themes-label">{{ csrf() }}
+{%- set cur = (opts|selectattr(0, "equalto", current)|list or [opts[0]])[0] -%}
+{#- 平时折起来只占一行；点开在侧栏里列出所有主题（色块 + 名字），点一个就换 -#}
+<details class="themes">
+  <summary aria-label="外观：现在是{{ cur[1] }}，点开换主题"><span class="dot" style="--sw:{{ cur[2] }}" aria-hidden="true"></span><span>外观</span><span class="now">{{ cur[1] }}</span>
+    <svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></summary>
+  <form method="post" action="{{ url_for('theme_set') }}" aria-label="换外观">{{ csrf() }}
     {%- for key, name, sw in opts %}
-    <button type="submit" name="theme" value="{{ key }}" style="--sw:{{ sw }}" title="{{ name }}" aria-label="{{ name }}" aria-pressed="{{ 'true' if current == key else 'false' }}"></button>
+    <button type="submit" name="theme" value="{{ key }}" aria-label="{{ name }}" aria-pressed="{{ 'true' if current == key else 'false' }}"><span class="dot" style="--sw:{{ sw }}" aria-hidden="true"></span>{{ name }}</button>
     {%- endfor %}
   </form>
-</div>
+</details>
 {% endmacro %}
 
 {% macro theme_js(current) %}
-{%- if current == "xmas" %}
+{%- if current in ("starry", "lily") %}
+<canvas id="flow" aria-hidden="true"></canvas>
+<script>
+/* 星夜：侧栏的天空在流动。几百道短笔触顺着跟底图同一个流场（横向气流 + 漩涡 + 绕着星星转的光晕）慢慢走，
+   拖出会慢慢干掉的颜料痕迹（destination-out 一点点擦掉旧的），漩涡看起来一直在转。
+   每道笔触走得慢、活得久，亮度不忽明忽暗（作者反馈「闪着有点晃」），只在出生和消失时慢慢淡入淡出。
+   画布只盖住侧栏，在菜单文字下面（.rail > * 抬到上面一层）；左边有字的地方笔触淡一些。
+   手机宽度（侧栏变成顶栏）、系统「减少动态效果」都不画；标签页切走时暂停。流场和 tools/paint_starry.py 里的 field() 一致。 */
+(function(){
+  if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  var rail = document.getElementById('rail'), cv = document.getElementById('flow');
+  if (!rail || !cv || !cv.getContext) return;
+  var cx = cv.getContext('2d'), W = 520, H = 1800, ps = [], rw = 0, rh = 0, dpr = 1, run = true, sc = 1;
+  var LILY = document.documentElement.getAttribute('data-theme') === 'lily';   // 睡莲：水面上的光横着慢慢漂，没有漩涡
+  var VOR = [[.70,.30,.34,1],[.30,.47,.22,-1],[.78,.66,.20,1]];
+  var LIGHTS = [[.80,.17,.055],[.66,.40,.040],[.88,.52,.045],[.72,.78,.035],[.92,.90,.030],[.82,.055,.085]];
+  var BLUE = ['150,182,222','186,206,226','104,148,210','78,122,198','214,226,214'], GOLD = ['248,226,140','242,205,74','255,240,190'];
+  function field(x, y){
+    if (LILY) return .10 * Math.sin(y * 18 + x * 4) + .05 * Math.sin(y * 41 - x * 7);
+    var a = .35 * Math.sin(y * 9 + x * 3) + .18 * Math.sin(y * 23 - x * 5), vx = Math.cos(a), vy = Math.sin(a), i, dx, dy, d, w;
+    for (i = 0; i < VOR.length; i++){
+      dx = x - VOR[i][0]; dy = (y - VOR[i][1]) * H / W; d = Math.hypot(dx, dy);
+      if (d < VOR[i][2] * 1.6){ w = Math.pow(1 - d / (VOR[i][2] * 1.6), 1.3) * 2.4; var n = d || 1; vx += w * -dy * VOR[i][3] / n; vy += w * dx * VOR[i][3] / n; }
+    }
+    for (i = 0; i < LIGHTS.length; i++){
+      dx = x - LIGHTS[i][0]; dy = (y - LIGHTS[i][1]) * H / W; d = Math.hypot(dx, dy);
+      if (d < LIGHTS[i][2] * 2.2){ w = (1 - d / (LIGHTS[i][2] * 2.2)) * 3; vx += w * -dy / (d || 1); vy += w * dx / (d || 1); }
+    }
+    return Math.atan2(vy, vx);
+  }
+  function near(x, y){
+    var best = 0;
+    for (var i = 0; i < LIGHTS.length; i++){ var d = Math.hypot(x - LIGHTS[i][0], (y - LIGHTS[i][1]) * H / W); best = Math.max(best, 1 - d / (LIGHTS[i][2] * 2.4)); }
+    return best;
+  }
+  function spawn(p){
+    p = p || {};
+    p.x = Math.random(); p.y = Math.random() * Math.min(1, rh / (H * sc));
+    p.life = 0; p.max = 320 + Math.random() * 380; p.w = (1.8 + Math.random() * 1.6);
+    if (LILY){
+      p.c = ['255,255,255','248,246,252','236,232,248','226,240,238','250,236,240'][(Math.random() * 5) | 0];
+      p.a = (.28 + Math.random() * .30) * (p.x < .62 ? .7 : 1); p.w = 1.4 + Math.random() * 1.6;
+    } else {
+    var g = near(p.x, p.y);
+    p.c = g > .3 && Math.random() < g ? GOLD[(Math.random() * GOLD.length) | 0] : BLUE[(Math.random() * BLUE.length) | 0];
+    p.a = (.30 + Math.random() * .30) * (p.x < .62 ? .55 : 1);
+    }
+    return p;
+  }
+  function size(){
+    var r = rail.getBoundingClientRect();
+    if (innerWidth <= 860 || r.width < 120){ cv.style.display = 'none'; rw = 0; return; }
+    cv.style.display = ''; dpr = Math.min(window.devicePixelRatio || 1, 2);
+    rw = r.width; rh = innerHeight; sc = rw / W;
+    cv.style.width = rw + 'px'; cv.style.height = rh + 'px'; cv.width = rw * dpr; cv.height = rh * dpr;
+    cx.setTransform(dpr, 0, 0, dpr, 0, 0); cx.lineCap = 'round';
+    var want = Math.round(rw * rh / 1100); while (ps.length < want) ps.push(spawn()); ps.length = want;
+  }
+  function frame(){
+    if (!run) return;
+    if (rw){
+      cx.globalCompositeOperation = 'destination-out'; cx.fillStyle = 'rgba(0,0,0,.035)'; cx.fillRect(0, 0, rw, rh);
+      cx.globalCompositeOperation = 'source-over';
+      var step = .55 / W;
+      for (var i = 0; i < ps.length; i++){
+        var p = ps[i], a = field(p.x, p.y), ox = p.x * rw, oy = p.y * H * sc;
+        p.x += Math.cos(a) * step; p.y += Math.sin(a) * step * W / H; p.life++;
+        var k = Math.min(1, p.life / 60, (p.max - p.life) / 60);          // 生出来、快走完时慢慢淡入淡出，中间亮度不变（不闪）
+        cx.strokeStyle = 'rgba(' + p.c + ',' + (p.a * k).toFixed(3) + ')'; cx.lineWidth = p.w;
+        cx.beginPath(); cx.moveTo(ox, oy); cx.lineTo(p.x * rw, p.y * H * sc); cx.stroke();
+        if (p.life > p.max || p.x < -.02 || p.x > 1.02 || p.y * H * sc > rh || p.y < 0) spawn(p);
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+  size(); addEventListener('resize', size);
+  document.addEventListener('visibilitychange', function(){ run = !document.hidden; if (run) frame(); });
+  frame();
+})();
+</script>
+{%- elif current == "xmas" %}
 <canvas id="snow" aria-hidden="true"></canvas>
 <script>
 /* 圣诞主题的飘雪：稀疏、慢、半透明，不挡点击；系统设了「减少动态效果」就不飘；标签页切走时暂停。 */

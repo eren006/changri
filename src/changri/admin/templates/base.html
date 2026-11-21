@@ -59,6 +59,11 @@ a{color:inherit}
 .who button{background:none;border:0;color:var(--night-ink);cursor:pointer;font:inherit;text-decoration:underline;text-underline-offset:3px;padding:0}
 
 main{padding:60px clamp(24px,5vw,72px) 104px;max-width:1080px;width:100%}
+main{position:relative}
+.mod-help{position:absolute;top:18px;right:clamp(24px,5vw,72px);display:inline-flex;align-items:center;gap:6px;padding:5px 12px 5px 8px;border:1px solid var(--card-line);border-radius:999px;
+  background:var(--surface);color:var(--mute);font-size:13px;text-decoration:none;box-shadow:var(--shadow-sm);transition:color .15s ease,border-color .15s ease}
+.mod-help:hover{color:var(--dusk);border-color:var(--dusk)}
+.mod-help svg{width:16px;height:16px}
 h1{font:800 40px/1.2 var(--serif);letter-spacing:.01em;margin:0 0 12px;color:var(--ink)}
 .lede{margin:0 0 48px;color:var(--mute);font-size:15px;line-height:1.8;max-width:62ch}
 h2{font:700 23px/1.3 var(--serif);letter-spacing:.01em;margin:0 0 20px}
@@ -352,9 +357,12 @@ tr:last-child td{border-bottom:0}
     {% if auto_note %}<form class="au-note{{ ' bad' if auto_note.kind == 'failed' }}" method="post" action="{{ root_url('update_auto_seen') }}" role="status">{{ csrf() }}
       <input type="hidden" name="next" value="{{ (request.script_root ~ request.full_path) if request.method == 'GET' else '' }}">
       <p>{% if auto_note.kind == 'done' %}长日bot 已在 {{ auto_note.ts|datetimefmt }} 自动从 {{ auto_note.from }} 更新到 {{ auto_note.to }}，检查都通过了。{% else %}{{ auto_note.message }}{% endif %}
-        <a href="{{ root_url('update_page') }}">去「更新」页看看</a></p>
+        <a href="{{ root_url('update_page') }}">{{ '看这次更新了什么' if auto_note.kind == 'done' else '去「更新」页看看' }}</a></p>
       <button class="btn ghost" type="submit">知道了</button></form>{% endif %}
     {% for m in get_flashed_messages() %}<p class="flash" role="status">{{ m }}</p>{% endfor %}
+    {#- 个性化模块的页面右上角放「帮助」，链到介绍页对应的一节（features/modhelp） -#}
+    {%- set _mh = request.endpoint and ({'longterm':'longterm','paidan':'paidan','storycal':'storycal'}.get(request.endpoint.split('_')[0])) -%}
+    {%- if _mh %}<a class="mod-help" href="{{ url_for('modules_help') }}#m-{{ _mh }}"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M6.2 6.3a1.9 1.9 0 0 1 3.7.5c0 1.2-1.9 1.6-1.9 2.7"/><circle cx="8" cy="11.6" r=".4" fill="currentColor"/></svg>帮助</a>{% endif %}
     <div class="ui">{% block body %}{% endblock %}</div>
   </main>
 </div>

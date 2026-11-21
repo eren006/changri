@@ -39,6 +39,14 @@
   <h2>当前版本</h2>
   <p class="tabular"><b>{{ current }}</b></p>
   <form method="post" action="{{ url_for('update_check') }}">{{ csrf() }}<button class="btn" type="submit">检查更新</button></form>
+  {% set mf = mine|map(attribute="features")|sum(start=[]) %}{% set mx = mine|map(attribute="fixes")|sum(start=[]) %}
+  {% if mf or mx %}
+  <p class="chg-k chg-h">{% if since %}从 {{ since }} 更新到 {{ current }}，这几版更新了什么{% else %}这一版更新了什么{% endif %}</p>
+  <div class="chg">
+    {% if mf %}<p class="chg-k"><span class="dot ok"></span>新功能</p><ul>{% for x in mf %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+    {% if mx %}<p class="chg-k"><span class="dot warn"></span>修 bug</p><ul>{% for x in mx %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+  </div>
+  {% endif %}
 </section>
 
 {% if info %}

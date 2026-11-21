@@ -1,0 +1,74 @@
+{% extends "base.html" %}{% block title %}个性化模块{% endblock %}
+{% block head %}<style>
+.mh-toc{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 8px}
+.mh-toc a{padding:6px 14px;border:1px solid var(--card-line);border-radius:999px;text-decoration:none;color:var(--ink);font-size:14px;background:var(--surface)}
+.mh-toc a:hover{border-color:var(--dusk);color:var(--dusk)}
+.mh{scroll-margin-top:24px}
+.mh .st{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--mute);font-weight:400;margin-left:10px}
+.mh dl{display:grid;grid-template-columns:7.5em 1fr;gap:10px 18px;margin:14px 0 0}
+.mh dt{color:var(--mute);font-size:14px}
+.mh dd{margin:0}
+.mh code{white-space:nowrap;font:500 .92em var(--sans);padding:1px 7px;margin:0 1px;border-radius:6px;background:var(--soft);color:var(--ink)}
+.mh .acts{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+@media (max-width:600px){.mh dl{grid-template-columns:1fr;gap:2px}.mh dd{margin-bottom:10px}}
+</style>{% endblock %}
+{% block body %}
+<h1>个性化模块</h1>
+<p class="lede">这几个是给特定玩法准备的附加功能，平时用不到，所以<b>默认都关着</b>，也不会被「全部恢复默认设置」打开。要用哪个，到「功能与设置 → 个性化模块」打开，点「重启并生效」。关掉以后数据都留着，再打开一切照旧。</p>
+<nav class="mh-toc" aria-label="跳到">
+  <a href="#m-longterm">长期群</a><a href="#m-paidan">排单</a><a href="#m-letters">写信综</a><a href="#m-storycal">故事历</a>
+</nav>
+
+{% macro status(m) %}<span class="st"><span class="dot {{ 'ok' if m.on else '' }}"></span>{{ '已打开' if m.on else '没打开' }}</span>{% endmacro %}
+{% macro acts(m, label) %}<div class="acts">{% if m.page %}<a class="btn" href="{{ m.page }}">{{ label }}</a>{% endif %}<a class="btn {{ 'ghost' if m.page }}" href="{{ url_for('extensions_page') }}">{{ '到「功能与设置」关掉' if m.on else '到「功能与设置」打开' }}</a></div>{% endmacro %}
+
+<section class="mh" id="m-longterm">
+  <h2>长期群{{ status(mods.longterm) }}</h2>
+  <p>恋综、跑团之外的第三种群模式，给<b>长期开着、不分季度</b>的群用：没有时间线和房间，大家写戏、聊天，按写了多少字换货币，再拿货币买东西、合成、做检定。</p>
+  <dl>
+    <dt>适合</dt><dd>长期的写手群、陪伴群、养成类的群；想按字数发奖励、又不想开一季恋综的。</dd>
+    <dt>怎么开始</dt><dd>后台「长期群」页建一个长期群（可以建好几个），QQ 群里管理员发 <code>/模式 长期群</code>、<code>/切换长期群 名字</code>。之后群里发 <code>/长期群帮助</code> 能看到全部指令。</dd>
+    <dt>玩家做什么</dt><dd>先发 <code>/注册 名字</code>；写完的戏合并转发到群里，回复它发 <code>/字数统计</code> 交字数（默认要管理员在后台批准才入账）；<code>/签到</code>、<code>/商城</code>、<code>/赠送</code>、<code>/合成</code>；<code>/ra</code> <code>/rt</code> 读自己的属性面板。</dd>
+    <dt>管理员做什么</dt><dd>后台定货币和「多少字换多少」、属性、道具和价格、签到奖励、KPI；在「总览」批准字数、看所有人的动态；群里 <code>/调整</code>、<code>/发放</code> 直接加减。</dd>
+    <dt>跟恋综的关系</dt><dd>数据完全分开：角色、货币、道具都不通用。切到长期群模式的群里，恋综指令不响应。</dd>
+  </dl>
+  {{ acts(mods.longterm, "打开长期群") }}
+</section>
+
+<section class="mh" id="m-paidan">
+  <h2>排单{{ status(mods.paidan) }}</h2>
+  <p>给<b>接稿的人</b>（下面叫 owner）管理订单：客户在群里按格式下单、补图，机器人登记单号、转到对应的工作群，算额度和单口，每天提醒到期和工期。</p>
+  <dl>
+    <dt>适合</dt><dd>接画稿、修图、手工这类按「张」卖的人，有好几种业务、好几个客户群。</dd>
+    <dt>几个词</dt><dd><b>业务</b>：一种服务（A、B、C），各有工作群、工期、默认单口；<b>额度</b>：客户买的一笔张数和到期日；<b>单口</b>：同一客户同一业务最多同时几单；<b>散单</b>：没有客户档案的人凭兑换码下单。</dd>
+    <dt>怎么开始</dt><dd>后台「排单」页建业务、生成绑定码；在工作群、客户群、散单群里发 <code>绑定 绑定码</code>；owner 本人也绑一次。</dd>
+    <dt>客户做什么</dt><dd><code>下单</code>（照格式填）、<code>补充 单号 …</code>、<code>已上传所有图 单号</code>、<code>我的额度</code>。</dd>
+    <dt>owner 做什么</dt><dd>在工作群回复成品图 <code>发送 单号</code> 交付，再到网页上扣张数；可以按天暂停，工期自动顺延。</dd>
+  </dl>
+  {{ acts(mods.paidan, "打开排单") }}
+</section>
+
+<section class="mh" id="m-letters">
+  <h2>写信综{{ status(mods.letters) }}</h2>
+  <p>恋综里的<b>正式信件</b>玩法：比短信正式、比心动信公开，按字数给写信币赏金，还有偷看和截信的道具。</p>
+  <dl>
+    <dt>适合</dt><dd>想让玩家多写长篇书信、制造信件戏剧性的恋综季。</dd>
+    <dt>玩家做什么</dt><dd>在个人群发 <code>发送信件</code>，写【收件人】【内容】，可选【日期】【附件】【署名】，收件人在个人群收到（太长时画成信纸）。<code>信件状态</code> 看今天还能寄几封、写信币多少。</dd>
+    <dt>道具</dt><dd>「望远镜」抄一份某人寄出的下一封信；「羽毛笔」把某人的下一封信截到自己手里，<code>羽毛笔修改</code> 改完照常寄出。写信币和两个道具第一次用到时自动建好。</dd>
+    <dt>设置</dt><dd>每天封数、冷却、写信币赏金在「功能与设置」的「写信综」组里。没有单独的后台页面。收尾时信件清空。</dd>
+  </dl>
+  {{ acts(mods.letters, "") }}
+</section>
+
+<section class="mh" id="m-storycal">
+  <h2>故事历{{ status(mods.storycal) }}</h2>
+  <p>让恋综的「天」对上<b>故事里的日期</b>：把现实里的一天（D）平分成若干故事日，比如 D0 = 康熙十四年 3月1日–3月31日。</p>
+  <dl>
+    <dt>适合</dt><dd>古风、年代、跨度很长的剧情：现实一天要演完故事里的一个月。</dd>
+    <dt>打开以后</dt><dd>换天公告、季度状态会带上故事日期；开房间时写故事里的某一天（比如「3月5日」），不再写钟点。</dd>
+    <dt>不变的</dt><dd>心动信、每日上限、自动换天照旧按 D 和现实时间走。</dd>
+    <dt>设置</dt><dd>后台「故事历」页定每个 D 对应的故事日期范围。</dd>
+  </dl>
+  {{ acts(mods.storycal, "故事历设置") }}
+</section>
+{% endblock %}

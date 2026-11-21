@@ -29,7 +29,7 @@ def register(app, login_required):
     @app.route("/longterm")
     @login_required
     def longterm_page():
-        return render_template("longterm.html", groups=lt.list_groups())
+        return render_template("longterm.html", lt_groups=lt.list_groups())
 
     @app.post("/longterm/new")
     @login_required
@@ -69,10 +69,10 @@ def register(app, login_required):
                        members=[m for m in members if not q or q in m["name"] or q in m["aliases"]
                                 or any(q in str(v) for v in m["info"].values())])
         elif tab == "words":
-            ctx.update(subs=lt.submissions(gid, 100), unclaimed=lt.list_unclaimed(gid), all_members=lt.list_members(gid))
+            ctx.update(sub_list=lt.submissions(gid, 100), unclaimed=lt.list_unclaimed(gid), all_members=lt.list_members(gid))
         elif tab == "items":
             rs = lt.recipes(gid)
-            ctx.update(items=lt.item_defs(gid), edit_item=lt.item_def(gid, request.args.get("item", "")),
+            ctx.update(item_list=lt.item_defs(gid), edit_item=lt.item_def(gid, request.args.get("item", "")),
                        recipes=rs, edit_recipe=next((r for r in rs if r["name"] == request.args.get("recipe")), None))
         else:
             ctx.update(defs=lt.attr_defs(gid), checkins_today=lt.checkins_today(gid), kpi_periods=lt.KPI_PERIODS)

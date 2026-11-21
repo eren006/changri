@@ -15,7 +15,7 @@ from changri.admin.common import GLOBAL_ENDPOINTS, HIDDEN_FIELDS, LOCK_AFTER, LO
 from changri.core.textutil import hm_text, next_day_mark
 
 THEME_COOKIE = "admin_theme"
-THEMES = {"lily", "ballet", "xmas", "sakura", "newyear"}          # 样式在 templates/_themes.html；空 = 默认
+THEMES = {"starry", "lily", "ballet", "xmas", "sakura", "newyear"}          # 样式在 templates/_themes.html；空 = 默认
 
 
 def create_app() -> Flask:
@@ -118,7 +118,7 @@ def create_app() -> Flask:
 
     @app.post("/theme")
     def theme_set():
-        """后台外观（睡莲 / 芭蕾 / 圣诞 / 樱花 / 默认）：记在这个浏览器的 cookie 里，回到刚才的页面。"""
+        """后台外观（星夜 / 睡莲 / 芭蕾 / 圣诞 / 樱花 / 新春 / 默认）：记在这个浏览器的 cookie 里，回到刚才的页面。"""
         from urllib.parse import urlparse
         theme = request.form.get("theme", "")
         ref = urlparse(request.referrer or "")
@@ -506,9 +506,14 @@ def create_app() -> Flask:
             except updater.UpdateError as e:
                 flash(str(e))
         from changri.core import autoupdate
-        return render_template("update.html", current=updater.current_version(), info=info, done=done,
+        cur = updater.current_version()
+        auto = autoupdate.status(info)
+        last = auto.get("last") or {}
+        since = last.get("from", "") if last.get("to") == cur else ""
+        mine = updater.installed_changes(cur, since)          # 后台每次检查更新时存的说明（启动 2 分钟后、之后每 6 小时）；打开页面不联网
+        return render_template("update.html", current=cur, info=info, done=done, mine=mine, since=since if len(mine) > 1 else "",
                                skipped=get_config("update_skip", ""), failed=failed.read_text(encoding="utf-8") if failed.exists() else "",
-                               auto=autoupdate.status(info))
+                               auto=auto)
 
     @app.post("/update/auto")
     @owner_required

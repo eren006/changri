@@ -257,6 +257,29 @@ class PageTests(Base):
         webusers.create_user("boss", "longenough1", "owner")
         self.c.post("/login", data={"username": "boss", "password": "longenough1", "_csrf": token(self.c)})
 
+    def test_update_page_lists_what_this_version_changed(self):
+        """更新装好以后（没有更新的版本了），「更新」页照样列出现在这一版更新了什么；自动更新跳过了几版的，列出这几版的。"""
+        changes = [{"version": "9.0.2", "features": ["新功能二"], "fixes": ["修二"]},
+                   {"version": "9.0.1", "features": ["新功能一"], "fixes": []},
+                   {"version": "9.0.0", "features": ["旧的"], "fixes": []}]
+        updater.remember_changes(updater.parse_changes(changes))
+        set_config("update_latest", "")
+        with mock.patch.object(updater, "current_version", return_value="9.0.2"):
+            html = self.c.get("/update").get_data(as_text=True)
+            self.assertIn("这一版更新了什么", html)
+            self.assertIn("新功能二", html)
+            self.assertNotIn("新功能一", html)
+            auto_file = autoupdate.DATA_DIR / "update_auto.json"
+            auto_file.write_text(json.dumps({"ts": time.time(), "from": "9.0.0", "to": "9.0.2"}), encoding="utf-8")
+            try:
+                html = self.c.get("/update").get_data(as_text=True)
+            finally:
+                auto_file.unlink()
+            self.assertIn("从 9.0.0 更新到 9.0.2", html)
+            self.assertIn("新功能一", html)
+            self.assertNotIn("旧的", html)
+        self.assertEqual(updater.installed_changes("8.0.0"), [])                     # 没存过这一版的说明：什么都不列
+
     def test_update_page_shows_and_saves_settings(self):
         html = self.c.get("/update").get_data(as_text=True)
         self.assertIn("自动更新", html)

@@ -172,6 +172,29 @@ def pending_changes(changes: list[dict], current: str, latest: str) -> list[dict
     return sorted(rows, key=lambda c: parse_version(c["version"]), reverse=True)
 
 
+def remember_changes(changes: list[dict]) -> None:
+    """每次检查更新都把各版本的「更新了什么」存一份（全局设置 update_changes）。
+    更新装好以后就没有「新版本」了，「更新」页靠这份说明「现在这一版更新了什么」（以前更新完就看不到了）。"""
+    import json
+    from .db import set_config
+    if changes:
+        set_config("update_changes", json.dumps(changes[:30], ensure_ascii=False))
+
+
+def installed_changes(current: str, since: str = "") -> list[dict]:
+    """现在这一版更新了什么：since（上一次自动更新前的版本）比当前旧，就列出 since 之后到当前的每一版；否则只列当前这一版。新的在前。"""
+    import json
+    from .db import get_config
+    try:
+        changes = parse_changes(json.loads(get_config("update_changes", "") or "[]"))
+    except ValueError:
+        return []
+    cur = parse_version(current)
+    low = parse_version(since) if since and is_newer(current, since) else None
+    rows = [c for c in changes if (low < parse_version(c["version"]) <= cur if low else parse_version(c["version"]) == cur)]
+    return sorted(rows, key=lambda c: parse_version(c["version"]), reverse=True)
+
+
 def update_badge() -> str:
     """设置平台「更新」入口要不要出小红点：有比当前新的版本、而且主人没点过「这个版本先不更新」，返回那个版本号；否则空。"""
     from .db import get_config
@@ -187,6 +210,7 @@ def check(url: str | None = None) -> dict:
     rt_needed = layout.INSTALLED and not (layout.RUNTIMES / m["runtime"]).is_dir()
     size = m["app"]["size"] + (m["runtimes"].get(layout.platform_tag(), {}).get("size", 0) if rt_needed else 0)
     pend = pending_changes(m["changes"], cur, m["version"])
+    remember_changes(m["changes"])
     feats = [x for c in pend for x in c["features"]]           # 跳过了几个版本的，合成一份列出来，不按版本分
     fixes = [x for c in pend for x in c["fixes"]]
     return {**m, "current": cur, "newer": is_newer(m["version"], cur), "size": size, "runtime_needed": rt_needed, "pending": pend,

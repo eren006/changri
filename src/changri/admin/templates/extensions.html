@@ -161,7 +161,7 @@ function copyEx(b){var t=b.previousElementSibling.textContent;if(navigator.clipb
 <textarea id="aip" readonly style="width:100%;height:420px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font:13px/1.55 ui-monospace,Menlo,monospace">{{ ai_prompt }}</textarea>
 {% else %}
 {% if tab == 'aux' %}<p class="note" style="margin:0 0 12px">辅助功能可以开关：官方扩展和你自己装的扩展。关着的功能，对应的指令和后台页面都不会出现。</p>
-{% elif tab == 'custom' %}<p class="note" style="margin:0 0 12px">个性化模块是别人点名要的、非常小的定制功能，平时用不上。<b>每个都默认关着</b>，点「全部恢复默认设置」时也会全部关回去；要用哪个自己打开开关，再点「重启并生效」。</p>
+{% elif tab == 'custom' %}<p class="note" style="margin:0 0 12px">个性化模块是别人点名要的、非常小的定制功能，平时用不上。<b>每个都默认关着</b>，点「全部恢复默认设置」时也会全部关回去；要用哪个自己打开开关，再点「重启并生效」。<a href="{{ url_for('modules_help') }}">看每个模块是干嘛的</a></p>
 {% else %}<p class="note" style="margin:0 0 12px">核心功能一直开着，不能关；点「进入设置」调这个功能的设置。</p>{% endif %}
 <div class="bar">
   {% if owner and cur == 'aux' %}

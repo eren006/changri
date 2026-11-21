@@ -4,13 +4,13 @@
 <p class="lede">恋综、跑团之外的第三种群模式：没有季度和时间线，玩家注册后交字数换货币，有属性面板、背包、商城。可以建好几个，彼此不相通。</p>
 
 <section>
-  <div class="sec-head"><h2>我的长期群<span class="n">{{ groups|length }}</span></h2>
+  <div class="sec-head"><h2>我的长期群<span class="n">{{ lt_groups|length }}</span></h2>
     <details class="panel"><summary class="btn sm">新建</summary>
       <form class="inline" method="post" action="{{ url_for('longterm_new') }}" style="margin-top:10px">{{ csrf() }}
         <label>名字<input type="text" name="name" required maxlength="16" placeholder="春日长期群" style="width:200px"></label><button class="btn sm">建好</button></form>
     </details></div>
-  {% if groups %}
-  <div class="rowlist">{% for g in groups %}
+  {% if lt_groups %}
+  <div class="rowlist">{% for g in lt_groups %}
     <div class="row"><div><a href="{{ url_for('longterm_group', gid=g.id) }}"><b>{{ g.name }}</b></a>{% if g.n_pending %} <span class="tag">{{ g.n_pending }} 次字数等批准</span>{% endif %}
       <div class="muted">{{ g.n_members }} 人 · {{ g.currency }} · 每 {{ g.chars_per_step }} 字换 {{ g.coins_per_step }}</div></div>
       <div class="acts"><a class="btn sm ghost" href="{{ url_for('longterm_group', gid=g.id) }}">打开</a></div></div>

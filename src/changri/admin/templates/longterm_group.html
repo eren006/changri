@@ -127,11 +127,11 @@ details.lt-add>summary{cursor:pointer;display:inline-block}
 </section>
 
 <section>
-  <div class="sec-head"><h2>所有字数统计<span class="n">最近 {{ subs|length }} 次</span></h2></div>
-  {% if subs %}
+  <div class="sec-head"><h2>所有字数统计<span class="n">最近 {{ sub_list|length }} 次</span></h2></div>
+  {% if sub_list %}
   <div class="tablewrap"><table class="rt">
     <tr><th>编号</th><th>时间</th><th>谁交的</th><th>新记字数</th><th>状态</th></tr>
-    {% for s in subs %}
+    {% for s in sub_list %}
     <tr><td class="tabular"><a href="{{ url_for('longterm_submission', sid=s.id) }}">#{{ s.id }}</a></td><td class="tabular">{{ s.ts|ts }}</td><td>{{ s.submitter_name or '管理员' }}</td>
       <td class="tabular">{{ s.total_chars }}</td><td>{{ {'pending':'等批准','approved':'已入账','rejected':'驳回'}[s.status] }}</td></tr>
     {% endfor %}
@@ -141,11 +141,11 @@ details.lt-add>summary{cursor:pointer;display:inline-block}
 
 {% elif tab == 'items' %}
 <section>
-  <div class="sec-head"><h2>道具<span class="n">{{ items|length }} 种 · {{ items|selectattr('on_sale')|list|length }} 种在卖</span></h2></div>
-  {% if items %}
+  <div class="sec-head"><h2>道具<span class="n">{{ item_list|length }} 种 · {{ item_list|selectattr('on_sale')|list|length }} 种在卖</span></h2></div>
+  {% if item_list %}
   <div class="tablewrap"><table class="rt">
     <tr><th>道具</th><th>使用效果</th><th>商城</th><th></th></tr>
-    {% for d in items %}
+    {% for d in item_list %}
     <tr><td><b>{{ d.name }}</b>{% if d.description %}<div class="muted">{{ d.description }}</div>{% endif %}</td>
       <td>{{ d.effects or '—' }}</td>
       <td>{% if d.on_sale %}{{ d.price }} {{ g.currency }}<div class="muted">库存 {{ '不限' if d.stock < 0 else d.stock }}{% if d.limit_total %} · 每人限 {{ d.limit_total }}{% endif %}{% if d.limit_daily %} · 每天限 {{ d.limit_daily }}{% endif %}</div>{% else %}<span class="muted">没上架</span>{% endif %}</td>

@@ -125,6 +125,16 @@ class AdminTests(unittest.TestCase):
         self.assertIn('id="fortune"', html)
         self.assertNotIn('id="snow"', html)
         self.assertNotIn('id="petals"', html)
+        self.c.post("/theme", data={"theme": "starry", "_csrf": tok})                  # 星夜：页面上闪星星，别的都不飘
+        html = self.c.get("/season").get_data(as_text=True)
+        self.assertIn('data-theme="starry"', html)
+        self.assertIn('aria-label="星夜" aria-pressed="true"', html)
+        self.assertIn('id="flow"', html)                                              # 侧栏夜空流动（页面上不再闪星星）
+        self.assertNotIn('id="stars"', html)
+        self.assertNotIn('id="snow"', html)
+        self.assertNotIn('id="fortune"', html)
+        self.assertIn('<details class="themes">', html)                               # 平时折起来
+        self.assertIn('<span class="now">星夜</span>', html)                          # 折起来那一行写着现在的主题
         self.c.post("/theme", data={"theme": "", "_csrf": tok})                        # 切回原来的样子
         html = self.c.get("/season").get_data(as_text=True)
         self.assertIn('<html lang="zh-CN">', html)
