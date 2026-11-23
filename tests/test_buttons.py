@@ -161,6 +161,50 @@ class ButtonsE2E(unittest.TestCase):
         asyncio.new_event_loop().run_until_complete(handle_event(self.bot, ev))
         return [_parts(m) for m in SENT[before:]]
 
+    def test_help_hub(self):
+        """「帮助」：最上层入口，一排直接发出的按钮；只列开着的功能；后面跟别的字不理。"""
+        out = self.say("帮助")
+        self.assertEqual(len(out), 1)
+        text, btns = out[0]
+        self.assertIn("帮助", text)
+        for b in (("格式", "格式", True), ("我的", "我的", True), ("时间线", "时间线", True), ("玩家名单", "玩家名单", True)):
+            self.assertIn(b, btns)
+        set_config("ext:relations", "1")
+        set_config("ext:wishes", "1")
+        labels = [b[0] for b in self.say("帮助")[0][1]]
+        self.assertIn("公知格式", labels)                    # 甲还没交公知
+        self.assertIn("看心愿", labels)
+        set_config("ext:wishes", "0")
+        self.assertNotIn("看心愿", [b[0] for b in self.say("帮助")[0][1]])
+        self.assertEqual(self.say("帮助我"), [])
+
+    def test_help_hub_follows_player(self):
+        """没交公知 → 「公知格式」；没有关系线 → 「开始关系线」；交了、拉了就变回「看」。"""
+        set_config("ext:relations", "1")
+        btns = self.say("帮助", member="M1", group="G1")[0][1]
+        self.assertIn(("公知格式", "格式公知", True), btns)
+        self.assertIn(("开始关系线", "格式关系线", True), btns)
+        self.assertIn("提交公知", self.say("格式公知")[0][0])                          # 点了真的拿到格式
+        a, b = roles.get_role_by_name("甲")["id"], roles.get_role_by_name("乙")["id"]
+        sheets.submit(a, "gongzhi", "我的公知")
+        relations.add_detail(a, b, "乙", "第一段")
+        btns = self.say("帮助", member="M1", group="G1")[0][1]
+        self.assertIn(("我的公知", "查看公知 甲", True), btns)                          # 交了、还没展示：只看自己的
+        self.assertIn(("看关系线", "查看关系线", True), btns)
+        self.assertEqual(self.say("查看公知 甲")[0], ("<图>", []))                     # 点了直接出自己那份
+        set_config("gongzhi_public", "1")                                              # 展示了：看所有人的
+        self.assertIn(("看公知", "查看公知", True), self.say("帮助", member="M1", group="G1")[0][1])
+        set_config("gongzhi_public", "0")
+        btns = self.say("帮助", member="M3", group="G3")[0][1]                         # 丙还都没有
+        self.assertIn(("公知格式", "格式公知", True), btns)
+        self.assertIn(("开始关系线", "格式关系线", True), btns)
+        from changri.core import deadlines
+        deadlines.set("gongzhi", "2000-01-01 00:00")                                   # 截止锁上了：不再引导去写
+        deadlines.set("rel", "2000-01-01 00:00")
+        btns = self.say("帮助", member="M3", group="G3")[0][1]
+        self.assertIn(("看公知", "查看公知", True), btns)
+        self.assertIn(("看关系线", "查看关系线", True), btns)
+
     def test_format_menu_only_enabled(self):
         out = self.say("格式")
         self.assertEqual(len(out), 1)
@@ -286,21 +330,6 @@ class ButtonsE2E(unittest.TestCase):
         self.assertIn("2 位", text)
         self.assertEqual([x[1] for x in btns], ["查看公知 甲", "查看公知 乙"])
         self.assertEqual(self.say("查看公知 乙"), [("<图>", [])])          # 点名字：只发这一个人的
-
-    def test_gongzhi_list_splits_players_and_npcs(self):
-        """玩家、NPC 分两条发，各自一组按钮；只有玩家时只发一条。"""
-        set_config("gongzhi_public", "1")
-        for n in ("甲", "乙", "丙"):
-            sheets.submit(roles.get_role_by_name(n)["id"], "gongzhi", f"我是{n}", [])
-        with get_conn() as c:
-            c.execute("UPDATE roles SET is_npc=1 WHERE name='乙'")
-        out = self.say("查看公知")
-        self.assertEqual(len(out), 2)
-        self.assertIn("玩家", out[0][0])
-        self.assertIn("2 位", out[0][0])
-        self.assertEqual([x[1] for x in out[0][1]], ["查看公知 甲", "查看公知 丙"])
-        self.assertIn("NPC", out[1][0])
-        self.assertEqual([x[1] for x in out[1][1]], ["查看公知 乙"])
 
     def test_gongzhi_falls_back_to_long_image(self):
         set_config("gongzhi_public", "1")

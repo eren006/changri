@@ -126,6 +126,21 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
     await mine.finish()
 
 
+help_cmd = _cmd("帮助")
+
+
+@help_cmd.handle()
+async def _(event: GroupMessageCreateEvent, args=CommandArg()):
+    """「帮助」：最上层入口，格式、我的、时间线、看公知、看关系线……一排按钮。后面跟了别的字（打错的）不理，免得刷屏。
+    按发指令的人换按钮：没交公知给「公知格式」，没有关系线给「开始关系线」（见 formats._hub_items）。"""
+    if args.extract_plain_text().strip():
+        await help_cmd.finish()
+    role = _sender_role(event)
+    rid = role["id"] if role else None
+    await reply_buttons(help_cmd, formats.hub_text(rid), [Btn(label, cmd) for label, cmd in formats.hub(rid)], per_row=4)
+    await help_cmd.finish()
+
+
 change_code = _cmd("换绑码")
 
 

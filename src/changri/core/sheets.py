@@ -28,8 +28,16 @@ def folder() -> Path:
 
 
 def public() -> bool:
-    """展示公知：开着，玩家才能看别人的公知：「查看公知」是所有人的，「查看公知 角色名」只看这一个人。默认关。"""
-    return get_config("gongzhi_public", "0") == "1"
+    """展示公知：开着，玩家才能看别人的公知：「查看公知」是所有人的，「查看公知 角色名」只看这一个人。默认关。
+    设了公知截止时间（core/deadlines.py）的，到点自动算开着。"""
+    from . import deadlines
+    return get_config("gongzhi_public", "0") == "1" or deadlines.passed("gongzhi")
+
+
+def closed(kind: str) -> bool:
+    """公知过了截止时间：玩家不能再交、不能再改。二表没有截止。"""
+    from . import deadlines
+    return kind == "gongzhi" and deadlines.locked("gongzhi")
 
 
 def normalize_image(data: bytes) -> tuple[bytes, str] | None:
@@ -100,12 +108,11 @@ def submit(role_id: int, kind: str, text: str, images: list[bytes] | None = None
 
 def get(role_id: int, kind: str) -> dict | None:
     with get_conn() as c:
-        r = c.execute("SELECT s.*, ro.name, ro.is_npc FROM sheets s JOIN roles ro ON ro.id=s.role_id WHERE s.role_id=? AND s.kind=?", (role_id, kind)).fetchone()
+        r = c.execute("SELECT s.*, ro.name FROM sheets s JOIN roles ro ON ro.id=s.role_id WHERE s.role_id=? AND s.kind=?", (role_id, kind)).fetchone()
         if not r:
             return None
         imgs = [x["filename"] for x in c.execute("SELECT filename FROM sheet_images WHERE role_id=? AND kind=? ORDER BY ord", (role_id, kind))]
-    return {"role_id": role_id, "name": r["name"], "kind": kind, "text": r["text"], "images": imgs, "updated_ts": r["updated_ts"],
-            "is_npc": bool(r["is_npc"])}
+    return {"role_id": role_id, "name": r["name"], "kind": kind, "text": r["text"], "images": imgs, "updated_ts": r["updated_ts"]}
 
 
 def all_of(kind: str) -> list[dict]:

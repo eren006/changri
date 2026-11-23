@@ -10,6 +10,8 @@ def register(app, ctx):
     def _rel_can(role) -> tuple[bool, str]:
         if not relations.enabled():
             return False, "关系线现在没有开放"
+        if why := relations.closed_note():           # 过了截止时间：只能看
+            return False, why
         return (False, phonegate.PAUSE_MSG) if phonegate.comm_paused() else (True, "")
 
     @app.route("/p/me/rel")

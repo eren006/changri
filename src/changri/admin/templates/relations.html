@@ -50,14 +50,32 @@
 .ui .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 18px}
 </style>
 
+{% macro deadline_panel(which, name, effect) %}{% set d = dl[which] %}
+<details class="panel"><summary class="btn sm ghost">{{ ic.sliders() }}{% if d.at %}{{ name }}截止：{{ d.at[5:] }}{{ '（已截止）' if d.passed }}{% else %}{{ name }}截止：未设{% endif %}</summary>
+  <form class="form" method="post" action="{{ url_for('deadline_set', which=which) }}">{{ csrf() }}
+    <div class="fields"><div><label for="dl-{{ which }}">{{ name }}截止时间（不填 = 不截止）</label>
+      <input id="dl-{{ which }}" name="at" type="datetime-local" value="{{ d.at|replace(' ', 'T') }}"></div></div>
+    <p class="note">{{ effect }}按运行机器人那台电脑的时间算。</p>
+    <div class="actions"><button class="btn" type="submit">保存</button>
+      {% if d.at %}<button class="btn ghost" type="submit" name="clear" value="1">取消截止</button>{% endif %}
+      <button class="btn ghost" type="button" onclick="this.closest('details').open=false">收起</button></div>
+  </form></details>
+{% if d.passed %}
+<form method="post" action="{{ url_for('deadline_reopen', which=which) }}">{{ csrf() }}<input type="hidden" name="on" value="{{ 0 if d.reopened else 1 }}">
+  <button class="btn sm ghost" type="submit"><span class="dot {{ 'ok' if d.reopened else 'bad' }}"></span>{{ '重新关闭' if d.reopened else '重新开放' }}{{ name }}</button></form>
+{% endif %}
+{% endmacro %}
+
 {% if view == 'sheets' %}
 <details class="fold" open>
   <summary><h2>公知与二表</h2><span class="chip">公知 {{ n_gz }}/{{ sheets|length }} · 二表 {{ n_eb }}/{{ sheets|length }}</span></summary>
   <div class="body">
     <div class="sec-head keep" style="margin-top:12px"><span class="muted">玩家在群里发「提交公知」「提交二表」（文字和图片都行，重复提交会覆盖）。</span>
       <form method="post" action="{{ url_for('sheets_public') }}">{{ csrf() }}<input type="hidden" name="on" value="{{ 0 if sheets_public else 1 }}">
-        <button class="btn sm ghost" type="submit"><span class="dot {{ 'ok' if sheets_public else 'bad' }}"></span>展示公知：{{ '开' if sheets_public else '关' }}</button></form></div>
+        <button class="btn sm ghost" type="submit"><span class="dot {{ 'ok' if sheets_public else 'bad' }}"></span>展示公知：{{ '开' if sheets_public else '关' }}</button></form>
+      {{ deadline_panel('gongzhi', '公知', '到点后：自动对所有人展示（不用再开「展示公知」），公告群播一句「公知已截止，可以互相查看了」，玩家不能再交或修改，后台还能改文字。想提前给大家看，直接打开「展示公知」；想延后，改这里的时间。') }}</div>
     <p class="note" style="margin:0 0 6px">关着：玩家只能「查看公知」看自己的；开着：「查看公知」看到所有人的，「查看公知 角色名」只看这一个人（都做成长图）。二表只有本人和管理员能看。</p>
+    {% if dl.gongzhi.passed and not sheets_public %}<p class="note" style="margin:0 0 6px">公知已过截止时间，现在已经自动对所有人展示。要收回，先取消截止时间。</p>{% endif %}
     <div class="shl">
       {% for x in sheets %}
       <div class="sr"><b>{{ x.name }}</b>
@@ -78,7 +96,8 @@
           <div class="fields"><div><label for="rh">超过多少小时没人回就提醒（0 = 不提醒）</label><input id="rh" name="hours" value="{{ '%g' % limit }}" inputmode="decimal"></div></div>
           <p class="note">从对方最后一段细节发出的时间算起；已确认完成的不算。提醒会出现在这里和「总览」的待办里。</p>
           <div class="actions"><button class="btn" type="submit">保存</button><button class="btn ghost" type="button" onclick="this.closest('details').open=false">取消</button></div>
-        </form></details></div>
+        </form></details>
+      {{ deadline_panel('rel', '关系线', '到点后：全部锁定，只能看——不能拉新线，也不能接着写、改、撤回或确认（群里和小手机都一样）。') }}</div>
     {% if late %}<div class="callout bad" style="margin-top:10px"><b>{{ late|length }} 条超时没回复</b>
       {% for w in late %}<div class="muted">{{ w.a_name }} ⇄ {{ w.b_name }} · 在等 {{ w.waiting_on }} · 已等 {{ '%.0f' % w.hours }} 小时</div>{% endfor %}</div>{% endif %}
     {% for p in people %}

@@ -241,8 +241,9 @@ class SeasonTests(unittest.TestCase):
         r, sent = self.run_tick("2026-11-15", "00:05")
         self.assertEqual(r, "d0")
         n = self._counts()
-        self.assertEqual((n["messages"], n["lovemails"], n["relations"], n["rel_details"], n["wishes"]), (0, 0, 0, 0, 0))
-        self.assertEqual((n["rooms"], n["room_members"]), (1, 0))                  # 已结束的房间清了，进行中的留着
+        self.assertEqual((n["messages"], n["lovemails"], n["wishes"]), (0, 0, 0))
+        self.assertEqual((n["relations"], n["rel_details"]), (1, 1))               # 关系线不清：开场前写好的要留着
+        self.assertEqual((n["rooms"], n["room_members"]), (2, 1))                  # 房间都留着：已结束的也不清（事前的戏）
         self.assertEqual(n["roles"], 2)                                            # 角色不动
         self.assertIn("清零", sent[0][2])
 

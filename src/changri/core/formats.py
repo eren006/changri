@@ -139,6 +139,54 @@ def mine() -> list[tuple[str, str]]:
     return [(label, cmd) for label, cmd, on in MINE if on()]
 
 
+# 「帮助」：最上层的入口，记住这一个词就行，别的都从这里点进去（作者定，2026-11-22）。
+# (按钮上的字, 点了发的指令, 一句话说明, 开没开)。只列开着的功能；顺序 = 按钮顺序。
+HUB: list[tuple[str, str, str, Callable[[], bool]]] = [
+    ("格式", "格式", "短信、约会、拉线、交公知……各种指令怎么写", _always),
+    ("我的", "我的", "角色卡、待回、数量这些自查", _always),
+    ("时间线", "时间线", "自己今天和以后的约会安排", _always),
+    ("看公知", "查看公知", "公知（开放展示以后能看所有人的）", _ext("relations")),
+    ("看关系线", "查看关系线", "你和别人之间的关系线", _relations),
+    ("玩家名单", "玩家名单", "所有角色", _always),
+    ("看心愿", "看心愿", "现在挂着的心愿", _ext("wishes")),
+    ("看帖子", "查看帖子", "最近的帖子", _ext("forum")),
+]
+
+
+def _hub_items(role_id: int | None) -> list[tuple[str, str, str]]:
+    """按这个玩家的情况换按钮：
+    · 公知：还没交、也没锁上 → 「公知格式」；交了但还没对所有人展示（截止前） → 「我的公知」，直接看自己那份；
+      已经展示（到了截止时间，或管理员打开了「展示公知」） → 「看公知」，出所有人的名单。
+    · 关系线：一条都没有、也没锁上 → 「开始关系线」（给拉线格式）。
+    没有角色（或不知道是谁）就用默认的。"""
+    out = []
+    for label, cmd, desc, on in HUB:
+        if not on():
+            continue
+        if role_id and cmd == "查看公知":
+            from . import sheets
+            mine = sheets.get(role_id, "gongzhi")
+            if mine is None and not sheets.closed("gongzhi"):
+                label, cmd, desc = "公知格式", "格式公知", "你还没交公知，点这里看怎么写"
+            elif mine is not None and not sheets.public():
+                label, cmd, desc = "我的公知", f"查看公知 {mine['name']}", "你交的公知（截止前只能看自己的）"
+        elif role_id and cmd == "查看关系线":
+            from . import relations
+            if not relations.list_for(role_id) and not relations.closed_note():
+                label, cmd, desc = "开始关系线", "格式关系线", "你还没有关系线，点这里看怎么拉线"
+        out.append((label, cmd, desc))
+    return out
+
+
+def hub(role_id: int | None = None) -> list[tuple[str, str]]:
+    return [(label, cmd) for label, cmd, _d in _hub_items(role_id)]
+
+
+def hub_text(role_id: int | None = None) -> str:
+    lines = [f"· {label}：{desc}" for label, _cmd, desc in _hub_items(role_id)]      # 写按钮上的字，不写指令（「查看公知 甲」看着怪）
+    return "📖 帮助（点按钮，或者直接发指令）\n" + "\n".join(lines)
+
+
 def qq_needed() -> bool:
     """用了 QQ 小号（房间群靠绑的 QQ 认人）才要求新角色绑 QQ。"""
     from .db import get_config

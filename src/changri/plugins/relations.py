@@ -72,8 +72,8 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
                                        Btn("看全部", f"查看关系线 {me['name']}", style="secondary")])
     head = (new_line + "\n") if new_line else ""
     if delivered:
-        await add_rel.finish(f"{head}✅ 已经发给「{target['name']}」了。\n{stat}" + season.prep_note("关系线"))
-    await add_rel.finish(f"{head}✅ 记下了。不过「{target['name']}」还没有能收消息的个人群，TA 暂时收不到提醒。\n{stat}" + season.prep_note("关系线"))
+        await add_rel.finish(f"{head}✅ 已经发给「{target['name']}」了。\n{stat}")
+    await add_rel.finish(f"{head}✅ 记下了。不过「{target['name']}」还没有能收消息的个人群，TA 暂时收不到提醒。\n{stat}")
 
 
 confirm_rel = _cmd("确认关系线")
@@ -82,6 +82,8 @@ confirm_rel = _cmd("确认关系线")
 @confirm_rel.handle()
 async def _(event: GroupMessageCreateEvent, args=CommandArg()):
     me = _me(event)
+    if why := relations.closed_note():
+        await confirm_rel.finish("🔒 " + why)
     parts = _name_args(args)
     target = roles.get_role_by_name(parts[0]) if parts else None
     if not me or not target or not relations.confirm(me["id"], target["id"]):
@@ -95,6 +97,8 @@ withdraw_rel = _cmd("撤回关系")
 @withdraw_rel.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     me = _me(event)
+    if why := relations.closed_note():
+        await withdraw_rel.finish("🔒 " + why)
     parts = args.extract_plain_text().strip().split(None, 1)
     if not me or len(parts) != 2:
         await withdraw_rel.finish("格式：撤回关系 对方角色名 要撤回的内容")
@@ -311,6 +315,9 @@ def _make_submit(kind: str):
         me = _me(event)
         if not me:
             await cmd.finish(NEED_ROLE)
+        if sheets.closed(kind):                   # 过了公知截止时间：不收也不改（管理员在后台能改文字）
+            from changri.core import deadlines
+            await cmd.finish(f"🔒 公知已于 {deadlines.label('gongzhi')} 截止，不能再提交或修改了。要改请找管理员。")
         text = args.extract_plain_text().strip()
         images = await download_images(args, limit=sheets.IMG_MAX)
         first = sheets.get(me["id"], kind) is None
@@ -323,7 +330,12 @@ def _make_submit(kind: str):
             n_img = len(images or [])
             await _tell_group("backstage", head + (f"\n\n{text}" if text else "") +
                                   (f"\n\n（附 {n_img} 张图，发「查看{label} {me['name']}」看）" if n_img else ""))
-        extra = "；别人要等管理员开启「展示公知」才能看" if kind == "gongzhi" and not sheets.public() else ""
+        extra = ""
+        if kind == "gongzhi" and not sheets.public():
+            from changri.core import deadlines
+            dl = deadlines.label("gongzhi")
+            extra = (f"；公知 {dl} 截止，截止前可以重复提交修改，截止后自动对所有人展示" if dl
+                     else "；别人要等管理员开启「展示公知」才能看")
         await cmd.finish(f"✅ 「{me['name']}」的{label}已提交（{info}）。发「查看{label}」可以看到做成的长图{extra}。")
     return cmd
 
@@ -346,21 +358,10 @@ def _make_view(kind: str):
             everyone = sheets.all_of(kind)       # 不带名字：看所有人的；带名字：只看这一个人
             if not everyone:
                 await cmd.finish("还没有人提交公知。发「提交公知 内容」就能提交。")
-            players = [x for x in everyone if not x.get("is_npc")]
-            npcs = [x for x in everyone if x.get("is_npc")]
-            everyone = players + npcs            # 长图也是玩家在前、NPC 在后
-            if len(everyone) > 1 and page == 1:  # 能发按钮：列名字，点谁看谁（带他自己的图），不再拼一整张长图；玩家、NPC 分两条发
-                groups = [(t, g) for t, g in (("玩家", players), ("NPC", npcs)) if g]
-                sent = False
-                for title, group in groups:
-                    ok = await reply_buttons(
-                        cmd, f"📜 公知 · {title}\n{len(group)} 位，点下面的名字查看（或发「查看公知 名字」）",
-                        [Btn(x["name"], f"查看公知 {x['name']}") for x in group], per_row=3, fallback=False)
-                    if not ok:
-                        break
-                    sent = True
-                if sent:
-                    await cmd.finish()
+            if len(everyone) > 1 and page == 1 and await reply_buttons(    # 能发按钮：列名字，点谁看谁（带他自己的图），不再拼一整张长图
+                    cmd, f"📜 公知\n{len(everyone)} 位，点下面的名字查看（或发「查看公知 名字」）",
+                    [Btn(x["name"], f"查看公知 {x['name']}") for x in everyone], per_row=3, fallback=False):
+                await cmd.finish()
             await _show(cmd, everyone, kind, page, again)
             await cmd.finish()
         target = roles.get_role_by_name(name) if name else me

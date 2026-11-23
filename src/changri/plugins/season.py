@@ -297,3 +297,9 @@ async def _season_tick():
             logger.info(f"[季度] {r}")
     except Exception as e:  # noqa: BLE001
         logger.warning(f"[季度] 定时任务出错：{e}")
+    try:                                                            # 公知到了截止时间：公告群播一句（只播一次）
+        from changri.core import deadlines
+        if await deadlines.tick(make_send(), get_announce()):
+            logger.info("[公知] 已截止，公告群已播报")
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[公知] 截止播报出错：{e}")

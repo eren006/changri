@@ -1,7 +1,7 @@
 """设置平台 · 公知、二表与关系线。由 changri.admin.create_app 调用 register(app, login_required) 挂上路由（路由名不变，模板里的 url_for 照常用）。"""
 from flask import Response, abort, flash, jsonify, redirect, render_template, request, url_for
 from changri.core import relations as relations_core, sheets as sheets_core
-from changri.core.db import get_conn, set_config
+from changri.core.db import get_config, get_conn, set_config
 from changri.admin.common import _fmt_ts
 
 
@@ -27,8 +27,11 @@ def register(app, login_required):
                                    "confirmed": r["confirmed"], "wait": w})
         sheets = sheets_core.overview()
         view = "relations" if request.args.get("view") == "relations" else "sheets"
+        from changri.core import deadlines
+        dl = {k: {"at": deadlines.get(k), "passed": deadlines.passed(k), "reopened": deadlines.reopened(k)} for k in deadlines.KEYS}
         return render_template("relations.html", view=view, rels=rels, people=sorted(people.values(), key=lambda x: x["name"]), stats=relations_core.stats(), waits=waits,
-                               late=relations_core.overdue(), limit=relations_core.alert_hours(), sheets=sheets, sheets_public=sheets_core.public(),
+                               late=relations_core.overdue(), limit=relations_core.alert_hours(), sheets=sheets, dl=dl,
+                               sheets_public=get_config("gongzhi_public", "0") == "1",
                                n_gz=sum(1 for x in sheets if x["gongzhi"]), n_eb=sum(1 for x in sheets if x["erbiao"]))
 
     @app.route("/relations/<int:rel_id>/view")
@@ -73,6 +76,42 @@ def register(app, login_required):
         set_config("gongzhi_public", "1" if on else "0")
         flash("已开启展示公知：玩家发「查看公知」看到所有人的，发「查看公知 角色名」只看这一个人" if on else "已关闭展示公知：玩家只能看自己的")
         return redirect(url_for("relations_page", view="sheets"))
+
+    @app.post("/deadlines/<which>")
+    @login_required
+    def deadline_set(which):
+        """公知、关系线的截止时间（可选）。空 = 没有截止。"""
+        from changri.core import deadlines
+        if which not in deadlines.KEYS:
+            abort(404)
+        back = redirect(url_for("relations_page", view="sheets" if which == "gongzhi" else "relations"))
+        raw = "" if request.form.get("clear") else request.form.get("at", "")
+        if not deadlines.set(which, raw):
+            flash("时间看不懂，请用页面上的日期时间选择器选，或者写成 2026-11-25 20:00")
+            return back
+        name = "公知" if which == "gongzhi" else "关系线"
+        at = deadlines.get(which)
+        if not at:
+            flash(f"已取消{name}截止时间")
+        elif which == "gongzhi":
+            flash(f"公知 {at} 截止：到点自动对所有人展示、公告群播一句，玩家不能再交或修改（后台还能改文字）")
+        else:
+            flash(f"关系线 {at} 截止：到点后全部锁定，只能看")
+        return back
+
+    @app.post("/deadlines/<which>/reopen")
+    @login_required
+    def deadline_reopen(which):
+        """截止以后的手动后门：「重新开放」↔「重新关闭」，同一个按钮来回切。"""
+        from changri.core import deadlines
+        if which not in deadlines.KEYS:
+            abort(404)
+        on = request.form.get("on") == "1"
+        deadlines.set_reopened(which, on)
+        name = "公知" if which == "gongzhi" else "关系线"
+        flash(f"已重新开放{name}：玩家又可以{'交和改' if which == 'gongzhi' else '写、改、撤回'}了。要锁回去，按「重新关闭{name}」。" if on
+              else f"已重新关闭{name}：玩家只能看。")
+        return redirect(url_for("relations_page", view="sheets" if which == "gongzhi" else "relations"))
 
     @app.post("/relations/alert")
     @login_required

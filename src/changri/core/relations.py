@@ -10,6 +10,15 @@ def enabled() -> bool:
     return get_config("rel_enabled", "1") != "0"
 
 
+def closed_note() -> str:
+    """过了关系线截止时间（core/deadlines.py）：全部锁定、只能看，返回给玩家的说明；没过返回空。
+    拉线、闲谈、记时间点、改、删、撤回、确认都不行（作者定，2026-11-22）。管理员在后台删线不受影响。"""
+    from . import deadlines
+    if not deadlines.locked("rel"):                 # 没到点，或者管理员按了「重新开放关系线」
+        return ""
+    return f"关系线已于 {deadlines.label('rel')} 截止，现在只能看，不能再写、改或撤回。"
+
+
 def _pair(a: int, b: int) -> tuple[int, int]:
     return (a, b) if a < b else (b, a)
 
@@ -36,6 +45,8 @@ def add_detail(from_id: int, to_id: int, to_name: str, text: str) -> tuple[bool,
     """拉线：没有关系线就建立一条，然后追加一段细节。"""
     if not enabled():
         return False, "❌ 关系线现在没有开放。"
+    if why := closed_note():
+        return False, "🔒 " + why
     if from_id == to_id:
         return False, "⚠️ 不能跟自己拉关系线。"
     max_chars = get_int("max_detail_chars", 500)
@@ -195,6 +206,8 @@ def start(from_id: int, to_id: int, to_name: str):
         return None, "关系线现在没有开放。"
     if from_id == to_id:
         return None, "不能跟自己建立关系线。"
+    if why := closed_note():
+        return None, why
     rel = get_rel(from_id, to_id)
     if rel:
         return rel, ""
@@ -213,6 +226,8 @@ def start(from_id: int, to_id: int, to_name: str):
 
 
 def edit_detail(detail_id: int, role_id: int, text: str) -> tuple[bool, str]:
+    if why := closed_note():
+        return False, why
     text = text.strip()
     mx = get_int("max_detail_chars", 500)
     if not text or len(text) > mx:
@@ -227,6 +242,8 @@ def edit_detail(detail_id: int, role_id: int, text: str) -> tuple[bool, str]:
 
 def delete_detail(detail_id: int, role_id: int) -> tuple[bool, str, str, int]:
     """返回 (成功, 提示, 被删的内容, 对方 id)。"""
+    if why := closed_note():
+        return False, why, "", 0
     with get_conn() as conn:
         d = conn.execute("SELECT d.*, r.role_lo, r.role_hi FROM rel_details d JOIN relations r ON r.id=d.rel_id WHERE d.id=? AND d.from_role_id=?", (detail_id, role_id)).fetchone()
         if not d:
@@ -257,6 +274,8 @@ def add_item(from_id: int, to_id: int, to_name: str, kind: str, text: str, label
 
 def edit_item(item_id: int, role_id: int, text: str, label: str = "") -> tuple[bool, str, int]:
     """返回 (成功, 提示, 对方 id)。"""
+    if why := closed_note():
+        return False, why, 0
     with get_conn() as conn:
         it = conn.execute("SELECT i.*, r.role_lo, r.role_hi FROM rel_items i JOIN relations r ON r.id=i.rel_id WHERE i.id=? AND i.from_role_id=?", (item_id, role_id)).fetchone()
         if not it:
@@ -270,6 +289,8 @@ def edit_item(item_id: int, role_id: int, text: str, label: str = "") -> tuple[b
 
 
 def delete_item(item_id: int, role_id: int) -> tuple[bool, str, int]:
+    if why := closed_note():
+        return False, why, 0
     with get_conn() as conn:
         it = conn.execute("SELECT i.*, r.role_lo, r.role_hi FROM rel_items i JOIN relations r ON r.id=i.rel_id WHERE i.id=? AND i.from_role_id=?", (item_id, role_id)).fetchone()
         if not it:

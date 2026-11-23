@@ -337,20 +337,19 @@ def start(name: str = "", clear: bool = False, now: str | None = None) -> tuple[
     if t >= s["start_date"]:
         enter_d0(t)
         return True, f"✅ 「{s['name']}」开始了，档期已经开始，直接进入 D0（自动天数、心动信已打开）。"
-    return True, f"✅ 「{s['name']}」开始了，现在是筹备期；{s['start_date']} 自动进入 D0。\n玩家和 NPC 可以先「创建新角色 名字」。筹备期的互动（短信、礼物、心动信、关系线等）不会留下记录，进入 D0 时会清零。"
+    return True, f"✅ 「{s['name']}」开始了，现在是筹备期；{s['start_date']} 自动进入 D0。\n玩家和 NPC 可以先「创建新角色 名字」。筹备期的短信、礼物、心动信、心愿不会留下记录，进入 D0 时会清零；关系线和房间（包括已经结束的）会一直留着。"
 
 
 def clear_prep_records() -> dict[str, int]:
-    """筹备期的互动不记录：从筹备期进入 D0 时，把这段时间发的短信/礼物、心动信、关系线、心愿和已经结束的房间复盘清掉，
-    正式季第一天从零开始。进行中的房间不动（人正在里面聊）。角色、属性、群位、论坛帖子不动。返回各清了多少条。"""
+    """筹备期的互动不记录：从筹备期进入 D0 时，把这段时间发的短信/礼物、心动信、心愿清掉，正式季第一天从零开始。
+    角色、属性、群位、论坛帖子不动。
+    关系线、房间（进行中的和已经结束的）也不动：玩家常在开场前就写好关系线、在微信群里做些事前的戏，清掉就白写了
+    （作者定，2026-11-22）。返回各清了多少条。"""
     out = {}
     with get_conn() as conn:
         out["短信和礼物"] = conn.execute("DELETE FROM messages").rowcount
         out["心动信"] = conn.execute("DELETE FROM lovemails").rowcount
-        conn.execute("DELETE FROM rel_details")
-        out["关系线"] = conn.execute("DELETE FROM relations").rowcount
         out["心愿"] = conn.execute("DELETE FROM wishes").rowcount
-        out["已结束的房间"] = conn.execute("DELETE FROM rooms WHERE status!='open'").rowcount      # 连带成员、发言、加入申请（外键级联）
     from . import milestone
     milestone.reset()                                                         # 「第 N 次记录」也从正式季第一天重新数
     return out
@@ -582,7 +581,7 @@ async def tick(send, announce, now: time.struct_time | None = None) -> str:
         enter_d0(t, skip_tonight=False)            # 到开始日自动进 D0：当天就是 D0，当晚 23:59 进 D1
         from . import storycal
         sl = storycal.stage_line(0)
-        await say(f"📜 「{s['name']}」档期开始，现在是 D0。" + (f"\n🕰️ {sl}" if sl else "") + "\n⚙️ 已自动打开：自动天数（每天 23:59 加一天）、心动信。\n🧹 筹备期的互动记录已清零，从今天重新算。")
+        await say(f"📜 「{s['name']}」档期开始，现在是 D0。" + (f"\n🕰️ {sl}" if sl else "") + "\n⚙️ 已自动打开：自动天数（每天 23:59 加一天）、心动信。\n🧹 筹备期的短信、礼物、心动信、心愿已清零，从今天重新算（关系线和房间保留）。")
         return "d0"
     if t > last_end(s) and get_config("season_closed_notice") != str(s["id"]):
         set_config("season_closed_notice", str(s["id"]))
