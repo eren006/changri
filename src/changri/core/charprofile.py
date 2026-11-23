@@ -230,3 +230,25 @@ def roster() -> str:
     if parts[1]:
         out += [f"🎭 NPC（{len(parts[1])} 人）", *parts[1]]
     return "\n\n".join(out)
+
+
+BTN_NAME_MAX = 4
+
+
+def btn_name(name: str, short: str = "") -> str:
+    """按钮上放人名：有简称用简称，没有用名字，最多前 4 个字（作者定，2026-11-23）。点了发的指令里照样用全名。"""
+    return (short or name or "")[:BTN_NAME_MAX]
+
+
+def btn_name_of(name: str) -> str:
+    """只知道全名时：查这个人的简称再套 btn_name。找不到这个人就按名字截。"""
+    from . import roles
+    r = roles.get_role_by_name(name)
+    return btn_name(name, get(r["id"])["short"] if r else "")
+
+
+def roster_targets(exclude_id: int | None = None) -> list[tuple[str, str]]:
+    """「玩家名单」下面一人一个按钮用：(按钮上的字, 全名)。嘉宾在前、NPC 在后，不含自己。"""
+    rows = [r for r in _all() if r["id"] != exclude_id]
+    rows.sort(key=lambda r: bool(r["is_npc"]))
+    return [(btn_name(r["name"], r["short"]), r["name"]) for r in rows]

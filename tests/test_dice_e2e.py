@@ -108,7 +108,7 @@ class DiceE2E(unittest.TestCase):
     def test_rt_is_its_own_command(self):
         for text in ("/rt 12 7", "/难度骰 12 7", "rt 12 7"):                              # 不会被当成 /r t…
             out = self.say(text)[0]
-            self.assertRegex(out, r"^D12=\d+/7 —— (成功|失败)。\S+$", text)
+            self.assertRegex(out, r"^D12=\d+/7 —— (成功|失败)。\S.*$", text)        # 后面那句评语可能带空格（「就差 1 点。」）
 
     def test_usage_counts_by_command_word(self):
         """匿名上报按指令词计数：只记指令词（别名照实记），不记后面写的内容；不是指令的话不算。"""

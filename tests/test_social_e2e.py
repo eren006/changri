@@ -170,7 +170,8 @@ class SocialE2E(unittest.TestCase):
         self.assertTrue(any("[GB]" in o and "甲 给你发来" in o for o in out))
         self.assertIn("没有叫「丙」", self.say("短信 丙 你好")[0])
         self.assertIn("不能发给自己", self.say("短信 甲 你好")[0])
-        self.assertIn("短信 收信人 内容", self.say("短信")[0])                  # 用法提示
+        self.assertIn("选一个人", self.say("短信")[0])                          # 只发「短信」：选人卡片
+        self.assertIn("短信 收信人 内容", self.say("短信 乙")[0])               # 写了一半：用法提示
         self.assertEqual(self.say("我昨天发短信给你了"), [])                     # 聊天里碰巧带了字，不理
         self.assertEqual(self.say("神秘人短信 乙 你好"), [])                      # 没开放自定义署名，不理
 

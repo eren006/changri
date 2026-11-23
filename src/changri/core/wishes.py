@@ -33,8 +33,24 @@ def label(w) -> str:
 
 
 def line(w, now: int | None = None) -> str:
-    """看心愿 / 撤心愿 列表里的一行（照老系统）。"""
+    """一行写完的老写法（照老系统）。QQ 里的列表改用 block。"""
     return f"编号：{w['id']}｜{label(w)}｜{hm_text(w['start_hm'], w['end_hm'])}（摘的当天）｜{w['place']}｜剩{left_hours(w, now)}h｜内容：{w['content']}"
+
+
+def block(w, now: int | None = None, mine: bool = False) -> str:
+    """看心愿 / 撤心愿 列表里的一段：第一行编号、时间、地点，第二行内容，第三行谁挂的、还剩多久。"""
+    who = f"你挂的（别人看到的是 {label(w)}）" if mine else label(w)
+    return (f"#{w['id']}　{hm_text(w['start_hm'], w['end_hm'])}（摘的当天）· {w['place']}\n"
+            f"　{w['content']}\n"
+            f"　{who} · 还剩 {left_hours(w, now)} 小时")
+
+
+def taker_busy(w, role_id: int) -> bool:
+    """这个人现在摘这条心愿会不会撞自己的时间线（摘走后房间开在今天）。看心愿的按钮上标「有约」用，真摘时 take 还会再查。"""
+    day = season.current_day()
+    if day is None:
+        return False
+    return bool(rooms.conflict(role_id, day, w["start_hm"], w["end_hm"], locks=False))
 
 
 def broadcast_text(w) -> str:
@@ -85,6 +101,9 @@ def day_count(role_id: int, col: str) -> int:
 
 
 def post(poster_id: int, time_text: str, place: str, content: str, sign: str = "") -> tuple[bool, str]:
+    if time_text.strip() == "时间" or place.strip() == "地点":      # 地点按钮填进去的占位字（plugins/wishes.py）忘了换
+        what = "、".join(x for x, bad in (("时间", time_text.strip() == "时间"), ("地点", place.strip() == "地点")) if bad)
+        return False, f"「{what}」两个字还没换：把它换成真的{what}再发。"
     if season.phase() != "playing":
         return False, "现在不是进行中的季度，不能挂心愿。"
     from . import godmode

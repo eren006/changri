@@ -5,7 +5,7 @@
   <header class="bar"><a class="back" href="{{ url_for('discover') }}">发现</a><div class="title">搜索与收藏</div></header>
   <div class="scroll list">
     <form class="inline" method="get" action="{{ url_for('search_page') }}" style="padding:12px 20px">
-      <input name="q" value="{{ q }}" maxlength="30" placeholder="搜联系人、短信、功能…" aria-label="搜索" autocomplete="off"><button class="send" type="submit">搜索</button>
+      <input name="q" value="{{ q }}" maxlength="30" placeholder="搜好友列表、短信、功能…" aria-label="搜索" autocomplete="off"><button class="send" type="submit">搜索</button>
     </form>
     {% if q %}
       {% for g in groups %}

@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block title %}{{ title }} · {{ brand }}{% endblock %}
 {% block body %}
-  {# 署名会话、点歌台、偷盗记录、匿名对话共用（照老系统的系统联系人和化名对话） #}
+  {# 署名会话、点歌台、偷盗记录、匿名对话共用（照老系统的系统好友列表和化名对话） #}
   <header class="bar">
     <a class="back" href="{{ url_for('inbox') }}">{{ skin.words.messages }}</a>
     <div class="title"><div class="avatar head" data-name="{{ title }}">{{ title[:1] }}</div>{{ title }}</div>

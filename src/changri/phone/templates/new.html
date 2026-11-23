@@ -21,7 +21,7 @@
   </details>
   {% include '_flash.html' %}
   {% endif %}
-  <h2 class="recipient-heading">联系人 <span>{{ others|length }} 位</span></h2>
+  <h2 class="recipient-heading">好友列表 <span>{{ others|length }} 位</span></h2>
   <div class="list recipient-list">
     {% for o in others %}
     <a class="row" href="{{ url_for('thread', other=o.id, gift=gift) if gift else url_for('thread', other=o.id) }}">

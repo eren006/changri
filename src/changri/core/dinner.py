@@ -75,6 +75,12 @@ def sit(name: str, seat_no: int) -> tuple[bool, str]:
     return True, render(s)
 
 
+def free_seats() -> list[int]:
+    """现在的空位号（从 1 数）。没开晚餐是空列表。"""
+    s = state()
+    return [i + 1 for i, x in enumerate(s["seats"]) if x is None] if s else []
+
+
 def cooldown_left(role_id: int) -> int:
     cd = get_int("dinner_poke_cooldown_min", 5) * 60
     last = get_int(f"poke_at:{role_id}", 0)
@@ -98,6 +104,20 @@ def poke_check(me_name: str, target: str) -> tuple[str, str]:
     if (a - b) % n not in (1, n - 1):
         return f"你只能戳相邻座位的人（你在 {a + 1} 号，{target} 在 {b + 1} 号）。", ""
     return "", ""
+
+
+def neighbors(me_name: str) -> list[str]:
+    """坐在我两边的人（首尾算相邻），「戳你一下」不带名字时给按钮用。没入座、旁边没人就是空列表。"""
+    s = state()
+    if not s or me_name not in s["seats"]:
+        return []
+    seats, n = s["seats"], s["max"]
+    i = seats.index(me_name)
+    out = []
+    for j in ((i - 1) % n, (i + 1) % n):
+        if j != i and seats[j] and seats[j] not in out:
+            out.append(seats[j])
+    return out
 
 
 def mark_poked(role_id: int) -> None:

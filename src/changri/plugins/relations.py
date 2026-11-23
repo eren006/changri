@@ -5,9 +5,9 @@ from nonebot.adapters.qq import Bot, GroupMessageCreateEvent
 from nonebot.matcher import current_bot
 from nonebot.params import CommandArg
 
-from changri.core.qqsend import make_send, reply_buttons, reply_long  # noqa: E402
+from changri.core.qqsend import finish_usage, make_send, reply_buttons, reply_long, send_card  # noqa: E402
 from changri.core.buttons import Btn
-from changri.core import admins, messaging, relations, roles, season
+from changri.core import admins, charprofile, messaging, relations, roles, season
 from changri.core.db import get_config, get_int
 
 NEED_ROLE = "你还没有角色。在你的个人群里发「创建新角色 名字」就能创建。"
@@ -57,9 +57,13 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     me = _me(event)
     if not me:
         await add_rel.finish("你还没有角色。在你的个人群里发「创建新角色 名字」就能创建。")
-    parts = args.extract_plain_text().strip().split(None, 1)
+    raw = args.extract_plain_text().strip()
+    parts = raw.split(None, 1)
+    if not raw and relations.enabled() and not relations.closed_note():   # 只发「拉线」：选人卡片，点名字填好「拉线 名字 」
+        from changri.core import datepick
+        await send_card(add_rel, *datepick.cmd_card("拉线 · 选一个人", "点名字会填进输入框，后面接着写这一段", me["id"], "拉线"))
     if len(parts) != 2:
-        await add_rel.finish("格式：拉线 对方名 内容")
+        await finish_usage(add_rel, "格式：拉线 对方名 内容\n例：拉线 张三 那天在花园里，你递给我一把伞……", f"拉线 {parts[0]} " if parts else "拉线 ")
     target = roles.get_role_by_name(parts[0])
     if not target:
         await add_rel.finish(f"❌ 找不到叫「{parts[0]}」的角色。")
@@ -133,6 +137,10 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
             await view_rel.finish(f"你和「{target['name']}」的关系线还没写内容。")
         text = f"📖 你和「{target['name']}」的关系线（{len(ds)} 段）\n" + "\n".join(f"\n【{d['from_name']}】\n{d['text']}" for d in ds)
         await reply_long(view_rel, text)
+        # 细节后面跟一条挂按钮：「接着写」把「拉线 名字 」填进输入框；截止锁上了就只给回列表
+        btns = [] if relations.closed_note() else [Btn("接着写", f"拉线 {target['name']} ", enter=False)]
+        btns.append(Btn("回列表", "查看关系线", style="secondary"))
+        await reply_buttons(view_rel, "接下来", btns, per_row=2, fallback=False)
         await view_rel.finish()
     items = relations.list_for(me["id"])
     max_rel = get_int("max_relationships_per_user", 20)
@@ -153,7 +161,7 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
     if max_total > 0:
         reply += f"　总数 {len(items)}/{max_total}（发起+收到）"
     reply += "\n💡 输入「查看关系线 名字」查看细节"
-    await reply_buttons(view_rel, reply, [Btn(it["other_name"], f"查看关系线 {it['other_name']}") for it in items], per_row=3)
+    await reply_buttons(view_rel, reply, [Btn(charprofile.btn_name_of(it["other_name"]), f"查看关系线 {it['other_name']}") for it in items], per_row=3)
     await view_rel.finish()
 
 
@@ -323,7 +331,7 @@ def _make_submit(kind: str):
         first = sheets.get(me["id"], kind) is None
         ok, info = sheets.submit(me["id"], kind, text, images)
         if not ok:
-            await cmd.finish(f"❌ {info}\n用法：提交{label} 你的内容（可以同时发图片）。重复提交会覆盖上一次。")
+            await finish_usage(cmd, f"❌ {info}\n用法：提交{label} 你的内容（可以同时发图片）。重复提交会覆盖上一次。", f"提交{label} ")
         if first or kind == "gongzhi":            # 第一次交「已经上交」，公知再交「修改了公知」；二表重交不发
             head = f"📮 {me['name']} 已经上交{label}" if first else f"✏️ {me['name']} 修改了{label}"
             await _tell_group("announce", head)                       # 公告群：只发这一句
@@ -358,10 +366,21 @@ def _make_view(kind: str):
             everyone = sheets.all_of(kind)       # 不带名字：看所有人的；带名字：只看这一个人
             if not everyone:
                 await cmd.finish("还没有人提交公知。发「提交公知 内容」就能提交。")
-            if len(everyone) > 1 and page == 1 and await reply_buttons(    # 能发按钮：列名字，点谁看谁（带他自己的图），不再拼一整张长图
-                    cmd, f"📜 公知\n{len(everyone)} 位，点下面的名字查看（或发「查看公知 名字」）",
-                    [Btn(x["name"], f"查看公知 {x['name']}") for x in everyone], per_row=3, fallback=False):
-                await cmd.finish()
+            players = [x for x in everyone if not x.get("is_npc")]
+            npcs = [x for x in everyone if x.get("is_npc")]
+            everyone = players + npcs            # 长图也是玩家在前、NPC 在后
+            if len(everyone) > 1 and page == 1:  # 能发按钮：列名字，点谁看谁（带他自己的图），不再拼一整张长图；玩家、NPC 分两条发
+                groups = [(t, g) for t, g in (("玩家", players), ("NPC", npcs)) if g]
+                sent = False
+                for title, group in groups:
+                    ok = await reply_buttons(
+                        cmd, f"📜 公知 · {title}\n{len(group)} 位，点下面的名字查看（或发「查看公知 名字」）",
+                        [Btn(charprofile.btn_name_of(x["name"]), f"查看公知 {x['name']}") for x in group], per_row=3, fallback=False)
+                    if not ok:
+                        break
+                    sent = True
+                if sent:
+                    await cmd.finish()
             await _show(cmd, everyone, kind, page, again)
             await cmd.finish()
         target = roles.get_role_by_name(name) if name else me

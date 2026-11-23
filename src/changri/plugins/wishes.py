@@ -8,7 +8,7 @@ from nonebot.params import CommandArg  # noqa: F401
 
 from changri.core import rooms, season, storycal, wishes
 from changri.core.buttons import Btn
-from changri.core.qqsend import make_send, reply_buttons
+from changri.core.qqsend import finish_usage, make_send, reply_buttons
 from changri.plugins.play import NEED_ROLE, NO_GROUP_TEXT, _announce_in_room, _cmd, _group_line, _invite, _me, _push, _qq_hint, _slot, settle_wish_room
 
 async def _broadcast(w) -> None:
@@ -33,8 +33,10 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     if re.search(r"[|｜]", text):
         text, sign = (x.strip() for x in re.split(r"[|｜]", text, 1))
     p = text.split(None, 2)
+    if not p:                                   # 只发「挂心愿」：给地点按钮（有预设地点时），点了填好「挂心愿 时间 花园 」
+        await _place_card(me)
     if len(p) < 3:
-        await wish_post.finish(USAGE.format(t=storycal.example_time()))
+        await finish_usage(wish_post, USAGE.format(t=storycal.example_time()), "挂心愿 ")
     ok, info = wishes.post(me["id"], p[0], p[1], p[2], sign)
     if not ok:
         await wish_post.finish(f"❌ {info}")
@@ -45,14 +47,51 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     await wish_post.finish(wishes.post_ok_text(w) + (f"\n{paid}" if paid else "") + season.prep_note("心愿"))
 
 
+async def _place_card(me) -> None:
+    """挂心愿第一步：选地点（core/datepick.places_for：「地点」扩展开着、录了地点；上锁的要有钥匙）。
+    没有预设地点就给用法和一个「填入输入框」。按钮都只填不发：后面还要写内容。"""
+    from changri.core import datepick
+    ps = datepick.places_for(me["id"])
+    head = USAGE.format(t=storycal.example_time())
+    if not ps:
+        await reply_buttons(wish_post, head, [Btn("填入输入框", "挂心愿 时间 地点 ", enter=False)], per_row=1)
+        await wish_post.finish()
+    btns = [Btn(x, f"挂心愿 时间 {x} ", enter=False) for x in ps[:datepick.MAX_ITEMS]]
+    if not datepick.only_preset():
+        btns.append(Btn("别的地方", "挂心愿 时间 地点 ", enter=False, style="secondary"))
+    await reply_buttons(wish_post, "挂心愿 · 选地点\n点地点会填进输入框：把「时间」换掉，后面接着写内容（想署名就再加「| 昵称」）\n\n" + head,
+                        btns, per_row=4)
+    await wish_post.finish()
+
+
+def _wish_buttons(ws, me_id: int | None) -> list:
+    """自己挂的给「撤」，别人的给「摘」；摘了会撞自己时间线的标「有约」。都只填进输入框：摘会马上开房间、通知对方，撤了就没了，让玩家自己按发送。"""
+    out = []
+    for w in ws:
+        if me_id and w["poster_id"] == me_id:
+            out.append(Btn(f"撤 #{w['id']}", f"撤心愿 {w['id']}", enter=False, style="secondary"))
+        elif me_id and wishes.taker_busy(w, me_id):
+            out.append(Btn(f"#{w['id']} 有约", f"摘心愿 {w['id']}", enter=False, style="secondary"))
+        else:
+            out.append(Btn(f"摘 #{w['id']}", f"摘心愿 {w['id']}", enter=False))
+    return out
+
+
 @wish_list.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent):
     ws = wishes.list_open()
     if not ws:
         await wish_list.finish("当前没有漂浮的心愿。")
-    # 摘心愿会马上开房间、通知对方：按钮只把指令填进输入框，玩家自己按发送
-    await reply_buttons(wish_list, "📜 当前心愿：\n" + "\n".join(wishes.line(w) for w in ws) + "\n\n摘一个发「摘心愿 编号」",
-                        [Btn(f"摘 #{w['id']}", f"摘心愿 {w['id']}", enter=False) for w in ws], per_row=4)
+    me = _me(bot, event)
+    me_id = me["id"] if me else None
+    btns = _wish_buttons(ws, me_id)
+    tips = ["点「摘」会把指令填进输入框，确认后再发"]
+    if any(b.label.endswith("有约") for b in btns):
+        tips.append("标「有约」的：那个时段你已经有安排了，摘不了")
+    if any(b.label.startswith("撤") for b in btns):
+        tips.append("「撤」是你自己挂的")
+    await reply_buttons(wish_list, "📜 当前心愿\n\n" + "\n\n".join(wishes.block(w, mine=w["poster_id"] == me_id) for w in ws) + "\n\n" + "\n".join(tips),
+                        btns, per_row=4)
     await wish_list.finish()
 
 
@@ -63,7 +102,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
         await wish_take.finish(NEED_ROLE)
     n = wishes.parse_id(args.extract_plain_text())
     if not n:
-        await wish_take.finish("用法：摘心愿 编号，例：摘心愿 3（编号在「看心愿」里）")
+        await finish_usage(wish_take, "用法：摘心愿 编号，例：摘心愿 3（编号在「看心愿」里）\n发「看心愿」可以点着摘", "摘心愿 ")
     ok, info, room_id = wishes.take(n, me["id"])
     if not ok:
         await wish_take.finish(f"❌ {info}")
@@ -84,8 +123,11 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     n = wishes.parse_id(args.extract_plain_text())
     if not n:                                   # 不带编号：列出自己挂着的（照老系统）
         mine = wishes.list_open(me["id"])
-        await wish_back.finish(("📜 你发布的心愿：\n" + "\n".join(wishes.line(w) for w in mine) if mine else "你现在没有挂着的心愿。")
-                               + "\n\n使用「撤心愿 编号」撤回")
+        if not mine:
+            await wish_back.finish("你现在没有挂着的心愿。")
+        await reply_buttons(wish_back, "📜 你挂着的心愿\n\n" + "\n\n".join(wishes.block(w, mine=True) for w in mine) + "\n\n点「撤」把指令填进输入框，确认后再发",
+                            _wish_buttons(mine, me["id"]), per_row=4)
+        await wish_back.finish()
     ok, why = wishes.withdraw(n, me["id"])
     await wish_back.finish(f"✅ 心愿 #{n} 已撤回。" if ok else f"❌ {why}")
 

@@ -131,7 +131,7 @@ class ButtonsE2E(unittest.TestCase):
     def setUp(self):
         init_db()
         with get_conn() as c:
-            for t in ("messages", "sheets", "rel_details", "relations", "role_groups", "roles", "config"):
+            for t in ("messages", "sheets", "rel_details", "relations", "rpg_place_keys", "rpg_places", "role_groups", "roles", "config"):
                 try:
                     c.execute(f"DELETE FROM {t}")
                 except Exception:  # noqa: BLE001 表名随版本可能不同
@@ -167,7 +167,7 @@ class ButtonsE2E(unittest.TestCase):
         self.assertEqual(len(out), 1)
         text, btns = out[0]
         self.assertIn("帮助", text)
-        for b in (("格式", "格式", True), ("我的", "我的", True), ("时间线", "时间线", True), ("玩家名单", "玩家名单", True)):
+        for b in (("格式", "格式", True), ("我的", "我的", True), ("时间线", "时间线", True), ("好友列表", "好友列表", True)):
             self.assertIn(b, btns)
         set_config("ext:relations", "1")
         set_config("ext:wishes", "1")
@@ -204,6 +204,219 @@ class ButtonsE2E(unittest.TestCase):
         btns = self.say("帮助", member="M3", group="G3")[0][1]
         self.assertIn(("看公知", "查看公知", True), btns)
         self.assertIn(("看关系线", "查看关系线", True), btns)
+
+    def test_contacts(self):
+        """「好友列表」（「玩家名单」也一样）：名单 + 一人一个按钮，点了发「好友列表 名字」；张三的卡片上是能对 TA 做的事。"""
+        set_config("ext:relations", "1"); set_config("ext:lovemail", "1")
+        for word in ("好友列表", "联系人", "玩家名单"):
+            text, btns = self.say(word, member="M1", group="G1")[-1]
+            self.assertIn(("乙", "好友列表 乙", True), btns)
+            self.assertNotIn("甲", [b[0] for b in btns])
+            self.assertEqual(btns[-1], ("帮助", "帮助", True))
+        text, btns = self.say("好友列表 乙", member="M1", group="G1")[0]
+        self.assertIn("乙", text)
+        got = {b[0]: (b[1], b[2]) for b in btns}
+        self.assertEqual(got["短信"], ("【短信】\n对象：乙\n内容：", False))
+        self.assertEqual(got["送礼"], ("【送礼】\n对象：乙\n礼物：\n留言：", False))
+        self.assertEqual(got["心动信"], ("发送心动信\n【发送对象】乙\n【内容】\n【署名】", False))
+        self.assertEqual(got["约会"], ("约会 时间 地点 乙", False))
+        self.assertEqual(got["电话"], ("电话 时间 乙", False))
+        self.assertEqual(got["拉线"], ("拉线 乙 ", False))                               # 还没有关系线
+        self.assertNotIn("看公知", got)                                                  # 公知没展示
+        self.assertEqual(btns[-1], ("换个人", "好友列表", True))
+        a, b = roles.get_role_by_name("甲")["id"], roles.get_role_by_name("乙")["id"]
+        relations.add_detail(b, a, "甲", "乙先写")
+        sheets.submit(b, "gongzhi", "乙的公知"); set_config("gongzhi_public", "1")
+        text, btns = self.say("好友列表 乙", member="M1", group="G1")[0]
+        self.assertIn("关系线：1 段，轮到你回", text)
+        got = {b[0]: (b[1], b[2]) for b in btns}
+        self.assertEqual(got["看关系线"], ("查看关系线 乙", True))
+        self.assertNotIn("拉线", got)
+        self.assertEqual(got["看公知"], ("查看公知 乙", True))
+        from changri.core import dinner, rpg
+        with get_conn() as c:
+            c.execute("DELETE FROM rpg_place_keys"); c.execute("DELETE FROM rpg_places")
+        set_config("ext:places", "1"); rpg.save_place("花园")
+        set_config("ext:dinner", "1"); dinner.start(3, "无菜"); dinner.sit("甲", 1); dinner.sit("乙", 2)
+        got = {b[0]: (b[1], b[2]) for b in self.say("好友列表 乙", member="M1", group="G1")[0][1]}
+        self.assertEqual(got["约会"], ("约会 乙", True))                                 # 有预设地点：下一步选地点
+        self.assertEqual(got["戳一下"], ("戳你一下 乙", True))                            # 邻座
+        self.assertNotIn("戳一下", {b[0] for b in self.say("好友列表 丙", member="M1", group="G1")[0][1]})
+        dinner.stop()
+        self.assertIn("这是你自己", self.say("好友列表 甲", member="M1", group="G1")[0][0])
+        self.assertIn("找不到", self.say("好友列表 不存在", member="M1", group="G1")[0][0])
+
+    def test_date_picker_card(self):
+        """「约会」「电话」后面不写东西：选人卡片，点名字填「约会 时间 地点 名字」，不含自己；常联系的在前；最后是自己写、帮助。"""
+        a, c = roles.get_role_by_name("甲")["id"], roles.get_role_by_name("丙")["id"]
+        relations.add_detail(a, c, "丙", "认识")                     # 甲和丙有关系线：丙排前面
+        text, btns = self.say("约会", member="M1", group="G1")[0]
+        self.assertIn("选一个人", text)
+        self.assertEqual(btns[0], ("丙", "约会 时间 地点 丙", False))
+        self.assertIn(("乙", "约会 时间 地点 乙", False), btns)
+        self.assertNotIn("甲", [b[0] for b in btns])
+        self.assertEqual(btns[-2:], [("自己写", "约会 ", False), ("帮助", "帮助", True)])
+        _t, btns = self.say("电话", member="M1", group="G1")[0]
+        self.assertIn(("乙", "电话 时间 乙", False), btns)
+        self.assertIn("「时间、地点」两个字还没换", self.say("约会 时间 地点 乙", member="M1", group="G1")[0][0])   # 忘了换占位字
+        self.assertIn("「地点」两个字还没换", self.say("约会 1400-1500 地点 乙", member="M1", group="G1")[0][0])
+
+    def test_date_picker_with_places(self):
+        """有预设地点：选人卡片点名字直接发「约会 名字」，回地点卡片；上锁没钥匙的不列；只能用预设地点时没有「别的地方」。"""
+        from changri.core import rpg
+        with get_conn() as c:
+            c.execute("DELETE FROM rpg_place_keys"); c.execute("DELETE FROM rpg_places")
+        set_config("ext:places", "1")
+        rpg.save_place("咖啡厅"); rpg.save_place("花园"); rpg.save_place("密室", locked=True)
+        _t, btns = self.say("约会", member="M1", group="G1")[0]
+        self.assertIn(("乙", "约会 乙", True), btns)                                   # 第一步：点了直接发
+        text, btns = self.say("约会 乙", member="M1", group="G1")[0]
+        self.assertIn("和 乙 去哪儿", text)
+        self.assertIn(("咖啡厅", "约会 时间 咖啡厅 乙", False), btns)
+        self.assertIn(("花园", "约会 时间 花园 乙", False), btns)
+        self.assertNotIn("密室", [b[0] for b in btns])                                 # 没钥匙
+        self.assertIn(("别的地方", "约会 时间 地点 乙", False), btns)
+        self.assertEqual(btns[-1], ("换个人", "约会", True))
+        a = roles.get_role_by_name("甲")["id"]
+        rpg.set_key(a, next(p["id"] for p in rpg.places() if p["name"] == "密室"), True)
+        set_config("place_system_enabled", "1")                                          # 只能用预设地点
+        _t, btns = self.say("约会 乙/丙", member="M1", group="G1")[0]
+        self.assertIn(("密室", "约会 时间 密室 乙/丙", False), btns)
+        self.assertNotIn("别的地方", [b[0] for b in btns])
+        self.assertIn("用法", self.say("约会 不存在的人", member="M1", group="G1")[0][0])   # 名字不认得：照旧给用法
+        set_config("ext:places", "0")                                                    # 关了地点：回到一步填好
+        _t, btns = self.say("约会", member="M1", group="G1")[0]
+        self.assertIn(("乙", "约会 时间 地点 乙", False), btns)
+
+    def test_wish_list_buttons(self):
+        """看心愿：一个心愿一段；自己挂的给「撤」，别人的给「摘」；都只填不发。挂心愿不带东西：有预设地点给地点按钮。"""
+        import time as _t
+        from changri.core import rpg
+        set_config("ext:wishes", "1")
+        if "changri.plugins.wishes" not in {p.module_name for p in nonebot.get_loaded_plugins()}:
+            nonebot.load_plugin("changri.plugins.wishes")                        # 心愿默认关，启动时没加载
+        a, b = roles.get_role_by_name("甲")["id"], roles.get_role_by_name("乙")["id"]
+        with get_conn() as c:
+            c.execute("DELETE FROM wishes")
+            mine = c.execute("INSERT INTO wishes(poster_id, start_hm, end_hm, place, content, sign, status, created_ts) VALUES(?,?,?,?,?,?,?,?)",
+                             (a, "14:00", "15:00", "花园", "一起散步", "", "open", int(_t.time()))).lastrowid
+            other = c.execute("INSERT INTO wishes(poster_id, start_hm, end_hm, place, content, sign, status, created_ts) VALUES(?,?,?,?,?,?,?,?)",
+                              (b, "16:00", "17:00", "图书馆", "陪我看书", "神秘人", "open", int(_t.time()))).lastrowid
+        text, btns = self.say("看心愿", member="M1", group="G1")[0]
+        self.assertIn(f"＃{other}", text); self.assertIn("陪我看书", text); self.assertIn("还剩", text)   # Markdown 里 # 转成全角
+        self.assertNotIn("｜", text)                                                     # 不再挤成一行
+        self.assertIn((f"撤 #{mine}", f"撤心愿 {mine}", False), btns)
+        self.assertIn((f"摘 #{other}", f"摘心愿 {other}", False), btns)
+        text, btns = self.say("撤心愿", member="M1", group="G1")[0]
+        self.assertIn("你挂着的心愿", text)
+        self.assertEqual(btns, [(f"撤 #{mine}", f"撤心愿 {mine}", False)])
+        with get_conn() as c:
+            c.execute("DELETE FROM rpg_place_keys"); c.execute("DELETE FROM rpg_places")
+        out = self.say("挂心愿", member="M1", group="G1")[0]                              # 没有预设地点：用法 + 填入
+        self.assertEqual(out[1], [("填入输入框", "挂心愿 时间 地点 ", False)])
+        with get_conn() as c:
+            c.execute("DELETE FROM rpg_place_keys"); c.execute("DELETE FROM rpg_places")
+        set_config("ext:places", "1"); rpg.save_place("花园")
+        text, btns = self.say("挂心愿", member="M1", group="G1")[0]
+        self.assertIn("选地点", text)
+        self.assertIn(("花园", "挂心愿 时间 花园 ", False), btns)
+        self.assertIn(("别的地方", "挂心愿 时间 地点 ", False), btns)
+
+    def test_dinner_seat_buttons(self):
+        """晚餐：座位表下面挂空位按钮，点了直接发「入座 N」；坐了的位子在新的一条里就没有了；坐不上的也给现在的空位。"""
+        from changri.core import dinner
+        set_config("ext:dinner", "1")
+        if "changri.plugins.dinner" not in {p.module_name for p in nonebot.get_loaded_plugins()}:
+            nonebot.load_plugin("changri.plugins.dinner")                        # 晚餐默认关，启动时没加载
+        dinner.start(4, "无菜")
+        text, btns = self.say("入座", member="M1", group="G1")[0]
+        self.assertIn("点空位入座", text)
+        self.assertEqual(btns, [("1号", "入座 1", True), ("2号", "入座 2", True), ("3号", "入座 3", True), ("4号", "入座 4", True)])
+        text, btns = self.say("入座 3", member="M1", group="G1")[0]
+        self.assertIn("3. 甲", text)
+        self.assertNotIn("3号", [b[0] for b in btns])
+        text, btns = self.say("入座 3", member="M2", group="G2")[0]                     # 有人了
+        self.assertIn("已经被 甲 坐了", text)
+        self.assertEqual([b[0] for b in btns], ["1号", "2号", "4号"])
+        for n, m in ((1, "M2"), (2, "M3")):
+            self.say(f"入座 {n}", member=m, group=m.replace("M", "G"))
+        roles.create_role("丁", "B1", "G4", "M4")
+        text, btns = self.say("入座 4", member="M4", group="G4")[0]
+        self.assertIn("座位都坐满了", text)
+        self.assertEqual(btns, [])
+        dinner.stop()
+
+    def test_form_pickers(self):
+        """只发「短信」「送礼」「心动信」「拉线」：选人卡片，点名字把对象填好；写了一半给用法 + 填入输入框。"""
+        set_config("ext:relations", "1"); set_config("ext:lovemail", "1")
+        _t, btns = self.say("短信", member="M1", group="G1")[0]
+        self.assertIn(("乙", "【短信】\n对象：乙\n内容：", False), btns)
+        self.assertNotIn("甲", [b[0] for b in btns])
+        _t, btns = self.say("送礼", member="M1", group="G1")[0]
+        self.assertIn(("乙", "【送礼】\n对象：乙\n礼物：\n留言：", False), btns)
+        text, btns = self.say("短信 乙", member="M1", group="G1")[0]                   # 写了一半
+        self.assertIn("短信 收信人 内容", text)
+        self.assertEqual(btns, [("填入输入框", "【短信】\n对象：乙\n内容：", False)])
+        _t, btns = self.say("心动信", member="M1", group="G1")[0]
+        self.assertIn(("乙", "发送心动信\n【发送对象】乙\n【内容】\n【署名】", False), btns)
+        _t, btns = self.say("拉线", member="M1", group="G1")[0]
+        self.assertIn(("乙", "拉线 乙 ", False), btns)
+        text, btns = self.say("拉线 乙", member="M1", group="G1")[0]                    # 没写内容
+        self.assertEqual(btns, [("填入输入框", "拉线 乙 ", False)])
+        from changri.core import deadlines
+        deadlines.set("rel", "2000-01-01 00:00")                                           # 截止了：不给选人
+        self.assertNotIn("选一个人", self.say("拉线", member="M1", group="G1")[0][0])
+        deadlines.set("rel", "")
+
+    def test_relation_detail_next(self):
+        set_config("ext:relations", "1")
+        a, b = roles.get_role_by_name("甲")["id"], roles.get_role_by_name("乙")["id"]
+        relations.add_detail(a, b, "乙", "第一段")
+        out = self.say("查看关系线 乙", member="M1", group="G1")
+        self.assertEqual(out[-1][1], [("接着写", "拉线 乙 ", False), ("回列表", "查看关系线", True)])
+
+    def test_usage_has_fill(self):
+        text, btns = self.say("约会 1400-1500", member="M1", group="G1")[0]
+        self.assertIn("用法", text)
+        self.assertEqual(btns, [("填入输入框", "约会 ", False)])
+        _t, btns = self.say("电话 1400-1500", member="M1", group="G1")[0]
+        self.assertEqual(btns, [("填入输入框", "电话 ", False)])
+
+    def test_dinner_poke_neighbors(self):
+        from changri.core import dinner
+        set_config("ext:dinner", "1")
+        if "changri.plugins.dinner" not in {p.module_name for p in nonebot.get_loaded_plugins()}:
+            nonebot.load_plugin("changri.plugins.dinner")
+        dinner.start(4, "无菜")
+        self.assertIn("还没入座", self.say("戳你一下", member="M1", group="G1")[0][0])
+        dinner.sit("甲", 1); dinner.sit("乙", 2); dinner.sit("丙", 4)
+        text, btns = self.say("戳你一下", member="M1", group="G1")[0]
+        self.assertIn("旁边坐着", text)
+        self.assertEqual(sorted(b[1] for b in btns), ["戳你一下 丙", "戳你一下 乙"])          # 首尾相邻
+        self.assertTrue(all(b[2] for b in btns))
+        self.assertEqual(dinner.neighbors("乙"), ["甲"])
+        dinner.stop()
+
+    def test_card_followed_by_actions(self):
+        """「角色卡」先发卡片，后面跟一条「接下来做什么？」挂按钮；关系线有待回的把数写在按钮上。"""
+        set_config("ext:relations", "1")
+        a, b = roles.get_role_by_name("甲")["id"], roles.get_role_by_name("乙")["id"]
+        relations.add_detail(b, a, "甲", "乙先写了一段，轮到甲回")
+        out = self.say("角色卡", member="M1", group="G1")
+        self.assertGreaterEqual(len(out), 2)
+        text, btns = out[-1]
+        self.assertIn("接下来做什么", text)
+        cmds = [x[1] for x in btns]
+        for c in ("时间线", "我的待回", "查看关系线", "好友列表", "帮助"):
+            self.assertIn(c, cmds)
+        self.assertIn(("关系线 1待回", "查看关系线", True), btns)
+        set_config("ext:relations", "0")
+        self.assertNotIn("查看关系线", [x[1] for x in self.say("角色卡", member="M1", group="G1")[-1][1]])
+
+    def test_btn_name_rule(self):
+        from changri.core import charprofile
+        self.assertEqual(charprofile.btn_name("欧阳娜娜子", ""), "欧阳娜娜")      # 最多前 4 个字
+        self.assertEqual(charprofile.btn_name("欧阳娜娜子", "娜娜"), "娜娜")      # 有简称用简称
 
     def test_format_menu_only_enabled(self):
         out = self.say("格式")
@@ -330,6 +543,21 @@ class ButtonsE2E(unittest.TestCase):
         self.assertIn("2 位", text)
         self.assertEqual([x[1] for x in btns], ["查看公知 甲", "查看公知 乙"])
         self.assertEqual(self.say("查看公知 乙"), [("<图>", [])])          # 点名字：只发这一个人的
+
+    def test_gongzhi_list_splits_players_and_npcs(self):
+        """玩家、NPC 分两条发，各自一组按钮；只有玩家时只发一条。"""
+        set_config("gongzhi_public", "1")
+        for n in ("甲", "乙", "丙"):
+            sheets.submit(roles.get_role_by_name(n)["id"], "gongzhi", f"我是{n}", [])
+        with get_conn() as c:
+            c.execute("UPDATE roles SET is_npc=1 WHERE name='乙'")
+        out = self.say("查看公知")
+        self.assertEqual(len(out), 2)
+        self.assertIn("玩家", out[0][0])
+        self.assertIn("2 位", out[0][0])
+        self.assertEqual([x[1] for x in out[0][1]], ["查看公知 甲", "查看公知 丙"])
+        self.assertIn("NPC", out[1][0])
+        self.assertEqual([x[1] for x in out[1][1]], ["查看公知 乙"])
 
     def test_gongzhi_falls_back_to_long_image(self):
         set_config("gongzhi_public", "1")

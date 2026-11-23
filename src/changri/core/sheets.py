@@ -108,11 +108,12 @@ def submit(role_id: int, kind: str, text: str, images: list[bytes] | None = None
 
 def get(role_id: int, kind: str) -> dict | None:
     with get_conn() as c:
-        r = c.execute("SELECT s.*, ro.name FROM sheets s JOIN roles ro ON ro.id=s.role_id WHERE s.role_id=? AND s.kind=?", (role_id, kind)).fetchone()
+        r = c.execute("SELECT s.*, ro.name, ro.is_npc FROM sheets s JOIN roles ro ON ro.id=s.role_id WHERE s.role_id=? AND s.kind=?", (role_id, kind)).fetchone()
         if not r:
             return None
         imgs = [x["filename"] for x in c.execute("SELECT filename FROM sheet_images WHERE role_id=? AND kind=? ORDER BY ord", (role_id, kind))]
-    return {"role_id": role_id, "name": r["name"], "kind": kind, "text": r["text"], "images": imgs, "updated_ts": r["updated_ts"]}
+    return {"role_id": role_id, "name": r["name"], "kind": kind, "text": r["text"], "images": imgs, "updated_ts": r["updated_ts"],
+            "is_npc": bool(r["is_npc"])}
 
 
 def all_of(kind: str) -> list[dict]:

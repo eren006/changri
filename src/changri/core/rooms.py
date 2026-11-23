@@ -264,6 +264,9 @@ def create(kind: str, creator_id: int, target_ids: list[int], time_text: str, pl
     closed = "" if official else windows.check("date")
     if closed:
         return False, closed, 0
+    if time_text.strip() == "时间" or place.strip() == "地点":      # 选人卡片填进去的占位字（core/datepick.py）忘了换
+        what = "、".join(x for x, bad in (("时间", time_text.strip() == "时间"), ("地点", place.strip() == "地点")) if bad)
+        return False, f"「{what}」两个字还没换：把它换成真的{what}再发。", 0
     if kind != "微信":
         if season.phase() != "playing":
             return False, "现在不是进行中的季度（筹备期/没有季度时不能约）。", 0

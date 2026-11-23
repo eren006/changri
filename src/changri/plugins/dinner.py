@@ -13,7 +13,8 @@ from changri.core import dinner, dinner_dessert as dessert, dinner_ihave as ihav
 from changri.core.db import per_bot
 from nonebot.adapters.qq import MessageSegment
 
-from changri.core.qqsend import make_send, make_send_image, reply_long
+from changri.core.buttons import Btn
+from changri.core.qqsend import make_send, make_send_image, reply_buttons, reply_long
 from changri.plugins.play import NEED_ROLE, _cmd, _is_admin, _me
 from changri.core.textutil import parse_id
 
@@ -31,7 +32,24 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     if not p or not p[0].isdigit():
         await start_cmd.finish("用法：开始晚餐 座位数 [风格]\n风格：" + "、".join(dinner.MENUS) + "、无菜\n例：开始晚餐 5 现代西餐")
     ok, msg = dinner.start(int(p[0]), p[1] if len(p) > 1 else "现代中餐", bot.self_id, event.group_openid)
-    await start_cmd.finish(msg if ok else "❌ " + msg)
+    if not ok:
+        await start_cmd.finish("❌ " + msg)
+    await _with_seats(start_cmd, msg)
+
+
+SEAT_MAX_BTNS = 25          # QQ 一条消息最多 25 个按钮
+
+
+async def _with_seats(matcher, text: str) -> None:
+    """座位表下面挂空位按钮：点了直接发「入座 N」（换座也是再点一个，点错了没关系）。
+    QQ 改不了发出去的消息，旧座位表上的按钮还在；点到已经有人的位子会被告知换一个，所以每次都在最新一条上给现在的空位。"""
+    free = dinner.free_seats()
+    if not free:
+        await matcher.finish(text + "\n\n座位都坐满了。")
+    more = len(free) - SEAT_MAX_BTNS
+    tip = "\n\n点空位入座（点了直接坐下，想换座再点一个）" + (f"\n还有 {more} 个空位没放下：直接发「入座 号码」" if more > 0 else "")
+    await reply_buttons(matcher, text + tip, [Btn(f"{n}号", f"入座 {n}") for n in free[:SEAT_MAX_BTNS]], per_row=5)
+    await matcher.finish()
 
 
 @sit_cmd.handle()
@@ -41,9 +59,14 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
         await sit_cmd.finish(NEED_ROLE)
     n = parse_id(args.extract_plain_text())
     if not n:
-        await sit_cmd.finish("用法：入座 座位号，例：入座 3")
+        s = dinner.state()
+        if not s:
+            await sit_cmd.finish("晚餐还没开始，等管理员「开始晚餐」。")
+        await _with_seats(sit_cmd, dinner.render(s))                  # 只发「入座」：给座位表和空位按钮
     ok, msg = dinner.sit(me["name"], n)
-    await sit_cmd.finish(msg if ok else "❌ " + msg)
+    if not ok and not dinner.state():
+        await sit_cmd.finish("❌ " + msg)
+    await _with_seats(sit_cmd, msg if ok else "❌ " + msg)
 
 
 @end_cmd.handle()
@@ -62,8 +85,13 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     if not me:
         await poke_cmd.finish(NEED_ROLE)
     name = args.extract_plain_text().strip()
-    if not name:
-        await poke_cmd.finish("用法：戳你一下 对方角色名")
+    if not name:                                  # 不带名字：给两边邻座的按钮，点了直接戳
+        near = dinner.neighbors(me["name"])
+        if not near:
+            await poke_cmd.finish("用法：戳你一下 对方角色名（只能戳坐在你旁边的人）" + ("" if me["name"] in ((dinner.state() or {}).get("seats") or []) else "\n你还没入座，先发「入座」选个位子。"))
+        from changri.core import charprofile
+        await reply_buttons(poke_cmd, "戳谁？你旁边坐着：" + "、".join(near), [Btn(charprofile.btn_name_of(x), f"戳你一下 {x}") for x in near], per_row=2)
+        await poke_cmd.finish()
     left = dinner.cooldown_left(me["id"])
     if left:
         await poke_cmd.finish(f"⏳ 你戳得太快了，请等 {(left + 59) // 60} 分钟后再试。")

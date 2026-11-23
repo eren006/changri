@@ -183,6 +183,24 @@ async def reply_buttons(matcher, text: str, btns, per_row: int = 3, tail: str = 
     return True
 
 
+async def finish_usage(matcher, text: str, fill: str) -> None:
+    """「用法：……」下面挂一个「填入输入框」，把指令开头填好，玩家照着补完再发。发不了按钮就照旧只有文字。"""
+    from .buttons import Btn
+    await reply_buttons(matcher, text, [Btn("填入输入框", fill, enter=False)] if fill else [], per_row=1)
+    await matcher.finish()
+
+
+CARD_SECONDARY = ("自己写", "帮助", "别的地方", "换个人")
+
+
+async def send_card(matcher, text: str, items, per_row: int = 4) -> None:
+    """选人 / 选地点这类卡片：items = [(按钮上的字, 指令, 点了是不是直接发出)]，发完结束这条指令。底下那几个辅助按钮用灰色。"""
+    from .buttons import Btn
+    await reply_buttons(matcher, text, [Btn(label, cmd, enter=send, style="secondary" if label in CARD_SECONDARY else "primary")
+                                        for label, cmd, send in items], per_row=per_row)
+    await matcher.finish()
+
+
 AT_RE = re.compile(r"\A\{\{AT:(\w+):([^}]*)\}\}")
 _md_off_until = 0.0
 

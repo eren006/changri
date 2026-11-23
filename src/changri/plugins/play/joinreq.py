@@ -6,7 +6,7 @@ from nonebot.params import CommandArg
 from changri.core import roles, rooms
 from changri.core.buttons import Btn
 from changri.core.overview import slot_text as _slot
-from changri.core.qqsend import reply_buttons
+from changri.core.qqsend import finish_usage, reply_buttons
 from changri.core.textutil import hm_text
 
 from .common import NEED_ROLE, _cmd, _me
@@ -34,7 +34,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
         await join_cmd.finish(NEED_ROLE)
     p = args.extract_plain_text().split()
     if not p:
-        await join_cmd.finish("用法：申请加入 对方名 [开始时间]\n例：申请加入 张三 14:00")
+        await finish_usage(join_cmd, "用法：申请加入 对方名 [开始时间]\n例：申请加入 张三 14:00", "申请加入 ")
     target = roles.get_role_by_name(p[0])
     if not target:
         await join_cmd.finish(f"❌ 找不到角色：{p[0]}。")

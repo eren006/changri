@@ -11,8 +11,9 @@ from nonebot.params import CommandArg
 from nonebot.typing import T_State
 
 from changri.core.qqsend import download_images, make_send, reply_buttons, reply_long, send_to_group  # noqa: E402
-from changri.core import admins, blocks, charprofile, formats, forms, gifts, messaging, msgimages, roles, season, sendmsg, windows
+from changri.core import admins, blocks, charprofile, datepick, formats, forms, gifts, messaging, msgimages, roles, season, sendmsg, windows
 from changri.core.buttons import Btn
+from changri.core.qqsend import finish_usage, send_card
 from changri.core.db import get_config, get_conn, get_int, per_bot
 
 nonebot.require("nonebot_plugin_apscheduler")
@@ -84,12 +85,29 @@ async def _():
     await reply_long(look_wall, charprofile.look_wall())
 
 
-roster_cmd = _cmd("玩家名单", {"角色名单"})
+roster_cmd = _cmd("好友列表", {"联系人", "玩家名单", "角色名单"})       # 「玩家名单」并进好友列表（core/contacts.py）
 
 
 @roster_cmd.handle()
-async def _():
-    await reply_long(roster_cmd, charprofile.roster())
+async def _(event: GroupMessageCreateEvent, args=CommandArg()):
+    """「好友列表」：名单 + 一人一个按钮；「好友列表 张三」：张三的小卡片和能对 TA 做的事。"""
+    from changri.core import contacts
+    me = _sender_role(event)
+    name = args.extract_plain_text().strip()
+    if not name:
+        text, items = contacts.list_card(me["id"] if me else None)
+        if not items:
+            await reply_long(roster_cmd, text)
+            await roster_cmd.finish()
+        await send_card(roster_cmd, text, items)
+    if not me:
+        await roster_cmd.finish("你还没有角色。在你的个人群里发「创建新角色 名字」就能创建。")
+    target = roles.get_role_by_name(name)
+    if not target:
+        await roster_cmd.finish(f"找不到叫「{name}」的角色。发「好友列表」看名单。")
+    if target["id"] == me["id"]:
+        await roster_cmd.finish("这是你自己。看自己的发「角色卡」。")
+    await send_card(roster_cmd, *contacts.person_card(me, target))
 
 
 my_role = _cmd("我的角色", {"我的群"})
@@ -209,7 +227,11 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, state: T_State):
         lost_note = ("\n（管理员没有开放图片，这条没带上图片。）" if not msgimages.enabled()
                      else f"\n⚠️ 图片没带上：下载失败，或者超过了 {msgimages.max_bytes() // 1024 // 1024} MB。")
     if p["bad"] and not (p["to"] and images):                # 只有图片没有文字的短信（短信 对象）、只有图片的照片礼物（送礼 对象）也算
-        await social_msg.finish(forms.TEMPLATES["短信" if kind == "sms" else "送礼"])
+        name = "短信" if kind == "sms" else "送礼"
+        me = roles.find_role_for_sender(bot.self_id, event.group_openid, event.author.member_openid)
+        if me and not p["to"] and not p.get("form") and not had_image:       # 只发「短信」「送礼」：选人卡片
+            await send_card(social_msg, *datepick.form_card(name, me["id"]))
+        await finish_usage(social_msg, forms.TEMPLATES[name], formats.form_to(name, p["to"]) if p["to"] else formats.fill(name))
     me = roles.find_role_for_sender(bot.self_id, event.group_openid, event.author.member_openid)
     if not me:
         await social_msg.finish("你还没有角色。在你的个人群里发「创建新角色 名字」就能创建。")

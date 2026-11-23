@@ -657,7 +657,7 @@ def create_phone_app(secret_key: str) -> Flask:
                     groups.append({"label": "功能", "items": hit})
                 ppl = c.execute("SELECT id, name FROM roles WHERE id!=? AND name LIKE ? ORDER BY name LIMIT 8", (rid, like)).fetchall()
                 if ppl:
-                    groups.append({"label": "联系人", "items": [{"title": r["name"], "sub": "点击开始对话", "url": url_for("thread", other=r["id"])} for r in ppl]})
+                    groups.append({"label": "好友列表", "items": [{"title": r["name"], "sub": "点击开始对话", "url": url_for("thread", other=r["id"])} for r in ppl]})
                 from changri.core import phoneview
                 from changri.core.messaging import not_received_sql
                 # 发件人搜的是自己原本写的、挂在原本发给的人名下（混乱短信改过的字和误投只给收件人看）；收件人没真收到的不搜

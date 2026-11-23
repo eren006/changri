@@ -1384,7 +1384,7 @@ class PlayE2E(unittest.TestCase):
         self.assertIn("心愿已漂走", out); self.assertIn("有效期：24小时", out); self.assertIn("显示昵称：神秘人A", out)
         w1 = wishes.list_open()[0]["id"]
         wall = self.say("看心愿", member="M1", group="P1")[0]
-        self.assertIn("花园", wall); self.assertIn("神秘人A", wall); self.assertIn("剩24h", wall)
+        self.assertIn("花园", wall); self.assertIn("神秘人A", wall); self.assertIn("还剩 24 小时", wall)
         self.assertNotIn("甲", wall)                                                      # 对外不显示真名
         self.assertIn("不能摘自己", self.say(f"摘心愿 {w1}")[0])
         out = self.say(f"摘心愿 {w1}", member="M1", group="P1")
@@ -1394,7 +1394,7 @@ class PlayE2E(unittest.TestCase):
         self.assertIn("14:00-15:00 心愿", self.say("时间线")[0])
         self.say("挂心愿 1600-1700 图书馆 陪我看书")
         self.assertIn("👩", self.say("看心愿")[0])                                          # 没写昵称：只显示性别
-        self.assertIn("你发布的心愿", self.say("撤心愿")[0])                                 # 不带编号：列出自己的
+        self.assertIn("你挂着的心愿", self.say("撤心愿")[0])                                 # 不带编号：列出自己的
         self.assertIn("已撤回", self.say(f"撤心愿 {wishes.list_open()[0]['id']}")[0])
         self.assertIn("昵称最多 10 个字", self.say("挂心愿 1600-1700 图书馆 看书 | 一二三四五六七八九十一")[0])
 

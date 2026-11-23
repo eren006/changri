@@ -77,7 +77,21 @@ FILL = {"短信": "【短信】\n对象：\n内容：", "送礼": "【送礼】\
 
 
 def fill(name: str) -> str:
+    """填进输入框的格式（时间、地点玩家自己写，不替他们填）。"""
     return FILL.get(ALIASES.get(name, name), "")
+
+
+FORM_TARGET = {"短信": "对象：", "送礼": "对象：", "心动信": "【发送对象】"}
+
+
+def form_to(kind: str, name: str) -> str:
+    """竖着写的空白表单，对象已经填好（选人卡片、玩家名单的按钮用）。"""
+    key = FORM_TARGET[kind]
+    return FILL[kind].replace(key, key + name, 1)
+
+
+def sms_to(name: str) -> str:
+    return form_to("短信", name)
 
 
 def available() -> list[str]:
@@ -147,7 +161,7 @@ HUB: list[tuple[str, str, str, Callable[[], bool]]] = [
     ("时间线", "时间线", "自己今天和以后的约会安排", _always),
     ("看公知", "查看公知", "公知（开放展示以后能看所有人的）", _ext("relations")),
     ("看关系线", "查看关系线", "你和别人之间的关系线", _relations),
-    ("玩家名单", "玩家名单", "所有角色", _always),
+    ("好友列表", "好友列表", "所有嘉宾；点名字发短信、送礼、约会……", _always),
     ("看心愿", "看心愿", "现在挂着的心愿", _ext("wishes")),
     ("看帖子", "查看帖子", "最近的帖子", _ext("forum")),
 ]
@@ -187,6 +201,33 @@ def hub_text(role_id: int | None = None) -> str:
     return "📖 帮助（点按钮，或者直接发指令）\n" + "\n".join(lines)
 
 
+CARD_NEXT = "接下来做什么？"
+
+
+def card_actions(role) -> list[tuple[str, str]]:
+    """「角色卡」图片后面跟的一排按钮：先是自己的（背包、时间线、待回），再是和别人的（关系线、心动信、发短信），最后帮助。
+    有要处理的事就把数写在按钮上（「待回 3」「关系线 2待回」），一眼知道先点哪个。功能关着的不出。"""
+    out: list[tuple[str, str]] = []
+    if _ext("rpg")():
+        out.append(("背包", "背包"))
+    out.append(("时间线", "时间线"))
+    try:
+        from .overview import todo_items
+        n = len(todo_items(role))
+    except Exception:  # noqa: BLE001 数不出来就不写数，按钮照样给
+        n = 0
+    out.append((f"待回 {n}" if n else "待回", "我的待回"))
+    if _relations():
+        from . import relations
+        n = sum(1 for it in relations.list_for(role["id"]) if it["pending"])
+        out.append((f"关系线 {n}待回" if n else "关系线", "查看关系线"))
+    if _lovemail():
+        out.append(("心动信", "我的心动信"))
+    out.append(("好友列表", "好友列表"))
+    out.append(("帮助", "帮助"))
+    return out
+
+
 def qq_needed() -> bool:
     """用了 QQ 小号（房间群靠绑的 QQ 认人）才要求新角色绑 QQ。"""
     from .db import get_config
@@ -220,6 +261,6 @@ def welcome(role, head: str = "") -> str:
         lines.append("  手机码：打开小手机，在「我的」里改微信名、换头像")
     lines.append("  换绑码：以后要换个人群时用")
     lines += ["", "📋 发「我的」随时查看时间线、待回、数量这些自查。",
-              "👥 发「玩家名单」看所有角色，「查看皮相墙」看大家的皮相。",
+              "👥 发「好友列表」看所有角色、点名字跟 TA 互动，「查看皮相墙」看大家的皮相。",
               "📝 发「格式」看短信、约会等指令怎么写。"]
     return "\n".join(lines)

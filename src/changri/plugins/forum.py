@@ -9,7 +9,7 @@ from nonebot.params import CommandArg
 
 from changri.core import admins, announce, forum, godmode, roles, windows
 from changri.core.buttons import Btn
-from changri.core.qqsend import reply_buttons, send_to_group
+from changri.core.qqsend import finish_usage, reply_buttons, send_to_group
 from changri.core.textutil import parse_id
 
 NEED_ROLE = "你还没有角色。在你的个人群里发「创建新角色 名字」就能创建。"
@@ -60,7 +60,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
         await post_cmd.finish(NEED_ROLE)
     t = args.extract_plain_text().strip()
     if not t:
-        await post_cmd.finish("用法：发帖 署名 内容（只写内容就用角色名署名）\n例：发帖 路人甲 今天天气真好！")
+        await finish_usage(post_cmd, "用法：发帖 署名 内容（只写内容就用角色名署名）\n例：发帖 路人甲 今天天气真好！", "发帖 ")
     sign, content = _split_sign(t, me["name"])
     if len(content) > 1000:
         await post_cmd.finish("帖子太长了（最多 1000 字）。")

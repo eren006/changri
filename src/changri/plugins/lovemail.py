@@ -7,7 +7,7 @@ from nonebot.adapters.qq import Bot, GroupMessageCreateEvent
 from nonebot.matcher import current_bot
 from nonebot.params import CommandArg
 
-from changri.core.qqsend import download_images, make_send, reply_long  # noqa: E402
+from changri.core.qqsend import download_images, finish_usage, make_send, reply_long, send_card  # noqa: E402
 from changri.core import admins, lovemail, messaging, msgimages, roles, season
 from changri.core.announce import get_announce
 from changri.core.db import get_config, get_int, per_bot, set_config
@@ -68,12 +68,16 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
         if not images:
             await post_mail.finish(f"⚠️ 图片没下载下来，或者超过了 {msgimages.max_bytes() // 1024 // 1024} MB，这封信没有投出去，换一张再试试。")
         img_note = "\n🖼 附了一张图，派送时一起送到。"
+    if not text.strip() and not images:                  # 只发「心动信」：选人卡片，点名字填好【发送对象】，署名空着（匿名）
+        from changri.core import datepick
+        await send_card(post_mail, *datepick.form_card("心动信", me["id"]))
     receiver, content, signature = lovemail.parse_post(text)
     if not receiver and images and len(text.split()) == 1 and "【" not in text:     # 只附图不写字：发送心动信 收信人 + 图
         receiver = text.strip()
     if not receiver:
-        await post_mail.finish("⚠️ 要写清楚寄给谁。\"简单写法（署名是你的真名）：发送心动信 角色名 想说的话\n"
-                               "想换署名用这种：\n发送心动信\n【发送对象】角色名\n【内容】想说的话\n【署名】自定义昵称（不写就是「匿名」）")
+        await finish_usage(post_mail, "⚠️ 要写清楚寄给谁。简单写法（署名是你的真名）：发送心动信 角色名 想说的话\n"
+                                      "想换署名用这种：\n发送心动信\n【发送对象】角色名\n【内容】想说的话\n【署名】自定义昵称（不写就是「匿名」）",
+                           "发送心动信\n【发送对象】\n【内容】\n【署名】")
     target = roles.get_role_by_name(receiver)
     if not target:
         await post_mail.finish(f"⚠️ 找不到叫「{receiver}」的角色，核对一下名字。")

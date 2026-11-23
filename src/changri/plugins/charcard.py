@@ -3,7 +3,9 @@
 from nonebot import logger, on_command
 from nonebot.adapters.qq import Bot, GroupMessageCreateEvent, MessageSegment
 
-from changri.core import roles, rpgcard
+from changri.core import formats, roles, rpgcard
+from changri.core.buttons import Btn
+from changri.core.qqsend import reply_buttons
 
 NEED_ROLE = "你还没有角色。在你的个人群里发「创建新角色 名字」就能创建。"
 
@@ -19,6 +21,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent):
         png = rpgcard.render_card(me["id"])
         if png:
             await card.send(MessageSegment.file_image(png))
+            await _next(me)
             return
     except Exception as e:  # noqa: BLE001
         logger.warning(f"[角色卡] 画图失败，改发文字：{e}")
@@ -32,4 +35,10 @@ async def _(bot: Bot, event: GroupMessageCreateEvent):
         lines.append("货币：" + "、".join(f"{x['name']} {x['count']}" for x in info["money"]))
     if info["shop"]:
         lines.append("背包：" + ("、".join(f"{x['name']}×{x['count']}" for x in info["items"]) or "空"))
-    await card.finish("\n".join(lines))
+    await card.send("\n".join(lines))
+    await _next(me)
+
+
+async def _next(me) -> None:
+    """卡片后面跟一条短消息挂按钮（按钮挂不到图片上）。按钮发不出去（没权限、被关）就什么都不补，卡片已经发了。"""
+    await reply_buttons(card, formats.CARD_NEXT, [Btn(label, cmd) for label, cmd in formats.card_actions(me)], per_row=3, fallback=False)

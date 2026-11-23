@@ -13,6 +13,7 @@ from nonebot.params import CommandArg
 
 from changri.core import announce, blocks, roles, song
 from changri.core.db import get_config
+from changri.core.qqsend import finish_usage
 from changri.plugins.play import NEED_ROLE, _cmd, _me
 
 USAGE = ("🎵 点歌\n"
@@ -72,7 +73,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
         q = song.quoted_text(event)
         if "哔哩哔哩" in q or "bilibili" in q.lower():
             await pick.finish("📺 B 站分享到 QQ 的小程序卡片里读不到视频链接。\n请在 B 站点「分享 → 复制链接」，然后发：点歌 粘贴的链接 [给 某人] [寄语]\n也可以直接写 BV 号：点歌 BV1xxxxxxxxx")
-        await pick.finish(USAGE)
+        await finish_usage(pick, USAGE, "点歌 ")
     bad = song.limit_reached(me["id"])
     if bad:
         await pick.finish(bad)

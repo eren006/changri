@@ -9,7 +9,8 @@ from nonebot.params import CommandArg
 from changri.core import messaging, roles, rooms, season, storycal
 from changri.core.db import get_config, set_config
 from changri.core.overview import group_line as _group_line, slot_text as _slot
-from changri.core.qqsend import make_send, reply_long
+from changri.core.buttons import Btn
+from changri.core.qqsend import finish_usage, make_send, reply_buttons, reply_long
 from changri.core.textutil import hm_text
 
 from .common import NEED_ROLE, NOT_ADMIN, _announce_in_room, _cmd, _invite, _is_admin, _me, _missed_line, _names, _push, _push_group, _qq_hint, _resolve
@@ -74,14 +75,53 @@ async def _start_room(matcher, bot: Bot, event: GroupMessageCreateEvent, kind: s
     await matcher.finish(text if ok else f"❌ {text}")
 
 
+async def _pick(matcher, bot: Bot, event: GroupMessageCreateEvent, kind: str) -> None:
+    """「约会」「电话」后面什么都不写：选人卡片（core/datepick.py），点名字把指令填进输入框。没有角色就照旧给用法。"""
+    from changri.core import datepick
+    me = _me(bot, event)
+    if not me:
+        await matcher.finish(NEED_ROLE)
+    text, items = datepick.card(kind, me["id"])
+    await _send_card(matcher, text, items)
+
+
+SECONDARY = ("自己写", "帮助", "别的地方", "换个人")
+
+
+async def _send_card(matcher, text: str, items) -> None:
+    await reply_buttons(matcher, text, [Btn(label, cmd, enter=send, style="secondary" if label in SECONDARY else "primary")
+                                        for label, cmd, send in items], per_row=4)
+    await matcher.finish()
+
+
+async def _pick_place(matcher, bot: Bot, event: GroupMessageCreateEvent, names_text: str) -> bool:
+    """「约会 张三」（选人卡片第一步点出来的）：对象都认得、又有预设地点，就回地点卡片，返回 True；否则 False，照旧给用法。"""
+    from changri.core import charprofile, datepick
+    me = _me(bot, event)
+    if not me:
+        return False
+    names = _names(names_text)
+    targets, missing = _resolve(names)
+    if missing or not targets or not datepick.places_for(me["id"]):
+        return False
+    label = "、".join(charprofile.btn_name(t["name"], charprofile.get(t["id"])["short"]) for t in targets)
+    text, items = datepick.place_card(me["id"], "/".join(t["name"] for t in targets), label)
+    await _send_card(matcher, text, items)
+    return True
+
+
 private = _cmd("约会", {"私约"})                 # 0.21 起私约改名约会，老叫法照样认
 
 
 @private.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     p = args.extract_plain_text().split(None, 2)
+    if not p:
+        await _pick(private, bot, event, "约会")
+    if len(p) == 1:
+        await _pick_place(private, bot, event, p[0])
     if len(p) < 3:
-        await private.finish(f"用法：约会 时间 地点 对方（多人用 / 隔开）\n例：约会 {storycal.example_time()} 咖啡厅 张三/李四")
+        await finish_usage(private, f"用法：约会 时间 地点 对方（多人用 / 隔开）\n例：约会 {storycal.example_time()} 咖啡厅 张三/李四", "约会 ")
     await _start_room(private, bot, event, "约会", p[0], p[1], _names(p[2]))
 
 
@@ -91,8 +131,10 @@ phone = _cmd("电话")
 @phone.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     p = args.extract_plain_text().split(None, 1)
+    if not p:
+        await _pick(phone, bot, event, "电话")
     if len(p) < 2:
-        await phone.finish(f"用法：电话 时间 对方（多人用 / 隔开）\n例：电话 {storycal.example_time()} 张三")
+        await finish_usage(phone, f"用法：电话 时间 对方（多人用 / 隔开）\n例：电话 {storycal.example_time()} 张三", "电话 ")
     await _start_room(phone, bot, event, "电话", p[0], "", _names(p[1]))
 
 
@@ -105,7 +147,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
         await stakeout.finish("❌ 踩点没有开放。")
     p = args.extract_plain_text().split(None, 1)
     if len(p) < 2:
-        await stakeout.finish(f"用法：踩点 时间 地点（一个人的群，不带别人）\n例：踩点 {storycal.example_time()} 大图书馆")
+        await finish_usage(stakeout, f"用法：踩点 时间 地点（一个人的群，不带别人）\n例：踩点 {storycal.example_time()} 大图书馆", "踩点 ")
     await _start_room(stakeout, bot, event, "踩点", p[0], p[1].strip(), [])
 
 
