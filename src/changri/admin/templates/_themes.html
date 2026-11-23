@@ -3,7 +3,7 @@
     选了主题就固定用这一套，不再跟着系统深色模式变；「默认」和「樱花」照旧跟随系统（樱花有浅色、深色两套）。对比度：正文/次要文字/强调色 ≥4.5:1，输入框边线 ≥3:1。 -#}
 {% macro theme_css() %}
 /* ---------- 睡莲：莫奈《睡莲》——侧栏是一片用半透明短色块罩出来的池水（tools/paint_lily.py 生成 static/lily-pond.webp）：
-   上面是暖白的天光，往下转成水绿，右上角垂柳的倒影，一簇簇睡莲叶和粉白的花；上面一层光在水面上慢慢横着漂 ---------- */
+   上面是暖白的天光，往下转成水绿，右上角垂柳的倒影，一簇簇睡莲叶和粉白的花；（作者：睡莲不要流动的笔触，另想更莫奈的效果） ---------- */
 /* 侧栏是浅色的，字用深色：左边（菜单文字在的地方）再铺一层薄薄的浅色，笔触不抢字。 */
 :root[data-theme="lily"]{
   --paper:#eef1f4; --surface:#fbfcfd; --ink:#1f2a33; --mute:#4c5966; --line:#d6dee3; --soft:#e3eaee;
@@ -153,7 +153,15 @@
 /* 菜单项的字：夜空上加一点点阴影，笔触亮的地方也读得清 */
 :root[data-theme="starry"] .rail a,:root[data-theme="starry"] .rail h3,:root[data-theme="starry"] .brand,:root[data-theme="starry"] .who,:root[data-theme="starry"] .themes summary{text-shadow:0 1px 2px rgb(5 8 28 / .55)}
 /* 流动的画布在菜单文字下面：只在电脑宽度把文字那几块抬上去（手机上侧栏是顶栏 + 弹出菜单，画布不画，也别动它们的定位） */
-@media (min-width:861px){:root[data-theme="starry"] .rail .brand,:root[data-theme="starry"] .msheet > *,:root[data-theme="lily"] .rail .brand,:root[data-theme="lily"] .msheet > *{position:relative;z-index:1}}
+@media (min-width:861px){:root[data-theme="starry"] .rail .brand,:root[data-theme="starry"] .msheet > *,
+  :root[data-theme="lily"] .rail .brand,:root[data-theme="lily"] .msheet > *{position:relative;z-index:1}}
+/* 睡莲的池塘：几层叠在侧栏后面（theme_js 里搭）——会轻轻晃的画、涟漪和阳光的画布、跟着钟点变的光、最上面一层浅色（保证字清楚） */
+#pond{position:fixed;left:0;top:0;pointer-events:none;z-index:0;overflow:hidden}
+#pond > *{position:absolute;inset:0}
+#pond .img{background:url("{{ url_for('static', filename='lily-pond.webp') }}") center top / 100% auto no-repeat;filter:url(#pond-wave);inset:-6px}
+#pond .tint{mix-blend-mode:soft-light;transition:background-color 60s linear}
+#pond .wash{background:linear-gradient(90deg, rgb(244 246 247 / .62) 0%, rgb(244 246 247 / .45) 55%, rgb(244 246 247 / .08) 100%)}
+
 #flow{position:fixed;left:0;top:0;pointer-events:none;z-index:0}
 /* 手机上的弹出菜单是宽的：整幅画铺满，压暗得多一些 */
 @media (max-width:860px){
@@ -173,7 +181,7 @@
 :root[data-theme="starry"] .rail{scrollbar-color:rgb(190 205 255 / .35) transparent}
 /* 选主题：平时折成一行（当前主题的色块 + 名字），点开才列出全部 */
 .themes{margin:18px 0 0;font-size:13px;color:var(--night-mute)}
-.themes summary{display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:8px;cursor:pointer;list-style:none;color:var(--night-mute);
+.themes summary{position:relative;display:flex;align-items:center;gap:10px;padding:7px 8px 7px 36px;border-radius:8px;cursor:pointer;list-style:none;color:var(--night-mute);
   transition:background-color .15s ease,color .15s ease}
 .themes summary::-webkit-details-marker{display:none}
 .themes summary:hover{background:var(--rail-hover,rgba(255,255,255,.06));color:var(--night-ink)}
@@ -181,9 +189,10 @@
 .themes .now{color:var(--night-ink);font-weight:500}
 .themes .chev{margin-left:auto;width:14px;height:14px;flex:none;transition:transform .2s cubic-bezier(.22,1,.36,1)}
 .themes[open] .chev{transform:rotate(180deg)}
-.themes .dot{width:18px;height:18px;border-radius:50%;flex:none;background:var(--sw);box-shadow:inset 0 0 0 1.5px var(--night-line)}
+/* 色块用绝对定位放在左边留好的空里，文字从留白后面开始：不靠 flex 的 gap 排，作者的浏览器里色块曾经压住名字的头两个字 */
+.themes .dot{position:absolute;left:9px;top:50%;width:18px;height:18px;margin:-9px 0 0;border-radius:50%;background:var(--sw);box-shadow:inset 0 0 0 1.5px var(--night-line)}
 .themes form{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:6px 0 0}
-.themes button{display:flex;align-items:center;gap:8px;min-height:36px;padding:6px 8px;border:1px solid transparent;border-radius:8px;cursor:pointer;
+.themes button{position:relative;display:flex;align-items:center;min-height:36px;padding:6px 8px 6px 34px;border:1px solid transparent;border-radius:8px;cursor:pointer;
   background:none;color:var(--night-ink);font:inherit;font-size:13px;text-align:left;transition:background-color .15s ease,border-color .15s ease}
 .themes button:hover{background:var(--rail-hover,rgba(255,255,255,.06))}
 .themes button[aria-pressed="true"]{border-color:var(--night-line);background:var(--rail-active,rgba(255,255,255,.08));font-weight:600}
@@ -218,7 +227,7 @@
 {% endmacro %}
 
 {% macro theme_js(current) %}
-{%- if current in ("starry", "lily") %}
+{%- if current == "starry" %}
 <canvas id="flow" aria-hidden="true"></canvas>
 <script>
 /* 星夜：侧栏的天空在流动。几百道短笔触顺着跟底图同一个流场（横向气流 + 漩涡 + 绕着星星转的光晕）慢慢走，
@@ -230,13 +239,12 @@
   if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   var rail = document.getElementById('rail'), cv = document.getElementById('flow');
   if (!rail || !cv || !cv.getContext) return;
+  rail.insertBefore(cv, rail.firstChild);                       // 放进侧栏里、菜单文字下面（放在外面会画到字上）
   var cx = cv.getContext('2d'), W = 520, H = 1800, ps = [], rw = 0, rh = 0, dpr = 1, run = true, sc = 1;
-  var LILY = document.documentElement.getAttribute('data-theme') === 'lily';   // 睡莲：水面上的光横着慢慢漂，没有漩涡
   var VOR = [[.70,.30,.34,1],[.30,.47,.22,-1],[.78,.66,.20,1]];
   var LIGHTS = [[.80,.17,.055],[.66,.40,.040],[.88,.52,.045],[.72,.78,.035],[.92,.90,.030],[.82,.055,.085]];
   var BLUE = ['150,182,222','186,206,226','104,148,210','78,122,198','214,226,214'], GOLD = ['248,226,140','242,205,74','255,240,190'];
   function field(x, y){
-    if (LILY) return .10 * Math.sin(y * 18 + x * 4) + .05 * Math.sin(y * 41 - x * 7);
     var a = .35 * Math.sin(y * 9 + x * 3) + .18 * Math.sin(y * 23 - x * 5), vx = Math.cos(a), vy = Math.sin(a), i, dx, dy, d, w;
     for (i = 0; i < VOR.length; i++){
       dx = x - VOR[i][0]; dy = (y - VOR[i][1]) * H / W; d = Math.hypot(dx, dy);
@@ -257,14 +265,9 @@
     p = p || {};
     p.x = Math.random(); p.y = Math.random() * Math.min(1, rh / (H * sc));
     p.life = 0; p.max = 320 + Math.random() * 380; p.w = (1.8 + Math.random() * 1.6);
-    if (LILY){
-      p.c = ['255,255,255','248,246,252','236,232,248','226,240,238','250,236,240'][(Math.random() * 5) | 0];
-      p.a = (.28 + Math.random() * .30) * (p.x < .62 ? .7 : 1); p.w = 1.4 + Math.random() * 1.6;
-    } else {
     var g = near(p.x, p.y);
     p.c = g > .3 && Math.random() < g ? GOLD[(Math.random() * GOLD.length) | 0] : BLUE[(Math.random() * BLUE.length) | 0];
     p.a = (.30 + Math.random() * .30) * (p.x < .62 ? .55 : 1);
-    }
     return p;
   }
   function size(){
@@ -296,6 +299,82 @@
   size(); addEventListener('resize', size);
   document.addEventListener('visibilitychange', function(){ run = !document.hidden; if (run) frame(); });
   frame();
+})();
+</script>
+{%- elif current == "lily" %}
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="pond-wave" x="-5%" y="-5%" width="110%" height="110%">
+  <feTurbulence type="fractalNoise" baseFrequency=".012 .045" numOctaves="2" seed="7" result="n">
+    <animate attributeName="baseFrequency" dur="22s" values=".012 .045;.014 .040;.011 .050;.012 .045" repeatCount="indefinite"/></feTurbulence>
+  <feDisplacementMap in="SourceGraphic" in2="n" scale="5" xChannelSelector="R" yChannelSelector="G"/></filter></svg>
+<script>
+/* 睡莲：莫奈的池塘（作者：不要流动的笔触，要更莫奈的效果）。四样叠在侧栏后面：
+   ① 跟着钟点变的光：莫奈同一片池塘画了一天里的不同时候——早上银蓝、中午亮、下午金粉、傍晚紫、夜里暗蓝，慢慢过渡；
+   ② 画像隔着水看一样轻轻晃（SVG 扰动滤镜，几个像素）；③ 偶尔一圈涟漪荡开再淡掉；④ 一大片柔和的阳光慢慢从水面上移过去。
+   手机宽度只有颜色随钟点变（加在弹出菜单上）；系统「减少动态效果」时只有 ①，画不晃、没有涟漪和阳光。标签页切走时暂停。 */
+(function(){
+  var rail = document.getElementById('rail'); if (!rail) return;
+  var still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // 一天里的光：[几点, r, g, b, 浓淡]，中间按时间插值
+  var KEYS = [[0,40,52,110,.42],[5.5,70,80,140,.36],[7,196,212,236,.42],[10,236,244,250,.20],[13,255,252,236,.12],[16,255,214,170,.34],
+              [18,250,180,170,.40],[19.5,150,112,196,.44],[21.5,70,70,140,.44],[24,40,52,110,.42]];
+  function tint(){
+    var d = new Date(), h = d.getHours() + d.getMinutes() / 60, i = 0;
+    while (i < KEYS.length - 2 && KEYS[i + 1][0] <= h) i++;
+    var a = KEYS[i], b = KEYS[i + 1], t = (h - a[0]) / (b[0] - a[0]), c = [];
+    for (var k = 1; k < 5; k++) c.push(a[k] + (b[k] - a[k]) * t);
+    return 'rgba(' + c[0].toFixed(0) + ',' + c[1].toFixed(0) + ',' + c[2].toFixed(0) + ',' + c[3].toFixed(3) + ')';
+  }
+  var sheetTint = document.createElement('div');              // 手机：弹出菜单上也带这层光
+  sheetTint.style.cssText = 'position:absolute;inset:0;z-index:-1;pointer-events:none;mix-blend-mode:soft-light;border-radius:inherit';
+  var pond = document.createElement('div'); pond.id = 'pond'; pond.setAttribute('aria-hidden', 'true');
+  pond.innerHTML = '<div class="img"></div><canvas class="fx"></canvas><div class="tint"></div><div class="wash"></div>';
+  rail.insertBefore(pond, rail.firstChild);                  // 放在侧栏里面、菜单文字下面（侧栏自己是一层，放到外面会盖住字）
+  var cv = pond.querySelector('.fx'), cx = cv.getContext && cv.getContext('2d'), tl = pond.querySelector('.tint');
+  if (still) pond.querySelector('.img').style.filter = 'none';
+  var rw = 0, rh = 0, dpr = 1;
+  function size(){
+    var r = rail.getBoundingClientRect(), wide = innerWidth > 860 && r.width > 120;
+    pond.style.display = wide ? '' : 'none';
+    var sh = document.getElementById('msheet');
+    if (sh && !wide && sheetTint.parentNode !== sh){ sh.appendChild(sheetTint); }
+    if (!wide) { rw = 0; return; }
+    rw = r.width; rh = innerHeight; dpr = Math.min(window.devicePixelRatio || 1, 2);
+    pond.style.width = rw + 'px'; pond.style.height = rh + 'px';
+    if (cx){ cv.width = rw * dpr; cv.height = rh * dpr; cx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+  }
+  function light(){ var c = tint(); tl.style.backgroundColor = c; sheetTint.style.backgroundColor = c; }
+  size(); light(); addEventListener('resize', size); setInterval(light, 60000);
+  if (still || !cx) return;
+  var ripples = [], nextRipple = performance.now() + 4000 + Math.random() * 8000, sun = {t0: performance.now(), dur: 60000, pause: 35000}, run = true, last = 0;
+  function frame(now){
+    if (!run) return;
+    requestAnimationFrame(frame);
+    if (now - last < 33 || !rw) return;                       // 30 帧就够了
+    last = now; cx.clearRect(0, 0, rw, rh);
+    // 阳光：一大片柔和的暖光从左上慢慢移到右下，然后停一会儿
+    var p = (now - sun.t0) / sun.dur;
+    if (p > 1 + sun.pause / sun.dur){ sun.t0 = now; p = 0; }
+    if (p <= 1){
+      var k = Math.sin(Math.PI * p), x = rw * (-0.3 + 1.6 * p), y = rh * (0.15 + 0.6 * p), r = rw * 1.1;
+      var g = cx.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, 'rgba(255,248,226,' + (0.30 * k).toFixed(3) + ')'); g.addColorStop(1, 'rgba(255,248,226,0)');
+      cx.fillStyle = g; cx.fillRect(0, 0, rw, rh);
+    }
+    // 涟漪：右半边偶尔荡开一圈，扁的（从斜上方看水面）
+    if (now > nextRipple){ ripples.push({x: rw * (0.5 + Math.random() * 0.42), y: rh * (0.12 + Math.random() * 0.8), t0: now}); nextRipple = now + 20000 + Math.random() * 20000; }
+    for (var i = ripples.length - 1; i >= 0; i--){
+      var q = ripples[i], age = (now - q.t0) / 3600;
+      if (age > 1.6){ ripples.splice(i, 1); continue; }
+      for (var j = 0; j < 3; j++){
+        var a = age - j * 0.28; if (a <= 0 || a >= 1) continue;
+        var rr = 6 + a * rw * 0.22;
+        cx.strokeStyle = 'rgba(255,255,255,' + (0.55 * (1 - a)).toFixed(3) + ')'; cx.lineWidth = 1.6 * (1 - a) + 0.6;
+        cx.beginPath(); cx.ellipse(q.x, q.y, rr, rr * 0.34, 0, 0, 6.283); cx.stroke();
+      }
+    }
+  }
+  document.addEventListener('visibilitychange', function(){ run = !document.hidden; if (run) requestAnimationFrame(frame); });
+  requestAnimationFrame(frame);
 })();
 </script>
 {%- elif current == "xmas" %}

@@ -287,6 +287,21 @@ class ButtonsE2E(unittest.TestCase):
         self.assertEqual([x[1] for x in btns], ["查看公知 甲", "查看公知 乙"])
         self.assertEqual(self.say("查看公知 乙"), [("<图>", [])])          # 点名字：只发这一个人的
 
+    def test_gongzhi_list_splits_players_and_npcs(self):
+        """玩家、NPC 分两条发，各自一组按钮；只有玩家时只发一条。"""
+        set_config("gongzhi_public", "1")
+        for n in ("甲", "乙", "丙"):
+            sheets.submit(roles.get_role_by_name(n)["id"], "gongzhi", f"我是{n}", [])
+        with get_conn() as c:
+            c.execute("UPDATE roles SET is_npc=1 WHERE name='乙'")
+        out = self.say("查看公知")
+        self.assertEqual(len(out), 2)
+        self.assertIn("玩家", out[0][0])
+        self.assertIn("2 位", out[0][0])
+        self.assertEqual([x[1] for x in out[0][1]], ["查看公知 甲", "查看公知 丙"])
+        self.assertIn("NPC", out[1][0])
+        self.assertEqual([x[1] for x in out[1][1]], ["查看公知 乙"])
+
     def test_gongzhi_falls_back_to_long_image(self):
         set_config("gongzhi_public", "1")
         for n in ("甲", "乙"):

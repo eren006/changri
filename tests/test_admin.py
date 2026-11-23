@@ -111,6 +111,8 @@ class AdminTests(unittest.TestCase):
         html = self.c.get("/season").get_data(as_text=True)
         self.assertIn('data-theme="lily"', html)
         self.assertNotIn('id="snow"', html)
+        self.assertIn('id="pond-wave"', html)                                        # 睡莲：池水晃动、涟漪、阳光、跟着钟点变的光
+        self.assertNotIn('id="flow"', html)                                           # 不要流动的笔触（作者）
         self.c.post("/theme", data={"theme": "sakura", "_csrf": tok})                  # 樱花：飘花瓣，不飘雪；深浅色两套
         html = self.c.get("/season").get_data(as_text=True)
         self.assertIn('data-theme="sakura"', html)
