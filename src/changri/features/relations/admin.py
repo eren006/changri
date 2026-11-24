@@ -73,7 +73,8 @@ def register(app, login_required):
     @login_required
     def sheets_public():
         on = request.form.get("on") == "1"
-        set_config("gongzhi_public", "1" if on else "0")
+        from changri.admin import quick
+        quick.set_switch("gongzhi", on)                 # 和总览上的快捷开关是同一个
         flash("已开启展示公知：玩家发「查看公知」看到所有人的，发「查看公知 角色名」只看这一个人" if on else "已关闭展示公知：玩家只能看自己的")
         return redirect(url_for("relations_page", view="sheets"))
 

@@ -183,6 +183,8 @@ def create_app() -> Flask:
         if request.method == "POST":
             name = request.form.get("username", "").strip()
             ip = request.remote_addr or "?"
+            if webusers.take_reset_flag():
+                _fails.clear()                                   # 刚在服务器上重设了主账号密码：之前输错攒下的锁全部作废
             keys = (f"{ip}|{name.lower()}", f"{ip}|*")          # 这个账号被猜、这个 IP 在乱猜，分开记
             now = time.time()
             for k in keys:
@@ -223,6 +225,17 @@ def create_app() -> Flask:
         session.clear()
         return redirect(url_for("login"))
 
+    @app.post("/quick/<path:key>")
+    @login_required
+    def quick_switch(key):
+        """总览上的快捷开关（和「需要处理」里的一键按钮）：改的就是原页面上那个开关。"""
+        from changri.admin import quick
+        on = request.form.get("on") == "1"
+        if not quick.set_switch(key, on):
+            abort(404)
+        flash(f"「{quick.label(key)}」已{'打开' if on else '关闭'}")
+        return redirect(url_for("dashboard") + ("#todo" if request.form.get("from") == "todo" else "#quick"))
+
     @app.route("/")
     @login_required
     def dashboard():
@@ -235,6 +248,7 @@ def create_app() -> Flask:
                 return redirect(f"/b/{cards[0]['id']}/")          # 只有一个机器人：直接进去
             if cards:
                 return render_template("picker.html", cards=cards)
+        from changri.admin import quick
         from changri.core import errlog
         with get_conn() as conn:
             live = conn.execute("SELECT * FROM rooms WHERE status='open' ORDER BY id").fetchall()
@@ -248,7 +262,7 @@ def create_app() -> Flask:
         return render_template("dashboard.html", d=_dashboard(), errors=errors, err_serious=len(serious),
                                err_notices=len(err_rows) - len(serious), err_url=errlog.report_url(), err_contact=errlog.contact_qq(),
                                cal=season_core.month_grid(request.args.get("cal", "")), cal_line=season_core.upcoming_line(),
-                               live_rooms=live_rooms, waiting_rooms=sum(1 for r in live_rooms if not r["grp"]),
+                               live_rooms=live_rooms, quick_groups=quick.groups(url_for), waiting_rooms=sum(1 for r in live_rooms if not r["grp"]),
                                ask_contact=_should_ask_contact(), noat_tip=get_config(NOAT_TIP_DONE, "") != "1")
 
     NOAT_TIP_DONE = "noat_tip_done"         # 总览上「不用 @ 也能回」卡片叉掉了（每个机器人各记各的）

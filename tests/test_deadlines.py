@@ -162,5 +162,26 @@ class AdminPage(unittest.TestCase):
         self.assertEqual(c.post("/deadlines/nope", data={"_csrf": tok("/relations")}).status_code, 404)
 
 
+    def test_gongzhi_status_callout(self):
+        """公知没展示时，页面上直接说明玩家看不到、怎么打开，并给一个「现在展示公知」按钮；打开后换成一句说明。"""
+        setup_data()
+        webusers.create_user("boss", "longenough1", "owner")
+        c = create_app().test_client()
+        tok = lambda p: re.search(r'name="_csrf" value="([^"]+)"', c.get(p).get_data(as_text=True)).group(1)
+        c.post("/login", data={"username": "boss", "password": "longenough1", "_csrf": tok("/login")})
+        html = c.get("/relations?view=sheets").get_data(as_text=True)
+        self.assertIn("公知现在没有对玩家展示", html)
+        self.assertIn("现在展示公知", html)
+        c.post("/sheets/public", data={"_csrf": tok("/relations?view=sheets"), "on": "1"})
+        self.assertTrue(sheets.public())
+        html = c.get("/relations?view=sheets").get_data(as_text=True)
+        self.assertNotIn("公知现在没有对玩家展示", html)
+        self.assertIn("公知正在展示", html)
+        c.post("/sheets/public", data={"_csrf": tok("/relations?view=sheets"), "on": "0"})
+        deadlines.set("gongzhi", PAST)                            # 截止了：自动展示，不再提示去打开
+        html = c.get("/relations?view=sheets").get_data(as_text=True)
+        self.assertNotIn("公知现在没有对玩家展示", html)
+        self.assertIn("已经自动对所有人展示", html)
+
 if __name__ == "__main__":
     unittest.main()

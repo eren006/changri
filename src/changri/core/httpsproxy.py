@@ -180,7 +180,7 @@ def caddy_version() -> tuple[int, ...] | None:
     if not exe:
         return None
     try:
-        out = subprocess.run([exe, "version"], capture_output=True, text=True, timeout=5).stdout
+        out = subprocess.run([exe, "version"], capture_output=True, text=True, errors="replace", timeout=5).stdout
     except (OSError, subprocess.SubprocessError):
         return None
     m = re.search(r"v(\d+)\.(\d+)\.(\d+)", out)

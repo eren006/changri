@@ -153,8 +153,27 @@ def open_firewall_async() -> None:
     threading.Thread(target=open_firewall, kwargs={"only_if_changed": True}, name="changri-firewall", daemon=True).start()
 
 
+def _decode(b: bytes | None) -> str:
+    """命令输出转成文字。中文 Windows 上 netsh / schtasks 吐的是 GBK（OEM 代码页），
+    而打包的运行时开了 PYTHONUTF8=1，直接 text=True 会在读线程里炸 UnicodeDecodeError。
+    先按 UTF-8 解，不行再按系统 OEM 代码页解，最后兜底替换掉解不了的字节。"""
+    if not b:
+        return ""
+    try:
+        return b.decode("utf-8")
+    except UnicodeDecodeError:
+        pass
+    for enc in (("oem", "mbcs") if _is_windows() else ()):
+        try:
+            return b.decode(enc)
+        except (UnicodeDecodeError, LookupError):
+            continue
+    return b.decode("utf-8", errors="replace")
+
+
 def _run(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
-    r = subprocess.run(cmd, capture_output=True, text=True)
+    r = subprocess.run(cmd, capture_output=True)
+    r.stdout, r.stderr = _decode(r.stdout), _decode(r.stderr)
     if check and r.returncode != 0:
         raise RuntimeError(f"{' '.join(cmd)} 失败：{(r.stderr or r.stdout).strip()[:300]}")
     return r

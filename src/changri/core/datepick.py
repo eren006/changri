@@ -43,10 +43,10 @@ def fill_for(kind: str, name: str, place: str = PLACE_HOLDER) -> str:
 
 
 def people(me_id: int, limit: int = MAX_ITEMS) -> tuple[list[dict], int]:
-    """选人按钮的顺序：常联系的在前（有关系线、互发过短信礼物），然后其他嘉宾，NPC 最后；不含自己。返回 (放得下的, 没放下的个数)。"""
+    """选人按钮的顺序：玩家在前、NPC 在后；各自里面常联系的（有关系线、互发过短信礼物）在前。不含自己。返回 (放得下的, 没放下的个数)。"""
     from . import charprofile
     contacts = _contacts(me_id)
-    rows = [(r["id"] not in contacts, bool(r["is_npc"]), i, r) for i, r in enumerate(charprofile._all()) if r["id"] != me_id]
+    rows = [(bool(r["is_npc"]), r["id"] not in contacts, i, r) for i, r in enumerate(charprofile._all()) if r["id"] != me_id]   # NPC 一律在玩家后面（作者定，2026-11-23）
     rows.sort(key=lambda x: x[:3])
     return [x[3] for x in rows[:limit]], max(0, len(rows) - limit)
 

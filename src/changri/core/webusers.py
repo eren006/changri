@@ -5,11 +5,13 @@ import time
 
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from ..paths import DATA_DIR
 from .db import get_global_conn as get_conn
 
 NAME_RE = re.compile(r"[0-9A-Za-z_\-一-鿿]{2,20}")
 PASSWORD_MIN = 8
 _DUMMY = generate_password_hash("dummy-password-for-timing")
+RESET_FLAG = DATA_DIR / ".owner_reset"     # 命令行重设了主账号密码：正在跑的后台看到它就清掉登录锁（锁只在后台进程的内存里）
 
 
 def validate(username: str, password: str) -> str:
@@ -64,6 +66,32 @@ def reset_password(user_id: int) -> str | None:
     with get_conn() as conn:
         conn.execute("UPDATE web_users SET password_hash=? WHERE id=?", (generate_password_hash(password), user_id))
     return password
+
+
+def reset_owner() -> tuple[str, str] | None:
+    """主账号忘了密码：在服务器上运行 `changri reset-owner` 调到这里。随机一个新密码，返回（账号名, 新密码）；
+    还没有主账号返回 None（那就该去 /setup）。主账号若被停用（理论上不会）顺手解开。"""
+    with get_conn() as conn:
+        row = conn.execute("SELECT id, username FROM web_users WHERE role='owner'").fetchone()
+        if not row:
+            return None
+        password = secrets.token_urlsafe(9)
+        conn.execute("UPDATE web_users SET password_hash=?, disabled=0 WHERE id=?", (generate_password_hash(password), row["id"]))
+    try:
+        RESET_FLAG.parent.mkdir(parents=True, exist_ok=True)
+        RESET_FLAG.touch()
+    except OSError:
+        pass
+    return row["username"], password
+
+
+def take_reset_flag() -> bool:
+    """刚用命令行重设过主账号密码就返回 True（只返回一次）。"""
+    try:
+        RESET_FLAG.unlink()
+        return True
+    except OSError:
+        return False
 
 
 def set_disabled(user_id: int, disabled: bool) -> tuple[bool, str]:

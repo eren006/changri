@@ -9,6 +9,13 @@ from .db import get_config, get_conn, set_config
 log = logging.getLogger("changri.schedule")
 
 
+def reminders_due() -> bool:
+    """派送前的两条提醒（截止预告、公告群提醒）要不要发：季度真正开始以后（进了 D0，含补戏期）才发。
+    没有季度、只是预订了、还在筹备期时都不发：信箱可能还开着，每天催大家投信只会打扰群里。信池里有信照常派送。"""
+    from . import season
+    return season.phase() == "playing"
+
+
 async def run_lovemail_tick(send: messaging.Send, now: time.struct_time | None = None) -> str:
     """每 30 秒调用一次；返回这一轮做了什么（方便测试）。"""
     if not lovemail.enabled():
@@ -34,6 +41,8 @@ async def run_lovemail_tick(send: messaging.Send, now: time.struct_time | None =
     if cur == (target - 10) % 1440 and get_config("lovemail_notice10_day") != day:
         set_config("lovemail_notice10_day", day)
         from . import windows
+        if not reminders_due():                              # 没有季度：不催
+            return "notice10-skip"
         if get_config("lovemail_notice10", "1") == "0" or lovemail.today_limit() <= 0 or windows.check("lovemail"):  # 后台关了这条提醒，或今天不收信       # 今天不收信（上限 0 / 不在开放时段）就别催大家投
             return "notice10-skip"
         with get_conn() as conn:
@@ -46,7 +55,7 @@ async def run_lovemail_tick(send: messaging.Send, now: time.struct_time | None =
         return "notice10"
     if cur == (target - 5) % 1440 and get_config("lovemail_notice5_day") != day:
         set_config("lovemail_notice5_day", day)
-        if get_config("lovemail_notice5", "1") == "0":       # 后台关了这条提醒
+        if get_config("lovemail_notice5", "1") == "0" or not reminders_due():   # 后台关了这条提醒，或者没有季度
             return "notice5-skip"
         if announce:
             try:

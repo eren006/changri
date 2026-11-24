@@ -142,7 +142,18 @@ class TickTests(Base):
     def at(self, hh, mm):
         return time.struct_time((2026, 11, 13, hh, mm, 0, 4, 317, -1))
 
+    def _season(self, status="running", day="1"):
+        with get_conn() as c:
+            c.execute("DELETE FROM seasons")
+            if status:
+                c.execute("INSERT INTO seasons(name,start_date,end_date,status) VALUES('S','2000-01-01','2099-01-01',?)", (status,))
+        set_config("game_day", day)
+
+    def tearDown(self):
+        self._season(status=None, day="")
+
     def test_schedule(self):
+        self._season()                                                             # 季度进行中（D1）
         set_config("announce_group", "B1|ANN")
         lovemail.add_mail(self.a, self.b, "匿名", "信")
         send = self.sender()
@@ -155,6 +166,21 @@ class TickTests(Base):
         self.assertEqual(run(run_lovemail_tick(send, self.at(22, 0))), "delivered")
         self.assertEqual(lovemail.pool_all(), [])
         self.assertEqual(run(run_lovemail_tick(send, self.at(22, 1))), "idle")      # 当天不重复派
+
+    def test_no_reminders_before_season_starts(self):
+        """没有季度、只预订了、还在筹备期：两条提醒都不发；信池里的信照常派送。"""
+        set_config("announce_group", "B1|ANN")
+        lovemail.add_mail(self.a, self.b, "匿名", "信")
+        send = self.sender()
+        for i, (status, day) in enumerate([(None, ""), ("booked", ""), ("running", "")]):   # 没季度 / 预订了 / 筹备期
+            self._season(status, day)
+            for k in ("lovemail_notice10_day", "lovemail_notice5_day"):
+                set_config(k, "")
+            self.assertEqual(run(run_lovemail_tick(send, self.at(21, 50))), "notice10-skip", status)
+            self.assertEqual(run(run_lovemail_tick(send, self.at(21, 55))), "notice5-skip", status)
+        self.assertEqual(self.sent, [])
+        self.assertEqual(run(run_lovemail_tick(send, self.at(22, 0))), "delivered")       # 派送不受影响
+        self.assertTrue(self.sent)
 
     def test_after_delivery_counts_next_day(self):
         """当天的派送跑过以后再投的，算第二天：占第二天的次数、留到第二天派送；撤回退的也是第二天的。"""

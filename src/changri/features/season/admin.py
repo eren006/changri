@@ -325,8 +325,7 @@ def register(app, login_required):
     @login_required
     def season_autoday():
         on = request.form.get("on") == "1"
-        set_config("auto_day", "1" if on else "0")
-        if on:
-            set_config("auto_day_last", season_core.today())
+        from changri.admin import quick
+        quick.set_switch("autoday", on)                 # 和总览上的快捷开关是同一个
         flash("自动天数已" + ("开启" if on else "关闭"))
         return redirect(url_for("season_page"))

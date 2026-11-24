@@ -232,11 +232,11 @@ def roster() -> str:
     return "\n\n".join(out)
 
 
-BTN_NAME_MAX = 4
+BTN_NAME_MAX = 3
 
 
 def btn_name(name: str, short: str = "") -> str:
-    """按钮上放人名：有简称用简称，没有用名字，最多前 4 个字（作者定，2026-11-23）。点了发的指令里照样用全名。"""
+    """按钮上放人名：有简称用简称，没有用名字，最多前 3 个字（作者定，2026-11-23：4 个字一行放 4 个时手机上会被截成「菲尼克…」）。点了发的指令里照样用全名。"""
     return (short or name or "")[:BTN_NAME_MAX]
 
 

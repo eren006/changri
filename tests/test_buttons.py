@@ -413,9 +413,21 @@ class ButtonsE2E(unittest.TestCase):
         set_config("ext:relations", "0")
         self.assertNotIn("查看关系线", [x[1] for x in self.say("角色卡", member="M1", group="G1")[-1][1]])
 
+    def test_npc_after_players(self):
+        """选人按钮：NPC 一律排在玩家后面，就算跟 NPC 常联系也一样。"""
+        from changri.core import datepick
+        with get_conn() as c:
+            c.execute("UPDATE roles SET is_npc=1 WHERE name='乙'")
+        a, b = roles.get_role_by_name("甲")["id"], roles.get_role_by_name("乙")["id"]
+        relations.add_detail(a, b, "乙", "跟 NPC 有关系线")
+        names = [r["name"] for r in datepick.people(a)[0]]
+        self.assertEqual(names[-1], "乙")
+        _t, btns = self.say("短信", member="M1", group="G1")[0]
+        self.assertLess([x[0] for x in btns].index("丙"), [x[0] for x in btns].index("乙"))
+
     def test_btn_name_rule(self):
         from changri.core import charprofile
-        self.assertEqual(charprofile.btn_name("欧阳娜娜子", ""), "欧阳娜娜")      # 最多前 4 个字
+        self.assertEqual(charprofile.btn_name("欧阳娜娜子", ""), "欧阳娜")        # 最多前 3 个字
         self.assertEqual(charprofile.btn_name("欧阳娜娜子", "娜娜"), "娜娜")      # 有简称用简称
 
     def test_format_menu_only_enabled(self):

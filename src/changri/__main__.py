@@ -7,6 +7,7 @@
   service status      看开机自启装没装、在不在跑
   doctor              自检：端口、外网、公网 IP、数据目录
   backup              马上备份所有数据库到 data/backups/
+  reset-owner         主账号忘了密码：随机设一个新密码并打印出来（只能在服务器上运行）
   update              检查并安装新版本（和设置平台「更新」页一样；装完要重启才生效）
   migrate-legacy DIR  从老版本（0.19 及以前）的安装目录搬数据过来
   version             打印版本号
@@ -60,6 +61,7 @@ def main(argv: list[str] | None = None) -> int:
     sv.add_argument("action", choices=["install", "uninstall", "status"])
     sub.add_parser("doctor", help="自检")
     sub.add_parser("backup", help="备份所有数据库")
+    sub.add_parser("reset-owner", help="主账号忘了密码：重设一个新密码")
     ml = sub.add_parser("migrate-legacy", help="从老版本安装目录搬数据")
     ml.add_argument("old_dir")
     sub.add_parser("update", help="检查并安装新版本")
@@ -93,6 +95,22 @@ def main(argv: list[str] | None = None) -> int:
     if a.cmd == "backup":
         from changri.platform import backup
         print(f"已备份到 {backup.make('manual')}")
+        return 0
+    if a.cmd == "reset-owner":
+        from changri.core import webusers
+        from changri.core.db import DB_PATH, init_db
+        if not DB_PATH.exists():
+            print(f"找不到数据库 {DB_PATH}。请在长日bot 的安装文件夹里运行这个命令；如果从没打开过设置平台，直接打开它按首次设置建主账号就行。")
+            return 1
+        init_db()
+        res = webusers.reset_owner()
+        if not res:
+            print("还没有主账号：直接打开设置平台，按首次设置建一个就行。")
+            return 1
+        name, password = res
+        print(f"主账号 {name} 的密码已重设为：{password}")
+        print("旧密码已经失效。用这个密码登录设置平台后，到「账号」页改成你自己记得住的密码。")
+        print("之前输错太多次被锁住的，现在也可以直接登录了。")
         return 0
     if a.cmd == "migrate-legacy":
         from pathlib import Path

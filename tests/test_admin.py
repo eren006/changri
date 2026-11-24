@@ -315,7 +315,33 @@ class AdminTests(unittest.TestCase):
         self.assertIn("已删除", self.post(f"/accounts/{aid}/delete").get_data(as_text=True))
         self.assertEqual(webusers.count(), 1)
 
+    def test_reset_owner_cli(self):
+        """主账号忘了密码：命令行 reset-owner 打印新密码，旧密码失效，攒下的登录锁跟着作废。"""
+        import contextlib
+        import io
+        from changri import __main__ as cli
+        webusers.RESET_FLAG = _tmp / ".owner_reset"
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self.assertEqual(cli.main(["reset-owner"]), 1)                     # 还没有主账号
+        self.assertIn("首次设置", out.getvalue())
+        webusers.create_user("boss", "longenough1", "owner")
+        webusers.create_user("helper", "longenough2", "admin")
+        t = token(self.c)
+        for _ in range(admin_mod.LOCK_AFTER):
+            self.c.post("/login", data={"username": "boss", "password": "bad", "_csrf": t})
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self.assertEqual(cli.main(["reset-owner"]), 0)
+        pw = re.search(r"主账号 boss 的密码已重设为：(\S+)", out.getvalue()).group(1)
+        self.assertIsNone(webusers.verify("boss", "longenough1"))
+        self.assertIsNotNone(webusers.verify("helper", "longenough2"))           # 只动主账号
+        r = self.c.post("/login", data={"username": "boss", "password": pw, "_csrf": token(self.c)})
+        self.assertEqual(r.status_code, 302)                                      # 锁住了也能马上进
+        self.assertFalse(webusers.RESET_FLAG.exists())
+
     def test_change_own_password(self):
+
         self.login()
         self.assertIn("原密码不对", self.post("/accounts/password", old="x", new="newpassword1", again="newpassword1").get_data(as_text=True))
         self.assertIn("至少 8 位", self.post("/accounts/password", old="longenough1", new="short", again="short").get_data(as_text=True))

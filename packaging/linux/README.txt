@@ -11,6 +11,7 @@
   sudo ./changri doctor            自检（端口、能不能连上 QQ、公网 IP）
   ./changri run                    前台运行（不装开机自启时用；Ctrl+C 结束）
   sudo ./changri service status    看开机自启状态
+  sudo ./changri reset-owner       主账号忘了密码：显示一个新密码，登录后到「账号」页改掉
   journalctl -u changri-bot -f     看日志
   数据在 data/ 里，备份 = 复制这个文件夹。升级在设置平台「更新」页一键完成。
 

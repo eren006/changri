@@ -126,3 +126,18 @@ def prune(keep_also: tuple[str, ...] = ()) -> list[str]:
     for p in list(VERSIONS.glob("*.tmp")) + list(RUNTIMES.glob("*.tmp")) if INSTALLED else []:
         shutil.rmtree(p, ignore_errors=True)         # 上次没解压完的半成品
     return removed
+
+
+def ensure_win_root_scripts() -> str | None:
+    """Windows 安装目录根上的 .bat 在线更新不会换，新加的入口要自己补上（现在只有 Reset-Owner-Password.bat）。
+    缺了才写；返回给看门进程打印的一句话，没写返回 None。"""
+    if not (INSTALLED and sys.platform.startswith("win")):
+        return None
+    dest = APP_ROOT / "Reset-Owner-Password.bat"
+    if dest.exists():
+        return None
+    try:
+        dest.write_bytes((PKG_DIR / "scripts" / "Reset-Owner-Password.bat").read_bytes())   # 打包时已经存成 GBK + CRLF
+    except OSError:
+        return None
+    return "已在安装文件夹里放好 Reset-Owner-Password.bat（主账号忘了密码时双击）。"

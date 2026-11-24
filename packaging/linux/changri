@@ -3,6 +3,7 @@
 #   ./changri run                   前台运行（崩了自动拉起；Ctrl+C 结束）
 #   sudo ./changri service install  设为开机自启并启动；uninstall 取消；status 查看
 #   ./changri doctor                自检      ./changri backup  备份数据库      ./changri version
+#   sudo ./changri reset-owner      主账号忘了密码：重设并显示新密码
 ROOT="$(cd "$(dirname "$0")" && pwd -P)"
 cd "$ROOT" || exit 1
 

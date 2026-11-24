@@ -40,7 +40,17 @@ class SupervisorTests(unittest.TestCase):
     def runs(self) -> int:
         return int(self.counter.read_text())
 
+    def test_win_reset_script_placed_once(self):
+        """Windows 根目录的 .bat 在线更新不换：看门进程启动时把缺的 Reset-Owner-Password.bat 补上，已有的不动。"""
+        with mock.patch.object(layout, "APP_ROOT", self.tmp), mock.patch.object(layout.sys, "platform", "win32"):
+            self.assertIn("Reset-Owner-Password.bat", layout.ensure_win_root_scripts())
+            self.assertIn(b"reset-owner", (self.tmp / "Reset-Owner-Password.bat").read_bytes())
+            self.assertIsNone(layout.ensure_win_root_scripts())
+        with mock.patch.object(layout, "APP_ROOT", self.tmp / "x"):
+            self.assertIsNone(layout.ensure_win_root_scripts())                 # 不是 Windows：不写
+
     def test_clean_exit_stops(self):
+
         with self.child("raise SystemExit(0)"):
             self.assertEqual(supervisor.run(), 0)
         self.assertEqual(self.runs(), 1)

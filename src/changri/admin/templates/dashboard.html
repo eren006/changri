@@ -36,6 +36,24 @@ a.tile:active{transform:scale(.97)}
 .ios .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:28px;margin:0 0 36px;align-items:start}
 .ios .time{flex:none;min-width:58px;text-align:center;font:700 15px var(--sans);font-variant-numeric:tabular-nums;padding:5px 0;border-radius:9px;background:var(--soft);color:var(--mute)}
 .ios .grow.done{opacity:.5}
+.ios .todo-act a.tx{color:inherit;text-decoration:none}
+.ios .todo-act a.tx:hover b{text-decoration:underline}
+.ios .todo-act form{flex:none}
+.ios .qk .group{padding:0;margin:0 0 18px}
+.ios .qk .group:last-child{margin-bottom:0}
+.ios .qk .grow{padding:12px 0}
+.ios .qk .grow+.grow::before{left:0}
+.ios .qk-t{margin-left:0}
+.ios .qk-go{flex:none;font-size:13px;color:var(--mute);white-space:nowrap}
+.ios .qk-go:hover{color:var(--ink)}
+.ios .qk-v{flex:none;font-size:14px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ios .qk-sub{margin:0 0 18px}
+.ios .qk-sub>summary{cursor:pointer;list-style:none;display:flex;align-items:baseline;gap:8px;margin-bottom:6px}
+.ios .qk-sub>summary::-webkit-details-marker{display:none}
+.ios .qk-sub>summary::before{content:"›";display:inline-block;transition:transform .15s}
+.ios .qk-sub[open]>summary::before{transform:rotate(90deg)}
+.ios .qk-n{font-weight:400;color:var(--mute);text-transform:none;letter-spacing:0}
+.ios .qk-sub:not([open]){margin-bottom:12px}
 .ios .grow.next .time{background:var(--dusk);color:var(--dusk-ink)}
 .ios .pill{flex:none;font-size:12px;font-weight:600;padding:2px 10px;border-radius:999px;background:color-mix(in srgb,var(--dusk) 14%,transparent);color:var(--dusk)}
 
@@ -79,6 +97,7 @@ a.tile:active{transform:scale(.97)}
   {%- elif name == 'door' -%}<svg viewBox="0 0 24 24"><path d="M5 21V4a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v17"/><path d="M3 21h18"/><circle cx="12.5" cy="12" r=".8"/></svg>
   {%- elif name == 'calendar' -%}<svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>
   {%- elif name == 'alert' -%}<svg viewBox="0 0 24 24"><path d="M12 3 2.5 20h19z"/><path d="M12 10v4"/><circle cx="12" cy="17" r=".8"/></svg>
+  {%- elif name == 'toggle' -%}<svg viewBox="0 0 24 24"><rect x="2.5" y="7" width="19" height="10" rx="5"/><circle cx="16.5" cy="12" r="2.6"/></svg>
   {%- elif name == 'check' -%}<svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
   {%- endif -%}
 {% endmacro %}
@@ -169,17 +188,57 @@ a.tile:active{transform:scale(.97)}
   <div id="todo">
     <p class="label">需要处理</p>
     <div class="card group">
-      {% for level, title, href, hint in d.todo %}
+      {% for t in d.todo %}{% set level, title, href, hint = t[0], t[1], t[2], t[3] %}
+      {% if t|length > 4 %}{% set act = t[4] %}
+      <div class="grow todo-act">
+        <span class="ico {{ 'c-red' if level == 'bad' else 'c-orange' }}" aria-hidden="true">{{ icon('alert') }}</span>
+        <a class="tx" href="{{ href }}"><b>{{ title }}</b><span>{{ hint }}</span></a>
+        <form method="post" action="{{ url_for('quick_switch', key=act[0]) }}">{{ csrf() }}<input type="hidden" name="on" value="{{ 1 if act[1] else 0 }}"><input type="hidden" name="from" value="todo">
+          <button class="btn sm" type="submit">{{ act[2] }}</button></form>
+      </div>
+      {% else %}
       <a class="grow" href="{{ href }}">
         <span class="ico {{ 'c-red' if level == 'bad' else 'c-orange' }}" aria-hidden="true">{{ icon('alert') }}</span>
         <div class="tx"><b>{{ title }}</b><span>{{ hint }}</span></div><i class="chev" aria-hidden="true"></i>
       </a>
+      {% endif %}
       {% else %}
       <div class="okrow"><span class="ico c-green" aria-hidden="true">{{ icon('check') }}</span>没有待处理的事项。</div>
       {% endfor %}
     </div>
   </div>
 </div>
+
+{% if quick_groups %}
+<details class="card dcard" id="quick" open>
+  <summary><span class="ico c-blue" aria-hidden="true">{{ icon('toggle') }}</span>
+    <div class="tx"><b>快捷开关</b><span>一季里常用的开关放在这里；和各自页面上的是同一个开关，在哪边改都一样</span></div><i class="chev" aria-hidden="true"></i></summary>
+  <div class="body qk">
+    {% for title, rows, fold in quick_groups %}
+    {% if fold %}<details class="qk-sub"><summary class="label qk-t">{{ title }}{% set n_on = rows|selectattr('on')|list|length %}<span class="qk-n">{% if rows[0].on is defined %}开着 {{ n_on }} 项{% else %}{{ rows|length }} 项{% endif %}</span></summary>
+    {% else %}<p class="label qk-t">{{ title }}</p>{% endif %}
+    <div class="group">
+      {% for r in rows %}
+      {% if r.on is defined %}
+      <form class="grow" method="post" action="{{ url_for('quick_switch', key=r.key) }}">{{ csrf() }}
+        <div class="tx"><b>{{ r.label }}</b><span>{{ r.desc }}{% if r.note %}。{{ r.note }}{% endif %}</span></div>
+        <a class="qk-go" href="{{ r.page }}">设置页</a>
+        <label class="sw"><input type="checkbox" name="on" value="1" {{ 'checked' if r.on }} onchange="this.form.submit()" aria-label="{{ r.label }}"><i></i></label>
+      </form>
+      {% else %}
+      <div class="grow">
+        <div class="tx"><b>{{ r.label }}</b><span>{{ r.desc }}</span></div>
+        <span class="qk-v">{{ r.value }}</span>
+        <a class="qk-go" href="{{ r.page }}">去改</a>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+    {% if fold %}</details>{% endif %}
+    {% endfor %}
+  </div>
+</details>
+{% endif %}
 
 <details class="card dcard" id="cal"{% if request.args.get('cal') %} open{% endif %}>
   <summary><span class="ico c-purple" aria-hidden="true">{{ icon('calendar') }}</span>

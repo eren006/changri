@@ -19,7 +19,8 @@ def register(app, login_required):
     @app.post("/lovemail/open")
     @login_required
     def lovemail_open():
-        set_config("lovemail_enabled", "1" if request.form.get("on") else "0")
+        from changri.admin import quick
+        quick.set_switch("lovemail", bool(request.form.get("on")))   # 和总览上的快捷开关是同一个
         return redirect(url_for("lovemail_page"))
 
     @app.post("/lovemail/time")

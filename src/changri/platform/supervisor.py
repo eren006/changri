@@ -146,6 +146,8 @@ def run() -> int:
         signal.signal(signal.SIGBREAK, on_signal)        # Windows 关窗口 / Ctrl+Break
 
     _open_browser_once()
+    if msg := layout.ensure_win_root_scripts():
+        _log(msg)
     threading.Thread(target=_repair_win_task, name="win-task-repair", daemon=True).start()   # 放后台：schtasks 万一卡住也不耽误机器人启动
     quick_crashes = 0
     while not stopping["flag"]:

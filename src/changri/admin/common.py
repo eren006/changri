@@ -308,6 +308,34 @@ def _phone_todo() -> list[tuple]:
     return []
 
 
+def _season_todo(lovemail_on: bool) -> list[tuple]:
+    """按一季的进度提醒该开的开关，带一个一键按钮（第 5 项：(快捷开关 key, 改成开还是关, 按钮文字)）。
+    按钮改的就是原页面上那个开关（admin/quick.py）。"""
+    from changri.core import deadlines, extensions as _ext, godmode as god_core, sheets
+    out = []
+    running = season_core.running()
+    if running and not lovemail_on and _ext.is_enabled("lovemail"):   # 季度结束后心动信本来就该关，不算待处理
+        out.append(("warn", "心动信信箱是关的", url_for("lovemail_page"), "季度在进行，玩家现在不能投信，也不派送",
+                    ("lovemail", True, "打开信箱")))
+    if _ext.is_enabled("relations") and not sheets.public() and not deadlines.label("gongzhi"):
+        with get_conn() as c:
+            n_players = c.execute("SELECT COUNT(*) FROM roles WHERE is_npc=0").fetchone()[0]
+        n_in = sum(1 for x in sheets.all_of("gongzhi") if not x.get("is_npc"))
+        if n_players and n_in >= n_players:            # 玩家都交齐了，还没给大家看
+            out.append(("warn", f"公知都交齐了（{n_in}/{n_players}），玩家还看不到别人的", url_for("relations_page", view="sheets"),
+                        "打开「展示公知」后玩家就能互相看；也可以到公知页设截止时间，到点自动展示",
+                        ("gongzhi", True, "现在展示")))
+    if running:
+        off = [label for k, label in god_core.shown_features().items() if god_core.global_off(k)]
+        if off:
+            out.append(("warn", "全体关掉了：" + "、".join(off), url_for("god_page", role="all"),
+                        "所有人现在都用不了；临时关的记得打开。可以在下面「快捷开关」里逐个打开"))
+        if get_config("phone_paused", "0") == "1" and get_config("phone_enabled", "0") == "1" and _ext.is_enabled("phone"):
+            out.append(("warn", "小手机暂停通讯开着", url_for("phone_page"), "玩家在小手机上只能看，不能发",
+                        ("phone_paused", False, "恢复通讯")))
+    return out
+
+
 def _dashboard() -> dict:
     """总览页要的数据：今日通告 + 需要处理的事 + 概况。"""
     now = time.localtime()
@@ -329,9 +357,11 @@ def _dashboard() -> dict:
         n_msg_today = conn.execute("SELECT COUNT(*) FROM messages WHERE created_ts>=?", (day0,)).fetchone()[0]
         n_undelivered = conn.execute("SELECT COUNT(*) FROM messages WHERE created_ts>=? AND status!='sent' AND error NOT LIKE '被拉黑%' AND error NOT LIKE '礼物丢失%' AND error!='已撤回'", (int(time.time()) - 86400,)).fetchone()[0]
     enabled = get_config("lovemail_enabled", "1") != "0"
+    from changri.core import schedule as _sched
+    remind = _sched.reminders_due()                     # 没有季度时两条提醒不发，今日通告里也不列
     steps = [
-        (target - 10, "截止预告", f"提醒 {n_main} 个个人群：10 分钟后截止收稿") if get_config("lovemail_notice10", "1") != "0" else None,
-        (target - 5, "公告群提醒", "公告群：邮差正在整理信箱" if announce else "还没设公告群，这条不会发出") if get_config("lovemail_notice5", "1") != "0" else None,
+        (target - 10, "截止预告", f"提醒 {n_main} 个个人群：10 分钟后截止收稿") if remind and get_config("lovemail_notice10", "1") != "0" else None,
+        (target - 5, "公告群提醒", "公告群：邮差正在整理信箱" if announce else "还没设公告群，这条不会发出") if remind and get_config("lovemail_notice5", "1") != "0" else None,
         (target, "心动信派送", f"信池里 {len(pool)} 封，发给 {len({m['to_role_id'] for m in pool})} 位收信人" if pool else "信池现在是空的"),
     ]
     sheet, found_next = [], False
@@ -360,8 +390,7 @@ def _dashboard() -> dict:
     if httpsproxy.active() and not httpsproxy.cert_ok(httpsproxy.subject(), timeout=2):
         todo.append(("bad", "HTTPS 证书失效了", url_for("https_page"), "玩家的小手机网址是 https，现在打不开；多半是 80 端口被关了，证书续不上"))
     todo += _phone_todo()
-    if not enabled and season_core.running():           # 季度结束后心动信本来就该关，不算待处理
-        todo.append(("warn", "心动信开关是关的", url_for("settings"), "玩家现在不能投信"))
+    todo += _season_todo(enabled)
     if not announce:
         todo.append(("warn", "还没设置公告群", url_for("admins_page"), "管理员在目标群里发「设为公告群」"))
     if not n_admins:
