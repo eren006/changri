@@ -368,7 +368,7 @@ async def _hidden(matcher, event: MessageEvent, text: str) -> None:
     hint = "" if _in_trpg(event) else "有个人群的话，结果会发到个人群；"     # 恋综：有个人群的角色，也可以发到个人群
     if await _whisper(event, "🎲 暗骰结果（只有你看得到）\n" + text):
         await matcher.finish(f"🎲 {who} 掷了一次暗骰，结果已私下发给 TA。")
-    await matcher.finish(f"🎲 {who} 想掷暗骰，但私下发不出去，所以没掷。{hint}官方机器人只能私聊白名单里的人：请把执行暗骰的人（KP）加进机器人的白名单，加好后就能收到私聊。")
+    await matcher.finish(f"🎲 {who} 想掷暗骰，但私下发不出去，所以没掷。{hint}机器人现在私聊不了 TA：要管理员把 TA 加进机器人的私聊白名单。")
 
 
 @ra_cmd.handle()

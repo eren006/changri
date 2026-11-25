@@ -9,6 +9,7 @@ from changri.core.qqsend import finish_usage, make_send, reply_buttons, reply_lo
 from changri.core.buttons import Btn
 from changri.core import admins, charprofile, messaging, relations, roles, season
 from changri.core.db import get_config, get_int
+from changri.core.textutil import parse_id
 
 NEED_ROLE = "你还没有角色。在你的个人群里发「创建新角色 名字」就能创建。"
 
@@ -61,7 +62,8 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     parts = raw.split(None, 1)
     if not raw and relations.enabled() and not relations.closed_note():   # 只发「拉线」：选人卡片，点名字填好「拉线 名字 」
         from changri.core import datepick
-        await send_card(add_rel, *datepick.cmd_card("拉线 · 选一个人", "点名字会填进输入框，后面接着写这一段", me["id"], "拉线"))
+        await send_card(add_rel, *datepick.cmd_card("拉线 · 选一个人", "点名字会填进输入框，后面接着写这一段", me["id"], "拉线",
+                                                        "拉线 对方名 内容\n例：拉线 张三 那天在花园里，你递给我一把伞……"))
     if len(parts) != 2:
         await finish_usage(add_rel, "格式：拉线 对方名 内容\n例：拉线 张三 那天在花园里，你递给我一把伞……", f"拉线 {parts[0]} " if parts else "拉线 ")
     target = roles.get_role_by_name(parts[0])
@@ -105,15 +107,22 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
         await withdraw_rel.finish("🔒 " + why)
     parts = args.extract_plain_text().strip().split(None, 1)
     if not me or len(parts) != 2:
-        await withdraw_rel.finish("格式：撤回关系 对方角色名 要撤回的内容")
+        await withdraw_rel.finish("格式：撤回关系 对方名 编号\n例：撤回关系 张三 2（编号在「查看关系线 张三」里，你写的每段前面有）\n也可以把要撤回的那段原文整段贴上。")
     target = roles.get_role_by_name(parts[0])
     if not target:
         await withdraw_rel.finish(f"❌ 找不到叫「{parts[0]}」的角色。")
-    res = relations.withdraw(me["id"], target["id"], parts[1].strip())
+    n = parse_id(parts[1])                     # 后面只有数字（全角也算）= 编号；按原文撤回的内容不会只是数字（拉线时就不收纯数字）
+    if n is not None:
+        res, total = relations.withdraw_nth(me["id"], target["id"], n)
+        if res is None:
+            await withdraw_rel.finish(f"你在和「{target['name']}」的关系线上写了 {total} 段，没有第 {n} 段。" if total
+                                      else f"你还没在和「{target['name']}」的关系线上写过，没有能撤回的。")
+    else:
+        res = relations.withdraw(me["id"], target["id"], parts[1].strip())
     if res == "":
         await withdraw_rel.finish(f"你还没给「{target['name']}」写过关系线，没有能撤回的。")
     if res is None:
-        await withdraw_rel.finish(f"没找到你写过的这段：「{parts[1].strip()}」\n发「查看关系线 {target['name']}」看全部。")
+        await withdraw_rel.finish(f"没找到你写过的这段：「{parts[1].strip()}」\n也可以按编号撤回：撤回关系 {target['name']} 2（编号在「查看关系线 {target['name']}」里）。")
     await _notify(bot, target["id"], f"🗑️ 「{me['name']}」撤回了关系线上的一段：\n\"{res}\"")
     await withdraw_rel.finish(f"✅ 撤回了这段：\n\"{res}\"")
 
@@ -135,7 +144,15 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
         ds = relations.details(rel["id"])
         if not ds:
             await view_rel.finish(f"你和「{target['name']}」的关系线还没写内容。")
-        text = f"📖 你和「{target['name']}」的关系线（{len(ds)} 段）\n" + "\n".join(f"\n【{d['from_name']}】\n{d['text']}" for d in ds)
+        mine_no, k = {}, 0                       # 自己写的段标上编号（只数自己的），撤回时用「撤回关系 名字 编号」
+        for d in ds:
+            if d["from_role_id"] == me["id"]:
+                k += 1
+                mine_no[d["id"]] = k
+        text = (f"📖 你和「{target['name']}」的关系线（{len(ds)} 段）\n"
+                + "\n".join(f"\n【{d['from_name']}】" + (f" #{mine_no[d['id']]}" if d["id"] in mine_no else "") + f"\n{d['text']}" for d in ds))
+        if mine_no:
+            text += f"\n\n想撤回自己写的一段：撤回关系 {target['name']} 编号（# 后面的数字）"
         await reply_long(view_rel, text)
         # 细节后面跟一条挂按钮：「接着写」把「拉线 名字 」填进输入框；截止锁上了就只给回列表
         btns = [] if relations.closed_note() else [Btn("接着写", f"拉线 {target['name']} ", enter=False)]

@@ -45,6 +45,7 @@ def register(app, ctx):
         if not tip:
             ok, tip, catcher, new_id = bottle.throw(role, text)
             if ok:
+                ctx.draft_done("bottle")
                 if not _push(catcher, f"🍾 你捡到一个漂流瓶（编号{new_id}）：\n「{text}」\n\n想回信就发送：漂流瓶 {new_id} 你想说的话"):
                     tip += "（瓶子漂得有点远，对方那边暂时没收到。）"
         flash(tip)
@@ -60,6 +61,8 @@ def register(app, ctx):
         tip = _bottle_why(role) or _gate(role, "漂流瓶", text)
         if not tip:
             ok, tip, other, deliver = bottle.reply(role, bid, text)
+            if ok:
+                ctx.draft_done(f"bottle:{bid}")
             if ok and deliver:
                 _push(other, f"🍾 漂流瓶（编号{bid}）有了新的回信：\n「{text}」\n\n想继续回信就发送：漂流瓶 {bid} 你想说的话")
         flash(tip)

@@ -14,6 +14,7 @@ import json
 import random
 import re
 import time
+from datetime import date, datetime, timedelta
 
 from .db import get_config, get_conn, set_config
 
@@ -111,6 +112,19 @@ def update_group(gid: int, **kw) -> tuple[bool, str]:
             fields[k] = 1 if kw[k] else 0
     if "kpi_period" in kw:
         fields["kpi_period"] = kw["kpi_period"] if kw["kpi_period"] in KPI_PERIODS else "week"
+    if fields.get("kpi_period") == "days":
+        try:
+            n = int(kw.get("kpi_days") or 0)
+        except (TypeError, ValueError):
+            n = 0
+        if not 1 <= n <= KPI_MAX_DAYS:
+            return False, f"自定义 KPI 周期要填 1 到 {KPI_MAX_DAYS} 之间的天数。"
+        fields["kpi_days"] = n
+        raw = str(kw.get("kpi_anchor") or "").strip()
+        try:
+            fields["kpi_anchor"] = _ts(datetime.strptime(raw, "%Y-%m-%d").date()) if raw else _ts(date.today())
+        except ValueError:
+            return False, "KPI 从哪天开始算，要写成 2026-11-25 这样的日期。"
     for k in ("kpi_chars", "kpi_paras"):
         if k in kw:
             try:
@@ -175,6 +189,11 @@ def _member(row) -> dict | None:
     except ValueError:
         d["info"] = {}
     d["alias_list"] = [a for a in (d.get("aliases") or "").split(",") if a]
+    try:
+        notes = json.loads(d.get("notes") or "{}")
+        d["notes"] = {str(s): {str(k): str(v) for k, v in f.items()} for s, f in notes.items() if isinstance(f, dict)}
+    except (ValueError, AttributeError):
+        d["notes"] = {}
     return d
 
 
@@ -1016,22 +1035,61 @@ def shop_text(gid: int) -> str:
 
 # ======================== KPI ========================
 
-KPI_PERIODS = {"week": "本周", "month": "本月", "all": "累计"}
+KPI_PERIODS = {"week": "本周", "month": "本月", "days": "本期", "all": "累计"}
+KPI_MAX_DAYS = 366
 
 
 def kpi_on(group: dict) -> bool:
     return bool(group.get("kpi_chars") or group.get("kpi_paras"))
 
 
+def _day0(ts: float) -> date:
+    return date.fromtimestamp(ts)
+
+
+def _ts(d: date) -> int:
+    return int(time.mktime((d.year, d.month, d.day, 0, 0, 0, 0, 0, -1)))
+
+
+def kpi_range(group: dict, now: float | None = None) -> tuple[int, int | None]:
+    """这一期 [开始, 结束)：每周从周一 0 点，每月从 1 号 0 点，累计从头（没有结束）；
+    自定义（days）从 kpi_anchor 那天起每 kpi_days 天一期，到期自动进下一期。还没到第一期的开始日，就按第一期算（还没入账）。"""
+    now = now or time.time()
+    today = _day0(now)
+    period = group.get("kpi_period")
+    if period == "all":
+        return 0, None
+    if period == "month":
+        start = today.replace(day=1)
+        nxt = (start.replace(day=28) + timedelta(days=4)).replace(day=1)
+        return _ts(start), _ts(nxt)
+    if period == "days":
+        n = min(max(int(group.get("kpi_days") or 7), 1), KPI_MAX_DAYS)
+        anchor = _day0(group.get("kpi_anchor") or now)
+        k = max((today - anchor).days, 0) // n
+        start = anchor + timedelta(days=k * n)
+        return _ts(start), _ts(start + timedelta(days=n))
+    start = today - timedelta(days=today.weekday())
+    return _ts(start), _ts(start + timedelta(days=7))
+
+
 def kpi_start(group: dict, now: float | None = None) -> int:
-    """这一期从什么时候算起：每周从周一 0 点，每月从 1 号 0 点，累计从头。"""
-    t = time.localtime(now or time.time())
-    if group.get("kpi_period") == "all":
-        return 0
-    if group.get("kpi_period") == "month":
-        return int(time.mktime((t.tm_year, t.tm_mon, 1, 0, 0, 0, 0, 0, -1)))
-    day0 = time.mktime((t.tm_year, t.tm_mon, t.tm_mday, 0, 0, 0, 0, 0, -1))
-    return int(day0 - t.tm_wday * 86400)
+    return kpi_range(group, now)[0]
+
+
+def kpi_label(group: dict, now: float | None = None) -> str:
+    """「本周」「本月」「累计」；自定义周期写成「本期（11-25～12-04）」。"""
+    if group.get("kpi_period") != "days":
+        return KPI_PERIODS.get(group.get("kpi_period"), "本周")
+    s, e = kpi_range(group, now)
+    last = date.fromtimestamp(e) - timedelta(days=1)
+    return f"本期（{date.fromtimestamp(s):%m-%d}～{last:%m-%d}）"
+
+
+def kpi_left_days(group: dict, now: float | None = None) -> int | None:
+    """这一期还剩几天（含今天）；累计返回 None。"""
+    _, e = kpi_range(group, now)
+    return None if e is None else (date.fromtimestamp(e) - _day0(now or time.time())).days
 
 
 def kpi_progress(gid: int) -> dict[int, dict]:
@@ -1062,7 +1120,146 @@ def kpi_text(mid: int) -> str:
         parts.append(f"字数 {p['chars']}/{g['kpi_chars']}")
     if g["kpi_paras"]:
         parts.append(f"段数 {p['paras']}/{g['kpi_paras']}")
-    return f"🎯 {KPI_PERIODS[g['kpi_period']]} KPI：" + "　".join(parts) + ("　✅ 达标" if p["ok"] else "　还没达标")
+    left = kpi_left_days(g)
+    tail = f"（还剩 {left} 天）" if g["kpi_period"] == "days" and left is not None else ""
+    return f"🎯 {kpi_label(g)} KPI{tail}：" + "　".join(parts) + ("　✅ 达标" if p["ok"] else "　还没达标")
+
+
+# ======================== 条目（玩家自己的备忘录） ========================
+# 玩家随时加一栏（「魔杖」），下面写几个字段（木材：冬青）。都不是必填，栏目名、字段名都是自己起的。
+# 存在 lt_members.notes（JSON，按加的先后排）。
+
+NOTE_MAX_SECTIONS = 30
+NOTE_MAX_FIELDS = 30
+NOTE_MAX_NAME = 12
+NOTE_MAX_VALUE = 200
+_KV = re.compile(r"^\s*([^\s:：]{1,40})\s*(?:[:：]\s*|\s+|$)(.*)$")
+_INLINE_KV = re.compile(r"([^\s:：]{1,40})\s*[:：]\s*(.*?)(?=\s+[^\s:：]{1,40}\s*[:：]|$)")
+
+
+def parse_note_fields(text: str) -> list[tuple[str, str]]:
+    """一栏下面的字段。几种写法都认：
+    「木材 冬青」「木材：冬青」；一行写好几个「木材：冬青 杖芯：凤凰羽毛」；换行一行一个；只写「木材」= 这个字段先空着。"""
+    text = (text or "").strip()
+    if not text:
+        return []
+    lines = [x for x in text.splitlines() if x.strip()]
+    if len(lines) == 1 and len(re.findall(r"[:：]", text)) > 1:
+        return [(k.strip(), v.strip()) for k, v in _INLINE_KV.findall(text)]
+    out = []
+    for line in lines:
+        m = _KV.match(line)
+        if m:
+            out.append((m.group(1).strip(), m.group(2).strip()))
+    return out
+
+
+def _note_name(s: str) -> str:
+    return _clean_name(s).strip("【】[]「」:：")
+
+
+def set_note(mid: int, section: str, pairs: list[tuple[str, str]]) -> tuple[bool, str]:
+    """加一栏（已经有就接着写），写进这些字段（同名的覆盖）。pairs 可以是空的：只加一栏。"""
+    m = get_member(mid)
+    if not m:
+        return False, "没有这个玩家。"
+    section = _note_name(section)
+    if not section or len(section) > NOTE_MAX_NAME:
+        return False, f"栏目名要 1～{NOTE_MAX_NAME} 个字。"
+    notes = m["notes"]
+    if section not in notes and len(notes) >= NOTE_MAX_SECTIONS:
+        return False, f"最多 {NOTE_MAX_SECTIONS} 栏，先删掉不要的（/删条目 栏目名）。"
+    fields = dict(notes.get(section, {}))
+    for k, v in pairs:
+        k = _note_name(k)
+        if not k or len(k) > NOTE_MAX_NAME:
+            return False, f"字段名「{k[:20]}」要 1～{NOTE_MAX_NAME} 个字。"
+        if len(v) > NOTE_MAX_VALUE:
+            return False, f"「{k}」写得太长了，一个字段最多 {NOTE_MAX_VALUE} 字。"
+        if k not in fields and len(fields) >= NOTE_MAX_FIELDS:
+            return False, f"一栏最多 {NOTE_MAX_FIELDS} 个字段。"
+        fields[k] = v
+    notes[section] = fields
+    _save_notes(mid, notes)
+    return True, ""
+
+
+def delete_note(mid: int, section: str, field: str = "") -> tuple[bool, str]:
+    """删一整栏，或者删这一栏里的某个字段。"""
+    m = get_member(mid)
+    notes = m["notes"] if m else {}
+    section, field = _note_name(section), _note_name(field)
+    if section not in notes:
+        return False, f"没有「{section}」这一栏。"
+    if field:
+        if field not in notes[section]:
+            return False, f"「{section}」里没有「{field}」。"
+        del notes[section][field]
+    else:
+        del notes[section]
+    _save_notes(mid, notes)
+    return True, ""
+
+
+def _save_notes(mid: int, notes: dict) -> None:
+    with get_conn() as c:
+        c.execute("UPDATE lt_members SET notes=? WHERE id=?", (json.dumps(notes, ensure_ascii=False), mid))
+
+
+def notes_to_text(notes: dict) -> str:
+    """后台文本框里的样子：栏目名单独一行，下面一行一个「字段：内容」，栏目之间空一行。"""
+    return "\n\n".join("【" + s + "】" + "".join(f"\n{k}：{v}" for k, v in f.items()) for s, f in notes.items())
+
+
+def parse_notes_text(text: str) -> tuple[dict | None, str]:
+    """后台文本框 → 条目。「【魔杖】」是栏目名；空行后面第一行不带冒号的也算栏目名。下面的「字段：内容」归它。"""
+    notes: dict[str, dict[str, str]] = {}
+    cur, fresh = None, True                      # fresh：这一行是不是一段的第一行（开头或者空行后面）
+    for raw in (text or "").splitlines():
+        line = raw.strip()
+        if not line:
+            fresh = True
+            continue
+        head = re.fullmatch(r"[【\[]\s*(.+?)\s*[】\]]", line)
+        is_head = bool(head) or (fresh and not re.search(r"[:：]", line))
+        fresh = False
+        if is_head:
+            cur = _note_name(head.group(1) if head else line)
+            if not cur or len(cur) > NOTE_MAX_NAME:
+                return None, f"栏目名「{cur[:20]}」要 1～{NOTE_MAX_NAME} 个字。"
+            notes.setdefault(cur, {})
+            continue
+        if cur is None:
+            return None, f"「{line[:20]}」上面要先写栏目名，比如【魔杖】。"
+        for k, v in parse_note_fields(line):
+            k = _note_name(k)
+            if not k or len(k) > NOTE_MAX_NAME:
+                return None, f"字段名「{k[:20]}」要 1～{NOTE_MAX_NAME} 个字。"
+            notes[cur][k] = v[:NOTE_MAX_VALUE]
+    if len(notes) > NOTE_MAX_SECTIONS or any(len(f) > NOTE_MAX_FIELDS for f in notes.values()):
+        return None, f"最多 {NOTE_MAX_SECTIONS} 栏、每栏 {NOTE_MAX_FIELDS} 个字段。"
+    return notes, ""
+
+
+def replace_notes(mid: int, notes: dict) -> None:
+    _save_notes(mid, notes)
+
+
+def notes_text(mid: int, section: str = "") -> str:
+    m = get_member(mid)
+    notes = m["notes"]
+    if section:
+        section = _note_name(section)
+        if section not in notes:
+            return f"{m['name']} 还没有「{section}」这一栏。"
+        notes = {section: notes[section]}
+    if not notes:
+        return f"📒 {m['name']} 还没有条目。\n加一栏：/写条目 魔杖 木材：冬青 杖芯：凤凰羽毛"
+    out = [f"📒 {m['name']} 的条目"]
+    for s, f in notes.items():
+        out.append(f"【{s}】" + ("" if f else "（还没写内容）"))
+        out += [f"  {k}：{v}" if v else f"  {k}：—" for k, v in f.items()]
+    return "\n".join(out)
 
 
 # ======================== 签到 ========================
@@ -1269,7 +1466,10 @@ def help_text(group: dict | None, is_admin: bool = False) -> str:
              "/注册 名字　注册（再发一次 = 改资料）" + ("，换行写 " + "、".join(f"{k}：…" for k in reg_fields(group)) if group and reg_fields(group) else ""),
              "/我的　看资料、字数、" + cur + "、属性、背包（后面写名字或 @ 人看别人）",
              "/属性　/背包　只看属性 / 只看背包",
-             "/st 力量60　改自己的属性" + ("（这个群由管理员改）" if group and not group["self_attrs"] else "")]
+             "/st 力量60　改自己的属性" + ("（这个群由管理员改）" if group and not group["self_attrs"] else ""),
+             "/条目　看自己的条目（像备忘录，后面写名字或 @ 人看别人，写栏目名只看那一栏）",
+             "/写条目 魔杖 木材：冬青 杖芯：凤凰羽毛　加一栏、写字段，都不是必填；可以换行一行一个",
+             "/删条目 魔杖　删一栏（/删条目 魔杖 木材 只删一个字段）"]
     if group and group["checkin_on"]:
         lines.append("/签到　每天一次领奖励")
     lines += ["", "【字数和" + cur + "】",
@@ -1286,6 +1486,7 @@ def help_text(group: dict | None, is_admin: bool = False) -> str:
                   f"/调整 名字 力量+5 {cur}-10 苹果+2 字数+300　（=100 是直接改成）",
                   f"/发放 全员 {cur}+50　/发放 阿青、小白 苹果+1",
                   "/切换长期群 名字　/模式 恋综|跑团|长期群",
+                  "/写条目 @某人 魔杖 木材：冬青　替别人写（/删条目 @某人 … 一样）",
                   "其余（注册项、兑换比例、属性、道具、商城、配方、签到奖励、批准字数）在后台「长期群」页"]
     return "\n".join(lines)
 
@@ -1365,6 +1566,8 @@ def panel_text(mid: int) -> str:
     lines.append("📊 " + ("　".join(f"{n} {v}" for n, v in at) if at else "还没有属性"))
     bag = items(mid)
     lines.append("🎒 " + ("、".join(f"{n}×{q}" for n, q in bag) if bag else "背包是空的"))
+    if m["notes"]:
+        lines.append("📒 条目：" + "、".join(m["notes"]) + "（/条目 看内容）")
     return "\n".join(lines)
 
 

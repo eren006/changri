@@ -7,7 +7,7 @@
   finish.py  房间收尾：结束、强结、取消官约、到点提醒、清群、复盘、补录。
   launch.py  发起房间：约会 / 电话 / 踩点 / 微信，发起官约 / 官电，计划官约 / 执行官约。
   joinreq.py  申请加入别人的房间：申请加入 / 加入请求 / 同意加入 / 拒绝加入。
-  timeline.py  时间线：查看、删除、修改 / 同意 / 拒绝时间线，我的待回、我的数量、弧长。
+  timeline.py  时间线：查看、删除、修改 / 同意时间线，拒绝约会，我的待回、我的数量、弧长。
   ticks.py  定时任务（过期结束、补群、提前排的官约到点开房……）和 QQ 小号旁听到的房间指令。
   groups.py  备用群池管理（管理员）：设为备用群、转为小号群、放回、取消、查看；机器人进群时记一笔。
   record.py  复盘：官方机器人在房间群里收到的发言。
@@ -35,7 +35,7 @@ from .joinreq import (  # noqa: F401
 from .timeline import (  # noqa: F401
     tl, _timeline_text, del_slot, todo, chg, _when,
     CHG_USAGE, _vote_result, _propose_in_room, _decline, _vote, agree_tl,
-    reject_tl, my_count, my_arc, see_arc,
+    reject_tl, old_reject, old_reject_hint, my_count, my_arc, see_arc,
 )
 from .ticks import (  # noqa: F401
     _tick, _tick_pool_alert, _tick_outbox, _tick_expired, _tick_assign, _defer_waiting_told,

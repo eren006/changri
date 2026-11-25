@@ -9,6 +9,7 @@ from nonebot.params import CommandArg  # noqa: F401
 from changri.core import rooms, season, storycal, wishes
 from changri.core.buttons import Btn
 from changri.core.qqsend import finish_usage, make_send, reply_buttons
+from changri.core.textutil import join_time_range
 from changri.plugins.play import NEED_ROLE, NO_GROUP_TEXT, _announce_in_room, _cmd, _group_line, _invite, _me, _push, _qq_hint, _slot, settle_wish_room
 
 async def _broadcast(w) -> None:
@@ -32,7 +33,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     text, sign = args.extract_plain_text().strip(), ""
     if re.search(r"[|｜]", text):
         text, sign = (x.strip() for x in re.split(r"[|｜]", text, 1))
-    p = text.split(None, 2)
+    p = join_time_range(text).split(None, 2)
     if not p:                                   # 只发「挂心愿」：给地点按钮（有预设地点时），点了填好「挂心愿 时间 花园 」
         await _place_card(me)
     if len(p) < 3:
@@ -56,7 +57,7 @@ async def _place_card(me) -> None:
     if not ps:
         await reply_buttons(wish_post, head, [Btn("填入输入框", "挂心愿 时间 地点 ", enter=False)], per_row=1)
         await wish_post.finish()
-    btns = [Btn(x, f"挂心愿 时间 {x} ", enter=False) for x in ps[:datepick.MAX_ITEMS]]
+    btns = [Btn(x, f"挂心愿 时间 {x} ", enter=False) for x in ps[:datepick.capacity(0 if datepick.only_preset() else 1)]]
     if not datepick.only_preset():
         btns.append(Btn("别的地方", "挂心愿 时间 地点 ", enter=False, style="secondary"))
     await reply_buttons(wish_post, "挂心愿 · 选地点\n点地点会填进输入框：把「时间」换掉，后面接着写内容（想署名就再加「| 昵称」）\n\n" + head,

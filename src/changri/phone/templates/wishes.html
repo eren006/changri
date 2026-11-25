@@ -22,7 +22,7 @@
         <input id="wishPlace" name="place" list="wishPlaces" maxlength="30" placeholder="地点（不要有空格）" required>
         <datalist id="wishPlaces">{% for n in places %}<option value="{{ n }}">{% endfor %}</datalist>
         <div class="wish-label-row"><label for="wishContent">一句想说的话</label><span class="wish-hint" id="wishCount">还可写 {{ max_content }} 字</span></div>
-        <textarea id="wishContent" name="content" maxlength="{{ max_content }}" aria-describedby="wishCount" placeholder="比如，想和你一起等一场日落。" required></textarea>
+        <textarea id="wishContent" name="content" maxlength="{{ max_content }}" aria-describedby="wishCount" placeholder="比如，想和你一起等一场日落。" required data-draft="wish"></textarea>
         <label for="wishNick">留个昵称 <span class="wish-hint">选填 · 10 字内</span></label>
         <input id="wishNick" name="nick" maxlength="10" placeholder="比如：神秘人A" aria-describedby="wishPrivacy">
         <p class="wish-hint" id="wishPrivacy">心愿墙上只显示性别和昵称，不显示角色名；不写昵称就只显示性别。</p>

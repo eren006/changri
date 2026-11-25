@@ -10,11 +10,12 @@ from changri.core import announce, messaging, pool, qqmanager, roles, rooms, sto
 from changri.core.db import per_bot
 from changri.core.overview import slot_text as _slot
 from changri.core.qqsend import make_send
+from changri.core.textutil import join_time_range
 
 from .common import NEED_ROLE, _announce_in_room, _cmd, _me, _missed_line, _push, _push_group, _qq_hint, _to_group
 from .finish import _ensure_clean, _finish_room, _room_arg, _sweep_cleaning, _warn_expiring
 from .launch import _send_official_invites
-from .timeline import _decline, _propose_in_room, _vote_result
+from .timeline import _decline, _propose_in_room, _vote_result, old_reject_hint
 
 nonebot.require("nonebot_plugin_apscheduler")
 from nonebot_plugin_apscheduler import scheduler  # noqa: E402
@@ -149,7 +150,7 @@ async def _check_presence(only_gid: str = "") -> None:
             await _receipt_all_here(rooms.get(room["id"]))
 
 
-_ROOM_CMD = re.compile(r"[/.。]?(结束(?:约会|私约|电话|官约|微信|心愿|前置电话|踩点)|修改时间线|同意时间线|拒绝时间线)\s*(.*)")
+_ROOM_CMD = re.compile(r"[/.。]?(结束(?:约会|私约|电话|官约|微信|心愿|前置电话|踩点)|修改时间线|同意时间线|拒绝时间线|拒绝约会|取消约会)\s*(.*)")
 _LEAD_AT = re.compile(r"^(?:@\S+\s*)+")          # QQ 里「回复」一条消息会自动在开头 @ 原发送人
 
 
@@ -158,7 +159,7 @@ def _cmd_text(text: str) -> str:
 
 
 async def _listen_cmd(app_id, msg) -> bool:
-    """房间群里没有卡拉：有监听的 QQ 号时，群里发「结束约会 / 修改时间线 / 同意时间线 / 拒绝时间线」由 QQ 号听到，
+    """房间群里没有卡拉：有监听的 QQ 号时，群里发「结束约会 / 修改时间线 / 同意时间线 / 拒绝约会」由 QQ 号听到，
     按发言人绑定的 QQ 认出他是房间的哪位参与者，照常处理，结果由 QQ 号在群里回。返回是否是房间指令。"""
     m = _ROOM_CMD.fullmatch(_cmd_text(msg.text))
     if not m:
@@ -174,12 +175,12 @@ async def _listen_cmd(app_id, msg) -> bool:
     mine = {r["id"] for r in roles.roles_by_qq(msg.user_id)}
     me = next((roles.get_role(x["role_id"]) for x in rooms.members(room["id"]) if x["role_id"] in mine), None)
     if not me:
-        await say("认不出你是谁：请先在自己的群里对卡拉发「/绑定QQ 你的QQ号」，绑定后才能在这里用。")
+        await say("认不出你是谁：请先在自己的个人群里发「/绑定QQ 你的QQ号」，绑定后才能在这里用。")
         return True
     if cmd.startswith("结束"):
         await _finish_room(room["id"], "ended", "")
     elif cmd == "修改时间线":
-        p = arg.split()
+        p = join_time_range(arg).split()
         day = room["day"]
         if p and re.fullmatch(r"[Dd]\d+", p[0]):
             day = int(p.pop(0)[1:])
@@ -195,6 +196,8 @@ async def _listen_cmd(app_id, msg) -> bool:
             await say(_propose_in_room(me, room, others, day, hm) if ok else f"❌ {why}")
     elif cmd == "同意时间线":
         await say(await _vote_result(room, me, True, True))
+    elif cmd == "拒绝时间线":                                   # 老叫法，不再取消，只提示
+        await say(old_reject_hint(room))
     else:
         await say(await _decline(room, me, True))
     return True

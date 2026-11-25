@@ -114,7 +114,7 @@ def register(app, login_required):
         f = request.form
         mats = list(zip(f.getlist("mat_item"), f.getlist("mat_n")))
         ok, msg = rpg_core.save_recipe(f.get("name", ""), mats, f.get("out_item", ""), f.get("out_n"))
-        flash(msg)
+        flash(msg, "message" if ok else "error")
         return redirect(url_for("rpg_page"))
 
     @app.post("/rpg/recipe/<int:recipe_id>/delete")

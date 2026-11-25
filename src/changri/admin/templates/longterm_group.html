@@ -207,10 +207,15 @@ details.lt-add>summary{cursor:pointer;display:inline-block}
     <p><label class="check"><span class="sw"><input type="checkbox" name="count_review" value="1" {{ 'checked' if g.count_review }}><i></i></span>玩家交的字数要管理员批准才入账</label></p>
     <p><label class="check"><span class="sw"><input type="checkbox" name="count_admin_only" value="1" {{ 'checked' if g.count_admin_only }}><i></i></span>只有管理员能交字数统计</label></p>
     <p><label class="check"><span class="sw"><input type="checkbox" name="self_attrs" value="1" {{ 'checked' if g.self_attrs }}><i></i></span>玩家可以自己用 /st 改属性</label></p>
-    <p><b>KPI</b>　按 <select name="kpi_period" aria-label="KPI 周期">{% for k, v in kpi_periods.items() %}<option value="{{ k }}" {{ 'selected' if g.kpi_period == k }}>{{ {'week':'每周（周一起）','month':'每月','all':'累计'}[k] }}</option>{% endfor %}</select> 算，
+    <p><b>KPI</b>　按 <select name="kpi_period" id="kpi_period" aria-label="KPI 周期" onchange="document.getElementById('kpi_days_row').hidden=this.value!=='days'">{% for k, v in kpi_periods.items() %}<option value="{{ k }}" {{ 'selected' if g.kpi_period == k }}>{{ {'week':'每周（周一起）','month':'每月','days':'每隔几天（自定义）','all':'累计'}[k] }}</option>{% endfor %}</select> 算，
        字数至少 <input type="number" name="kpi_chars" min="0" value="{{ g.kpi_chars or '' }}" placeholder="不考核" style="width:100px" aria-label="KPI 字数">，
        段数至少 <input type="number" name="kpi_paras" min="0" value="{{ g.kpi_paras or '' }}" placeholder="不考核" style="width:90px" aria-label="KPI 段数">
-       <br><span class="note">合并转发里一条消息算一段；按入账（批准）的时间算进哪一期，后台加减的字数、段数也算。两项都空着 = 不考核。</span></p>
+       <span id="kpi_days_row" {{ 'hidden' if g.kpi_period != 'days' }}><br>
+         每<input type="number" name="kpi_days" min="1" max="366" value="{{ g.kpi_days or 7 }}" style="width:80px" aria-label="KPI 每几天一期"> 天一期，
+         从 <input type="date" name="kpi_anchor" value="{{ kpi_anchor_text }}" aria-label="KPI 第一期从哪天开始"> 起算，到期自动进下一期、重新计数
+         {% if g.kpi_period == 'days' %}<br><span class="muted">现在是{{ kpi_now }}，还剩 {{ kpi_left }} 天（含今天）。</span>{% endif %}
+       </span>
+       <br><span class="note">合并转发里一条消息算一段；按入账（批准）的时间算进哪一期，后台加减的字数、段数也算。两项都空着 = 不考核。自定义周期不填开始日期 = 从保存那天算。</span></p>
     <p><label class="check"><span class="sw"><input type="checkbox" name="checkin_on" value="1" {{ 'checked' if g.checkin_on }}><i></i></span>每日签到（/签到）{% if g.checkin_on %}<span class="muted">　今天 {{ checkins_today }} 人签了</span>{% endif %}</label></p>
     <p><label>签到奖励（一行一项，「名字 数量」或「名字 最少-最多」随机）<br>
        <textarea class="wide" name="checkin_rewards" rows="3" placeholder="{{ g.currency }} 10-30&#10;回血药水 1&#10;幸运 0-2">{{ g.checkin_rewards }}</textarea></label>

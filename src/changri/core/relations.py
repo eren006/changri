@@ -49,6 +49,9 @@ def add_detail(from_id: int, to_id: int, to_name: str, text: str) -> tuple[bool,
         return False, "🔒 " + why
     if from_id == to_id:
         return False, "⚠️ 不能跟自己拉关系线。"
+    from .textutil import parse_id
+    if parse_id(text) is not None:          # 只有数字的一段会跟「撤回关系 名字 2」（按编号撤回）分不清，不收
+        return False, "⚠️ 这一段只有数字，多写几个字再发。"
     max_chars = get_int("max_detail_chars", 500)
     if len(text) > max_chars:
         return False, f"⚠️ 这段有 {len(text)} 字，一次最多 {max_chars} 字，删短一点再发。"
@@ -110,6 +113,27 @@ def withdraw(from_id: int, to_id: int, text: str):
             return None
         conn.execute("DELETE FROM rel_details WHERE id=?", (row["id"],))
     return row["text"]
+
+
+def my_details(rel_id: int, from_id: int) -> list:
+    """这条关系线上 from_id 自己写的段，按先后排。「查看关系线 名字」里的编号、「撤回关系 名字 2」都按这个数。"""
+    with get_conn() as conn:
+        return conn.execute("SELECT id, text FROM rel_details WHERE rel_id=? AND from_role_id=? ORDER BY id", (rel_id, from_id)).fetchall()
+
+
+def withdraw_nth(from_id: int, to_id: int, n: int) -> tuple[str | None, int]:
+    """撤回自己写的第 n 段（从 1 数，只数自己写的）。返回 (被撤回的内容, 自己一共写了几段)；
+    关系线不存在返回 ('', 0)；编号超出范围返回 (None, 段数)。"""
+    rel = get_rel(from_id, to_id)
+    if not rel:
+        return "", 0
+    mine = my_details(rel["id"], from_id)
+    if not 1 <= n <= len(mine):
+        return None, len(mine)
+    row = mine[n - 1]
+    with get_conn() as conn:
+        conn.execute("DELETE FROM rel_details WHERE id=?", (row["id"],))
+    return row["text"], len(mine)
 
 
 def list_for(role_id: int) -> list[dict]:

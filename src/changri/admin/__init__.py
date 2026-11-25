@@ -11,7 +11,7 @@ from changri import config as _config
 from changri.core import botconf, extensions as ext_core, loopbridge, netcheck, pool as pool_core, qqmanager as qqmanager_core, roles as roles_core, roomnotify as roomnotify_core, rooms as rooms_core, season as season_core, setupcode, updater, webusers
 from changri.core import notices as author_notices
 from changri.core.db import DB_PATH, current_bot, enter_bot, get_config, get_conn, init_db, leave_bot, list_bot_ids, set_config, use_bot
-from changri.admin.common import GLOBAL_ENDPOINTS, HIDDEN_FIELDS, LOCK_AFTER, LOCK_SECONDS, SECTIONS, SETTINGS, _bot_cards, _bot_label, _bot_status, _csrf_token, _dashboard, _fails, _secret_key, field_view, log
+from changri.admin.common import GLOBAL_ENDPOINTS, HIDDEN_FIELDS, card_groups, group_card, LOCK_AFTER, LOCK_SECONDS, SECTIONS, SETTINGS, _bot_cards, _bot_label, _bot_status, _csrf_token, _dashboard, _fails, _secret_key, field_view, log
 from changri.core.textutil import hm_text, next_day_mark
 
 THEME_COOKIE = "admin_theme"
@@ -56,7 +56,7 @@ def create_app() -> Flask:
         elif session.get("uid") and request.endpoint and request.endpoint not in GLOBAL_ENDPOINTS and any(list_bot_ids(False)):
             ids = [i for i in list_bot_ids(False) if i]
             if request.method != "GET":      # 没带机器人前缀的写操作：不猜是哪个机器人，宁可拒绝，免得角色建到别人名下
-                flash("没有选定机器人，这次操作没有执行。请先选择机器人，再从它的页面操作。")
+                flash("没有选定机器人，这次操作没有执行。请先选择机器人，再从它的页面操作。", "error")
                 return redirect("/?pick=1")
             if ids:
                 pick = session.get("bot") if session.get("bot") in ids else ids[0]
@@ -136,7 +136,7 @@ def create_app() -> Flask:
         theme = request.cookies.get(THEME_COOKIE, "")
         ctx = {"admin_theme": theme if theme in THEMES else "", "me": session.get("name", ""), "is_owner": bool(session.get("owner")), "disabled_nav": ext_core.disabled_nav(),
                "in_bot": in_bot, "bot_id": request.environ.get("changri.bot", ""), "bots": [], "bot_label": "",
-               "root_url": lambda ep, **kw: url_for(ep, **kw)[len(request.script_root):], "update_dot": "", "author_notices": [], "auto_note": None}
+               "root_url": lambda ep, **kw: url_for(ep, **kw)[len(request.script_root):], "update_dot": "", "author_notices": [], "auto_note": None, "autostart_need": None}
         if session.get("uid"):
             accs = botconf.list_accounts()
             ctx["bots"] = [(a["app_id"], _bot_label(a)) for a in accs]
@@ -152,6 +152,11 @@ def create_app() -> Flask:
                     ctx["auto_note"] = autoupdate.note()
                 except Exception:  # noqa: BLE001
                     pass
+                try:                                  # Windows 在窗口里跑、没设开机自启：base.html 弹窗提醒
+                    from changri.platform import winstart
+                    ctx["autostart_need"] = winstart.need_popup()
+                except Exception:  # noqa: BLE001
+                    pass
         return ctx
 
     @app.route("/setup", methods=["GET", "POST"])
@@ -163,9 +168,9 @@ def create_app() -> Flask:
             setupcode.code()
         if request.method == "POST":
             if need_code and not setupcode.check(request.form.get("setup_code", "")):
-                flash("验证码不对。验证码在安装完成时打印在屏幕上，也在服务器的 data/.setup_code 文件里。")
+                flash("验证码不对。验证码在安装完成时打印在屏幕上，也在服务器的 data/.setup_code 文件里。", "error")
             elif request.form.get("password") != request.form.get("again"):
-                flash("两次输入的密码不一样。")
+                flash("两次输入的密码不一样。", "error")
             else:
                 ok, err = webusers.create_user(request.form.get("username", "").strip(), request.form.get("password", ""), "owner")
                 if ok:
@@ -190,7 +195,7 @@ def create_app() -> Flask:
             for k in keys:
                 _, until = _fails.get(k, (0, 0.0))
                 if until > now:
-                    flash(f"输错太多次了，请 {int((until - now) // 60) + 1} 分钟后再试。")
+                    flash(f"输错太多次了，请 {int((until - now) // 60) + 1} 分钟后再试。", "error")
                     return render_template("login.html"), 429
             user = webusers.verify(name, request.form.get("password", ""))
             if user and user["disabled"]:
@@ -206,7 +211,7 @@ def create_app() -> Flask:
                 n = _fails.get(k, (0, 0.0))[0] + 1
                 lock = 0 if n % LOCK_AFTER else (86400 if n >= 3 * LOCK_AFTER else 3600 if n >= 2 * LOCK_AFTER else LOCK_SECONDS)
                 _fails[k] = (n, now + lock if lock else 0.0)
-            flash("账号或密码不对。")
+            flash("账号或密码不对。", "error")
         return render_template("login.html")
 
     def _stray_login(err):
@@ -300,7 +305,7 @@ def create_app() -> Flask:
         if request.form.get("action") == "save":
             qq = request.form.get("qq", "").strip()
             if not errlog._QQ.fullmatch(qq):
-                flash("QQ 号要是 5 到 12 位数字。没保存，下次打开总览还会问你。")
+                flash("QQ 号要是 5 到 12 位数字。没保存，下次打开总览还会问你。", "error")
                 return redirect(url_for("dashboard"))
             set_config("contact_qq", qq)
             flash(f"已保存联系 QQ {qq}。以后报错发给作者时会带上它；想改或删：总览「报错日志」展开后点「联系 QQ」，或者「功能与设置 → 基础 → 进入设置」。")
@@ -319,11 +324,11 @@ def create_app() -> Flask:
             hours = 0
         text = f.get("text", "").strip()
         if hours <= 0 or not text:
-            flash("要写清楚多少小时，以及通知的内容")
+            flash("要写清楚多少小时，以及通知的内容", "error")
             return redirect(url_for("dashboard") + "#rooms")
         items = roomnotify_core.candidates(hours, "open" if f.get("mode") == "open" else "idle")
         if not items:
-            flash("没有符合条件的房间")
+            flash("没有符合条件的房间", "error")
             return redirect(url_for("dashboard") + "#rooms")
         from changri.core.qqsend import make_send
         ok, bad = loopbridge.run(roomnotify_core.notify(items, text, current_bot(), make_send(), qqmanager_core.room_say), timeout=120)
@@ -351,9 +356,10 @@ def create_app() -> Flask:
     @app.post("/settings/<group>")
     @login_required
     def settings_save(group):
-        keys = dict(SECTIONS).get(group)
-        if keys is None:
+        if group not in dict(SECTIONS):
             abort(404)
+        card = group_card(group)                    # 一张卡片里可能有好几组（EXTRA_GROUPS），一起存
+        keys = [k for g in (card_groups(card) if card else [group]) for k in dict(SECTIONS)[g]]
         for key in keys:
             if key in request.form:
                 set_config(key, request.form[key].strip())
@@ -403,7 +409,7 @@ def create_app() -> Flask:
         app_id, secret = request.form.get("app_id", "").strip(), request.form.get("secret", "").strip()
         ok, err = botconf.add_account(app_id, secret, request.form.get("note", ""))
         if not ok:
-            flash(err)
+            flash(err, "error")
         else:
             res = _remember_test(app_id, secret)
             flash("已保存，机器人会在几秒内自动连接。" if res["ok"] else "已保存，但连接检查没通过，请看下面的提示。")
@@ -442,7 +448,7 @@ def create_app() -> Flask:
         """彻底删除：账号 + 这个机器人的整套数据。要原样输入 AppID 确认。"""
         from changri.core import db as _db, phoneserver
         if request.form.get("confirm", "").strip() != app_id:
-            flash("AppID 没对上，没有删除。")
+            flash("AppID 没对上，没有删除。", "error")
             return redirect(url_for("bots_page"))
         phoneserver.stop(app_id)
         botconf.delete_account(app_id)
@@ -478,7 +484,7 @@ def create_app() -> Flask:
         if password:
             session["new_cred"] = {"username": user["username"], "password": password}
         else:
-            flash("不能重置这个账号的密码。")
+            flash("不能重置这个账号的密码。", "error")
         return redirect(url_for("accounts_page"))
 
     @app.post("/accounts/<int:user_id>/disable")
@@ -493,7 +499,7 @@ def create_app() -> Flask:
     @login_required
     def accounts_password():
         if request.form.get("new") != request.form.get("again"):
-            flash("两次输入的新密码不一样。")
+            flash("两次输入的新密码不一样。", "error")
         else:
             ok, err = webusers.change_password(session["uid"], request.form.get("old", ""), request.form.get("new", ""))
             flash("密码已修改" if ok else err)
@@ -518,7 +524,7 @@ def create_app() -> Flask:
                 info = updater.check()
                 set_config("update_latest", info["version"] if info["newer"] else "")
             except updater.UpdateError as e:
-                flash(str(e))
+                flash(str(e), "error")
         from changri.core import autoupdate
         cur = updater.current_version()
         auto = autoupdate.status(info)
@@ -541,12 +547,21 @@ def create_app() -> Flask:
                 set_config(key, v)
         win = request.form.get("window", "").strip()
         if win and not autoupdate.parse_window(win):
-            flash("时段的格式不对，要写成 04:00-06:00 这样，其他已保存")
+            flash("时段的格式不对，要写成 04:00-06:00 这样，其他已保存", "error")
         else:
             if win:
                 set_config("auto_update_window", autoupdate.window_text(autoupdate.parse_window(win)))
             flash("已保存")
         return redirect(url_for("update_page"))
+
+    @app.post("/autostart/install")
+    @owner_required
+    def autostart_install():
+        """后台弹窗「还没设开机自启」里点「现在设好」。"""
+        from changri.platform import winstart
+        flash(winstart.install_from_admin(request.remote_addr in ("127.0.0.1", "::1")))
+        nxt = request.form.get("next", "")
+        return redirect(nxt if nxt.startswith("/") and not nxt.startswith("//") else url_for("dashboard"))
 
     @app.post("/update/auto/seen")
     @owner_required
@@ -564,7 +579,7 @@ def create_app() -> Flask:
             info = updater.check()
             set_config("update_latest", info["version"] if info["newer"] else "")
         except updater.UpdateError as e:
-            flash(str(e))
+            flash(str(e), "error")
             return redirect(url_for("update_page"))
         return redirect(url_for("update_page", check=1))
 
@@ -585,11 +600,11 @@ def create_app() -> Flask:
             from changri.core import autoupdate
             res = updater.update_now(extra=autoupdate.snapshot())       # 记下更新前的样子，新版本起来后对照检查
         except updater.UpdateError as e:
-            flash(str(e))
+            flash(str(e), "error")
             return redirect(url_for("update_page"))
         except Exception as e:  # noqa: BLE001
             log.exception("更新失败")
-            flash(f"更新失败：{type(e).__name__}。原来的版本没有被改动。")
+            flash(f"更新失败：{type(e).__name__}。原来的版本没有被改动。", "error")
             return redirect(url_for("update_page"))
         set_config("update_latest", "")
         (DB_PATH.parent / "update_failed.txt").unlink(missing_ok=True)
@@ -617,7 +632,7 @@ def create_app() -> Flask:
         ips = request.form.get("ips", "").strip()
         want = bool(request.form.get("on"))
         if want and not parse_allow(ips):
-            flash("要先填至少一个允许的 IP，否则不能开启（名单为空 = 谁都进不来）")
+            flash("要先填至少一个允许的 IP，否则不能开启（名单为空 = 谁都进不来）", "error")
             return redirect(url_for("remote_page"))
         set_config("remote_admin_ips", ips)
         set_config("remote_admin_enabled", "1" if want else "0")
@@ -646,7 +661,7 @@ def create_app() -> Flask:
         try:
             subj = httpsproxy.enable(request.form.get("domain", ""))
         except httpsproxy.CaddyError as e:
-            flash(f"没能开通：{e}")
+            flash(f"没能开通：{e}", "error")
             return redirect(url_for("https_page"))
         from changri.platform import service
         fw = service.open_firewall() or service.firewall_hint()
@@ -692,8 +707,14 @@ def create_app() -> Flask:
     def extensions_page():
         items = ext_core.list_all()
         for it in items:
-            g = it.get("settings_group")
-            it["fields"] = [field_view(k, label, default, get_config(k, default)) for k, (label, default) in dict(SECTIONS)[g].items() if k not in HIDDEN_FIELDS] if g else []
+            groups = card_groups(it)
+            it["settings_group"] = groups[0] if groups else None
+            it["fields"] = []
+            for i, g in enumerate(groups):
+                fs = [field_view(k, label, default, get_config(k, default)) for k, (label, default) in dict(SECTIONS)[g].items() if k not in HIDDEN_FIELDS]
+                if i and fs:
+                    fs[0]["sub"] = g                # 挂进来的组前面加个小标题
+                it["fields"] += fs
             it["load_error"] = it.get("error") or ext_core.load_error(it["id"])
             if it["kind"] == "user":
                 it["vals"] = {st["key"]: ext_core.get_setting(it["id"], st["key"]) for st in it.get("settings", [])}
@@ -718,7 +739,7 @@ def create_app() -> Flask:
     @owner_required
     def extensions_ready_install(ext_id):
         ok, msg = ext_core.install_ready(ext_id, replace=request.form.get("replace") == "1")
-        flash(msg)
+        flash(msg, "message" if ok else "error")
         return redirect(url_for("extensions_page", tab="aux" if ok else "api"))
 
     @app.route("/extensions/ai-prompt.md")
@@ -759,10 +780,10 @@ def create_app() -> Flask:
     def extensions_upload():
         f = request.files.get("file")
         if not f or not f.filename:
-            flash("先选一个 zip 文件")
+            flash("先选一个 zip 文件", "error")
             return redirect(url_for("extensions_page"))
         ok, msg = ext_core.install_zip(f.read(ext_core.MAX_ZIP + 1), replace=request.form.get("replace") == "1")
-        flash(msg)
+        flash(msg, "message" if ok else "error")
         return redirect(url_for("extensions_page"))
 
     @app.post("/extensions/<ext_id>/delete")

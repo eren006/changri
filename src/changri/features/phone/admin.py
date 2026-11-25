@@ -57,7 +57,7 @@ def register(app, login_required):
         import time as _time
         base = get_config("phone_base_url", "").rstrip("/")
         if get_config("phone_enabled", "0") != "1" or not base or not roles_core.get_role(role_id):
-            flash("小手机还没开启，或者找不到这个角色")
+            flash("小手机还没开启，或者找不到这个角色", "error")
             return redirect(url_for("phone_page"))
         phonecodes.code_for_role(role_id)
         tok = _sec.token_urlsafe(24)
@@ -72,7 +72,7 @@ def register(app, login_required):
         import time as _time
         base = get_config("phone_base_url", "").rstrip("/")
         if get_config("phone_enabled", "0") != "1" or not base:
-            flash("小手机还没开启")
+            flash("小手机还没开启", "error")
             return redirect(url_for("phone_page"))
         tok = _sec.token_urlsafe(24)
         set_config(f"phone_admin:{tok}", str(int(_time.time()) + 60))
@@ -85,11 +85,11 @@ def register(app, login_required):
         from changri.core import phoneserver
         port = request.form.get("phone_port", "").strip()
         if bad := phoneserver.check_port(port):
-            flash(bad)
+            flash(bad, "error")
             return redirect(url_for("phone_page"))
         base = request.form.get("phone_base_url", "").strip().rstrip("/")
         if base and not base.startswith(("http://", "https://")):
-            flash("网址要以 http:// 或 https:// 开头")
+            flash("网址要以 http:// 或 https:// 开头", "error")
             return redirect(url_for("phone_page"))
         phoneserver.set_port(int(port))
         ip = netcheck.public_ip_cached()
@@ -108,7 +108,7 @@ def register(app, login_required):
             flash(f"{res}。" + (f"{fw}。" if fw else "") + f"最后一步：到云服务商控制台的安全组放行 {port} 端口，再点下面的「检查玩家能不能打开」。")
             from changri.core import httpsproxy
             if err := httpsproxy.sync():
-                flash(err)
+                flash(err, "error")
         return redirect(url_for("phone_page"))
 
     @app.post("/phone/settings")
@@ -118,11 +118,11 @@ def register(app, login_required):
         from changri.core import phoneserver
         port = f.get("phone_port", str(phoneserver.port())).strip()
         if bad := phoneserver.check_port(port):
-            flash(bad)
+            flash(bad, "error")
             return redirect(url_for("phone_page"))
         base = f.get("phone_base_url", "").strip().rstrip("/")
         if base and not base.startswith(("http://", "https://")):
-            flash("网址要以 http:// 或 https:// 开头")
+            flash("网址要以 http:// 或 https:// 开头", "error")
             return redirect(url_for("phone_page"))
         old_port, old_on = str(phoneserver.port()), get_config("phone_enabled", "0")
         phoneserver.set_port(int(port))          # 所有机器人共用这个端口

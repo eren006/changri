@@ -218,9 +218,9 @@ def down_reason(app_id: str, link_id: int = 0) -> str:
     if not st["running"]:
         return ""
     if not st["connected"]:
-        return f"连不上 SnowLuma（{st['error'] or '等待重连'}）"
+        return f"连不上这个号的 QQ 客户端（LLBot / NapCat / SnowLuma 等）：{st['error'] or '等待重连'}"
     if st["online"] is False:
-        return "SnowLuma 还在，但 QQ 号已经掉线，要重新扫码登录"
+        return "QQ 客户端还连着，但 QQ 号已经掉线，要重新扫码登录"
     return ""
 
 

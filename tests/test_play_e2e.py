@@ -173,8 +173,8 @@ class PlayE2E(unittest.TestCase):
         self.assertIn("找不到角色", self.say("约会 1400-1500 咖啡厅 路人")[0])
         self.assertIn("时间格式", self.say("约会 下午 咖啡厅 乙")[0])
         self.assertIn("不能约自己", self.say("约会 1400-1500 咖啡厅 甲")[0])
-        out = self.say("约会 1400-1500 咖啡厅 乙")
-        self.assertTrue(any("已发起" in o and "R" in o and "1234560" in o for o in out))
+        out = self.say("约会 14：00 ～ 15：00 咖啡厅 乙")                         # 输入法的全角、空格也认
+        self.assertTrue(any("已发起" in o and "R" in o and "1234560" in o for o in out), out)
         self.assertTrue(any("[P1]" in o and "向你发起了约会" in o for o in out))          # 对方个人群收到通知
         self.assertTrue(any("[POOL0]" in o and "参与者" in o for o in out))               # 房间群里发了说明
         # 时间撞了
@@ -743,23 +743,23 @@ class PlayE2E(unittest.TestCase):
         self.assertEqual(rooms.get(rid)["start_hm"], "16:00")
 
     def test_decline_two_person_cancels(self):
-        """「拒绝时间线」= 不想参加（照老系统）：整场取消，双方时间线拿掉，个人群里带房间号也能发。"""
+        """「拒绝约会」= 不想参加（照老系统）：整场取消，双方时间线拿掉，个人群里带房间号也能发。"""
         self.add_pool(1)
         self.say("约会 1400-1500 咖啡厅 乙")
         rid = rooms.timeline(roles.get_role_by_name("甲")["id"])[0]["id"]
-        out = self.say(f"拒绝时间线 R{rid}", member="M1", group="P1")
+        out = self.say(f"拒绝约会 R{rid}", member="M1", group="P1")
         self.assertTrue(any(f"已取消 R{rid}" in o for o in out), out)
         self.assertTrue(any(o.startswith("[P0]") and "乙 拒绝了" in o for o in out), out)       # 发起人收到
         self.assertEqual(rooms.get(rid)["status"], "cancelled")
         self.assertEqual(rooms.timeline(roles.get_role_by_name("甲")["id"]), [])
-        self.assertIn("已经结束或取消", self.say(f"拒绝时间线 R{rid}", member="M1", group="P1")[0])
+        self.assertIn("已经结束或取消", self.say(f"拒绝约会 R{rid}", member="M1", group="P1")[0])
 
     def test_decline_multi_person_dissolves(self):
         """三人以上也整场解散（作者定）：所有人的时间线都拿掉，其他人收到通知。"""
         self.add_pool(1)
         self.say("约会 1400-1500 咖啡厅 乙/丙")
         rid = rooms.timeline(roles.get_role_by_name("甲")["id"])[0]["id"]
-        out = self.say("拒绝时间线", member="M2", group="POOL0")
+        out = self.say("拒绝约会", member="M2", group="POOL0")
         self.assertTrue(any(f"已取消 R{rid}" in o for o in out), out)
         self.assertTrue(any(o.startswith("[P0]") and "丙 拒绝了" in o for o in out), out)
         self.assertTrue(any(o.startswith("[P1]") and "丙 拒绝了" in o for o in out), out)
@@ -768,12 +768,40 @@ class PlayE2E(unittest.TestCase):
             self.assertEqual(rooms.timeline(roles.get_role_by_name(n)["id"]), [])
 
     def test_decline_with_pending_change_dissolves_at_once(self):
-        """有人申请改时间时，「拒绝时间线」也是一次就整场取消（不再是投反对票）。"""
+        """有人申请改时间时，「拒绝约会」也是一次就整场取消（不再是投反对票）。"""
         self.add_pool(1)
         self.say("约会 1400-1500 咖啡厅 乙")
         rid = rooms.timeline(roles.get_role_by_name("甲")["id"])[0]["id"]
         self.say("修改时间线 D1 1600-1700", member="M0", group="POOL0")
-        self.say("拒绝时间线", member="M1", group="POOL0")
+        self.say("拒绝约会", member="M1", group="POOL0")
+        self.assertEqual(rooms.get(rid)["status"], "cancelled")
+
+    def test_empty_review_has_no_admin_jargon(self):
+        """没记到戏文的复盘：只说格式、找管理员，不对玩家讲后台配置，也不写死机器人的名字。"""
+        self.add_pool(1)
+        self.say("约会 1400-1500 咖啡厅 乙")
+        rid = rooms.timeline(roles.get_role_by_name("甲")["id"])[0]["id"]
+        self.say("结束约会", group="POOL0")
+        out = "\n".join(self.say(f"复盘 R{rid}"))
+        self.assertIn("角色名：正文", out)
+        self.assertIn("找管理员", out)
+        for w in ("卡拉", "接收全部消息", "监听"):
+            self.assertNotIn(w, out)
+
+    def test_old_reject_word_no_longer_cancels(self):
+        """老叫法「拒绝时间线」不再取消：有改时间申请时说不同意就不理、整场取消发「拒绝约会」；没有申请时说已改名。"""
+        self.add_pool(1)
+        self.say("约会 1400-1500 咖啡厅 乙")
+        rid = rooms.timeline(roles.get_role_by_name("甲")["id"])[0]["id"]
+        out = self.say(f"拒绝时间线 R{rid}", member="M1", group="P1")
+        self.assertIn("已改名", out[0])
+        self.assertIn(f"拒绝约会 R{rid}", out[0])
+        self.say("修改时间线 D1 1600-1700", member="M0", group="POOL0")
+        out = "\n".join(self.say("拒绝时间线", member="M1", group="POOL0"))
+        self.assertIn("不同意改时间就不用理它", out)
+        self.assertIn("拒绝约会", out)
+        self.assertEqual(rooms.get(rid)["status"], "open")
+        self.say("取消约会", member="M1", group="POOL0")                 # 别名也能整场取消
         self.assertEqual(rooms.get(rid)["status"], "cancelled")
 
     def test_decline_only_before_scene_starts(self):
@@ -784,7 +812,7 @@ class PlayE2E(unittest.TestCase):
         with get_conn() as c:
             c.execute("INSERT INTO room_lines(room_id, ts, role_id, name, text, is_rp, chars) VALUES(?,?,?,?,?,1,4)",
                       (rid, 1, roles.get_role_by_name("甲")["id"], "甲", "你也来了"))
-        out = self.say(f"拒绝时间线 R{rid}", member="M1", group="P1")
+        out = self.say(f"拒绝约会 R{rid}", member="M1", group="P1")
         self.assertIn("已经开始写了", out[0])
         self.assertIn("结束约会", out[0])
         self.assertEqual(rooms.get(rid)["status"], "open")
@@ -792,13 +820,13 @@ class PlayE2E(unittest.TestCase):
     def test_room_notice_explains_decline(self):
         self.add_pool(1)
         out = self.say("约会 1400-1500 咖啡厅 乙")
-        self.assertTrue(any("拒绝时间线" in o and "开始写戏之前" in o for o in out), out)
+        self.assertTrue(any("拒绝约会" in o and "开始写戏之前" in o for o in out), out)
 
     def test_official_cannot_be_declined(self):
         self.add_pool(1)
         self.say("发起官约 D1 1400-1500 后山 甲/乙", member="ADMIN", group="ADM")
         rid = rooms.timeline(roles.get_role_by_name("甲")["id"])[0]["id"]
-        out = self.say(f"拒绝时间线 R{rid}", member="M1", group="P1")
+        out = self.say(f"拒绝约会 R{rid}", member="M1", group="P1")
         self.assertIn("不能拒绝", out[0])
         self.assertEqual(rooms.get(rid)["status"], "open")
 
@@ -1315,8 +1343,8 @@ class PlayE2E(unittest.TestCase):
         self.add_pool(1)
         set_config("ext:joinreq", "1")
         self.say("约会 1400-1500 咖啡厅 乙")
-        set_config("join_kinds", "官约、电话")                                               # 电话填了也不算；约会不在里面
-        self.assertEqual(rooms.joinable_kinds(), ("官约",))
+        set_config("join_kinds", "官约、电话")                                               # 官约、电话填了都不算；约会不在里面
+        self.assertEqual(rooms.joinable_kinds(), ())
         self.assertIn("没有可以加入", self.say("申请加入 甲", member="M2", group="P2")[0])
         set_config("join_kinds", "约会")
         self.assertTrue(any("申请已发出" in o for o in self.say("申请加入 甲", member="M2", group="P2")))
@@ -1488,6 +1516,23 @@ class PlayE2E(unittest.TestCase):
         self.assertIn("直接用", self.say("点赞楼层 001 1")[0])
         self.assertIn("没有这个帖子", self.say("查看帖子 099")[0])
         self.assertIn("没有这个帖子", self.say("回复帖子 099 嗯")[0])
+
+    def test_relation_withdraw_by_number_or_text(self):
+        """撤回关系：按编号（只数自己写的，查看关系线里标着 #几）或整段原文都行；编号超了说一共几段；纯数字的段拉线时就不收。"""
+        self.say("拉线 乙 第一段", member="M0", group="P0")
+        self.say("拉线 甲 乙写的", member="M1", group="P1")
+        self.say("拉线 乙 第二段", member="M0", group="P0")
+        self.say("拉线 乙 第三段", member="M0", group="P0")
+        view = "\n".join(self.say("查看关系线 乙", member="M0", group="P0"))
+        self.assertIn("【甲】 #2\n第二段", view)
+        self.assertNotIn("【乙】 #", view)                                              # 别人写的不标编号
+        self.assertIn("撤回关系 乙 编号", view)
+        out = self.say("撤回关系 乙 ２", member="M0", group="P0")[0]                   # 全角数字也算编号
+        self.assertIn("第二段", out)
+        self.assertIn("写了 2 段，没有第 5 段", self.say("撤回关系 乙 5", member="M0", group="P0")[0])
+        self.assertIn("第三段", self.say("撤回关系 乙 第三段", member="M0", group="P0")[0])   # 原文照旧能撤
+        self.assertIn("只有数字", self.say("拉线 乙 123", member="M0", group="P0")[0])
+        self.assertIn("#1\n第一段", "\n".join(self.say("查看关系线 乙", member="M0", group="P0")))
 
     def test_pending_providers(self):
         self.say("拉线 乙 小时候是邻居", member="M0", group="P0")

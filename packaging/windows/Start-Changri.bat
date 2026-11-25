@@ -2,8 +2,9 @@
 setlocal
 cd /d "%~dp0"
 title 长日bot
-rem 双击运行：启动长日bot（机器人 + 设置平台 + 小手机），第一次会自动打开浏览器。关掉这个窗口就停止。
-rem 想开机自动运行：右键 Install-Autostart.bat，选「以管理员身份运行」。
+rem 双击运行：启动长日bot（机器人 + 设置平台 + 小手机），会自动打开浏览器。
+rem 还没设开机自启时，会先问一次「是否允许此应用对你的设备进行更改」：点「是」就设好开机自启、交给后台运行，这个窗口自己关掉；
+rem 点「否」就在这个窗口里运行，关掉窗口就停止（细节见 changri/platform/winstart.py）。
 if /i "%~1"=="--service" set "CHANGRI_SERVICE=1"
 :loop
 call "%~dp0_env.bat" || goto broken

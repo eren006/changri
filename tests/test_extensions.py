@@ -392,7 +392,8 @@ class ExtensionAdminTests(_PatchedDir):
         for card in ("set-base", "set-social", "set-gift", "set-play", "set-lovemail", "set-dice", "set-relations"):
             self.assertIn(f'id="{card}"', page)                                  # 每张卡片自带「进入设置」弹窗
         self.assertIn("进入设置", page)
-        self.assertNotIn('id="set-season"', page)                                # 季度没有设置项，只有管理页入口
+        self.assertIn('id="set-season"', page)                                   # 季度卡片里挂着「复盘网页」那组（admin/common.EXTRA_GROUPS）
+        self.assertNotIn('id="set-decks"', page)                                 # 牌堆没有设置项，只有管理页入口
         self.assertEqual(self.c.get("/settings").status_code, 302)               # 旧的设置页跳到功能页
         r = self.c.post("/settings/心动信", data={"lovemail_default_limit": "7", "_csrf": token(self.c, "/extensions")}, follow_redirects=True)
         self.assertIn("已保存", r.get_data(as_text=True))

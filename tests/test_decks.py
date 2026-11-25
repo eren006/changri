@@ -226,6 +226,11 @@ class AdminPage(unittest.TestCase):
         fid = decks.files()[0]["id"]
         self.c.post(f"/decks/{fid}/delete", data={"_csrf": self._tok("/decks")})
         self.assertIn("没有叫", decks.draw("运势"))
+        # 中文 Windows 记事本存的 ANSI（GBK）也能直接传
+        self.c.post("/decks/save", data={"_csrf": self._tok("/decks"), "raw": "", "file": (io.BytesIO('{"天气": ["小雨"]}'.encode("gbk")), "gbk.json")},
+                    content_type="multipart/form-data")
+        self.assertEqual(decks.draw("天气"), "🃏 抽卡「天气」：小雨")
+        self.assertIsNone(decks.decode_upload(b"\xff\xfe\x00\x81"))
 
     def test_rejected_save_keeps_draft(self):
         bomb = "".join(f"【_{c}】\n" + ("{_%s}" % n) * 10 + "\n" for c, n in zip("abcd", "bcde")) + "【_e】\nx\n【炸】\n{_a}\n"

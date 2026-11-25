@@ -180,7 +180,8 @@ def parse_when(text: str, day: int | None = None) -> tuple[tuple[str, str] | Non
     返回 (时间, 错误)：不是日期写法时 (None, "")，让调用的人按原来的格式报错；是日期但不在这个 D 里时 (None, 原因)。"""
     if not enabled():
         return None, ""
-    span = parse_span(text)
+    from .textutil import norm_time
+    span = parse_span(norm_time(text))         # 全角数字、「～」这类也认
     if isinstance(span, str):
         return None, ""
     if day is None:

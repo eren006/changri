@@ -68,7 +68,7 @@ def register(app, login_required):
         from changri.core import roomlog
         f = request.form
         ok, msg = roomlog.add_line(rid, f.get("role", type=int), f.get("text", ""), _line_ts(f))
-        flash(msg)
+        flash(msg, "message" if ok else "error")
         return redirect(url_for("review_view", rid=rid) + "#lines")
 
     @app.post("/reviews/<int:rid>/lines/<int:line_id>/edit")
@@ -77,7 +77,7 @@ def register(app, login_required):
         from changri.core import roomlog
         f = request.form
         ok, msg = roomlog.edit_line(rid, line_id, f.get("text", ""), f.get("role", type=int), _line_ts(f))
-        flash(msg)
+        flash(msg, "message" if ok else "error")
         return redirect(url_for("review_view", rid=rid) + "#lines")
 
     @app.post("/reviews/<int:rid>/lines/<int:line_id>/delete")

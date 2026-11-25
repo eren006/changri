@@ -71,6 +71,8 @@ section{border-top:1px solid var(--line);padding:36px 0 46px}
 section:first-of-type{border-top:0;padding-top:0}
 .note{color:var(--mute);font-size:13px;line-height:1.7;margin:10px 0 0;max-width:62ch}
 .flash{margin:0 0 32px;padding:14px 18px;border-left:3px solid var(--dusk);background:var(--soft);border-radius:0 6px 6px 0}
+.flash.bad{border:1px solid var(--bad);border-left-width:3px;background:color-mix(in srgb,var(--bad) 8%,var(--surface));color:var(--ink)}   /* 跟 .callout.bad 一个样子 */
+.flash.near{margin:0 0 16px}
 
 label{display:block;font-size:13px;font-weight:500;color:var(--mute);margin:0 0 8px}
 input[type=text],input[type=password],input:not([type]),select,textarea{width:100%;padding:11px 14px;border:1px solid var(--field);border-radius:var(--r-ctl);background:var(--surface);color:var(--ink);font:inherit;box-shadow:var(--shadow-sm);transition:border-color .15s ease,box-shadow .15s ease}
@@ -216,6 +218,11 @@ tr:last-child td{border-bottom:0}
   .brand{margin:0}
   .brand span{display:none}
   .mtitle{display:block;flex:1;min-width:0;text-align:center;font-weight:600;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* 有好几个机器人时，页名下面一行小字写当前是哪个机器人，点它打开菜单（里面能切换） */
+  .mtitle.mt2{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:44px;padding:0 4px;border:0;background:none;color:inherit;font:inherit;cursor:pointer;line-height:1.25}
+  .mtitle.mt2 span{display:block;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mtitle .mt-p{font-weight:600;font-size:15px}
+  .mtitle .mt-b{font-weight:400;font-size:12px;color:var(--night-mute)}
   .menubtn{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 16px;border:1px solid var(--night-line);border-radius:999px;background:var(--rail-hover,rgba(255,255,255,.08));
     color:var(--night-ink);font:500 14.5px var(--sans);cursor:pointer;transition:background-color .15s ease}
   .menubtn:hover,.menubtn:active{background:var(--rail-active,rgba(255,255,255,.16))}
@@ -286,7 +293,48 @@ tr:last-child td{border-bottom:0}
   .ui table.cards td.act,.ui table.rt td.act{position:absolute;top:8px;right:10px;padding:0;text-align:left}
   .ui table.cards td.act .btn{width:auto;min-height:40px;padding:6px 14px}
 }
+.copy-fail{display:block;margin:6px 0 0;color:var(--bad);font-size:13px;line-height:1.5}
 </style>
+<script>
+/* 复制到剪贴板（全后台共用）：copyText(文字, 按钮, 要选中的元素)，返回 Promise<是否真的复制了>。
+   后台常常是 http://公网IP:5091 打开的，这时浏览器不给 navigator.clipboard，退回老办法：临时文本框 + execCommand('copy')。
+   成功才在按钮上写「已复制」；复制不了就在按钮旁边说一声，并把能看到的那段文字选中，方便长按复制 */
+window.copyText=function(text,btn,target){
+  text=String(text==null?'':text);
+  function legacy(){
+    var t=document.createElement('textarea'),ae=document.activeElement,ok=false;
+    t.value=text;t.setAttribute('readonly','');
+    t.style.cssText='position:fixed;top:0;left:-9999px;width:1px;height:1px;padding:0;border:0;font-size:16px';   /* 16px：iOS 不放大页面 */
+    document.body.appendChild(t);
+    try{t.focus({preventScroll:true})}catch(e){}
+    t.select();try{t.setSelectionRange(0,text.length)}catch(e){}   /* iOS 只认 setSelectionRange */
+    try{ok=document.execCommand('copy')}catch(e){ok=false}
+    document.body.removeChild(t);
+    if(ae&&ae!==document.body&&ae.focus){try{ae.focus({preventScroll:true})}catch(e){}}
+    return !!ok}
+  var p=(navigator.clipboard&&window.isSecureContext)
+    ?navigator.clipboard.writeText(text).then(function(){return true},function(){return legacy()})
+    :Promise.resolve(legacy());
+  return p.then(function(ok){
+    if(btn){
+      if(btn._copyHtml==null)btn._copyHtml=btn.innerHTML;
+      var tip=btn._copyTip;
+      if(ok){btn.textContent='已复制';if(tip){tip.remove();btn._copyTip=null}
+        clearTimeout(btn._copyT);btn._copyT=setTimeout(function(){btn.innerHTML=btn._copyHtml},1600)}
+      else if(!tip){tip=document.createElement('span');tip.className='copy-fail';tip.setAttribute('role','alert');tip.textContent='复制不了，请长按选中后复制';
+        btn.insertAdjacentElement('afterend',tip);btn._copyTip=tip}
+    }
+    if(!ok&&target){
+      var d=target.closest&&target.closest('details');if(d&&!d.open)d.open=true;
+      if(target.getClientRects().length){
+        try{if(target.select){target.focus({preventScroll:true});target.select();target.setSelectionRange&&target.setSelectionRange(0,target.value.length)}
+          else{var r=document.createRange();r.selectNodeContents(target);var s=getSelection();s.removeAllRanges();s.addRange(r)}
+          target.scrollIntoView({block:'nearest'})}catch(e){}
+      }
+    }
+    return ok});
+};
+</script>
 {% block head %}{% endblock %}
 </head>
 <body>
@@ -294,7 +342,8 @@ tr:last-child td{border-bottom:0}
   <aside class="rail" id="rail">
     <div class="mbar" data-impeccable-ignore="cramped-padding">{# 误报：桌面上 display:contents；手机宽度下有 6px 16px 内边距、56px 高，文字离边 13px 以上 #}
       <a class="brand" href="{{ url_for('dashboard') }}{{ '?pick=1' if not in_bot }}"><b>长日</b><span>控制台</span></a>
-      <span class="mtitle">{{ self.title() }}</span>
+      {% if in_bot and bots|length > 1 and bot_label %}<button class="mtitle mt2" type="button" data-openmenu aria-label="{{ self.title() }}，当前机器人：{{ bot_label }}，点这里切换"><span class="mt-p">{{ self.title() }}</span><span class="mt-b">{{ bot_label }} ▾</span></button>
+      {%- else %}<span class="mtitle">{{ self.title() }}</span>{% endif %}
       <button class="menubtn" id="menubtn" type="button" aria-expanded="false" aria-controls="msheet"><i aria-hidden="true"></i>菜单{% if update_dot %}<span class="reddot" aria-label="有新版本"></span>{% endif %}</button>
     </div>
     <div class="scrim" id="scrim" aria-hidden="true"></div>
@@ -306,7 +355,7 @@ tr:last-child td{border-bottom:0}
     {% elif in_bot %}<div class="botswitch"><span class="tag" style="color:var(--night-mute)">{{ bot_label }}</span></div>{% endif %}
     <nav aria-label="主导航">
       {% set groups = [
-        ('', [('dashboard','总览')]),
+        ('', [('dashboard','总览'),('manual_page','使用手册')]),
         ('约会房间的群', [('backup_pool_page','备用群池'),('qqlink_page','QQ 小号与群号组')]),
         ('通用', [('noat_page','不用 @ 也能回'),('autoreply_page','自定义回复'),('dice_lines_page','个性化骰子'),('extensions_page','功能与设置'),('admins_page','QQ 管理员'),('images_page','图片管理'),('msgmon_page','消息监听'),('tools_page','小工具')]),
         ('恋综', [('god_page','角色'),('season_page','季度与出场'),('lovemail_page','心动信'),('relations_page','公知、二表与关系线'),('collect_page','官约 · 收集 · 复盘'),('rpg_attrs_page','属性与货币')]),
@@ -359,7 +408,8 @@ tr:last-child td{border-bottom:0}
       <p>{% if auto_note.kind == 'done' %}长日bot 已在 {{ auto_note.ts|datetimefmt }} 自动从 {{ auto_note.from }} 更新到 {{ auto_note.to }}，检查都通过了。{% else %}{{ auto_note.message }}{% endif %}
         <a href="{{ root_url('update_page') }}">{{ '看这次更新了什么' if auto_note.kind == 'done' else '去「更新」页看看' }}</a></p>
       <button class="btn ghost" type="submit">知道了</button></form>{% endif %}
-    {% for m in get_flashed_messages() %}<p class="flash" role="status">{{ m }}</p>{% endfor %}
+    {#- 出错的提示（flash(msg, "error")，或者以 ❌ 开头的）用红色、role=alert；其余照旧 -#}
+    {% for cat, m in get_flashed_messages(with_categories=true) %}{% if cat == 'error' or (m is string and m.startswith('❌')) %}<p class="flash bad" role="alert">{{ m }}</p>{% else %}<p class="flash" role="status">{{ m }}</p>{% endif %}{% endfor %}
     {#- 个性化模块的页面右上角放「帮助」，链到介绍页对应的一节（features/modhelp） -#}
     {%- set _mh = request.endpoint and ({'longterm':'longterm','paidan':'paidan','storycal':'storycal'}.get(request.endpoint.split('_')[0])) -%}
     {%- if _mh %}<a class="mod-help" href="{{ url_for('modules_help') }}#m-{{ _mh }}"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M6.2 6.3a1.9 1.9 0 0 1 3.7.5c0 1.2-1.9 1.6-1.9 2.7"/><circle cx="8" cy="11.6" r=".4" fill="currentColor"/></svg>帮助</a>{% endif %}
@@ -377,6 +427,7 @@ document.querySelectorAll('table.rt').forEach(function(t){var h=[].map.call(t.qu
 function set(on){rail.classList.toggle('open',on);document.documentElement.classList.toggle('menu-open',on);btn.setAttribute('aria-expanded',on?'true':'false');
   if(on){var a=sh.querySelector('a[aria-current=page]')||sh.querySelector('a');if(a)setTimeout(function(){a.focus({preventScroll:true});a.scrollIntoView({block:'center'})},50)}else btn.focus({preventScroll:true})}
 btn.addEventListener('click',function(){set(!rail.classList.contains('open'))});
+[].forEach.call(document.querySelectorAll('[data-openmenu]'),function(b){b.addEventListener('click',function(){set(true)})});
 document.getElementById('scrim').addEventListener('click',function(){set(false)});
 document.addEventListener('keydown',function(e){if(e.key==='Escape'&&rail.classList.contains('open'))set(false)});
 sh.addEventListener('click',function(e){if(e.target.closest('a'))set(false)});
@@ -384,12 +435,56 @@ window.matchMedia('(min-width:861px)').addEventListener('change',function(m){if(
 })();
 </script>
 <script>
-/* 提交表单后回到原来的滚动位置（保存、开关、删除都不再跳回顶部） */
-(function(){var K='scroll:'+location.pathname;
-function save(){try{sessionStorage.setItem(K,String(window.scrollY))}catch(e){}}
-document.addEventListener('submit',save,true);
-var sub=HTMLFormElement.prototype.submit;HTMLFormElement.prototype.submit=function(){save();return sub.apply(this,arguments)};
-try{var y=sessionStorage.getItem(K);if(y!==null){sessionStorage.removeItem(K);window.addEventListener('load',function(){window.scrollTo(0,parseInt(y,10)||0)})}}catch(e){}
+/* 提交表单后：
+   1) 回到原来的滚动位置（保存、开关、删除都不再跳回页首；地址里带 #锚点 时听锚点的）；
+   2) 保存没成功（页面上有红色提示）时，把刚才填的内容填回同一个表单里还空着的格子，重新打开它所在的折叠面板，
+      在表单上面再放一份出错提示，滚到那里。
+   只在同一个网址路径（含 /b/机器人/ 前缀，换了机器人不会串）、一分钟以内有效，用一次就清掉。
+   不记：带 data-nokeep 的表单、密码框、文件框、隐藏字段（_csrf 这类） */
+(function(){var K='changri-keep',TTL=60000;
+function flashH(){var h=0;[].forEach.call(document.querySelectorAll('main > .flash'),function(f){var cs=getComputedStyle(f);h+=f.offsetHeight+(parseFloat(cs.marginTop)||0)+(parseFloat(cs.marginBottom)||0)});return h}
+function skipEl(el){var t=(el.type||'').toLowerCase();return !el.name||el.disabled||t==='password'||t==='file'||t==='hidden'||t==='submit'||t==='button'||t==='reset'||t==='image'}
+function stash(form){
+  if(!form||(form.target&&form.target!=='_self'))return;
+  var d={p:location.pathname,t:Date.now(),y:window.scrollY,fh:flashH()},post=(form.getAttribute('method')||'get').toLowerCase()==='post';
+  if(post&&!form.hasAttribute('data-nokeep')){
+    d.i=[].indexOf.call(document.forms,form);d.a=form.getAttribute('action')||'';d.f=[];
+    [].forEach.call(form.elements,function(el){if(skipEl(el))return;var t=(el.type||'').toLowerCase();
+      if(t==='checkbox'||t==='radio')d.f.push([el.name,el.value,el.checked?1:0]);
+      else if(el.tagName==='SELECT'&&el.multiple)d.f.push([el.name,[].filter.call(el.options,function(o){return o.selected}).map(function(o){return o.value})]);
+      else d.f.push([el.name,el.value])});
+    d.o=[].map.call(document.querySelectorAll('details'),function(x){return x.open?1:0});
+  }
+  try{sessionStorage.setItem(K,JSON.stringify(d))}catch(e){}}
+document.addEventListener('submit',function(e){if(!e.defaultPrevented)stash(e.target)});   /* 冒泡阶段：onsubmit="return confirm()" 取消了就不记 */
+var sub=HTMLFormElement.prototype.submit;HTMLFormElement.prototype.submit=function(){stash(this);return sub.apply(this,arguments)};
+var d=null;try{d=JSON.parse(sessionStorage.getItem(K)||'null');sessionStorage.removeItem(K)}catch(e){d=null}
+if(!d||d.p!==location.pathname||!(Date.now()-d.t<TTL))return;
+var err=document.querySelector('main > .flash.bad'),form=null;
+if(err&&d.f){
+  form=document.forms[d.i];
+  if(!form||(form.getAttribute('action')||'')!==d.a)form=[].filter.call(document.forms,function(f){return (f.getAttribute('action')||'')===d.a&&(f.getAttribute('method')||'').toLowerCase()==='post'})[0]||null;
+}
+if(form){
+  var used={};
+  d.f.forEach(function(r){var name=r[0],els=[].filter.call(form.elements,function(el){return el.name===name&&!skipEl(el)});
+    if(!els.length)return;var t=(els[0].type||'').toLowerCase();
+    if(t==='checkbox'||t==='radio')return;   /* 开关、单选照服务器给的状态（保存没成功就是没变），不按刚才点的填 */
+    var k=used[name]||0;used[name]=k+1;var el=els[k];if(!el)return;
+    if(el.tagName==='SELECT'){if(el.getAttribute('onchange')||el.selectedIndex>0||el.multiple)return;   /* 改了就提交的、页面已经选好的：不动 */
+      if([].some.call(el.options,function(o){return o.value===r[1]}))el.value=r[1];return}
+    if(!el.value&&r[1])el.value=r[1]});     /* 只填空着的格子，页面自己带出来的值不动 */
+  for(var p=form.parentElement;p;p=p.parentElement)if(p.tagName==='DETAILS')p.open=true;
+  var ds=document.querySelectorAll('details');
+  if(d.o&&d.o.length===ds.length)[].forEach.call(ds,function(x,i){if(d.o[i]&&!x.classList.contains('more'))x.open=true});
+  var near=err.cloneNode(true);near.classList.add('near');near.removeAttribute('role');form.parentNode.insertBefore(near,form);   /* 顶上那条已经 role=alert 读过了 */
+  if(!location.hash)setTimeout(function(){near.scrollIntoView({block:'start'});window.scrollBy(0,-72)},0);
+  return}
+if(err||location.hash)return;   /* 出错但找不到原表单：留在页首看提示；有锚点：听锚点的 */
+var y=Math.max(0,(d.y||0)-(d.fh||0)+flashH());   /* 顶上的提示条多了 / 少了，跟着挪，内容停在原处 */
+if('scrollRestoration' in history)history.scrollRestoration='manual';
+var at=0;function go(){window.scrollTo(0,y);at=window.scrollY}
+go();window.addEventListener('load',function(){if(Math.abs(window.scrollY-at)<4)go()});   /* 图片加载完页面变长了再对一次；人已经自己滑走了就不动 */
 })();
 </script>
 <div id="rs" hidden style="position:fixed;inset:0;z-index:99;background:rgba(20,20,40,.72);display:none;place-items:center;padding:24px">
@@ -441,6 +536,44 @@ setInterval(tick,4000);document.addEventListener('visibilitychange',tick);})();
   function open(){if(!d.open)d.showModal()}
   var cq=document.getElementById('cq');               /* 总览页「留个联系 QQ」那个弹窗在的时候，等它关了再弹 */
   if(cq&&cq.open)cq.addEventListener('close',open,{once:true});else open();
+})();
+</script>
+{% endif %}
+{% if autostart_need %}{% set _local = request.remote_addr in ('127.0.0.1', '::1') %}
+<dialog class="as-dlg" id="as-dlg" aria-labelledby="as-h">
+  <h2 id="as-h" class="as-h">还没设开机自启</h2>
+  <p>长日bot 现在是在服务器上的黑色窗口里运行的。服务器一重启（云服务商维护、Windows 自动更新都会重启），机器人就停了，要有人去服务器上重新打开。设成开机自启以后，它会在后台自己运行，重启后也会自己起来。</p>
+  {% if autostart_need.admin or _local %}
+  <p class="as-tip">{% if autostart_need.admin %}点「现在设好」就行，不用去服务器上操作；机器人不会停。{% else %}点「现在设好」后，服务器上会弹出「是否允许此应用对你的设备进行更改」，点「是」。机器人不会停。{% endif %}</p>
+  <div class="as-act">
+    <form method="post" action="{{ root_url('autostart_install') }}">{{ csrf() }}<input type="hidden" name="next" value="{{ (request.script_root ~ request.full_path) if request.method == 'GET' else '' }}"><button class="btn" type="submit">现在设好</button></form>
+    <form method="dialog"><button class="btn ghost" value="later">以后再说</button></form>
+  </div>
+  {% else %}
+  <p class="as-tip">请登录到服务器（远程桌面），打开长日bot 的安装文件夹，<b>右键 Install-Autostart.bat →「以管理员身份运行」</b>。机器人不会停，黑色窗口可以继续开着。<br>或者在服务器上打开这个后台（http://127.0.0.1:{{ autostart_need.port }}），这个提示里会有「现在设好」按钮。</p>
+  <div class="as-act"><form method="dialog"><button class="btn" value="later">知道了</button></form></div>
+  {% endif %}
+</dialog>
+<style>
+.as-dlg{border:1px solid var(--card-line);border-radius:14px;background:var(--surface);color:var(--ink);padding:24px 26px 22px;width:min(460px,calc(100vw - 32px));max-height:calc(100vh - 48px);overflow:auto;box-shadow:0 24px 60px -20px rgb(0 0 0 / .45)}
+.as-dlg::backdrop{background:rgb(10 10 25 / .45)}
+.as-dlg p{margin:0;line-height:1.7;overflow-wrap:anywhere}
+.as-h{font:700 19px/1.4 var(--sans);margin:0 0 8px}
+.as-dlg .as-tip{margin-top:10px}
+.as-act{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+.as-act form{margin:0}
+</style>
+<script>
+/* 没设开机自启的提醒：点「以后再说 / 知道了」、按 Esc 后，这个浏览器一天内不再弹；作者通知在弹的话等它关了再弹 */
+(function(){var d=document.getElementById('as-dlg'),K='changri-autostart-later';if(!d||!d.showModal)return;
+  try{var t=+localStorage.getItem(K)||0;if(Date.now()-t<864e5)return}catch(e){return}
+  var f=d.querySelector('form[method=post]');if(f)f.addEventListener('submit',function(){try{localStorage.setItem(K,String(Date.now()))}catch(e){}});   /* 等 UAC 那会儿别又弹 */
+  d.addEventListener('cancel',function(){try{localStorage.setItem(K,String(Date.now()))}catch(e){}});
+  d.addEventListener('close',function(){if(d.returnValue==='later'||d.returnValue===''){try{localStorage.setItem(K,String(Date.now()))}catch(e){}}});
+  function open(){if(!d.open)d.showModal()}
+  var an=document.getElementById('an-dlg'),cq=document.getElementById('cq');
+  var w=(an&&an.open)?an:((cq&&cq.open)?cq:null);
+  if(w)w.addEventListener('close',function(){setTimeout(open,50)},{once:true});else setTimeout(function(){var a2=document.getElementById('an-dlg');if(a2&&a2.open)a2.addEventListener('close',open,{once:true});else open()},0);
 })();
 </script>
 {% endif %}

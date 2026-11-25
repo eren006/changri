@@ -17,7 +17,7 @@ def register(app, login_required):
     def gacha_pool_save():
         f = request.form
         ok, msg = gacha_core.save_pool(f.get("name", ""), f.get("note", ""), f.get("pity_n", 0), f.get("enabled", "1") == "1", f.get("pool_id", type=int))
-        flash(msg)
+        flash(msg, "message" if ok else "error")
         return redirect(url_for("gacha_page"))
 
     @app.post("/gacha/pool/<int:pool_id>/delete")
@@ -32,7 +32,7 @@ def register(app, login_required):
     def gacha_prize_add():
         f = request.form
         ok, msg = gacha_core.add_prize(f.get("pool_id", type=int) or 0, f.get("item", ""), f.get("n", 1), f.get("weight", 1), f.get("rare") == "1")
-        flash(msg)
+        flash(msg, "message" if ok else "error")
         return redirect(url_for("gacha_page"))
 
     @app.post("/gacha/prize/<int:prize_id>/delete")

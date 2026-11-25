@@ -1,4 +1,4 @@
-"""时间线：查看、删除、修改 / 同意 / 拒绝时间线，我的待回、我的数量、弧长。"""
+"""时间线：查看、删除、修改 / 同意时间线，拒绝约会（整场取消），我的待回、我的数量、弧长。"""
 
 import re
 
@@ -10,7 +10,7 @@ from changri.core import pool, qqmanager, qqpool, roles, rooms, season, storycal
 from changri.core.buttons import Btn
 from changri.core.db import get_int
 from changri.core.qqsend import reply_buttons, reply_long
-from changri.core.textutil import hm_text
+from changri.core.textutil import hm_text, join_time_range
 
 from .common import NEED_ROLE, _cmd, _is_admin, _me, _push
 from .finish import _finish_room, _room_arg, remove_room
@@ -95,7 +95,7 @@ CHG_USAGE = "用法：修改时间线 [R房间号] [D几] 时间（在房间群�
 @chg.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     """在房间群里发：改这个房间。在别的群（个人群）发：带上 R房间号。申请会推到其他参与者的个人群，下面挂同意/拒绝。"""
-    p = args.extract_plain_text().split()
+    p = join_time_range(args.extract_plain_text()).split()
     rid = next((int(x[1:]) for x in p if re.fullmatch(r"[Rr]\d+", x)), None)
     p = [x for x in p if not re.fullmatch(r"[Rr]\d+", x)]
     here = rooms.room_of_group(bot.self_id, event.group_openid)
@@ -118,7 +118,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     old, new = _when(room), f"D{day} {hm[0]}-{hm[1]}"
     if not [m for m in rooms.members(r) if m["role_id"] != me["id"]]:      # 只有自己（踩点）：不用等谁同意，直接生效
         await chg.finish(await _vote_result(room, me, True, bool(here and here["id"] == r)))
-    vote_btns = [Btn("同意", f"同意时间线 R{r}")]          # 不同意就不理它；「拒绝时间线」是整场取消，不放在这里免得误点
+    vote_btns = [Btn("同意", f"同意时间线 R{r}")]          # 不同意就不理它；「拒绝约会」是整场取消，不放在这里免得误点
     others = [m for m in rooms.members(r) if m["role_id"] != me["id"]]
     if here and here["id"] == r:            # 在房间群里：大家都看得到，直接在群里挂按钮
         await reply_buttons(chg, _propose_in_room(me, room, others, day, hm),
@@ -132,7 +132,7 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
 
 
 async def _vote_result(room, me, agree: bool, in_room: bool) -> str:
-    """同意/拒绝时间线：记票、通知相关的人、生效时改房间群名，返回给投票人的回执。卡拉在群里和 QQ 号听到的两条路共用。"""
+    """同意时间线：记票、通知相关的人、生效时改房间群名，返回给投票人的回执。卡拉在群里和 QQ 号听到的两条路共用。"""
     rid, old = room["id"], _when(room)
     st, ch = rooms.vote_change(rid, me["id"], agree)
     if st == "none":
@@ -169,11 +169,11 @@ async def _vote_result(room, me, agree: bool, in_room: bool) -> str:
 
 def _propose_in_room(me, room, others, day: int, hm) -> str:
     return (f"📝 {me['name']} 申请把时间线改成 D{day} {hm[0]}-{hm[1]}（原来 {_when(room)}）。\n"
-            f"要 {'、'.join(m['name'] for m in others)} 都发「同意时间线」才生效；不同意就不用理，时间不变。（「拒绝时间线」是整场取消，不是不同意改时间。）")
+            f"要 {'、'.join(m['name'] for m in others)} 都发「同意时间线」才生效；不同意就不用理，时间不变。（「拒绝约会」是整场取消，不是不同意改时间。）")
 
 
 async def _decline(room, me, in_room: bool) -> str:
-    """「拒绝时间线」= 不想参加（照老系统，作者定的更严）：开始写戏之前，任何一个参与者发，整场取消、所有人的时间线拿掉、群放回去；
+    """「拒绝约会」（0.23 前叫「拒绝时间线」）= 不想参加（照老系统，作者定的更严）：开始写戏之前，任何一个参与者发，整场取消、所有人的时间线拿掉、群放回去；
     多人房也整场解散；有人申请改时间也一样直接取消（不再是对申请投反对票：不同意改时间就不理它）。官约 / 官电 / 心愿不能拒。"""
     why = rooms.decline_check(room, me["id"])
     if why:
@@ -191,7 +191,7 @@ async def _vote(matcher, bot: Bot, event: GroupMessageCreateEvent, args, agree: 
         rid = _room_arg(args.extract_plain_text()) if args else None
         room = rooms.get(rid) if rid else None
     if not me or not room:
-        await matcher.finish(f"请在约会房间的群里发（或带上房间号：{'同意' if agree else '拒绝'}时间线 R12）。")
+        await matcher.finish(f"请在约会房间的群里发（或带上房间号：{'同意时间线' if agree else '拒绝约会'} R12）。")
     if not any(m["role_id"] == me["id"] for m in rooms.members(room["id"])):
         await matcher.finish("你不是这个房间的参与者。")
     in_room = rooms.room_of_group(bot.self_id, event.group_openid) is not None
@@ -199,7 +199,17 @@ async def _vote(matcher, bot: Bot, event: GroupMessageCreateEvent, args, agree: 
 
 
 agree_tl = _cmd("同意时间线")
-reject_tl = _cmd("拒绝时间线")
+reject_tl = _cmd("拒绝约会", {"取消约会"})            # 整场取消；以前叫「拒绝时间线」，容易当成「不同意改时间」误发
+old_reject = _cmd("拒绝时间线")
+
+
+def old_reject_hint(room) -> str:
+    """老指令「拒绝时间线」不再取消房间，只回一句该怎么做。有人申请改时间时先说不同意怎么办。"""
+    rid = f" R{room['id']}" if room else " R房间号"
+    cancel = f"整场取消请发「拒绝约会{rid}」（只能在开始写戏之前）。"
+    if room and room["pending_change"]:
+        return f"不同意改时间就不用理它，时间不变。\n{cancel}"
+    return f"「拒绝时间线」已改名。{cancel}"
 
 
 @agree_tl.handle()
@@ -210,6 +220,15 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
 @reject_tl.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     await _vote(reject_tl, bot, event, args, False)
+
+
+@old_reject.handle()
+async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
+    room = rooms.room_of_group(bot.self_id, event.group_openid)
+    if not room:
+        rid = _room_arg(args.extract_plain_text()) if args else None
+        room = rooms.get(rid) if rid else None
+    await old_reject.finish(old_reject_hint(room))
 
 
 my_count = _cmd("我的数量")

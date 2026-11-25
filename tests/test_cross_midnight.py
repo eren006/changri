@@ -16,6 +16,24 @@ class ParseTest(unittest.TestCase):
         self.assertIsNone(rooms.parse_hm("1400-1400"))      # 一样的还是不行
         self.assertIsNone(rooms.parse_hm("2500-0100"))
 
+    def test_parse_ime_forms(self):
+        """手机输入法打出来的全角数字、全角冒号、各种横线 / 波浪线都认。"""
+        for t in ("１４００－１５００", "14：00～15：00", "1400—1500", "1400–1500", "1400﹣1500", "1400 ~ 1500", "14:00 到 15:00"):
+            self.assertEqual(rooms.parse_hm(t), ("14:00", "15:00"), t)
+
+    def test_join_time_range(self):
+        from changri.core.textutil import join_time_range
+        self.assertEqual(join_time_range("1400 - 1500 咖啡厅 张三").split(), ["1400-1500", "咖啡厅", "张三"])
+        self.assertEqual(join_time_range("14：00～15：00 咖啡厅 张三").split(), ["14:00-15:00", "咖啡厅", "张三"])
+        self.assertEqual(join_time_range("D2 1400 到 1500 后山 甲/乙").split(), ["D2", "1400-1500", "后山", "甲/乙"])
+        self.assertEqual(join_time_range("1400-1500 1-2教室 Ａ"), "1400-1500 1-2教室 Ａ")      # 别的字不动
+        self.assertEqual(join_time_range("3月5日 咖啡厅 张三"), "3月5日 咖啡厅 张三")
+        self.assertEqual(join_time_range("R12 D1 1400 - 1500"), "R12 D1 1400-1500")
+        # 只并开头的时间段：故事历的日期后面、心愿内容里的数字原样不动
+        self.assertEqual(join_time_range("3月5日 花园 1000 - 1100"), "3月5日 花园 1000 - 1100")
+        self.assertEqual(join_time_range("3月5日 想 2000 - 2100 看星星"), "3月5日 想 2000 - 2100 看星星")
+        self.assertEqual(join_time_range("1400-1500 2023 - 2024 甲"), "1400-1500 2023 - 2024 甲")
+
     def test_span_and_text(self):
         self.assertEqual(rooms.span(3, "23:00", "01:00"), (3 * 1440 + 1380, 4 * 1440 + 60))
         self.assertTrue(rooms.spans_overlap(3, "23:00", "01:00", 4, "00:30", "01:30"))
@@ -81,6 +99,26 @@ class DbTest(unittest.TestCase):
             nid = c.execute("SELECT MAX(id) FROM rooms").fetchone()[0]
             c.execute("INSERT INTO room_members(room_id, role_id) VALUES(?,?)", (nid, self.c))
         self.assertEqual(rooms.conflict(self.c, 3, "23:00", "01:00")["id"], nid)
+
+    def test_clash_message_names_the_day_of_the_other_room(self):
+        """撞上的是前一天 / 后一天那场时，提示写那场自己的天，不是要约的那天。"""
+        ok, info, rid = rooms.create("约会", self.a, [self.b], "2300-0100", "花园")      # D3 23:00-次日01:00
+        self.assertTrue(ok, info)
+        ok, msg, _ = rooms.create("约会", self.a, [self.c], "0030-0130", "湖边", day=4)
+        self.assertFalse(ok)
+        self.assertIn("D3 23:00-次日01:00", msg)
+        self.assertNotIn("D4 23:00", msg)
+        # 反过来：D4 凌晨有约，在 D3 晚上约跨午夜
+        with get_conn() as c:
+            c.execute("INSERT INTO rooms(kind, creator_id, day, start_hm, end_hm, place, created_ts) VALUES('约会',?,4,'00:15','01:15','湖边',0)", (self.c,))
+            nid = c.execute("SELECT MAX(id) FROM rooms").fetchone()[0]
+            c.execute("INSERT INTO room_members(room_id, role_id) VALUES(?,?)", (nid, self.c))
+        hit = rooms.conflict(self.c, 3, "23:00", "01:00")
+        self.assertEqual(rooms.clash_when(hit, 3), "D4 00:15-01:15")
+        # 管理员锁定（每天都锁）撞在第二天凌晨：写第二天
+        godmode.add_lock(self.b, None, "0100-0200")
+        hit = rooms.conflict(self.b, 5, "23:30", "01:30")
+        self.assertEqual(rooms.clash_when(hit, 5), "D6 01:00-02:00")
 
     def test_lock_cross_midnight(self):
         godmode.add_lock(self.a, 3, "2330-0030")

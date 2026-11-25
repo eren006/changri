@@ -18,7 +18,7 @@ def register(app, login_required):
     def trpg_card_page(card_id):
         card = trpg_core.get_card(card_id)
         if not card:
-            flash("没有这张角色卡")
+            flash("没有这张角色卡", "error")
             return redirect(url_for("trpg_page"))
         attrs = trpg_core.list_attrs(card_id)
         return render_template("trpg_card.html", card=card, owner=trpg_core.card_owner(card_id), attrs=attrs,
@@ -31,7 +31,7 @@ def register(app, login_required):
             return redirect(url_for("trpg_page"))
         items = trpg_core.parse_st(request.form.get("text", ""))
         if not items:
-            flash("格式：力量60 或 力量+5（可以一次写多个）")
+            flash("格式：力量60 或 力量+5（可以一次写多个）", "error")
         else:
             ok, lines = trpg_core.apply_st(card_id, items, source="后台手改")
             flash("；".join(lines) if ok else lines[0])

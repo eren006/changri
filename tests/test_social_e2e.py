@@ -103,7 +103,8 @@ class SocialE2E(unittest.TestCase):
         ok, msg = roles.create_role("小甲", "B1", "GC", "MC")                     # 新角色不能用别人的简称当名字
         self.assertFalse(ok)
         self.assertIn("简称已清除", self.say("修改简称 甲")[0])
-        self.assertIsNone(roles.get_role_by_name("小甲"))
+        self.assertEqual(roles.get_role_by_name("小甲")["name"], "甲")              # 清掉的简称留成旧名字：照样找到甲，别人也拿不走
+        self.assertIn("以前用过", self.say("修改简称 小甲", member="MB", group="GB")[0])
 
     def test_look_cooldown_and_rename(self):
         """皮相 2 小时只能改一次；修改名字：不能撞别人的本名/简称，改完各处按新名字找得到。"""
@@ -115,7 +116,8 @@ class SocialE2E(unittest.TestCase):
         self.assertIn("别人的名字", self.say("修改名字 乙")[0])
         self.assertIn("一样", self.say("修改名字 甲")[0])
         self.assertIn("「甲」改为「阿甲」", self.say("修改名字 阿甲")[0])
-        self.assertIsNone(roles.get_role_by_name("甲"))
+        self.assertEqual(roles.get_role_by_name("甲")["name"], "阿甲")             # 旧名字还找得到原来的人（别人拿不走）
+        self.assertIn("以前用过", self.say("修改名字 甲", member="MB", group="GB")[0])
         self.assertIn("阿甲", self.say("我的角色")[0])
         out = self.say("短信 阿甲 新名字找得到", member="MB", group="GB")
         self.assertTrue(any("[GA]" in o for o in out), out)
@@ -170,7 +172,7 @@ class SocialE2E(unittest.TestCase):
         self.assertTrue(any("[GB]" in o and "甲 给你发来" in o for o in out))
         self.assertIn("没有叫「丙」", self.say("短信 丙 你好")[0])
         self.assertIn("不能发给自己", self.say("短信 甲 你好")[0])
-        self.assertIn("选一个人", self.say("短信")[0])                          # 只发「短信」：选人卡片
+        self.assertIn("可以写给：乙", self.say("短信")[0])                      # 只发「短信」：选人卡片（这里关了按钮，发的是纯文字版）
         self.assertIn("短信 收信人 内容", self.say("短信 乙")[0])               # 写了一半：用法提示
         self.assertEqual(self.say("我昨天发短信给你了"), [])                     # 聊天里碰巧带了字，不理
         self.assertEqual(self.say("神秘人短信 乙 你好"), [])                      # 没开放自定义署名，不理

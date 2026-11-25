@@ -29,7 +29,7 @@ def register(app, login_required):
     def trpglog_view(log_id):
         log = trpglog_core.get(log_id)
         if not log:
-            flash("没有这个 log")
+            flash("没有这个 log", "error")
             return redirect(url_for("trpglog_page"))
         ls = trpglog_core.lines(log_id)
         style = trpgrender_core.parse_style(log["palette"])
@@ -80,11 +80,11 @@ def register(app, login_required):
         up = request.files.get("file")
         raw = up.read(trpgimport_core.MAX_BYTES + 1) if up and up.filename else request.form.get("text", "").encode()
         if len(raw) > trpgimport_core.MAX_BYTES:
-            flash("文件太大了，最多 2MB")
+            flash("文件太大了，最多 2MB", "error")
         else:
             entries = trpgimport_core.parse(trpgimport_core.decode(raw))
             if not entries:
-                flash("没有认出聊天记录的格式。需要每条消息前有一行「2026-11-14 21:03:11 昵称」或「昵称(2026-11-14 21:03:11)」。")
+                flash("没有认出聊天记录的格式。需要每条消息前有一行「2026-11-14 21:03:11 昵称」或「昵称(2026-11-14 21:03:11)」。", "error")
             else:
                 skip = {x.strip() for x in re.split(r"[,，\n]", request.form.get("skip", "")) if x.strip()}
                 r = trpgimport_core.import_into(log_id, entries, skip)

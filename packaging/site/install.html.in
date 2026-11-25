@@ -82,8 +82,7 @@ footer a{color:inherit}
 <ol>
 <li>解压前先<b>解除锁定</b>：右键下载的 zip →「属性」→ 勾选最下面的「解除锁定」→ 确定。不做这一步，双击启动时 Windows 会弹安全提示。</li>
 <li>解压到一个固定的位置，例如 <code>D:\changri-bot</code>。解压完压缩包就可以删了。</li>
-<li>双击 <code>Start-Changri.bat</code>，会自动打开浏览器进入设置平台。如果弹出「Windows 已保护你的电脑」，点「更多信息」→「仍要运行」。</li>
-<li>想开机自动运行：右键 <code>Install-Autostart.bat</code> →「以管理员身份运行」。</li>
+<li>双击 <code>Start-Changri.bat</code>。如果弹出「Windows 已保护你的电脑」，点「更多信息」→「仍要运行」；问「是否允许此应用对你的设备进行更改」时点「是」：会自动设成开机自启、在后台运行，然后打开浏览器进入设置平台。</li>
 </ol>
 <p class="note">有的杀毒软件会对 .bat 弹提示：这些是普通文本脚本，可以用记事本打开看内容。</p>
 </section>

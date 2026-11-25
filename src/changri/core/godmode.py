@@ -120,8 +120,9 @@ def lock_hit(role_id: int, day: int, a: str, b: str) -> dict | None:
     for r in rows:
         # 锁定也可能跨午夜；只写了钟点、没写天的锁每天都锁，前一天、当天、后一天的都要比
         lock_days = [r["day"]] if r["day"] is not None else (rooms._near_days(day))
-        if any(rooms.spans_overlap(day, a, b, d, r["start_hm"], r["end_hm"]) for d in lock_days):
-            return {"id": 0, "kind": "管理员锁定", "start_hm": r["start_hm"], "end_hm": r["end_hm"], "status": "open"}
+        hit_d = next((d for d in lock_days if rooms.spans_overlap(day, a, b, d, r["start_hm"], r["end_hm"])), "none")
+        if hit_d != "none":
+            return {"id": 0, "kind": "管理员锁定", "day": hit_d, "start_hm": r["start_hm"], "end_hm": r["end_hm"], "status": "open"}
     return None
 
 

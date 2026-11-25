@@ -10,7 +10,7 @@ from .db import get_conn, get_int
 from .textutil import hm_text
 
 _RP = re.compile(r"^\s*(\S{1,12}?)\s*[：:\s]\s*(.+)$", re.S)
-_ROOM_CMD = re.compile(r"(?:@\S+\s*)*[/.。]?(结束(?:约会|私约|电话|官约|微信|心愿|前置电话)|修改时间线|同意时间线|拒绝时间线|绑定qq|绑定QQ|补录)\s*.*", re.S)
+_ROOM_CMD = re.compile(r"(?:@\S+\s*)*[/.。]?(结束(?:约会|私约|电话|官约|微信|心愿|前置电话)|修改时间线|同意时间线|拒绝时间线|拒绝约会|取消约会|绑定qq|绑定QQ|补录)\s*.*", re.S)
 
 
 def body_of(name: str, text: str) -> str:

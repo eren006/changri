@@ -141,7 +141,7 @@ class LinuxScriptTests(unittest.TestCase):
     def test_firewall_off_says_so(self):
         (self.state / "health").write_text("up")
         code, out, calls = self.run_fix(unit=True)
-        self.assertIn("没开本机防火墙", out)
+        self.assertIn("本机防火墙（ufw / firewalld / iptables）没拦着", out)
 
     def test_ufw_active_opens_ports_from_file(self):
         (self.state / "health").write_text("up")

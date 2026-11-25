@@ -19,6 +19,14 @@
 {% include '_phone_tools_css.html' %}
 {% include '_phone_profile_css.html' %}
 {% include '_phone_discover_css.html' %}
+<style>
+/* iPhone 上输入框字小于 16px，一点就会把整页放大；放在最后兜底，所有外观都一样 */
+@media (max-width: 820px), (pointer: coarse) {
+  .phone input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=hidden]):not([type=submit]):not([type=button]):not([type=color]),
+  .phone select, .phone textarea { font-size: 16px !important; font-size: max(16px, 1em) !important; }
+  .phone .entry input { font-size: 20px !important; }
+}
+</style>
 </head>
 <body>
 {% include '_phone_symbol_runtime.html' %}
@@ -98,6 +106,45 @@
   };
   applyAvatars();
 </script>
+<dialog class="viewer" id="phoneViewer" aria-label="大图"><img alt="大图"></dialog>
+<script>
+  // 点图看大图：在本页弹出，不开新窗口（QQ 会把新窗口交给系统浏览器，那边没登录，会落到激活页）
+  (function () {
+    var v = document.getElementById('phoneViewer');
+    document.addEventListener('click', function (e) {
+      var a = e.target.closest && e.target.closest('a[data-view]');
+      if (!a || e.metaKey || e.ctrlKey || e.shiftKey) return;
+      e.preventDefault();
+      if (!v.showModal) { location.href = a.href; return; }       // 很老的浏览器：同一个窗口打开，登录还在
+      v.querySelector('img').src = a.href; v.showModal();
+    });
+    v.addEventListener('click', function () { v.close(); });
+    v.addEventListener('close', function () { v.querySelector('img').removeAttribute('src'); });
+  })();
+  // 带激活码的链接（…/p#code=…）在已登录时会直接到这里：把地址栏里的码去掉
+  if (/(^#|&)code=/.test(location.hash) && {{ (mode != 'entry')|tojson }} && history.replaceState) history.replaceState(null, '', location.pathname + location.search);
+  // 从「返回」回到缓存里的旧页面：表单里的校验码可能过期了，重新载入一次（写了一半的字有本机草稿）
+  window.addEventListener('pageshow', function (e) { if (e.persisted && {{ (request.method == 'GET')|tojson }} && document.querySelector('input[name=_csrf]')) location.reload(); });
+</script>
+{% if role is defined and role %}
+<script>
+  // 草稿：带 data-draft 的输入框，打字时存在这台手机上；页面刷新、点了别的按钮、校验码过期，回来都能填回去。
+  // 发送成功时服务器在下一页带上 draft_clear，就清掉。QQ 浏览器可能不让存，存不了也不影响别的。
+  (function () {
+    var pre = 'cd:' + {{ bot_tag()|tojson }} + ':' + {{ role.id|tojson }} + ':';
+    function get(k) { try { return localStorage.getItem(pre + k); } catch (e) { return null; } }
+    function put(k, v) { try { if (v && v.trim()) localStorage.setItem(pre + k, v); else localStorage.removeItem(pre + k); } catch (e) {} }
+    window.phoneDraft = { clear: function (k) { put(k, ''); }, save: put };
+    {{ (draft_clear or [])|tojson }}.forEach(function (k) { put(k, ''); });
+    document.querySelectorAll('[data-draft]').forEach(function (el) {
+      var k = el.dataset.draft;
+      if (!el.value) { var old = get(k); if (old) { el.value = old; el.dispatchEvent(new Event('input', { bubbles: true })); } }
+      else put(k, el.value);
+      el.addEventListener('input', function () { put(k, el.value); });
+    });
+  })();
+</script>
+{% endif %}
 {% if role is defined and role %}
 <div id="newMsgToast" role="status" aria-live="polite" hidden style="position:fixed;left:50%;transform:translateX(-50%);top:12px;z-index:50;max-width:440px;width:calc(100% - 32px);padding:10px 14px;border-radius:14px;background:var(--bg);border:1px solid var(--line);box-shadow:0 8px 24px rgba(0,0,0,.16)"><a id="newMsgLink" href="#" style="display:block;color:var(--text)"></a></div>
 <script>

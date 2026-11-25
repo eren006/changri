@@ -18,7 +18,9 @@ def build(role_id: int) -> str:
         sec = []
         for kind, label, out_t, in_t in (("sms", "短信", "📤 你最喜欢发短信给：", "📨 最喜欢给你发短信："), ("gift", "礼物", "🎁 你最喜欢送礼给：", "🎀 最喜欢送你礼物：")):
             to = _top(c, "SELECT r.name, COUNT(*) AS n FROM messages m JOIN roles r ON r.id=m.to_role_id WHERE m.kind=? AND m.from_role_id=? AND m.status!='failed' GROUP BY m.to_role_id ORDER BY n DESC, r.id LIMIT 3", (kind, role_id))
-            fr = _top(c, "SELECT r.name, COUNT(*) AS n FROM messages m JOIN roles r ON r.id=m.from_role_id WHERE m.kind=? AND m.to_role_id=? AND m.status='sent' GROUP BY m.from_role_id ORDER BY n DESC, r.id LIMIT 3", (kind, role_id))
+            # 收到的按落款算：匿名、自定义署名、化名的写署名，不写真名（不然一看排行就知道是谁）
+            fr = _top(c, "SELECT COALESCE(NULLIF(m.sign,''), r.name) AS name, COUNT(*) AS n FROM messages m JOIN roles r ON r.id=m.from_role_id "
+                         "WHERE m.kind=? AND m.to_role_id=? AND m.status='sent' GROUP BY 1 ORDER BY n DESC, 1 LIMIT 3", (kind, role_id))
             if to or fr:
                 sec.append(f"【{label}】" + (f"\n{in_t}\n{fr}" if fr else "") + (f"\n{out_t}\n{to}" if to else ""))
         mine = _top(c, "SELECT r.name, COUNT(*) AS n FROM rooms x JOIN room_members m ON m.room_id=x.id JOIN roles r ON r.id=m.role_id "

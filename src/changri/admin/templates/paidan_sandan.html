@@ -23,7 +23,7 @@
 {% if fresh %}
 <section>
   <div class="sec-head keep"><h2>刚生成的兑换码<span class="n">{{ fresh|length }} 个</span></h2>
-    <span class="btns"><button class="btn" type="button" onclick="var t=document.getElementById('fresh');t.select();navigator.clipboard&&navigator.clipboard.writeText(t.value);this.textContent='已复制'">复制全部</button></span></div>
+    <span class="btns"><button class="btn" type="button" onclick="var t=document.getElementById('fresh');copyText(t.value,this,t)">复制全部</button></span></div>
   <textarea id="fresh" rows="{{ [fresh|length, 10]|min }}" readonly>{{ fresh|join('\n') }}</textarea>
 </section>
 {% endif %}

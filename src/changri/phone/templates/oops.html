@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block title %}{{ oops_title }} · {{ brand }}{% endblock %}
+{% block body %}
+  <style>
+    .oops { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+            padding: 48px 28px calc(env(safe-area-inset-bottom) + 48px); gap: 14px; min-height: 70vh; min-height: 70dvh; }
+    .oops-mark { width: 76px; height: 76px; border-radius: 50%; background: var(--theirs); color: var(--muted);
+                 display: flex; align-items: center; justify-content: center; margin-bottom: 6px; }
+    .oops-mark svg { width: 38px; height: 38px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+    .oops h1 { margin: 0; font-size: 22px; font-weight: 700; color: var(--text); }
+    .oops p { margin: 0; max-width: 300px; font-size: 16px; line-height: 1.75; color: var(--muted); }
+    .oops-back { display: flex; align-items: center; justify-content: center; width: min(280px, 100%); min-height: 52px; margin-top: 18px;
+                 border: 0; border-radius: 26px; background: var(--mine); color: var(--mine-text); font: inherit; font-size: 17px; font-weight: 600; cursor: pointer; }
+    .oops-home { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; font-size: 15px; color: var(--link); }
+    .oops-code { font-size: 12px; color: var(--muted); opacity: .6; letter-spacing: .08em; }
+  </style>
+  <main class="oops" role="main">
+    <div class="oops-mark" aria-hidden="true">
+      {% if phone_off %}<svg viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 18.5h3"/><path d="M9 9.5l6 5M15 9.5l-6 5"/></svg>
+      {% elif oops_code in (400, 405, 413) %}<svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4.5h4.5"/></svg>
+      {% else %}<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5"/><path d="M12 16.5v.01"/></svg>{% endif %}
+    </div>
+    <h1>{{ oops_title }}</h1>
+    <p>{{ oops_msg }}</p>
+    <button type="button" class="oops-back" id="oopsBack">返回</button>
+    {% if not phone_off %}<a class="oops-home" href="{{ url_for('entry') }}">回小手机首页</a>{% endif %}
+    <div class="oops-code">{{ oops_code }}</div>
+  </main>
+  <script>
+    (function () {
+      var b = document.getElementById('oopsBack');
+      if (!b) return;
+      b.addEventListener('click', function () {
+        // 从别处直接打开（没有上一页）就回首页
+        if (history.length > 1) { history.back(); setTimeout(function () { location.href = {{ url_for('entry')|tojson }}; }, 800); }
+        else location.href = {{ url_for('entry')|tojson }};
+      });
+    })();
+  </script>
+{% endblock %}

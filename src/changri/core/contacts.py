@@ -32,7 +32,8 @@ def list_card(me_id: int | None) -> tuple[str, list[tuple[str, str, bool]]]:
 
 def _last_contact(me_id: int, other_id: int) -> str:
     with get_conn() as c:
-        r = c.execute("SELECT kind, from_role_id, created_ts FROM messages WHERE (from_role_id=? AND to_role_id=?) OR (from_role_id=? AND to_role_id=?) "
+        # 对方发给我的只算署了本名的：匿名、自定义署名、化名的短信礼物我不该知道是 TA 发的（时间一对就露了）
+        r = c.execute("SELECT kind, from_role_id, created_ts FROM messages WHERE (from_role_id=? AND to_role_id=?) OR (from_role_id=? AND to_role_id=? AND sign='') "
                       "ORDER BY id DESC LIMIT 1", (me_id, other_id, other_id, me_id)).fetchone()
     if not r:
         return ""

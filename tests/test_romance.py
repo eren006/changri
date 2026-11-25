@@ -68,7 +68,7 @@ class BlockTests(Base):
 
 class LovemailTests(Base):
     def test_parse(self):
-        self.assertEqual(lovemail.parse_post("乙 你好呀"), ("乙", "你好呀", ""))             # 简单格式署名留空，插件补真名
+        self.assertEqual(lovemail.parse_post("乙 你好呀"), ("乙", "你好呀", "匿名"))         # 一行写的不写署名也是匿名
         self.assertEqual(lovemail.parse_post("【发送对象】乙\n【内容】想你\n多行\n【署名】小风"), ("乙", "想你\n多行", "小风"))
         self.assertEqual(lovemail.parse_post("乙")[0], "")
 
@@ -261,12 +261,13 @@ class RelationTests(Base):
 
     def test_caps(self):
         set_config("max_detail_chars", "5")
-        self.assertFalse(relations.add_detail(self.a, self.b, "乙", "123456")[0])
+        self.assertFalse(relations.add_detail(self.a, self.b, "乙", "abcdef")[0])
         set_config("max_detail_chars", "500"); set_config("max_detail_count", "2")
-        relations.add_detail(self.a, self.b, "乙", "1"); relations.add_detail(self.a, self.b, "乙", "2")
-        self.assertIn("已经写满", relations.add_detail(self.a, self.b, "乙", "3")[1])
+        relations.add_detail(self.a, self.b, "乙", "a"); relations.add_detail(self.a, self.b, "乙", "b")
+        self.assertIn("已经写满", relations.add_detail(self.a, self.b, "乙", "c")[1])
+        self.assertIn("只有数字", relations.add_detail(self.a, self.b, "乙", "３")[1])          # 纯数字的段不收（跟按编号撤回分不清）
         set_config("max_detail_count", "20"); set_config("max_rel_total_chars", "4")
-        self.assertIn("超过总字数", relations.add_detail(self.a, self.b, "乙", "12345")[1])
+        self.assertIn("超过总字数", relations.add_detail(self.a, self.b, "乙", "abcde")[1])
         set_config("max_rel_total_chars", "3000"); set_config("max_relationships_per_user", "1")
         self.assertIn("你发起的关系线", relations.add_detail(self.a, self.c, "丙", "x")[1])
         set_config("max_relationships_per_user", "20"); set_config("max_relationships_total", "1")

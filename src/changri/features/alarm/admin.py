@@ -14,10 +14,10 @@ def register(app, login_required):
     def alarm_add():
         items, errs = alarm_core.parse_group_lines(request.form.get("lines", ""))
         if errs:
-            flash("没加上：" + "；".join(errs[:3]) + ("……" if len(errs) > 3 else ""))
+            flash("没加上：" + "；".join(errs[:3]) + ("……" if len(errs) > 3 else ""), "error")
             return redirect(url_for("alarm_page"))
         if not items:
-            flash("还没写内容。一行一条：9月12日 20:00 记得交日报")
+            flash("还没写内容。一行一条：9月12日 20:00 记得交日报", "error")
             return redirect(url_for("alarm_page"))
         n, err = alarm_core.group_add(items)
         flash(err or f"已添加 {n} 条群体闹钟" + ("" if n == len(items) else f"（{len(items) - n} 条和已有的完全相同，跳过了）"))

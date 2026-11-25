@@ -24,7 +24,7 @@ import sys
 import threading
 import time
 
-from . import layout
+from . import layout, winstart
 from .portcheck import PORT_BUSY
 
 RELAUNCH = 10            # 给启动脚本：按 current 重新起我
@@ -125,6 +125,22 @@ def _open_running(port: int) -> None:
 
 
 def run() -> int:
+    try:
+        return _run()
+    finally:
+        winstart.mark_exit()                     # Start-Changri.bat 马上又拉起我（更新、崩溃）时，别当成有人双击去弹 UAC
+
+
+def _handoff_to_task() -> bool:
+    """Windows 双击启动：自动设好开机自启并交给后台任务（platform/winstart.py）。出任何错都照旧在窗口里跑。"""
+    try:
+        return winstart.handoff()
+    except Exception as e:  # noqa: BLE001
+        _log(f"自动设开机自启时出错（{type(e).__name__}: {e}），这次先在这个窗口里运行。")
+        return False
+
+
+def _run() -> int:
     from ..core import updater
     started_version = layout.read_current()
     stopping = {"flag": False}
@@ -145,6 +161,8 @@ def run() -> int:
     if hasattr(signal, "SIGBREAK"):
         signal.signal(signal.SIGBREAK, on_signal)        # Windows 关窗口 / Ctrl+Break
 
+    if _handoff_to_task():
+        return 0
     _open_browser_once()
     if msg := layout.ensure_win_root_scripts():
         _log(msg)

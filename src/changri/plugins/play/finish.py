@@ -185,7 +185,8 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
         await review_cmd.finish("你不是这个房间的参与者。")
     text = roomlog.review_text(room["id"])
     if not text:
-        await review_cmd.finish("这场没有记到戏文。戏文要按「角色名：正文」的格式写；房间群里要有卡拉（开着「接收全部消息」），或者有监听的 QQ 号（说话的人要绑定过 QQ）。")
+        logger.info(f"[复盘] R{room['id']} 没有戏文：房间群里要有官方机器人（开着「接收全部消息」），或者有监听的 QQ 号（说话的人要绑定过 QQ）")
+        await review_cmd.finish("这场没有记到戏文。戏文要按「角色名：正文」的格式写；格式没问题还是没有的话，可以找管理员看看。")
     await reply_long(review_cmd, IMG + text)
 
 
@@ -221,7 +222,8 @@ async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
     QQ 会把被引用的记录作为文字带过来（只有发送者和内容，没有时间），已有的跳过，缺的按顺序插进复盘。"""
     from changri.core import roomlog
     if get_config("qq_backfill_enabled", "1") != "1":
-        await backfill_cmd.finish("补录没有打开（管理员在设置平台「QQ 小号与群号组（双骰）」页打开）。")
+        logger.info("[补录] 没打开：设置平台「QQ 小号与群号组（双骰）」页 qq_backfill_enabled")
+        await backfill_cmd.finish("补录现在没有打开，想用的话找管理员。")
     if not season.running():
         await backfill_cmd.finish("现在没有进行中的季度，补录只能补进进行中的季度。")
     arg = _room_arg(args.extract_plain_text())

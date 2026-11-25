@@ -18,5 +18,6 @@
   {% if missing %}<p class="note">还没交：{{ missing|join('、') }}</p>{% endif %}
 </section>
 <textarea id="ctext" hidden>{{ text }}</textarea>
-<script>var b=document.getElementById('cp');if(b)b.onclick=function(){var t=document.getElementById('ctext').value;if(navigator.clipboard)navigator.clipboard.writeText(t).then(function(){b.textContent='已复制';setTimeout(function(){b.textContent='复制全部'},1500)})}</script>
+<script>var b=document.getElementById('cp');if(b)b.onclick=function(){var t=document.getElementById('ctext');
+  copyText(t.value,b).then(function(ok){if(!ok){t.hidden=false;t.readOnly=true;t.rows=8;t.focus();t.select()}})}   /* 复制不了就把全文摊开，方便长按选中 */</script>
 {% endblock %}

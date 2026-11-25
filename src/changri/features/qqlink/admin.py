@@ -52,7 +52,7 @@ def register(app, login_required):
         name = (request.form.get("new_set", "").strip() or request.form.get("pick_set", "").strip())
         gids = request.form.getlist("gid")                       # 每项是「QQ号连接编号:群号」
         if not gids:
-            flash("先勾选要加的群")
+            flash("先勾选要加的群", "error")
             return redirect(url_for("qqlink_page"))
         bad = []
         for item in gids:
@@ -68,7 +68,7 @@ def register(app, login_required):
     def qqlink_sets_rename():
         old, new = request.form.get("old", ""), request.form.get("new", "")
         err = qqpool_core.rename_set(current_bot(), old, new)
-        flash(err or f"群号组已改名为「{new.strip()}」")
+        flash(err or f"群号组已改名为「{new.strip()}」", "error" if err else "message")
         return redirect(url_for("qqlink_page"))
 
     @app.post("/qqlink/sets/toggle")
@@ -83,7 +83,7 @@ def register(app, login_required):
     @login_required
     def qqlink_sets_remove(gid):
         err = qqpool_core.leave_set(current_bot(), gid)
-        flash(err or "已移出群号组")
+        flash(err or "已移出群号组", "error" if err else "message")
         return redirect(url_for("qqlink_page"))
 
     @app.post("/qqlink/auth")
@@ -99,7 +99,7 @@ def register(app, login_required):
         from changri.core.db import current_bot
         err = qqpool_core.save_conf(request.form.get("url", ""), request.form.get("token") or None, bool(request.form.get("on")))
         if err:
-            flash(err)
+            flash(err, "error")
         else:
             loopbridge.run(qqmanager_core.restart(current_bot()))
             flash("设置已保存，连接已按新设置重启")
@@ -124,7 +124,7 @@ def register(app, login_required):
         from changri.core.db import current_bot
         lid, err = qqpool_core.add_link(request.form.get("name", ""), request.form.get("url", ""), request.form.get("token", ""), bool(request.form.get("on")))
         if err:
-            flash(err)
+            flash(err, "error")
         else:
             loopbridge.run(qqmanager_core.restart(current_bot()))
             flash("已添加 QQ 号连接")
@@ -136,7 +136,7 @@ def register(app, login_required):
         from changri.core.db import current_bot
         err = qqpool_core.update_link(lid, request.form.get("name", ""), request.form.get("url", ""), request.form.get("token") or None, bool(request.form.get("on")))
         if err:
-            flash(err)
+            flash(err, "error")
         else:
             loopbridge.run(qqmanager_core.restart(current_bot()))
             flash("已保存，连接已按新设置重启")
@@ -149,7 +149,7 @@ def register(app, login_required):
         err = qqpool_core.delete_link(current_bot(), lid)
         if not err:
             qqmanager_core.stop_link(current_bot(), lid)
-        flash(err or "已删除这个 QQ 号连接，它名下的群也一起移出了群号池")
+        flash(err or "已删除这个 QQ 号连接，它名下的群也一起移出了群号池", "error" if err else "message")
         return redirect(url_for("qqlink_page"))
 
     @app.post("/qqlink/skip")
@@ -165,7 +165,7 @@ def register(app, login_required):
         name, qq = request.form.get("role", "").strip(), request.form.get("qq", "").strip()
         role = roles_core.get_role_by_name(name)
         err = "没有叫这个名字的角色" if not role else roles_core.bind_qq(role["id"], qq, force=True)
-        flash(err or f"已把 QQ {qq} 认到「{name}」名下")
+        flash(err or f"已把 QQ {qq} 认到「{name}」名下", "error" if err else "message")
         return redirect(url_for("qqlink_page"))
 
     @app.post("/qqlink/unbind/<qq>")
@@ -196,7 +196,7 @@ def register(app, login_required):
     @login_required
     def qqlink_group_add():
         err = qqpool_core.add_group(request.form.get("gid", ""), request.form.get("note", ""), "bot")
-        flash(err or "已加进来。在群里 @机器人 说一句话就会自动关联")
+        flash(err or "已加进来。在群里 @机器人 说一句话就会自动关联", "error" if err else "message")
         return redirect(url_for("qqlink_page"))
 
     @app.post("/qqlink/group/<gid>/edit")
@@ -217,7 +217,7 @@ def register(app, login_required):
     def qqlink_group_rename(gid):
         from changri.core.db import current_bot
         err = loopbridge.run(qqmanager_core.rename(current_bot(), gid, request.form.get("name", "")))
-        flash(err or "群名已改")
+        flash(err or "群名已改", "error" if err else "message")
         return redirect(url_for("qqlink_page"))
 
     # ---------- 一个群在「小号的群号组」和「官方机器人的备用群」之间来回转 ----------
@@ -233,18 +233,18 @@ def register(app, login_required):
         bot = current_bot()
         o = handover.official_row(bot, gid)
         if not o:
-            flash("官方机器人还不认得这个群：先在群里发一次「设为备用群 本群群号」")
+            flash("官方机器人还不认得这个群：先在群里发一次「设为备用群 本群群号」", "error")
             return _back()
         why = handover.check_to_official(bot, o["group_openid"], gid)
         if why:
-            flash(why)
+            flash(why, "error")
             return _back()
         a = handover.alt_row(bot, gid)
         name = qqpool_core.free_name((a["set_name"] if a else "") or o["set_name"])
         err = loopbridge.run(qqmanager_core.rename(bot, gid, name)) if a and not a["moved"] else "小号不管这个群"
         ok, why = handover.to_official(bot, o["group_openid"], gid, o["set_name"])
         if not ok:
-            flash(why)
+            flash(why, "error")
             return _back()
         flash(f"群 {gid} 已转给官方机器人。" + (f"群名已由小号改成「{name}」。" if not err else
               f"小号没能改群名（{err}）：{handover.RENAME_ASK.format(name=name)}"))
@@ -259,7 +259,7 @@ def register(app, login_required):
         bot = current_bot()
         why = handover.check_to_qq(bot, gid)
         if why:
-            flash(why)
+            flash(why, "error")
             return _back()
         seen, errs = False, []
         for ln in qqpool_core.links():
@@ -271,7 +271,7 @@ def register(app, login_required):
             except Exception as e:  # noqa: BLE001
                 errs.append(str(e) or "取群列表失败")
         if not seen:
-            flash(f"没转：小号现在不在群 {gid} 里" + (f"（{'；'.join(errs)}）" if errs else "（或者小号没连上）") + "。先让小号进群、设为管理员，再点一次。")
+            flash(f"没转：小号现在不在群 {gid} 里" + (f"（{'；'.join(errs)}）" if errs else "（或者小号没连上）") + "。先让小号进群、设为管理员，再点一次。", "error")
             return _back()
         o = handover.official_row(bot, gid)
         note = ""

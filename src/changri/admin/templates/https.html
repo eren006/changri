@@ -15,7 +15,7 @@
   <p class="note">Caddy 在前面接 https，再转给设置平台和小手机。它已经在运行。</p>
   {% elif st.windows %}
   <p>用远程桌面登录这台服务器，在长日bot 的文件夹里找到下面这个文件，<b>右键 → 以管理员身份运行</b>：</p>
-  <div class="cmd"><code id="cmd">{{ st.install }}</code><button class="btn ghost" type="button" onclick="navigator.clipboard.writeText(document.getElementById('cmd').textContent).then(()=>{this.textContent='已复制'})">复制路径</button></div>
+  <div class="cmd"><code id="cmd">{{ st.install }}</code><button class="btn ghost" type="button" onclick="var c=document.getElementById('cmd');copyText(c.textContent,this,c)">复制路径</button></div>
   <p class="note">
     {% if st.installed and not st.version_ok %}现在装的 Caddy 是 {{ st.version or '旧版' }}，要 2.10 以上才能申请 IP 证书，再运行一次会升级。
     {% elif st.installed and not st.api %}Caddy 装了，但服务没在运行。再运行一次这个文件会把它启动。
@@ -24,7 +24,7 @@
   </p>
   {% else %}
   <p>用 SSH 或云服务商网页上的「登录」打开这台服务器的终端，粘贴下面这一行回车（会要你的服务器密码）：</p>
-  <div class="cmd"><code id="cmd">{{ st.install }}</code><button class="btn ghost" type="button" onclick="navigator.clipboard.writeText(document.getElementById('cmd').textContent).then(()=>{this.textContent='已复制'})">复制</button></div>
+  <div class="cmd"><code id="cmd">{{ st.install }}</code><button class="btn ghost" type="button" onclick="var c=document.getElementById('cmd');copyText(c.textContent,this,c)">复制</button></div>
   <p class="note">
     {% if st.installed and not st.version_ok %}现在装的 Caddy 是 {{ st.version or '旧版' }}，要 2.10 以上才能申请 IP 证书，运行这一行会升级。
     {% elif st.installed and not st.api %}Caddy 装了，但没有按长日bot 要的方式运行（本机 2019 端口收配置）。运行这一行会把它调好；如果这台服务器上的 Caddy 已经在跑你自己的网站，脚本会停下来，不会动它。

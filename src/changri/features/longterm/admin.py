@@ -1,4 +1,6 @@
 """设置平台 · 长期群：建长期群、设货币和兑换比例、属性、注册项；看注册信息、字数留底；改玩家的货币 / 字数 / 属性 / 背包。"""
+import time
+
 from flask import abort, flash, redirect, render_template, request, url_for
 
 from changri.core import longterm as lt
@@ -36,7 +38,7 @@ def register(app, login_required):
     def longterm_new():
         gid, err = lt.create_group(request.form.get("name", ""))
         if not gid:
-            flash(err)
+            flash(err, "error")
             return redirect(url_for("longterm_page"))
         flash("建好了。QQ 群里管理员发「/模式 长期群」，再发「/切换长期群 名字」接上。")
         return redirect(url_for("longterm_group", gid=gid))
@@ -65,7 +67,7 @@ def register(app, login_required):
             if kpi in ("ok", "no") and prog:
                 members = [m for m in members if prog[m["id"]]["ok"] == (kpi == "ok")]
             ctx.update(all_members=lt.list_members(gid), fields=lt.reg_fields(g), q=q, kpi=kpi, prog=prog,
-                       kpi_label=lt.KPI_PERIODS.get(g["kpi_period"], "本周"),
+                       kpi_label=lt.kpi_label(g),
                        members=[m for m in members if not q or q in m["name"] or q in m["aliases"]
                                 or any(q in str(v) for v in m["info"].values())])
         elif tab == "words":
@@ -75,7 +77,8 @@ def register(app, login_required):
             ctx.update(item_list=lt.item_defs(gid), edit_item=lt.item_def(gid, request.args.get("item", "")),
                        recipes=rs, edit_recipe=next((r for r in rs if r["name"] == request.args.get("recipe")), None))
         else:
-            ctx.update(defs=lt.attr_defs(gid), checkins_today=lt.checkins_today(gid), kpi_periods=lt.KPI_PERIODS)
+            ctx.update(defs=lt.attr_defs(gid), checkins_today=lt.checkins_today(gid), kpi_periods=lt.KPI_PERIODS, kpi_now=lt.kpi_label(g), kpi_left=lt.kpi_left_days(g),
+                       kpi_anchor_text=time.strftime("%Y-%m-%d", time.localtime(g["kpi_anchor"])) if g.get("kpi_anchor") else "")
         return render_template("longterm_group.html", **ctx)
 
     @app.post("/longterm/<int:gid>/settings")
@@ -88,7 +91,7 @@ def register(app, login_required):
                                   reg_fields=f.get("reg_fields", ""), self_attrs=f.get("self_attrs") == "1",
                                   count_admin_only=f.get("count_admin_only") == "1", count_review=f.get("count_review") == "1",
                                   checkin_on=f.get("checkin_on") == "1", checkin_rewards=f.get("checkin_rewards", ""),
-                                  kpi_period=f.get("kpi_period", "week"), kpi_chars=f.get("kpi_chars") or 0, kpi_paras=f.get("kpi_paras") or 0)
+                                  kpi_period=f.get("kpi_period", "week"), kpi_days=f.get("kpi_days"), kpi_anchor=f.get("kpi_anchor", ""), kpi_chars=f.get("kpi_chars") or 0, kpi_paras=f.get("kpi_paras") or 0)
         flash("已保存。" if ok else err)
         return redirect(_tab(gid, "settings"))
 
@@ -97,7 +100,7 @@ def register(app, login_required):
     def longterm_delete(gid):
         g = _group_or_404(gid)
         if request.form.get("confirm", "").strip() != g["name"]:
-            flash("没删：要在框里填长期群的名字确认。")
+            flash("没删：要在框里填长期群的名字确认。", "error")
             return redirect(_tab(gid, "settings"))
         lt.delete_group(gid)
         flash(f"已删除长期群「{g['name']}」和里面的所有数据。")
@@ -146,7 +149,7 @@ def register(app, login_required):
         if not s:
             abort(404)
         ok, msg = (lt.approve if request.form.get("act") == "approve" else lt.reject)(sid)
-        flash(msg)
+        flash(msg, "message" if ok else "error")
         back = request.form.get("back", "home")
         return redirect(url_for("longterm_submission", sid=sid) if back == "sub" else _tab(s["group_id"], back if back in dict(TABS) else "home"))
 
@@ -169,7 +172,7 @@ def register(app, login_required):
             ids = [m["id"] for m in lt.list_members(gid)]
         ids = [i for i in ids if (lt.get_member(i) or {}).get("group_id") == gid]
         if not ops or not ids:
-            flash("要选人（或者勾「全员」），并写内容，比如：银两+50 苹果+1")
+            flash("要选人（或者勾「全员」），并写内容，比如：银两+50 苹果+1", "error")
         else:
             res = lt.bulk_adjust(ids, ops, note=request.form.get("note", "").strip()[:60] or "后台批量发放")
             bad = [f"{n}：{'；'.join(o)}" for n, o in res if not all("→" in x for x in o)]
@@ -199,7 +202,7 @@ def register(app, login_required):
         _group_or_404(gid)
         m, err = lt.add_member(gid, request.form.get("name", ""))
         if not m:
-            flash(err)
+            flash(err, "error")
             return redirect(_tab(gid, "players"))
         flash("加好了。本人在群里用同一个名字「/注册」就会认上。")
         return redirect(url_for("longterm_member", mid=m["id"]))
@@ -212,7 +215,7 @@ def register(app, login_required):
         mid = request.form.get("member_id", "")
         m = lt.get_member(int(mid)) if mid.isdigit() else None
         if not m or m["group_id"] != gid:
-            flash("先选一位玩家。")
+            flash("先选一位玩家。", "error")
         else:
             n = lt.claim(gid, name, m["id"])
             flash(f"「{name}」的 {n} 字转给了「{m['name']}」，以后这个名字自动算给 TA。")
@@ -242,7 +245,7 @@ def register(app, login_required):
         return render_template("longterm_member.html", m=m, g=g, fields=lt.reg_fields(g), attrs=lt.list_attrs(mid),
                                defs=lt.attr_defs(g["id"]), bag=lt.items(mid), events=lt.events(g["id"], mid=mid, limit=100),
                                ledger=lt.ledger(mid, 200), lines=lt.member_submission_lines(mid, 200), pending_chars=lt.pending_chars(mid),
-                               kpi=lt.kpi_progress(g["id"]).get(mid) if lt.kpi_on(g) else None, kpi_label=lt.KPI_PERIODS.get(g["kpi_period"], "本周"))
+                               kpi=lt.kpi_progress(g["id"]).get(mid) if lt.kpi_on(g) else None, kpi_label=lt.kpi_label(g), notes_text=lt.notes_to_text(m["notes"]))
 
     @app.post("/longterm/member/<int:mid>/edit")
     @login_required
@@ -255,6 +258,18 @@ def register(app, login_required):
         flash("已保存。" if ok else err)
         return redirect(url_for("longterm_member", mid=mid))
 
+    @app.post("/longterm/member/<int:mid>/notes")
+    @login_required
+    def longterm_member_notes(mid):
+        _member_or_404(mid)
+        notes, err = lt.parse_notes_text(request.form.get("notes", ""))
+        if notes is None:
+            flash(err, "error")
+        else:
+            lt.replace_notes(mid, notes)
+            flash("条目已保存。")
+        return redirect(url_for("longterm_member", mid=mid) + "#notes")
+
     @app.post("/longterm/member/<int:mid>/coins")
     @login_required
     def longterm_member_coins(mid):
@@ -262,7 +277,7 @@ def register(app, login_required):
         try:
             n = int(request.form.get("amount", ""))
         except ValueError:
-            flash("数量要填整数。")
+            flash("数量要填整数。", "error")
             return redirect(url_for("longterm_member", mid=mid))
         how = request.form.get("how", "add")
         note = request.form.get("note", "").strip()[:60] or "后台调整"
@@ -283,7 +298,7 @@ def register(app, login_required):
         _member_or_404(mid)
         ops = lt.parse_adjust(request.form.get("text", ""))
         if not ops:
-            flash("格式：力量+5 苹果+2 字数+300 金币=100（可以一次写多个）")
+            flash("格式：力量+5 苹果+2 字数+300 金币=100（可以一次写多个）", "error")
         else:
             note = request.form.get("note", "").strip()[:60] or "后台调整"
             flash("；".join(lt.apply_adjust(mid, ops, note=note, log=True)))

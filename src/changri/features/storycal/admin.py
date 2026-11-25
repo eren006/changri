@@ -21,7 +21,7 @@ def register(app, login_required):
         errs = cal.save(request.form.get("era", ""), {d: request.form.get(f"d{d}", "") for d in range(cal.MAX_STAGES)})
         if errs:
             for e in errs:
-                flash("没保存：" + e)
+                flash("没保存：" + e, "error")
         else:
             flash("故事历已保存")
         return redirect(url_for("storycal_page"))

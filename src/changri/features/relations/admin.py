@@ -88,7 +88,7 @@ def register(app, login_required):
         back = redirect(url_for("relations_page", view="sheets" if which == "gongzhi" else "relations"))
         raw = "" if request.form.get("clear") else request.form.get("at", "")
         if not deadlines.set(which, raw):
-            flash("时间看不懂，请用页面上的日期时间选择器选，或者写成 2026-11-25 20:00")
+            flash("时间看不懂，请用页面上的日期时间选择器选，或者写成 2026-11-25 20:00", "error")
             return back
         name = "公知" if which == "gongzhi" else "关系线"
         at = deadlines.get(which)
@@ -120,7 +120,7 @@ def register(app, login_required):
         try:
             hours = max(0.0, float(request.form.get("hours", "0") or 0))
         except ValueError:
-            flash("请填数字，0 表示不提醒")
+            flash("请填数字，0 表示不提醒", "error")
             return redirect(url_for("relations_page", view="relations"))
         set_config("rel_alert_hours", f"{hours:g}")
         flash("已保存：" + (f"超过 {hours:g} 小时没回复会提醒" if hours else "不再提醒"))

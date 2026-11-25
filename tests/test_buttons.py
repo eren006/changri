@@ -368,6 +368,15 @@ class ButtonsE2E(unittest.TestCase):
         self.assertNotIn("选一个人", self.say("拉线", member="M1", group="G1")[0][0])
         deadlines.set("rel", "")
 
+    def test_lovemail_one_line_is_anonymous(self):
+        """一行写的心动信不写署名也是匿名（跟选人卡片「署名不写就是匿名」一致），回执写明署名。"""
+        set_config("ext:lovemail", "1")
+        text = self.say("心动信 乙 晚安", member="M1", group="G1")[0][0]
+        self.assertIn("署名：匿名", text)
+        self.assertNotIn("署名：甲", text)
+        text = self.say("发送心动信\n【发送对象】乙\n【内容】早\n【署名】小风", member="M1", group="G1")[0][0]
+        self.assertIn("署名：小风", text)
+
     def test_relation_detail_next(self):
         set_config("ext:relations", "1")
         a, b = roles.get_role_by_name("甲")["id"], roles.get_role_by_name("乙")["id"]
@@ -612,6 +621,38 @@ class ButtonsE2E(unittest.TestCase):
         self.bot.reject = True
         self.say("格式")
         self.assertEqual(qs._btn_off_until, 0.0)                            # 不是连续的，不暂停
+
+    def test_card_plain_fallback(self):
+        """按钮发不出去（关了 / QQ 拒收）：选人卡片改发纯文字，列出名字和照抄的格式，不说「点」。"""
+        set_config("ext:lovemail", "1")
+        set_config("qq_buttons", "0")
+        for cmd, want in (("短信", "【短信】"), ("心动信", "【发送对象】"), ("约会", "约会 时间 地点 对方"), ("电话", "电话 时间 对方")):
+            out = self.say(cmd, member="M1", group="G1")
+            text = "\n".join(o[0] for o in out)
+            self.assertTrue(all(o[1] == [] for o in out), out)
+            self.assertIn("乙", text, cmd)
+            self.assertIn("丙", text, cmd)
+            self.assertIn(want, text, cmd)
+            self.assertNotIn("点", text.replace("地点", ""), cmd)
+        set_config("qq_buttons", "1")
+        self.bot.reject = True                                                 # QQ 拒收 Markdown：也退回同样的纯文字
+        text = "\n".join(o[0] for o in self.say("送礼", member="M1", group="G1"))
+        self.assertIn("乙、丙", text)
+        self.assertIn("【送礼】", text)
+        self.assertNotIn("点名字", text)
+
+    def test_card_capacity_from_layout(self):
+        """名字多到放不下：按 5 行 × 4 个排，名字 18 个 +「自己写」「帮助」正好 20 个都在，「还有 N 位」算对。"""
+        from changri.core import buttons as bt, datepick
+        for i in range(30):
+            roles.create_role(f"人{i:02d}", "B1", f"GX{i}", f"MX{i}")
+        text, items, _plain = datepick.form_card("短信", roles.get_role_by_name("甲")["id"])
+        self.assertEqual(len(items), bt.MAX_ROWS * bt.CARD_PER_ROW)
+        self.assertEqual([x[0] for x in items[-2:]], ["自己写", "帮助"])
+        self.assertIn(f"还有 {32 - datepick.MAX_ITEMS} 位", text)                # 乙、丙 + 30 个
+        _t, btns = self.say("短信", member="M1", group="G1")[0]
+        self.assertIn("自己写", [b[0] for b in btns])
+        self.assertIn("帮助", [b[0] for b in btns])
 
     def test_switch_off(self):
         set_config("qq_buttons", "0")

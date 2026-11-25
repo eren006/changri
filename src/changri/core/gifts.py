@@ -89,11 +89,38 @@ def export_text() -> str:
     return "\n".join(f"{x['id']}｜{x['name']}｜{x['note']}" for x in items())
 
 
+_LIST_MARK = re.compile(r"^(?:[-*•·]\s*|\d{1,3}\s*[.、)）]\s*)")   # AI 爱在行首加的「1. 」「- 」
+
+
+def ai_import_prompt() -> str:
+    """后台「让 AI 帮忙编礼物」的提示词：管理员复制给 ChatGPT / 豆包 / DeepSeek，AI 写出来的整段贴进「批量导入」。
+    规则和上限跟 add() 一致；已经上架的名字列进去，让 AI 别重名（重名的导入时也会自动跳过）。"""
+    have = [x["name"] for x in items()]
+    text = ("请帮我给一个恋综 RP 的「礼品店」编一批礼物，角色们会互相送。\n"
+            "主题 / 风格：（换成你想要的，比如：民国上海、校园、古风宫廷、现代都市，或者不写）\n"
+            "数量：（比如 20 件）\n\n"
+            "要求：\n"
+            "1. 一行一件，格式是「礼物名｜说明」，中间用竖线「｜」隔开。不要编号、不要分类标题、不要空行、不要别的话。\n"
+            "2. 礼物名 30 字以内，不能是纯数字，彼此不重复。\n"
+            "3. 说明 100 字以内，一两句话写它是什么样子、送它有什么意味；觉得不用说明的，只写礼物名也行。\n"
+            "4. 礼物要具体、有画面感，便宜的小东西和贵重的都可以有，适合拿来暧昧、示好、道歉、试探。\n"
+            "5. 全部放进一个代码块里输出，方便我整段复制。")
+    if have:
+        text += "\n\n下面这些已经有了，别重复：\n" + "、".join(have)
+    return text
+
+
 def import_text(text: str) -> tuple[int, list[str]]:
-    """一行一件：「名字」或「名字｜说明」（带编号的导出格式「1｜名字｜说明」也认，编号忽略）。已有的跳过。返回 (新增几件, 跳过的说明)。"""
+    """一行一件：「名字」或「名字｜说明」（带编号的导出格式「1｜名字｜说明」也认，编号忽略）。已有的跳过。返回 (新增几件, 跳过的说明)。
+    AI 写的也直接认：代码块的 ``` 行跳过，行首的「1. 」「- 」去掉。"""
     n, skipped = 0, []
     for raw in text.splitlines():
-        parts = [x.strip() for x in re.split(r"[｜|]", raw.strip())]
+        line = raw.strip()
+        if line.startswith("```"):
+            continue
+        if not re.match(r"^\d+\s*[｜|]", line):
+            line = _LIST_MARK.sub("", line)
+        parts = [x.strip() for x in re.split(r"[｜|]", line)]
         if parts and parts[0].isdigit() and len(parts) >= 2:
             parts = parts[1:]
         if not parts or not parts[0]:

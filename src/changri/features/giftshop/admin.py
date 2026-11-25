@@ -8,13 +8,14 @@ def register(app, login_required):
     @app.route("/giftshop")
     @login_required
     def giftshop_page():
-        return render_template("giftshop.html", items=gifts_core.items(), only=get_config("gift_only_preset", "0") == "1")
+        return render_template("giftshop.html", items=gifts_core.items(), only=get_config("gift_only_preset", "0") == "1",
+                               ai_prompt=gifts_core.ai_import_prompt())
 
     @app.post("/giftshop/add")
     @login_required
     def giftshop_add():
         ok, msg = gifts_core.add(request.form.get("name", ""), request.form.get("note", ""))
-        flash(msg)
+        flash(msg, "message" if ok else "error")
         return redirect(url_for("giftshop_page"))
 
     @app.post("/giftshop/<int:item_id>/delete")

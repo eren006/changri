@@ -49,14 +49,14 @@ def register(app, login_required):
     def season_book():
         f = request.form
         ok, msg = season_core.book(f.get("name", ""), f.get("start", ""), f.get("end", ""), f.get("supp", ""))
-        flash(msg)
+        flash(msg, "message" if ok else "error")
         return redirect(url_for("season_page"))
 
     @app.post("/season/npc/create")
     @login_required
     def season_npc_create():
         ok, msg = npc_core.create(request.form.get("name", ""))
-        flash(msg)
+        flash(msg, "message" if ok else "error")
         return redirect(url_for("season_page") + "#npc")
 
     @app.post("/season/npc/<int:role_id>/profile")
@@ -66,7 +66,7 @@ def register(app, login_required):
         from changri.core import charprofile, roles as roles_core
         r = roles_core.get_role(role_id)
         if not r or not r["is_npc"]:
-            flash("没有这个 NPC")
+            flash("没有这个 NPC", "error")
         else:
             text = request.form.get("lines", "").strip()
             flash(charprofile.edit(r, text, admin=True) if text else "写上要改的，比如：修改皮相 某某")
@@ -76,7 +76,7 @@ def register(app, login_required):
     @login_required
     def season_npc_flag():
         ok, msg = npc_core.set_flag(request.form.get("name", ""), request.form.get("on") == "1")
-        flash(msg)
+        flash(msg, "message" if ok else "error")
         return redirect(url_for("season_page") + "#npc")
 
     @app.post("/season/<int:season_id>/delete")
@@ -128,7 +128,7 @@ def register(app, login_required):
         elif act == "send":
             staff = announce.get_backstage()
             if not staff:
-                flash("还没设后台群：在后台群里发「设为后台群」。")
+                flash("还没设后台群：在后台群里发「设为后台群」。", "error")
             elif not seasonview.url(season_id):
                 flash(seasonview.why_no_url() or "先打开复盘网页。")
             else:
@@ -187,10 +187,10 @@ def register(app, login_required):
         s = season_core.get_season(season_id)
         back = request.form.get("back") == "list"
         if not s or request.form.get("confirm", "").strip() != s["name"]:
-            flash("没有删除：确认框里要输入这个季度的名字")
+            flash("没有删除：确认框里要输入这个季度的名字", "error")
             return redirect(url_for("season_page") + "#past" if back or not s else url_for("season_view", season_id=season_id))
         ok, msg = season_core.delete_history(season_id)
-        flash(msg)
+        flash(msg, "message" if ok else "error")
         return redirect(url_for("season_page") + "#past" if ok or back else url_for("season_view", season_id=season_id))
 
     @app.post("/season/start")
@@ -255,7 +255,7 @@ def register(app, login_required):
         from changri.core import seasonreport
         ps = seasonreport.live_players()
         if not ps:
-            flash("现在没有可以出海报的玩家（还没有互动，或者已经收尾清空了；收尾后到历史季度里下载）")
+            flash("现在没有可以出海报的玩家（还没有互动，或者已经收尾清空了；收尾后到历史季度里下载）", "error")
             return redirect(url_for("season_page") + "#report")
         show = _live_show()
         return _download(seasonreport.zip_posters([(_safe(p["name"]), p["data"]) for p in ps], show), f"{_safe(show)}-季末海报.zip", "application/zip")
@@ -300,9 +300,9 @@ def register(app, login_required):
     @login_required
     def season_wipe():
         if season_core.running():
-            flash("季度还在进行中，先结束")
+            flash("季度还在进行中，先结束", "error")
         elif request.form.get("confirm") != "收尾":
-            flash("没有清空：确认框里要输入「收尾」")
+            flash("没有清空：确认框里要输入「收尾」", "error")
         else:
             season_core.wipe()
             flash("已收尾，本季的角色和互动记录已清空")
@@ -313,9 +313,9 @@ def register(app, login_required):
     def season_day():
         raw = request.form.get("day", "").strip().upper().lstrip("D")
         if not season_core.running():
-            flash("现在没有进行中的季度")
+            flash("现在没有进行中的季度", "error")
         elif not raw.isdigit():
-            flash("天数写成 D3 或 3")
+            flash("天数写成 D3 或 3", "error")
         else:
             season_core.set_day(int(raw))
             flash(f"现在是 D{int(raw)}")

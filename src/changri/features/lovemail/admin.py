@@ -28,7 +28,7 @@ def register(app, login_required):
     def lovemail_time():
         at = request.form.get("at", "").strip()
         if not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", at):
-            flash("时间要写成 22:00 这样（24 小时制）")
+            flash("时间要写成 22:00 这样（24 小时制）", "error")
         else:
             set_config("lovemail_delivery_time", at)
             flash(f"已改：每天 {at} 自动派送")

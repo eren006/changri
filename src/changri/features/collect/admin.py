@@ -17,7 +17,7 @@ def register(app, login_required):
         ok, msg = collect_core.create(f.get("title", ""), f.get("prompt", ""), collect_core.parse_local(f.get("start", "")) if f.get("timed") == "1" else 0,
                                       collect_core.parse_local(f.get("end", "")) if f.get("timed") == "1" else 0)
         if not ok:
-            flash(msg)
+            flash(msg, "error")
             return redirect(url_for("collect_page"))
         flash("已创建")
         return redirect(url_for("collect_view", cid=int(msg)))

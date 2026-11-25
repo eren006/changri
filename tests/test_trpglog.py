@@ -229,6 +229,43 @@ class LogRender(unittest.TestCase):
         off = trpgrender.render_html(log, trpglog.lines(log["id"]), trpgrender.parse_style('{"dice_hl":false}'))
         self.assertNotIn("lv-crit", off.split("</style>")[1])
 
+    def test_same_character_same_color_across_logs(self):
+        from changri.core import trpgrender
+        st = trpgrender.parse_style("{}")
+        mk = lambda *names: [{"kind": "say", "speaker_name": n} for n in names]
+        a = trpgrender.color_map(mk("小明", "阿红"), st)
+        b = trpgrender.color_map(mk("老王", "阿红", "小明"), st)                 # 换了顺序、多了人，颜色不变
+        self.assertEqual((a["小明"], a["阿红"]), (b["小明"], b["阿红"]))
+        many = trpgrender.color_map(mk(*[f"角色{i}" for i in range(10)]), st)
+        self.assertEqual(len(set(many.values())), 10)                             # 一份 log 里不撞色
+        log = self._log()
+        out = trpgrender.render_html(log, trpglog.lines(log["id"]))
+        k = re.search(r'class="who (s\d)">阿红', out).group(1)
+        self.assertRegex(out, rf'class="ln dice {k}[" ]')                         # 阿红后面的骰点跟着阿红的颜色
+        self.assertFalse(set(trpgrender.PALETTE[-2:]) & set(a.values()))             # 人少时不分到靛蓝、灰色
+
+    def test_reading_aids(self):
+        from changri.core import trpgrender
+        self.assertTrue(trpgrender.is_ooc("（我去吃个饭）"))
+        self.assertTrue(trpgrender.is_ooc("(brb)"))
+        self.assertTrue(trpgrender.is_ooc("// 等下早点下"))
+        self.assertFalse(trpgrender.is_ooc("（笑）“你好”（转身）"))              # 头尾是括号、中间是戏，不算场外
+        self.assertFalse(trpgrender.is_ooc("“你好”"))
+        log, _ = trpglog.new_log("G1", "雾港", "M1")
+        trpglog.add_line(log["id"], "M1", "小明", "say", "我先说一句")
+        cmd = trpglog.add_line(log["id"], "M2", "阿红", "say", ".ra 聆听")
+        trpglog.add_line(log["id"], "", "骰子", "dice", "阿红的聆听检定：D100=12/60 —— 困难成功", cmd)
+        trpglog.add_line(log["id"], "M1", "小明", "say", "（我去倒杯水）")
+        out = trpgrender.render_html(trpglog.get(log["id"]), trpglog.lines(log["id"]))
+        body = out.split("<main", 1)[1]
+        self.assertEqual(body.count(".ra 聆听"), 1)                                # 指令不再单独一行，只在卡片标签里
+        self.assertRegex(body, r'class="ln dice s1"[^>]*data-sp="阿红"[^>]*><div class="txt"><span class="cmd"><span class="who s1">阿红</span> \.ra 聆听')
+        self.assertIn('class="ln say ooc', body)
+        self.assertIn('id="ooc"', out)                                            # 有场外的话才出「隐藏场外」
+        self.assertRegex(body, r'id="L\d+"')
+        plain = trpgrender.render_html(trpglog.get(log["id"]), [l for l in trpglog.lines(log["id"]) if "倒杯水" not in l["text"]])
+        self.assertNotIn('id="ooc"', plain)
+
     def test_token_needs_shared(self):
         log = self._log()
         self.assertIsNone(trpglog.by_token(log["token"]))                    # 没公开不能按 token 打开
@@ -276,8 +313,9 @@ class LogRender(unittest.TestCase):
         self.assertIn("srcdoc=", page)
         self.assertNotIn("<script>alert(1)", page)
         t = tok(f"/trpglog/{log['id']}")
-        c.post(f"/trpglog/{log['id']}/style", data={"_csrf": t, "theme": "dark", "color_0": "#abcdef", "color_1": "#b5401f", "dice_hl": "1"})
         from changri.core import trpgrender
+        red_default = trpgrender.color_map(trpglog.lines(log["id"]), trpgrender.parse_style("{}"))["阿红"][0]
+        c.post(f"/trpglog/{log['id']}/style", data={"_csrf": t, "theme": "dark", "color_0": "#abcdef", "color_1": red_default, "dice_hl": "1"})
         st = trpgrender.parse_style(trpglog.get(log["id"])["palette"])
         self.assertEqual((st["theme"], st["colors"], st["dice_hl"], st["dim_bot"]), ("dark", {"小明": "#abcdef"}, True, False))
         c.post(f"/trpglog/{log['id']}/share", data={"_csrf": t, "on": "1"})

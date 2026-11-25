@@ -97,7 +97,7 @@ fix_firewall() {
   if [ -n "${done}" ]; then
     ok "本机防火墙（$(echo ${done} | tr ' ' '/')）已放行端口：${ports}"
   else
-    ok "这台服务器没开本机防火墙（ufw / firewalld），不用放行"
+    ok "这台服务器的本机防火墙（ufw / firewalld / iptables）没拦着，不用放行"
   fi
 }
 fix_firewall

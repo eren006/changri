@@ -78,7 +78,7 @@ def register(app, login_required):
         new_id, err = pd.save_business(request.form.get("letter", ""), request.form.get("name", ""), _int("days", 7),
                                        _int("slots", 1), request.form.get("template", ""), bid)
         if err:
-            flash("没保存：" + err)
+            flash("没保存：" + err, "error")
         else:
             b = pd.business(new_id)
             flash(f"已保存「{b['name']}」" + ("。记得在下单格式里加上「QQ号：」这一栏（没写会自动补在最后）" if pd.template_missing_qq(b["template"]) else ""))
@@ -116,12 +116,12 @@ def register(app, login_required):
         slots = {b["id"]: _int(f"slots_{b['id']}", b["default_slots"]) for b in pd.businesses()}
         cid, err = pd.create_client(request.form.get("name", ""), slots, request.form.get("note", ""))
         if err:
-            flash("没保存：" + err)
+            flash("没保存：" + err, "error")
             return redirect(url_for("paidan_clients"))
         for fn, val in ((pd.set_client_qq, request.form.get("qq", "")), (pd.set_client_gid, request.form.get("real_gid", ""))):
             e = fn(cid, val)
             if e:
-                flash(e)
+                flash(e, "error")
         code = pd.new_bind_code("client", cid)
         flash(f"已建客户。绑定码：{code}，让客户本人在他的群里发「绑定 {code}」")
         return redirect(url_for("paidan_client", cid=cid))
@@ -216,7 +216,7 @@ def register(app, login_required):
         o, err = pd.place_order(_int("bid"), request.form.get("content", ""), cid=cid, orderer_name=request.form.get("orderer", ""),
                                 qq=request.form.get("qq", ""), manual=True)
         if err:
-            flash("没补录：" + err)
+            flash("没补录：" + err, "error")
             return redirect(url_for("paidan_orders"))
         flash(f"已补录 {o['no']}")
         return redirect(url_for("paidan_order", oid=o["id"]))
@@ -247,7 +247,7 @@ def register(app, login_required):
         fn = pd.complete_order if first else pd.recharge
         res, err = fn(oid, _int("n", 1), _int("q") or None)
         if err:
-            flash("没扣：" + err)
+            flash("没扣：" + err, "error")
             return redirect(url_for("paidan_order", oid=oid))
         done = pd.order(oid)
         sent = _send_one(pd.order_target(done)[0], pd.done_notice(done)) if first else ""
@@ -261,14 +261,14 @@ def register(app, login_required):
     @login_required
     def paidan_order_edit(oid):
         err = pd.edit_content(oid, request.form.get("content", ""))
-        flash(err or "已改好下单内容")
+        flash(err or "已改好下单内容", "error" if err else "message")
         return redirect(url_for("paidan_order", oid=oid))
 
     @app.post("/paidan/orders/<int:oid>/unlock")
     @login_required
     def paidan_order_unlock(oid):
         err = pd.unlock_uploads(oid)
-        flash(err or "已打开传图，客户可以继续补图，补完让他再发「已上传所有图」")
+        flash(err or "已打开传图，客户可以继续补图，补完让他再发「已上传所有图」", "error" if err else "message")
         return redirect(url_for("paidan_order", oid=oid))
 
     @app.post("/paidan/orders/<int:oid>/cancel")
@@ -276,7 +276,7 @@ def register(app, login_required):
     def paidan_order_cancel(oid):
         err = pd.cancel_order(oid)
         if err:
-            flash(err)
+            flash(err, "error")
         else:
             o = pd.order(oid)
             flash("已取消" + _send_one(pd.order_target(o)[0], pd.cancel_notice(o)))
@@ -301,7 +301,7 @@ def register(app, login_required):
     def paidan_codes_gen():
         codes, err = pd.gen_codes(_int("bid"), _int("n", 1), request.form.get("expires", ""))
         if err:
-            flash("没生成：" + err)
+            flash("没生成：" + err, "error")
             return redirect(url_for("paidan_sandan"))
         flash(f"已生成 {len(codes)} 个兑换码")
         return redirect(url_for("paidan_sandan", fresh=",".join(codes)))
@@ -310,7 +310,7 @@ def register(app, login_required):
     @login_required
     def paidan_sandan_settings():
         err = pd.set_sandan_real_gid(request.form.get("real_gid", ""))
-        flash(err or "已保存")
+        flash(err or "已保存", "error" if err else "message")
         return redirect(url_for("paidan_sandan"))
 
     @app.post("/paidan/sandan/code")
@@ -333,7 +333,7 @@ def register(app, login_required):
         day = pd.today()
         err = pd.add_pause(day, day)
         if err:
-            flash(err)
+            flash(err, "error")
         else:
             set_config("pd_pause_notified", day)          # 定时任务就不再发一遍
             flash("今天已暂停，期限都顺延了 1 天。" + _send_all(lambda cid: pd.pause_notice(cid, day)))
@@ -347,7 +347,7 @@ def register(app, login_required):
             return paidan_pause_today()
         err = pd.add_pause(day)
         if err:
-            flash(err)
+            flash(err, "error")
         else:
             flash(f"已设 {pd._md(day)} 暂停，到那天 0 点生效。" + _send_all(lambda cid: pd.pause_preview([day])))
         return redirect(url_for("paidan_pause"))
@@ -358,7 +358,7 @@ def register(app, login_required):
         day = request.form.get("day", "")
         err = pd.cancel_pause(day)
         if err:
-            flash(err)
+            flash(err, "error")
         else:
             flash(f"已取消 {pd._md(day)} 的暂停。" + _send_all(lambda cid: f"📢 {pd._md(day)} 恢复正常接单～"))
         return redirect(url_for("paidan_pause"))
@@ -376,7 +376,7 @@ def register(app, login_required):
     def paidan_settings_save():
         remind, pause_hm = request.form.get("remind", ""), request.form.get("pause_hm", "")
         if not (HM.match(remind) and HM.match(pause_hm)):
-            flash("时间要写成 12:00 这样")
+            flash("时间要写成 12:00 这样", "error")
         else:
             set_config("pd_remind_hm", remind)
             set_config("pd_pause_hm", pause_hm)

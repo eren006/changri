@@ -23,7 +23,7 @@ def register(app, login_required):
         call = f.get("kind") == "官电"
         ids = [int(x) for x in f.getlist("role") if x.isdigit()]
         if len(ids) < 2:
-            flash("至少选两位角色")
+            flash("至少选两位角色", "error")
             return redirect(url_for("official_page"))
         with get_conn() as conn:
             found = {r["id"]: r for r in conn.execute(f"SELECT * FROM roles WHERE id IN ({','.join('?' * len(ids))})", ids)}

@@ -40,6 +40,7 @@ def register(app, ctx):
         except Exception:  # noqa: BLE001
             pass
         from changri.core import letters
+        ctx.draft_done("wish")
         flash(wishes.post_ok_text(wishes.get(int(info))) + letters.paid_note(role["id"], "wish"))
         return redirect(url_for("wishes_page"))
 

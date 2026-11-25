@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block title %}{{ other }} · {{ brand }}{% endblock %}
 {% block body %}
-  <style>.favf{align-self:flex-end;margin:0 4px}.favb{border:0;background:none;color:var(--mute);font-size:15px;opacity:.55;padding:2px 4px;cursor:pointer}.favb.on{color:#e0a020;opacity:1}</style>
+  <style>.favf{align-self:flex-end;margin:0 4px}.favb{border:0;background:none;color:var(--mute);font-size:15px;opacity:.55;padding:0;min-width:44px;min-height:44px;margin:-8px -6px -6px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent}.favb.on{color:#e0a020;opacity:1}</style>
   <header class="bar">
     <a class="back" href="{{ url_for('inbox') }}">{{ skin.words.messages }}</a>
     <div class="title"><div class="avatar head" data-name="{{ other }}">{{ other[:1] }}</div>{{ disp(other) }}</div>
@@ -16,7 +16,7 @@
           <form method="post" action="{{ url_for('block') }}" onsubmit="return confirm('拉黑 {{ other }}？TA 再联系你时会被告知「已拒绝」。')"><input type="hidden" name="_csrf" value="{{ csrf() }}"><input type="hidden" name="to" value="{{ other_id }}"><button class="profile-item block-danger" style="width:100%;text-align:left;padding:10px" type="submit">拉黑</button></form>
           <form method="post" action="{{ url_for('block') }}" onsubmit="return confirm('静默拉黑 {{ other }}？TA 察觉不到，发来的内容看起来和送达一样。')"><input type="hidden" name="_csrf" value="{{ csrf() }}"><input type="hidden" name="to" value="{{ other_id }}"><input type="hidden" name="silent" value="1"><button class="profile-item block-danger" style="width:100%;text-align:left;padding:10px" type="submit">静默拉黑</button></form>
           {% endif %}
-          <form method="post" action="{{ url_for('set_remark') }}" style="display:flex;gap:6px;padding:6px 4px"><input type="hidden" name="_csrf" value="{{ csrf() }}"><input type="hidden" name="target" value="{{ other_id }}"><input name="remark" maxlength="12" value="{{ my_remarks.get(other, '') }}" placeholder="给 TA 写个备注（只有你看得到）" aria-label="备注" autocomplete="off" style="flex:1;min-width:0;height:34px;border:1px solid var(--line);border-radius:8px;padding:0 8px;background:var(--bg);color:var(--text);font:inherit;font-size:14px"><button type="submit" class="quiet-button">保存</button></form>
+          <form method="post" action="{{ url_for('set_remark') }}" style="display:flex;gap:6px;padding:6px 4px"><input type="hidden" name="_csrf" value="{{ csrf() }}"><input type="hidden" name="target" value="{{ other_id }}"><input name="remark" maxlength="12" value="{{ my_remarks.get(other, '') }}" placeholder="给 TA 写个备注（只有你看得到）" aria-label="备注" autocomplete="off" style="flex:1;min-width:0;height:40px;border:1px solid var(--line);border-radius:8px;padding:0 8px;background:var(--bg);color:var(--text);font:inherit;font-size:16px"><button type="submit" class="quiet-button">保存</button></form>
           <a class="profile-item" style="display:block;padding:10px" href="{{ url_for('profile') }}">外观与字号</a>
         </div>
       </details>
@@ -30,9 +30,9 @@
       <div class="msg {{ 'mine' if m.mine else 'theirs' }}" id="m{{ m.id }}">
         <div class="avatar bav" data-name="{{ me if m.mine else other }}">{{ (me if m.mine else other)[:1] }}</div>
         {% if m.kind == 'gift' %}
-        <div class="gift"><div class="gname">{{ m.title }}</div>{% if m.text %}<div class="gnote">{{ m.text }}</div>{% endif %}{% for i in m.imgs %}<a href="{{ url_for('msg_image', img_id=i) }}" target="_blank" rel="noopener"><img class="msg-img" src="{{ url_for('msg_image', img_id=i) }}" alt="图片" loading="lazy"></a>{% endfor %}</div>
+        <div class="gift"><div class="gname">{{ m.title }}</div>{% if m.text %}<div class="gnote">{{ m.text }}</div>{% endif %}{% for i in m.imgs %}<a href="{{ url_for('msg_image', img_id=i) }}" data-view><img class="msg-img" src="{{ url_for('msg_image', img_id=i) }}" alt="图片" loading="lazy"></a>{% endfor %}</div>
         {% else %}
-        <div class="bubble{{ ' has-img' if m.imgs }}">{% if m.text %}{{ m.text }}{% endif %}{% for i in m.imgs %}<a href="{{ url_for('msg_image', img_id=i) }}" target="_blank" rel="noopener"><img class="msg-img" src="{{ url_for('msg_image', img_id=i) }}" alt="图片" loading="lazy"></a>{% endfor %}</div>
+        <div class="bubble{{ ' has-img' if m.imgs }}">{% if m.text %}{{ m.text }}{% endif %}{% for i in m.imgs %}<a href="{{ url_for('msg_image', img_id=i) }}" data-view><img class="msg-img" src="{{ url_for('msg_image', img_id=i) }}" alt="图片" loading="lazy"></a>{% endfor %}</div>
         {% endif %}
 {% if admin_viewing and m.id %}<form method="post" action="{{ url_for('admin_msg_delete', mid=m.id) }}" onsubmit="return confirm('删除这条？收发双方的小手机里都不再显示；已经发到 QQ 群里的撤不回来。')" style="align-self:center"><input type="hidden" name="_csrf" value="{{ csrf() }}"><button type="submit" class="linkbtn" style="font-size:12px;color:#c33">删除</button></form>{% endif %}{% if admin_viewing and false %}<form method="post" action="{{ url_for('admin_song_delete', sid=m.song_id) }}" onsubmit="return confirm('删除这条点歌？')" style="align-self:center"><input type="hidden" name="_csrf" value="{{ csrf() }}"><button type="submit" class="linkbtn" style="font-size:12px;color:#c33">删除</button></form>{% endif %}
         <form method="post" action="{{ url_for('fav_toggle') }}" class="favf"><input type="hidden" name="_csrf" value="{{ csrf() }}"><input type="hidden" name="id" value="{{ m.id }}"><input type="hidden" name="next" value="{{ url_for('thread', other=other_id) }}#m{{ m.id }}"><button type="submit" class="favb{{ ' on' if m.fav }}" aria-label="{{ '取消收藏' if m.fav else '收藏这条' }}" title="收藏">{{ '★' if m.fav else '☆' }}</button></form>
@@ -66,7 +66,7 @@
     {% endif %}
     <div class="input-wrap">
       <div class="img-chip" id="imgChip" hidden><span id="imgName"></span><button type="button" id="imgClear" aria-label="去掉图片">×</button></div>
-      <textarea name="text" id="text" rows="1" maxlength="500" placeholder="{{ '留言（可以不写）' if draft_gift else '短信' }}"></textarea>
+      <textarea name="text" id="text" rows="1" maxlength="500" placeholder="{{ '留言（可以不写）' if draft_gift else '短信' }}" data-draft="msg:{{ other_id }}">{{ draft_text }}</textarea>
     </div>
     <button class="icon send" type="submit" id="sendBtn" aria-label="发送" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5"/></svg></button>
   </form>
@@ -102,6 +102,21 @@
       if (po) po.addEventListener('click', function () { pp.hidden = !pp.hidden; po.setAttribute('aria-expanded', String(!pp.hidden)); });
       pp.querySelectorAll('.preset-item').forEach(function (x) { x.addEventListener('click', function () { gn.value = x.dataset.name; pp.hidden = true; refresh(); }); });
       f.addEventListener('submit', function () { b.disabled = true; });
+      // 收藏：不刷新页面（刷新会把输入框里写了一半的字冲掉）；不行就退回普通提交
+      document.querySelectorAll('form.favf').forEach(function (ff) {
+        ff.addEventListener('submit', function (e) {
+          if (!window.fetch || !window.FormData) return;
+          e.preventDefault();
+          var fb = ff.querySelector('.favb');
+          fetch(ff.action, { method: 'POST', body: new FormData(ff), credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } })
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+            .then(function (d) {
+              if (!d.ok) throw 0;
+              fb.classList.toggle('on', d.fav); fb.textContent = d.fav ? '★' : '☆';
+              fb.setAttribute('aria-label', d.fav ? '取消收藏' : '收藏这条');
+            }).catch(function () { ff.submit(); });
+        });
+      });
       var sc = document.getElementById('scroll'); sc.scrollTop = sc.scrollHeight;
       if (imgF) {
         var ip = document.getElementById('imgPick'), chip = document.getElementById('imgChip'), nm = document.getElementById('imgName'), ic = document.getElementById('imgClear');

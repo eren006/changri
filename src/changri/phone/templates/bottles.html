@@ -13,7 +13,7 @@
     <form class="bottle-letter{% if why %} is-disabled{% endif %}" method="post" action="{{ url_for('bottle_throw') }}">
       <input type="hidden" name="_csrf" value="{{ csrf() }}">
       <div class="bottle-letter-head">{{ admin_app_icon('bottle') }}<div><label for="bottleText">写一张纸条扔进海里</label><p class="bottle-hint" id="bottlePrivacy">不署名，交给一次偶然。</p></div></div>
-      <textarea id="bottleText" name="text" maxlength="{{ max_msg }}" placeholder="有人能听到我说话吗……" aria-describedby="bottlePrivacy bottleLimit{% if why %} bottleWhy{% endif %}" required{% if why %} disabled{% endif %}></textarea>
+      <textarea id="bottleText" name="text" maxlength="{{ max_msg }}" placeholder="有人能听到我说话吗……" aria-describedby="bottlePrivacy bottleLimit{% if why %} bottleWhy{% endif %}" required{% if why %} disabled{% endif %} data-draft="bottle"></textarea>
       {% if why %}<p class="bottle-reason" id="bottleWhy">{{ why }}</p>{% endif %}
       <div class="bottle-letter-foot"><span class="bottle-hint" id="bottleLimit">{{ max_msg }} 字内 · 对方看不到你的名字</span><button type="submit"{% if why %} disabled{% endif %}>扔出去</button></div>
     </form>

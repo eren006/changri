@@ -197,6 +197,86 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
     await reply_long(st_cmd, "改好了。\n" + lt.attrs_text(m["id"]))
 
 
+# ---------- 条目（自己的备忘录：一栏一栏，下面写字段，都不是必填） ----------
+
+notes_cmd = _cmd("条目", {"我的条目", "备忘录"})
+note_set_cmd = _cmd("写条目", {"加条目", "记条目"})
+note_del_cmd = _cmd("删条目", {"删除条目"})
+NOTE_USAGE = ("用法：/写条目 栏目名 字段：内容\n例：/写条目 魔杖 木材：冬青 杖芯：凤凰羽毛\n"
+              "也可以换行一行一个；只写栏目名就先加一个空的栏目。栏目名、字段名都自己起，不用全填。")
+
+
+def _split_first(text: str) -> tuple[str, str]:
+    parts = text.strip().split(None, 1)
+    return (parts[0], parts[1] if len(parts) > 1 else "") if parts else ("", "")
+
+
+async def _note_owner(matcher, event, g):
+    """写 / 删条目改谁的：@ 了人就是那个人（只有管理员能替别人改），没 @ 就是自己。"""
+    if _mentioned(event):
+        if not _is_admin(event):
+            await matcher.finish("只能改自己的条目。")
+        m = _target(event, g, "")
+        if not m:
+            await matcher.finish("@ 的这位还没注册。")
+        return m
+    m = _me(event, g)
+    if not m:
+        await matcher.finish(need_register(g))
+    return m
+
+
+@notes_cmd.handle()
+async def _(event: GroupMessageCreateEvent, args=CommandArg()):
+    g = _group(event)
+    if not g:
+        await notes_cmd.finish(NO_GROUP)
+    text = args.extract_plain_text().strip()
+    if _mentioned(event):
+        m = _target(event, g, "")
+        if not m:
+            await notes_cmd.finish("@ 的这位还没注册。")
+        await reply_long(notes_cmd, lt.notes_text(m["id"], text))
+        return
+    first, rest = _split_first(text)
+    other = lt.member_by_name(g["id"], first) if first else None
+    me = _me(event, g)
+    if other and not (me and first in me["notes"]):       # 「/条目 阿青」看别人；自己正好有一栏叫这个名字时先看自己的
+        await reply_long(notes_cmd, lt.notes_text(other["id"], rest))
+        return
+    if not me:
+        await notes_cmd.finish(need_register(g) if not first else f"没找到「{first}」。")
+    await reply_long(notes_cmd, lt.notes_text(me["id"], text))
+
+
+@note_set_cmd.handle()
+async def _(event: GroupMessageCreateEvent, args=CommandArg()):
+    g = _group(event)
+    if not g:
+        await note_set_cmd.finish(NO_GROUP)
+    m = await _note_owner(note_set_cmd, event, g)
+    section, rest = _split_first(args.extract_plain_text())
+    if not section:
+        await note_set_cmd.finish(NOTE_USAGE)
+    ok, err = lt.set_note(m["id"], section, lt.parse_note_fields(rest))
+    if not ok:
+        await note_set_cmd.finish(err)
+    await reply_long(note_set_cmd, "记好了。\n" + lt.notes_text(m["id"], section))
+
+
+@note_del_cmd.handle()
+async def _(event: GroupMessageCreateEvent, args=CommandArg()):
+    g = _group(event)
+    if not g:
+        await note_del_cmd.finish(NO_GROUP)
+    m = await _note_owner(note_del_cmd, event, g)
+    section, field = _split_first(args.extract_plain_text())
+    if not section:
+        await note_del_cmd.finish("用法：/删条目 栏目名（删整栏）　/删条目 栏目名 字段名（只删一个字段）")
+    ok, err = lt.delete_note(m["id"], section, field.strip())
+    await note_del_cmd.finish((f"已删掉「{section}」里的「{field.strip()}」。" if field.strip() else f"已删掉「{section}」这一栏。") if ok else err)
+
+
 # ---------- 赠送 ----------
 
 give_cmd = _cmd("赠送", {"转账", "赠送物品"})

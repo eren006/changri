@@ -75,13 +75,13 @@ async def _(event: GroupMessageCreateEvent, args=CommandArg()):
     if not receiver and images and len(text.split()) == 1 and "【" not in text:     # 只附图不写字：发送心动信 收信人 + 图
         receiver = text.strip()
     if not receiver:
-        await finish_usage(post_mail, "⚠️ 要写清楚寄给谁。简单写法（署名是你的真名）：发送心动信 角色名 想说的话\n"
-                                      "想换署名用这种：\n发送心动信\n【发送对象】角色名\n【内容】想说的话\n【署名】自定义昵称（不写就是「匿名」）",
+        await finish_usage(post_mail, "⚠️ 要写清楚寄给谁。简单写法（署名是「匿名」）：发送心动信 角色名 想说的话\n"
+                                      "想写署名用这种：\n发送心动信\n【发送对象】角色名\n【内容】想说的话\n【署名】自定义昵称（不写就是「匿名」）",
                            "发送心动信\n【发送对象】\n【内容】\n【署名】")
     target = roles.get_role_by_name(receiver)
     if not target:
         await post_mail.finish(f"⚠️ 找不到叫「{receiver}」的角色，核对一下名字。")
-    signature = signature or me["name"]
+    signature = signature or "匿名"                 # 不写署名就是匿名（一行写的和【】格式、选人卡片都一样）
     ok, msg, left = lovemail.add_mail(me["id"], target["id"], signature, content, images)
     if not ok:
         await post_mail.finish(msg)

@@ -56,6 +56,7 @@ class StoryCalTests(unittest.TestCase):
         self.on()
         cal.save("康熙十四年", {1: "6月1日-6月30日"})
         self.assertEqual(rooms.parse_hm("6月5日"), ("03:12", "04:00"))
+        self.assertEqual(rooms.parse_hm("６月５日"), ("03:12", "04:00"))           # 全角数字也认
         self.assertIsNone(rooms.parse_hm("1400-1500"))                      # 开着且这个 D 填了日期：不能写钟点
         self.assertIn("故事里的某一天", cal.format_error())
         set_config("game_day", "5")                                          # 这个 D 没填：照旧写钟点，免得谁都约不了

@@ -351,7 +351,7 @@ class Watch(unittest.TestCase):
         link.connected = True
         self.assertIsNone(qqmanager.watch("b", 60))                        # 2 分钟内恢复：不提醒也不发「已恢复」
         asyncio.run(link._handle(json.dumps({"post_type": "meta_event", "meta_event_type": "heartbeat", "self_id": 9, "status": {"online": False}})))
-        self.assertIn("QQ 号已经掉线", qqmanager.down_reason("b"))        # SnowLuma 连着但 QQ 号下线
+        self.assertIn("QQ 号已经掉线", qqmanager.down_reason("b"))        # QQ 客户端连着但 QQ 号下线
         asyncio.run(link._handle(json.dumps({"post_type": "meta_event", "meta_event_type": "heartbeat", "self_id": 9, "status": {"online": True}})))
         self.assertEqual(qqmanager.down_reason("b"), "")
 

@@ -304,7 +304,7 @@
     }
     $('hint').textContent = notes.join('；'); lastText = lines.join('\n'); $('copy').hidden = false;
   };
-  $('copy').onclick=function(){ if(navigator.clipboard) navigator.clipboard.writeText(lastText).then(function(){ $('copy').textContent='已复制'; setTimeout(function(){$('copy').textContent='复制结果'},1500); }); };
+  $('copy').onclick=function(){ copyText(lastText, $('copy'), $('res')); };
   load(); render();
 })();
 </script>

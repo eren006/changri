@@ -2,6 +2,7 @@
 和机器人同进程、同一个 SQLite，网页直接读写核心表，没有「同步」这回事。"""
 import hashlib
 import hmac
+from datetime import timedelta
 import secrets
 import time
 import importlib
@@ -62,15 +63,26 @@ def create_phone_app(secret_key: str) -> Flask:
     _serve_media_fallback(app)
     app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024        # 短信带图片：上传大小的硬上限，单张具体上限在设置里（msgimages）
     app.secret_key = secret_key
+    app.permanent_session_lifetime = timedelta(days=30)   # QQ 内置浏览器关掉页面就丢「会话 cookie」，放得久了再点会 CSRF 失败；存 30 天
     app.jinja_env.globals["csrf"] = lambda: _csrf()
+    app.jinja_env.globals["bot_tag"] = lambda: (_current_bot() or "")[-6:]   # 本机草稿的键：所有机器人共用一个网址，要分开
     app.jinja_env.globals["phone_themes"] = PHONE_THEMES
     from changri.core.textutil import next_day_mark
     app.jinja_env.globals["next_day"] = next_day_mark            # 跨午夜的约会在结束时间前显示「次日」
 
     def _csrf() -> str:
         if "csrf" not in session:
+            session.permanent = True
             session["csrf"] = secrets.token_hex(16)
         return session["csrf"]
+
+    def _current_bot() -> str:
+        from changri.core.db import current_bot
+        return current_bot() or ""
+
+    def draft_done(key: str) -> None:
+        """发送成功：告诉下一页把本机存的这份草稿清掉（键和模板里 data-draft 的一样，见 base.html）。"""
+        session["draft_clear"] = (session.get("draft_clear") or [])[-5:] + [key]
 
     def _skin():
         return phone_theme(get_config("phone_theme_config", ""), request.cookies.get(SKIN_COOKIE, ""))
@@ -121,6 +133,8 @@ def create_phone_app(secret_key: str) -> Flask:
                 ctx["phone_unread"] = 0
         if role is not None and "status" not in ctx:
             ctx["status"] = _status(role)
+        if role is not None and "draft_clear" in session and "draft_clear" not in ctx:
+            ctx["draft_clear"] = session.pop("draft_clear", [])
         if role is not None:
             ctx.setdefault("disp", profiles.make_disp(role["id"]))
             ctx.setdefault("phone_avatars", profiles.avatar_versions())
@@ -132,6 +146,50 @@ def create_phone_app(secret_key: str) -> Flask:
         return resp
 
     loopbridge.install_flask_handler(app, home="/p")  # 等机器人超时：提示「还在处理」，不出 500
+
+    # ---------- 出错页：一张中文页（跟着外观和深色），不出英文的 Bad Request / Not Found ----------
+    OOPS = {
+        400: ("没送出去", "页面放得太久，刚才那一下没送出去。返回再点一次就好，写的字还在。"),
+        403: ("不能这样做", "这一步没有权限。返回上一页看看吧。"),
+        404: ("找不到", "没有这个页面。"),
+        405: ("没送出去", "这个页面不能这样打开。返回上一页再点一次。"),
+        413: ("文件太大", "上传的图片太大了，换一张小一点的（或者截个图）再发。写的字还在。"),
+        500: ("出了点问题", "出了点问题，稍后再试，或者告诉管理员。"),
+    }
+
+    def _oops(e):
+        code = getattr(e, "code", None) or 500
+        if code not in OOPS:
+            code = 500
+        title, msg = OOPS[code]
+        off = False
+        try:
+            off = get_config("phone_enabled", "0") != "1"
+        except Exception:  # noqa: BLE001 数据库出问题也要能出这一页
+            pass
+        if code == 404 and off:
+            title, msg = "暂时关着", "小手机暂时关着，可以先在 QQ 里玩。"
+        if code == 400 and request.method == "POST" and request.path == "/p/me/send":
+            try:                                    # 会话丢了才走到这里：把这条短信先存进新会话，返回对话页时填回去
+                to = request.form.get("to", "")
+                if to.isdigit():
+                    _keep_msg_draft(int(to), "gift" if request.form.get("kind") == "gift" else "sms",
+                                    request.form.get("gift_name", "").strip(), request.form.get("text", "").strip())
+            except Exception:  # noqa: BLE001
+                pass
+        if request.headers.get("X-Requested-With") or request.accept_mimetypes.best == "application/json":
+            return jsonify(ok=False, msg=msg), code
+        try:
+            resp = page("oops.html", role=None, mode="oops", oops_code=code, oops_title=title, oops_msg=msg, phone_off=off)
+        except Exception:  # noqa: BLE001 连外观都读不出来：退回一张最简单的页
+            resp = make_response(f'<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+                                 f'<body style="font:17px/1.7 system-ui,sans-serif;padding:40px 24px;text-align:center">'
+                                 f'<p>{msg}</p><p><a href="/p" style="font-size:18px">返回小手机</a></p></body>')
+        resp.status_code = code
+        return resp
+
+    for _code in OOPS:
+        app.register_error_handler(_code, _oops)
 
     @app.after_request
     def headers(resp):
@@ -300,9 +358,14 @@ def create_phone_app(secret_key: str) -> Flask:
         items = [{"id": m["id"], "fav": m["id"] in favs, "mine": m["from_role_id"] == rid, "kind": m["kind"], "title": m["title"], "text": phoneview.text_of(m, rid), "imgs": pics.get(m["id"], []),
                   "time": time.strftime("%m-%d %H:%M", time.localtime(m["created_ts"]))} for m in msgs]
         blk = blocks.get_block(role["id"], other)
+        d = session.get("msg_draft") or {}
+        if d.get("to") == other and d.get("bot", "") == _current_bot():                 # 上一下没发出去（被拦下、页面放太久……）：把写的字填回去
+            session.pop("msg_draft", None)
+        else:
+            d = {}
         return page("thread.html", role=role, me=role["name"], other=who["name"], other_id=other, items=items, mode="thread",
                     blocked=blk, can_recall=bool(messaging.last_recallable(role["id"])),
-                    items_catalog=gifts.catalog(role["id"]), only_preset=gifts.only_preset(), draft_gift=request.args.get("gift", ""),
+                    items_catalog=gifts.catalog(role["id"]), only_preset=gifts.only_preset(), draft_gift=request.args.get("gift", "") or d.get("gift", ""), draft_text=d.get("text", ""),
                     allow_sign=get_config("allow_custom_sign", "0") == "1", images_ok=msgimages.enabled(), gift_images_ok=msgimages.gift_enabled(), image_mb=msgimages.max_bytes() // 1024 // 1024)
 
     # ---------- 特别的会话：署名、点歌台、偷盗记录、匿名对话（照老系统） ----------
@@ -401,6 +464,8 @@ def create_phone_app(secret_key: str) -> Flask:
         ok, msg = loopbridge.run(aliases.send(role, alias_id, text, _send_fn()))
         if not ok:
             flash(msg)
+        else:
+            draft_done(f"alias:{alias_id}")
         return redirect(url_for("alias_thread", alias_id=alias_id))
 
     @app.post("/p/me/a/<int:alias_id>/block")
@@ -438,6 +503,12 @@ def create_phone_app(secret_key: str) -> Flask:
             others = c.execute("SELECT id, name FROM roles WHERE id!=? ORDER BY name", (role["id"],)).fetchall()
         return page("new.html", role=role, others=others, gift=request.args.get("gift", ""), mode="new")
 
+    def _keep_msg_draft(to: int, kind: str, gift: str, text: str) -> None:
+        """没发出去的短信先放进会话，回到对话页时填回输入框（本机草稿之外再保一份，QQ 浏览器可能不让存本机）。
+        会话在 cookie 里，限 4KB，所以截一下。"""
+        if text or (kind == "gift" and gift):
+            session["msg_draft"] = {"bot": _current_bot(), "to": to, "gift": gift[:30] if kind == "gift" else "", "text": text[:500]}
+
     @app.post("/p/me/send")
     def send():
         role, bad = need_login()
@@ -450,7 +521,11 @@ def create_phone_app(secret_key: str) -> Flask:
         kind = "gift" if request.form.get("kind") == "gift" else "sms"
         gift = request.form.get("gift_name", "").strip()
         text = request.form.get("text", "").strip()
-        back = redirect(url_for("thread", other=target["id"]))
+        _redirect = redirect(url_for("thread", other=target["id"]))
+
+        def back():
+            _keep_msg_draft(target["id"], kind, gift, text)
+            return _redirect
         images = []
         up = request.files.get("image")
         if up and up.filename:
@@ -458,19 +533,23 @@ def create_phone_app(secret_key: str) -> Flask:
             why = msgimages.check(data)
             if why:
                 flash(why)
-                return back
+                return back()
             images = [data]
         bad_reason = phonegate.check_send(role["name"], "短信" if kind == "sms" else "礼物", gift, text)
         if bad_reason:
             flash(bad_reason)
-            return back
+            return back()
         sign = request.form.get("sign", "").strip() if get_config("allow_custom_sign", "0") == "1" else ""
         try:
             ok, msg = loopbridge.run(sendmsg.send(role, target, kind, gift, text, sign, _send_fn(), images, gift_by_name_ok=True))
         except Exception as e:  # noqa: BLE001
             ok, msg = False, loopbridge.friendly_error(e, "发送失败")
         flash(msg)
-        return back
+        if not ok:
+            return back()
+        session.pop("msg_draft", None)
+        draft_done(f"msg:{target['id']}")
+        return _redirect
 
     @app.post("/p/me/recall")
     def recall():
@@ -700,8 +779,11 @@ def create_phone_app(secret_key: str) -> Flask:
             m = c.execute("SELECT from_role_id, to_role_id FROM messages WHERE id=?", (mid,)).fetchone()
             if not m or role["id"] not in (m["from_role_id"], m["to_role_id"]):
                 abort(404)
-            if c.execute("DELETE FROM phone_favs WHERE role_id=? AND message_id=?", (role["id"], mid)).rowcount == 0:
+            on = c.execute("DELETE FROM phone_favs WHERE role_id=? AND message_id=?", (role["id"], mid)).rowcount == 0
+            if on:
                 c.execute("INSERT INTO phone_favs(role_id, message_id, created_ts) VALUES(?,?,?)", (role["id"], mid, int(time.time())))
+        if request.headers.get("X-Requested-With"):          # 对话页的星星：不刷新页面，输入框里写了一半的字不受影响
+            return jsonify(ok=True, fav=on)
         nxt = request.form.get("next", "")
         return redirect(nxt if nxt.startswith("/p/me/") else url_for("search_page"))
 
@@ -1067,7 +1149,7 @@ self.addEventListener('notificationclick', function (e) {
     def health():
         return "ok"
 
-    ctx = SimpleNamespace(_chat_or_404=_chat_or_404, _csrf=_csrf, _ext_or_404=_ext_or_404, _fmt=_fmt, _gate=_gate, _mjson=_mjson, _push=_push, _room_for=_room_for, _room_row=_room_row, _send_fn=_send_fn, current=current, need_login=need_login, page=page, is_admin=admin_viewing)
+    ctx = SimpleNamespace(_chat_or_404=_chat_or_404, _csrf=_csrf, _ext_or_404=_ext_or_404, _fmt=_fmt, _gate=_gate, _mjson=_mjson, _push=_push, _room_for=_room_for, _room_row=_room_row, _send_fn=_send_fn, current=current, draft_done=draft_done, need_login=need_login, page=page, is_admin=admin_viewing)
     from changri.features import registry
     for mod in registry.phone_pages():          # 各功能自己的小手机页面：features/<功能>/phone.py
         importlib.import_module(mod).register(app, ctx)

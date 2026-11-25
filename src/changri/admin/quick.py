@@ -57,15 +57,12 @@ def _god(k: str, label: str) -> tuple:
 
 def _card_of(key: str) -> tuple[str | None, str]:
     """设置项属于哪张功能卡片：(扩展 id，核心卡片为 None；「功能与设置」的哪个标签)。"""
-    from .common import SECTIONS
+    from .common import SECTIONS, group_card
     group = next((g for g, items in SECTIONS if key in items), None)
-    for e in extensions.CORE_CARDS:
-        if group and e.get("settings_group") == group:
-            return None, "core"
-    for e in extensions.OFFICIAL:
-        if group and e.get("settings_group") == group:
-            return e["id"], "custom" if e.get("personal") else "aux"
-    return None, "core"
+    card = group_card(group) if group else None
+    if not card or card.get("kind") == "core":
+        return None, "core"
+    return card["id"], "custom" if card.get("personal") else "aux"
 
 
 def _shown(key: str, also: str = "") -> bool:

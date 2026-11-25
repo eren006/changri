@@ -102,7 +102,7 @@ SECTIONS = [
         "season_view_lovemail": ("复盘网页里放心动信（1 开 / 0 关；只显示署名，不显示真实寄信人）", "1"),
     }),
     ("申请加入", {
-        "join_kinds": ("哪些房间可以被申请加入（用逗号隔开，可填：约会、官约、心愿；电话、微信、踩点不能加入，填了也不算）", "约会,官约,心愿"),
+        "join_kinds": ("哪些房间可以被申请加入（用逗号隔开，可填：约会、心愿；官约由管理员排人，电话、微信、踩点也不能加入，填了都不算）", "约会,心愿"),
     }),
     ("礼品店", {
         "gift_only_preset": ("只能送礼品店里的东西（1 是 / 0 否；开了送礼只能写礼品店的编号，不能自定义）", "0"),
@@ -220,6 +220,18 @@ SECTIONS = [
 # 外层的功能卡片已经有开关了，设置里不再重复显示（关系线、跑团骰子就是外层的开关；心动信的「信箱开放」挪到心动信管理页）
 HIDDEN_FIELDS = {"rel_enabled", "dice_enabled", "lovemail_enabled"}
 SETTINGS = {k: v for _, group in SECTIONS for k, v in group.items()}
+# 卡片自己的 settings_group 只能写一组；这几组没有自己的卡片，挂到最相关的卡片的「进入设置」里，接在它自己那组后面
+EXTRA_GROUPS = {"play": ["房间复盘"], "season": ["复盘网页"], "rpg": ["特殊道具"]}
+
+
+def card_groups(card: dict) -> list[str]:
+    """这张功能卡片「进入设置」里有哪几组设置（第一组是它自己的 settings_group）。"""
+    return ([card["settings_group"]] if card.get("settings_group") else []) + EXTRA_GROUPS.get(card["id"], [])
+
+
+def group_card(group: str) -> dict | None:
+    """这组设置在哪张功能卡片里（没有就是 None）。"""
+    return next((c for c in ext_core.CORE_CARDS + ext_core.OFFICIAL if group in card_groups(c)), None)
 
 
 log = logging.getLogger("changri.admin")
@@ -420,7 +432,7 @@ def _dashboard() -> dict:
 # 不属于任何一个机器人的页面（账号、更新、远程访问、机器人清单、登录）；其余页面都在 /b/<AppID>/ 下
 GLOBAL_ENDPOINTS = {"theme_set", "wizard", "bots_erase", "login", "logout", "setup", "static", "bots_page", "bots_add", "bots_test", "bots_secret", "bots_toggle", "bots_delete",
                     "accounts_page", "accounts_generate", "accounts_reset", "accounts_disable", "accounts_password", "accounts_delete",
-                    "update_page", "update_check", "update_skip", "update_apply", "update_auto_seen", "remote_page", "remote_save", "dashboard",
+                    "update_page", "update_check", "update_skip", "update_apply", "update_auto_seen", "autostart_install", "remote_page", "remote_save", "dashboard",
                     "https_page", "https_status", "https_enable", "https_disable"}
 
 

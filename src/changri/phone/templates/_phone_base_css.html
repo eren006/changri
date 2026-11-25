@@ -225,11 +225,11 @@ a { color: var(--link); text-decoration: none; }
 .compose .img-chip { display: flex; align-items: center; gap: 6px; align-self: flex-start; max-width: 100%; font-size: 12.5px; color: var(--muted);
   background: var(--theirs); border-radius: 12px; padding: 2px 4px 2px 10px; }
 .compose .img-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.compose .img-chip button { border: 0; background: none; color: inherit; font-size: 16px; line-height: 1; padding: 2px 6px; cursor: pointer; }
+.compose .img-chip button { border: 0; background: none; color: inherit; font-size: 16px; line-height: 1; padding: 0; min-width: 44px; min-height: 44px; margin: -14px -12px -14px -8px; cursor: pointer; }
 .compose [hidden] { display: none !important; }   /* 上面几条写了 display，不加这句 hidden 不起作用（没选图也露出一个空的 ×） */
 .msg-img { display: block; max-width: min(240px, 100%); max-height: 320px; border-radius: 10px; margin-top: 6px; }
 .bubble.has-img .msg-img:first-child { margin-top: 0; }
-.compose .input-wrap textarea { width: 100%; min-height: 44px; padding-right: 50px; }
+.compose .input-wrap textarea { flex: none; width: 100%; min-height: 44px; padding-right: 50px; }   /* flex:none：竖排容器里 flex-basis 0 会压住脚本设的高度，写多行时框不长高 */
 .compose .emoji-in { position: absolute; right: 1px; bottom: 0; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--muted); display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .compose .emoji-in svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
 .compose .emoji-in[aria-expanded="true"] { background: var(--theirs); color: var(--text); }
@@ -323,7 +323,7 @@ a { color: var(--link); text-decoration: none; }
 .tab-sub { font-size: 13px; line-height: 18px; color: var(--muted); margin-top: 2px; }
 .tab-sub .quota { display: inline; padding: 0; font-size: 13px; text-align: left; }
 .tab-sub .quota::before { content: " · "; }
-.quiet-button { border: 0; background: none; color: var(--link); font: inherit; font-size: 12px; cursor: pointer; min-height: 32px; white-space: nowrap; }
+.quiet-button { border: 0; background: none; color: var(--link); font: inherit; font-size: 12px; cursor: pointer; min-height: 44px; min-width: 44px; white-space: nowrap; }
 .row.pinned .name::after { content: " · 置顶"; font-size: 11px; font-weight: 400; color: var(--muted); }
 .appearance { margin: auto; width: min(350px, calc(100vw - 28px)); max-height: calc(100dvh - 40px); overflow: auto; border: 1px solid var(--line); border-radius: 22px; padding: 22px; color: var(--text); background: var(--bg); }
 .appearance::backdrop { background: #0007; }
@@ -447,7 +447,7 @@ a { color: var(--link); text-decoration: none; }
 .lm-pick .img-chip { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; font-size: 13px; color: var(--muted); background: var(--theirs); border-radius: 12px; padding: 2px 4px 2px 10px; }
 .lm-pick .img-chip[hidden] { display: none; }
 .lm-pick .img-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lm-pick .img-chip button { border: 0; background: none; color: inherit; font-size: 16px; line-height: 1; padding: 2px 6px; cursor: pointer; }
+.lm-pick .img-chip button { border: 0; background: none; color: inherit; font-size: 16px; line-height: 1; padding: 0; min-width: 44px; min-height: 44px; margin: -14px -12px -14px -8px; cursor: pointer; }
 .lm-sig { text-align: right; font-size: 13px; opacity: .8; margin-top: 10px; }
 .lm-revoke { margin-top: 8px; font-size: 13px; }
 
@@ -497,7 +497,7 @@ a { color: var(--link); text-decoration: none; }
 .cm .cdel { border: none; background: none; color: var(--muted); font-size: 11px; cursor: pointer; margin-left: 4px; }
 .cform { display: flex; gap: 6px; margin-top: 8px; }
 .cform[hidden] { display: none; }
-.cform input { flex: 1; min-width: 0; font: inherit; font-size: 15px; padding: 7px 12px; border-radius: 16px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+.cform input { flex: 1; min-width: 0; font: inherit; font-size: 16px; padding: 7px 12px; border-radius: 16px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
 .cform button { border: none; border-radius: 16px; padding: 0 14px; background: var(--mine); color: var(--mine-text); font: inherit; font-size: 13px; cursor: pointer; }
 /* 扩大触控区域，保留图标与文字原来的尺寸。 */
 .phone .compose .icon,.phone .stickers button,.phone .mmeta .m-like,.phone .mmeta .m-cmt,.phone .cform button,.phone .bottle-compose button {
@@ -581,11 +581,11 @@ a { color: var(--link); text-decoration: none; }
 .notice.inbox-flash { margin: var(--gap) var(--gutter) 0; }
 
 /* 首页全局搜索：输入框就是搜索条；有输入时列表换成分组结果 */
-.search-pill input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: transparent; font: inherit; font-size: 15px; color: var(--text); padding: 0; }
+.search-pill input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: transparent; font: inherit; font-size: 16px; color: var(--text); padding: 0; }
 .search-pill input::placeholder { color: var(--muted); }
 .search-pill input::-webkit-search-cancel-button { display: none; }
 .search-pill:focus-within { box-shadow: 0 0 0 2px var(--mine); }
-.search-clear { border: 0; background: none; padding: 0; width: 22px; height: 22px; color: var(--muted); cursor: pointer; display: inline-flex; flex-shrink: 0; }
+.search-clear { border: 0; background: none; padding: 0; width: 44px; height: 44px; margin: -11px -11px -11px -11px; align-items: center; justify-content: center; color: var(--muted); cursor: pointer; display: inline-flex; flex-shrink: 0; }
 .search-clear svg { width: 22px; height: 22px; }
 .search-clear[hidden] { display: none; }
 #inbox.searching > :not(.find-row):not(.search-results) { display: none !important; }
@@ -619,7 +619,7 @@ a { color: var(--link); text-decoration: none; }
 .pending-chip.is-due { background: #fff0eb; color: #9b3520; font-weight: 600; }
 .pending-line2 { margin-top: 1px; font-size: 13px; line-height: 20px; color: var(--muted); overflow-wrap: anywhere; }
 .pending-mute { margin: 0; flex-shrink: 0; }
-.pending-mute .quiet-button { padding: 0 8px; min-height: 40px; font-size: 13px; color: var(--muted); }
+.pending-mute .quiet-button { padding: 0 8px; min-height: 44px; font-size: 13px; color: var(--muted); }
 .pending-muted { margin: 4px 0 12px; }
 .pending-muted .pending-list { margin-top: 8px; }
 .pending-muted summary { margin: 0 var(--gutter); font-size: 13px; color: var(--muted); cursor: pointer; }
@@ -630,7 +630,7 @@ a { color: var(--link); text-decoration: none; }
 .nick-form label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 8px; }
 .nick-row { display: flex; gap: 8px; align-items: center; }
 .nick-row input { flex: 1; min-width: 0; height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; font-size: 16px; }
-.nick-row .quiet-button { min-height: 40px; padding: 0 10px; font-size: 15px; font-weight: 600; }
+.nick-row .quiet-button { min-height: 44px; padding: 0 10px; font-size: 15px; font-weight: 600; }
 .nick-hint { margin: 8px 0 0; font-size: 12px; line-height: 1.6; color: var(--muted); }
 .profile-flash { margin: 10px var(--gutter) 0; }
 
@@ -812,4 +812,9 @@ a { color: var(--link); text-decoration: none; }
 .phone-operation-state.is-failed::before { content: '!'; font-weight: 600; }
 @keyframes phone-wait { 50% { opacity: .45; transform: translateY(-1px); } }
 @media (prefers-reduced-motion: reduce) { .phone-operation-state.is-waiting::before { animation: none; } }
+
+/* 小图标按钮：看起来不变，能点到的范围放大到 44×44（手指点得准） */
+.icon-btn { position: relative; }
+.icon-btn::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; }
+.pick-tab { min-height: 44px; }
 </style>

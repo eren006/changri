@@ -25,5 +25,5 @@ async def _(bot: Bot, event: GroupMessageCreateEvent):
         await cmd.finish("手机码只能在你自己的个人群里要：这里别人也看得到，拿到激活码就能登录你的小手机。")
     code = phonecodes.code_for_role(role["id"])
     url = phone_url()
-    where = f"🔗 打开：{url}" if url else "🔗 网址请向管理员要（管理员还没在设置平台填小手机地址）"
-    await cmd.finish(f"📱 {role['name']} 的小手机\n{where}\n🔑 激活码：{code}\n激活码只属于你，别发给别人。")
+    where = f"🔗 点开就能用：{url}#code={code}" if url else "🔗 小手机网址还没设好，请向管理员要"
+    await cmd.finish(f"📱 {role['name']} 的小手机\n{where}\n🔑 激活码：{code}（链接打不开时手动输入）\n链接和激活码只属于你，别发给别人。")

@@ -16,7 +16,7 @@
       <details class="panel"><summary class="btn ghost">批量导入</summary>
         <form class="form" method="post" action="{{ url_for('giftshop_import') }}">{{ csrf() }}
           <div class="fields"><div><label for="gl">一行一件：名字，或「名字｜说明」</label><textarea id="gl" name="lines" rows="5" placeholder="一束玫瑰｜红色的&#10;手写信"></textarea></div></div>
-          <p class="note">导出的文件可以原样粘回这里（编号会重新排，已有的名字自动跳过）。</p>
+          <p class="note">导出的文件可以原样粘回这里（编号会重新排，已有的名字自动跳过）。不想自己编，用下面「让 AI 帮忙编礼物」，AI 写的整段直接粘进来。</p>
           <div class="actions"><button class="btn" type="submit">导入</button>{{ cancel() }}</div></form></details>
       {% if items %}<a class="btn ghost" href="{{ url_for('giftshop_export') }}">导出</a>
       <form method="post" action="{{ url_for('giftshop_clear') }}" onsubmit="return confirm('下架全部礼物？')">{{ csrf() }}<button class="btn ghost danger" type="submit">全部下架</button></form>{% endif %}
@@ -26,4 +26,20 @@
       <div class="acts"><form method="post" action="{{ url_for('giftshop_delete', item_id=g.id) }}" onsubmit="return confirm('下架这件礼物？')">{{ csrf() }}<button class="linkbtn">下架</button></form></div></div>{% endfor %}</div>
   {% else %}<p class="empty">还没有上架礼物。上架后，玩家送礼可以写编号。</p>{% endif %}
 </section>
+<section>
+  <div class="sec-head keep"><h2>让 AI 帮忙编礼物</h2>
+    <span class="btns"><button class="btn ghost" type="button" id="gsAiCopy">复制 AI 提示词</button></span></div>
+  <div class="card">
+    <p style="margin:0 0 10px">复制下面这段，贴给 ChatGPT、豆包、DeepSeek 这类 AI，把「主题 / 风格」「数量」两行括号里换成你想要的。AI 写出来的整段粘进上面「批量导入」就上架了。格式和字数上限都写在里面了，已经上架的礼物也列进去了，AI 不会重名。</p>
+    <details><summary>看提示词全文</summary>
+    <pre id="gsAi" style="margin:10px 0 0;padding:12px;border-radius:8px;background:var(--soft);white-space:pre-wrap;font-size:13px;line-height:1.6;max-height:360px;overflow:auto">{{ ai_prompt }}</pre>
+    </details>
+  </div>
+</section>
+<script>
+(function () {   // 复制走 base.html 的 copyText（http 打开也能复制，复制不了会说）
+  var b = document.getElementById('gsAiCopy'), el = document.getElementById('gsAi');
+  b.addEventListener('click', function () { copyText(el.textContent, b, el); });
+})();
+</script>
 {% endblock %}

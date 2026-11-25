@@ -28,7 +28,7 @@ def register(app, login_required):
     def add_slot(role_id):
         ok, res = roles_core.add_slot(role_id, request.form.get("real_gid", "").strip())
         if not ok:
-            flash(res)
+            flash(res, "error")
             return redirect(url_for("god_page", role=role_id))
         flash("群位已登记，请到那个群里发认群码")
         return redirect(url_for("god_page", role=role_id, code=res))

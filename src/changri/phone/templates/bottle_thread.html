@@ -17,7 +17,7 @@
   </div>
   <form class="compose bottle-compose" method="post" action="{{ url_for('bottle_reply', bid=bottle_id) }}">
     <input type="hidden" name="_csrf" value="{{ csrf() }}">
-    <textarea aria-label="回信" name="text" maxlength="{{ max_msg }}" placeholder="{{ why or '回信……' }}" rows="1" required{% if why %} disabled{% endif %}></textarea>
+    <textarea aria-label="回信" name="text" maxlength="{{ max_msg }}" placeholder="{{ why or '回信……' }}" rows="1" required{% if why %} disabled{% endif %} data-draft="bottle:{{ bottle_id }}"></textarea>
     <button type="submit"{% if why %} disabled{% endif %}>发送</button>
   </form>
   

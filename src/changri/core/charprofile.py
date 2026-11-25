@@ -49,29 +49,32 @@ def short_owner(short: str):
 
 
 def name_taken(name: str, except_id: int = 0) -> bool:
-    """本名或简称里有没有别人在用这个名字。"""
+    """本名或简称里有没有别人在用这个名字；别人改名前用过的旧名字也算占着（不然抢了旧名字就能截走发给那个人的短信）。"""
     with get_conn() as c:
         return bool(c.execute("SELECT 1 FROM roles WHERE name=? AND id!=?", (name, except_id)).fetchone()
-                    or c.execute("SELECT 1 FROM role_profiles WHERE short=? AND role_id!=?", (name, except_id)).fetchone())
+                    or c.execute("SELECT 1 FROM role_profiles WHERE short=? AND role_id!=?", (name, except_id)).fetchone()
+                    or c.execute("SELECT 1 FROM role_former_names WHERE name=? AND role_id!=?", (name, except_id)).fetchone())
 
 
 def set_short(role, val: str) -> str:
     if not val:
         return "❌ 请输入简称，例：修改简称 小明"
     old = get(role["id"]).get("short") or ""
+    from . import roles
     if val == role["name"]:
         _save(role["id"], short="")
+        roles.remember_former_name(role["id"], old)
         _move_songs(old, role["name"])
         return f"✅ 简称已清除，填名字时用本名「{role['name']}」。"
     if not SHORT_RE.fullmatch(val):
         return "❌ 简称只能是数字、英文字母、汉字，长度 1–10。"
-    from . import roles
     why = roles.name_problem(val, "简称")
     if why:
         return f"❌ {why}"
     if name_taken(val, role["id"]):
-        return f"❌ 「{val}」已经是别人的名字或简称了，换一个。"
+        return f"❌ 「{val}」已经是别人的名字或简称了（或者别人以前用过），换一个。"
     _save(role["id"], short=val)
+    roles.remember_former_name(role["id"], old)
     _move_songs(old, val)
     return f"✅ 简称已设为「{val}」，以后短信、约会等填名字的地方都能用它代替「{role['name']}」。"
 
@@ -93,7 +96,7 @@ def rename(role, val: str, now: int | None = None, admin: bool = False) -> str:
     if why:
         return f"❌ {why}"
     if name_taken(val, role["id"]):
-        return f"❌ 「{val}」已经是别人的名字或简称了，换一个。"
+        return f"❌ 「{val}」已经是别人的名字或简称了（或者别人以前用过），换一个。"
     now = now or int(time.time())
     last = get(role["id"]).get("name_ts") or 0
     if last and now - last < NAME_COOLDOWN and not admin:
@@ -101,6 +104,7 @@ def rename(role, val: str, now: int | None = None, admin: bool = False) -> str:
     with get_conn() as c:
         c.execute("UPDATE roles SET name=? WHERE id=?", (val, role["id"]))
         c.execute("UPDATE role_profiles SET short='' WHERE role_id=? AND short=?", (role["id"], val))   # 改成自己的简称：简称就不用了
+    roles.remember_former_name(role["id"], role["name"])
     if not admin:
         _save(role["id"], name_ts=now)
     _move_songs(role["name"], val)

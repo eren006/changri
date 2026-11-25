@@ -49,6 +49,22 @@ details.lt-more>summary{cursor:pointer;font-weight:600;margin-bottom:10px}
   </div>
 </section>
 
+<section id="notes">
+  <div class="sec-head"><h2>条目</h2></div>
+  {% if m.notes %}<div class="lt-two">{% for s, f in m.notes.items() %}
+    <div><h3 style="margin:0 0 6px;font-size:15px">{{ s }}</h3>
+      {% if f %}<dl class="lt-kv">{% for k, v in f.items() %}<dt>{{ k }}</dt><dd style="white-space:pre-wrap">{{ v or '—' }}</dd>{% endfor %}</dl>
+      {% else %}<p class="empty" style="margin:0">还没写内容。</p>{% endif %}</div>
+  {% endfor %}</div>{% else %}<p class="empty">还没有。玩家在群里发「/写条目 魔杖 木材：冬青」就会出现在这里。</p>{% endif %}
+  <details class="lt-more"><summary>改条目</summary>
+    <form class="lt-form" method="post" action="{{ url_for('longterm_member_notes', mid=m.id) }}">{{ csrf() }}
+      <p><textarea class="wide" name="notes" rows="{{ [notes_text.count('\n') + 3, 6]|max }}" placeholder="【魔杖】&#10;木材：冬青&#10;杖芯：凤凰羽毛&#10;&#10;【宠物】&#10;名字：小灰" aria-label="条目">{{ notes_text }}</textarea></p>
+      <p class="note">【栏目名】单独一行，下面一行一个「字段：内容」，栏目之间空一行。删掉的栏目、字段保存后就没了。</p>
+      <p><button class="btn">保存条目</button></p>
+    </form>
+  </details>
+</section>
+
 <section>
   <details class="lt-more" open><summary>动态</summary>
     {% if events %}<div class="rowlist lt-feed">{% for e in events %}

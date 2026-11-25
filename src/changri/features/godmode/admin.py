@@ -74,7 +74,7 @@ def register(app, login_required):
     def god_bindqq(role_id):
         """替玩家补绑 QQ（老季度建的角色没绑过的）。"""
         err = roles_core.bind_qq(role_id, request.form.get("qq", ""))
-        flash(err or "QQ 号已绑好")
+        flash(err or "QQ 号已绑好", "error" if err else "message")
         return _god_back(role_id)
 
     @app.post("/god/<int:role_id>/profile")
@@ -112,7 +112,7 @@ def register(app, login_required):
         from changri.core import rooms as rooms_core
         day = request.form.get("day", type=int)
         if day is None or day < 0:
-            flash("要写是第几天（0 或更大的数字）。")
+            flash("要写是第几天（0 或更大的数字）。", "error")
             return redirect(url_for("god_page", role="all"))
         data = rooms_core.blocked_hours()
         hours = sorted({int(h) for h in request.form.getlist("h") if h.isdigit() and 0 <= int(h) <= 23})
@@ -174,7 +174,7 @@ def register(app, login_required):
             flash("这个角色已经不在了。")
             return redirect(url_for("god_page"))
         if request.form.get("confirm", "").strip() != role["name"]:
-            flash("角色名没对上，没有删除。")
+            flash("角色名没对上，没有删除。", "error")
             return _god_back(role_id)
         flash(deleted_text(roles_core.delete_role(role_id)))
         return redirect(url_for("god_page"))
@@ -192,7 +192,7 @@ def register(app, login_required):
         f = request.form
         n = f.get("n", type=int) or 0
         if n <= 0:
-            flash("数量要写正整数")
+            flash("数量要写正整数", "error")
         else:
             delta = n if f.get("act") == "give" else -n
             ok, info = rpg_core.adjust(role_id, f.get("item", ""), delta, "上帝模式")
@@ -207,7 +207,7 @@ def register(app, login_required):
         name = attrs_core.norm(f.get("name", ""))
         val = f.get("value", type=int)
         if not name or val is None:
-            flash("要选属性、写一个整数")
+            flash("要选属性、写一个整数", "error")
         else:
             cur = attrs_core.get_attr(role_id, name) or 0
             new = val if f.get("act") == "set" else cur + val

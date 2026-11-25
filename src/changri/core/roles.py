@@ -77,6 +77,8 @@ def create_role(name: str, bot_id: str, group_openid: str, member_openid: str, r
             return False, f"你已经有角色「{row['name']}」了。"
         if conn.execute("SELECT 1 FROM role_profiles WHERE short=?", (name,)).fetchone():
             return False, f"「{name}」已经是别人的简称了，换一个名字。"
+        if conn.execute("SELECT 1 FROM role_former_names WHERE name=?", (name,)).fetchone():
+            return False, f"「{name}」是别人以前用过的名字（发给这个名字的短信会送到那个人那里），换一个名字。"
         try:
             cur = conn.execute("INSERT INTO roles(name, member_openid, created_ts) VALUES(?,?,?)", (name, member_openid, now))
         except sqlite3.IntegrityError:
@@ -205,7 +207,24 @@ def get_role_by_name(name: str):
         row = conn.execute("SELECT * FROM roles WHERE name=?", (name,)).fetchone()
         if row or not name:
             return row
-        return conn.execute("SELECT r.* FROM role_profiles p JOIN roles r ON r.id=p.role_id WHERE p.short=?", (name,)).fetchone()
+        row = conn.execute("SELECT r.* FROM role_profiles p JOIN roles r ON r.id=p.role_id WHERE p.short=?", (name,)).fetchone()
+        if row:
+            return row
+        return conn.execute("SELECT r.* FROM role_former_names f JOIN roles r ON r.id=f.role_id WHERE f.name=? ORDER BY f.ts DESC LIMIT 1",
+                            (name,)).fetchone()             # 改过名：写旧名字照样找到这个人（旧名字别人拿不走，见 former_owner）
+
+
+def former_owner(name: str, except_id: int = 0):
+    """这个名字以前是谁的本名或简称（改掉了的）。返回那个角色（只看 except_id 以外的人），没有返回 None。"""
+    with get_conn() as conn:
+        return conn.execute("SELECT r.* FROM role_former_names f JOIN roles r ON r.id=f.role_id WHERE f.name=? AND f.role_id!=? LIMIT 1",
+                            (name, except_id)).fetchone()
+
+
+def remember_former_name(role_id: int, name: str) -> None:
+    if name:
+        with get_conn() as conn:
+            conn.execute("INSERT OR IGNORE INTO role_former_names(role_id, name, ts) VALUES(?,?,?)", (role_id, name, int(time.time())))
 
 
 def list_groups(role_id: int) -> list:

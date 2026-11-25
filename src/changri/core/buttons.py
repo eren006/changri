@@ -15,6 +15,7 @@ from .dicecard import md_escape
 
 MAX_ROWS = 5            # QQ 限制：一条消息最多 5 行按钮
 MAX_PER_ROW = 5         # 每行最多 5 个
+CARD_PER_ROW = 4        # 选人 / 选地点卡片每行几个（qqsend.send_card、core/datepick 按这个算放得下几个）
 LABEL_MAX = 12          # 按钮上的字太长会被 QQ 截断，这里先截好
 
 # 按钮颜色：官方文档只写了 0 灰色线框、1 蓝色线框（2026-11 查）。红色（危险）的编号只在第三方文档里见过、说法不一，

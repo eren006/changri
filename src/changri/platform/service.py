@@ -10,6 +10,7 @@
 - Linux：服务以 changri 用户运行，没有 root。装的时候写一个 root 拥有的小脚本 FW_HELPER（只接受端口号参数），
   再写 sudoers 只允许 changri 免密运行它。不能让 root 去跑安装目录里的东西：安装目录归 changri 用户所有，能改。
 - 当前端口另外写到 data/firewall_ports，给修复工具读（它不用懂数据库）。
+- 自检（firewall_hint）用放行脚本的 --check 真去查端口通不通，不通先自己再放行一次，还不通才提示。
 """
 from __future__ import annotations
 
@@ -93,16 +94,12 @@ def open_firewall(ports: list[int] | None = None, only_if_changed: bool = False)
                 return ""
             _mark_done(ports)
             return f"Windows 防火墙已放行 {shown} 端口"
-        if os.geteuid() == 0:
-            r = None
-            done = _linux_firewall(ports)
-        elif os.path.exists(FW_HELPER) and shutil.which("sudo"):
-            r = _run(["sudo", "-n", FW_HELPER, *map(str, ports)], check=False)
-            done = r.stdout.split() if r.returncode == 0 else []
-        else:
+        r = _linux_helper(ports)
+        if r is None:
             return ""
-        if r is None or r.returncode == 0:
-            _mark_done(ports)                            # 防火墙没开也算「处理过了」：下次启动不再试
+        done = r.stdout.split() if r.returncode == 0 else []
+        if done:
+            _mark_done(ports)                            # 真放行了才记下。防火墙没开不记：以后有人开了 ufw，下次启动还会放行
     except Exception:  # noqa: BLE001
         return ""
     return f"本机防火墙（{'、'.join(done)}）已放行 {shown} 端口" if done else ""
@@ -136,15 +133,46 @@ def firewall_hint() -> str:
             return ("Windows 防火墙还没放行长日bot 的端口。用管理员身份打开命令提示符，运行："
                     f"netsh advfirewall firewall add rule name={FW_RULE} dir=in action=allow protocol=TCP localport={shown}"
                     f"；或者运行一次修复工具（{FIX_PAGE}）。")
-        if os.geteuid() == 0 or os.path.exists(FW_HELPER):
-            return ""                                    # 自己能放行，启动时已经放过了
-        fw = _linux_fw_active()
-        if not fw:
+        blocked = _linux_blocked(ports)
+        if blocked:                                      # 拦着：先自己再放行一次（比如装完以后才开的防火墙），还拦着才告诉人
+            _linux_helper(blocked)
+            blocked = _linux_blocked(blocked)
+        if blocked is None:                              # 查不了：没 root、放行脚本用不了（没装、sudoers 没装上）
+            fw = _linux_fw_active()
+            if not fw:
+                return ""
+            return (f"这台服务器的本机防火墙（{fw}）开着，长日bot 没法自己放行端口 {shown}。"
+                    f"运行一次修复工具就会帮你放行，以后改端口也会自动放行：{FIX_LINUX}")
+        if not blocked:
             return ""
-        return (f"这台服务器的本机防火墙（{fw}）开着，长日bot 没法自己放行端口 {shown}。"
-                f"运行一次修复工具就会帮你放行，以后改端口也会自动放行：{FIX_LINUX}")
+        return (f"本机防火墙还拦着端口 {','.join(map(str, blocked))}，长日bot 自己放行没成功。"
+                f"运行一次修复工具试试：{FIX_LINUX}")
     except Exception:  # noqa: BLE001
         return ""
+
+
+def _linux_helper(ports: list[int], check: bool = False):
+    """跑放行脚本：root 直接跑自带的那份，不是 root 用 sudo 跑装好的 FW_HELPER。跑不了返回 None。"""
+    args = (["--check"] if check else []) + [str(p) for p in ports]
+    if os.geteuid() == 0:
+        return _run(["sh", str(FW_HELPER_SRC), *args], check=False)
+    if os.path.exists(FW_HELPER) and shutil.which("sudo"):
+        return _run(["sudo", "-n", FW_HELPER, *args], check=False)
+    return None
+
+
+def _linux_blocked(ports: list[int]) -> list[int] | None:
+    """本机防火墙还拦着哪些端口；查不了返回 None。
+    旧版本装的 FW_HELPER 不认 --check（退出码 2）：当作查不了的话会一直提示，所以退回到「再放行一遍，成功就当通了」。"""
+    r = _linux_helper(ports, check=True)
+    if r is None:
+        return None
+    if r.returncode == 2:
+        r2 = _linux_helper(ports)
+        return [] if r2 is not None and r2.returncode == 0 else None
+    if r.returncode != 0:
+        return None
+    return [int(x) for x in r.stdout.split() if x.isdigit()]
 
 
 def open_firewall_async() -> None:
@@ -240,28 +268,26 @@ def _linux_sudo_helper(user: str) -> None:
         os.remove(tmp)
 
 
-def _linux_firewall(ports: list[int]) -> list[str]:
-    """有 root 时直接跑放行脚本（和 sudo 那条路、修复工具是同一份）。返回放行了的防火墙名字。"""
-    return _run(["sh", str(FW_HELPER_SRC), *map(str, ports)], check=False).stdout.split()
-
-
 def _linux_install() -> str:
     if os.geteuid() != 0:
         raise RuntimeError("请用 sudo 运行：sudo ./changri service install")
     if not shutil.which("systemctl"):
         raise RuntimeError("这台机器没有 systemd，没法设开机自启。可以用 ./changri run 前台运行（配合 screen / tmux）。")
     user = _ensure_user()
-    if user != "root":
-        _run(["chown", "-R", f"{user}:", str(APP_ROOT)])      # 在线更新要往安装目录里写新版本
     with open(UNIT_PATH, "w", encoding="utf-8") as f:
         f.write(_linux_unit(user))
     try:
         _linux_sudo_helper(user)
     except OSError:
         pass                                             # 装不上只是以后改端口要手动放行，不影响开机自启
+    fw = open_firewall()                                 # 会用 root 往 data/ 写 firewall_ports 等，所以放在 chown 之前
+    if user != "root":
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        # 在线更新要往安装目录里写新版本；data/ 里这时可能已有 root 建的文件（上面放行防火墙、读端口时建的库），
+        # 不改回来服务一启动就报 attempt to write a readonly database
+        _run(["chown", "-R", f"{user}:", str(APP_ROOT)])
     _run(["systemctl", "daemon-reload"])
-    _run(["systemctl", "enable", "--now", UNIT])
-    fw = open_firewall()
+    _run(["systemctl", "enable", "--now", UNIT])          # 最后才启动：这时文件归属已经对了
     return f"已设为开机自启并启动（服务名 {UNIT}，以 {user} 用户运行）" + (f"；{fw}" if fw else "")
 
 
@@ -334,10 +360,24 @@ def _win_install() -> str:
     if not ctypes.windll.shell32.IsUserAnAdmin():
         raise RuntimeError("请右键「Install-Autostart.bat」，选「以管理员身份运行」。")
     _win_register()
+    _set_win_off_mark(False)
     fw = open_firewall()
     _run(["schtasks", "/Run", "/TN", TASK], check=False)
     return "已设为开机自动运行，并已在后台启动（没有窗口）" + (f"；{fw}" if fw else "") + \
         "。如果之前双击开着的窗口还在，请先关掉它，否则端口会冲突。"
+
+
+def _set_win_off_mark(off: bool) -> None:
+    """用 Remove-Autostart.bat 取消过开机自启：记下来，双击 Start-Changri.bat 时就不再自动装回去（platform/winstart.py）。"""
+    from .winstart import OFF_MARK
+    try:
+        if off:
+            OFF_MARK.parent.mkdir(parents=True, exist_ok=True)
+            OFF_MARK.write_text("用 Remove-Autostart.bat 取消过开机自启，双击启动时不再自动装。删掉这个文件就恢复。\n", encoding="utf-8")
+        else:
+            OFF_MARK.unlink(missing_ok=True)
+    except OSError:
+        pass
 
 
 def _win_register() -> None:
@@ -390,13 +430,17 @@ def _win_uninstall() -> str:
     _run(["schtasks", "/End", "/TN", TASK], check=False)
     _run(["schtasks", "/Delete", "/TN", TASK, "/F"], check=False)
     _run(["netsh", "advfirewall", "firewall", "delete", "rule", f"name={FW_RULE}"], check=False)
-    return "已取消开机自动运行并停止。数据还在 data 文件夹里，没动。"
+    _set_win_off_mark(True)
+    return "已取消开机自动运行并停止。数据还在 data 文件夹里，没动。以后双击 Start-Changri.bat 只在窗口里运行，不会再自动设开机自启。"
 
 
 def _win_status() -> str:
     r = _run(["schtasks", "/Query", "/TN", TASK, "/FO", "LIST"], check=False)
     if r.returncode != 0:
-        return "没有设开机自启"
+        from .winstart import OFF_MARK
+        if OFF_MARK.exists():
+            return "没有设开机自启（用 Remove-Autostart.bat 取消过）：服务器重启后长日bot 不会自己起来。要装回去，右键 Install-Autostart.bat，选「以管理员身份运行」。"
+        return "没有设开机自启：服务器重启后长日bot 不会自己起来。双击 Start-Changri.bat，Windows 问「是否允许此应用对你的设备进行更改」时点「是」，就会自动设好。"
     running = "Running" in r.stdout or "正在运行" in r.stdout
     out = f"已设开机自启，现在{'正在运行' if running else '没在运行'}。"
     try:

@@ -11,10 +11,10 @@
 <details class="panel" style="margin:0 0 24px"{{ ' open' if st.blocked }}><summary class="btn ghost">让 nginx 转发验证请求</summary>
   <div class="form">
     <p>1. 找到 nginx 里<b>监听 80 端口的默认站点</b>（带 <code>default_server</code> 的那个 <code>server { }</code>，{{ '在 nginx 文件夹的 conf\\nginx.conf 里' if st.windows else '常在 /etc/nginx/sites-enabled/default' }}），把下面几行加进去：</p>
-    <div class="cmd"><code id="ngx" class="pre">{{ st.snippet }}</code><button class="btn ghost" type="button" onclick="navigator.clipboard.writeText(document.getElementById('ngx').textContent).then(()=>{this.textContent='已复制'})">复制</button></div>
+    <div class="cmd"><code id="ngx" class="pre">{{ st.snippet }}</code><button class="btn ghost" type="button" onclick="var c=document.getElementById('ngx');copyText(c.textContent,this,c)">复制</button></div>
     <p class="note">那个 server 里如果直接写了 <code>return 301 …</code>（全部跳到 https），要把它挪进 <code>location / { }</code> 里，不然验证请求也会被跳走。</p>
     <p style="margin-top:18px">2. 检查并重新加载 nginx：</p>
-    <div class="cmd"><code id="ngr">{{ st.reload_cmd }}</code><button class="btn ghost" type="button" onclick="navigator.clipboard.writeText(document.getElementById('ngr').textContent).then(()=>{this.textContent='已复制'})">复制</button></div>
+    <div class="cmd"><code id="ngr">{{ st.reload_cmd }}</code><button class="btn ghost" type="button" onclick="var c=document.getElementById('ngr');copyText(c.textContent,this,c)">复制</button></div>
     <p class="note">之后 Let's Encrypt 照样来 80 端口，nginx 把这一类请求交给 Caddy（本机 {{ st.alt_port }} 端口），其余请求还是 nginx 自己处理。{% if st.enabled %}改好后不用再点什么，Caddy 会自己重试。{% endif %}</p>
   </div>
 </details>

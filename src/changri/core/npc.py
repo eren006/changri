@@ -55,7 +55,8 @@ def create(name: str) -> tuple[bool, str]:
     if why:
         return False, why
     with get_conn() as c:
-        if c.execute("SELECT 1 FROM roles WHERE name=?", (name,)).fetchone() or c.execute("SELECT 1 FROM role_profiles WHERE short=?", (name,)).fetchone():
+        if c.execute("SELECT 1 FROM roles WHERE name=?", (name,)).fetchone() or c.execute("SELECT 1 FROM role_profiles WHERE short=?", (name,)).fetchone() \
+                or c.execute("SELECT 1 FROM role_former_names WHERE name=?", (name,)).fetchone():
             return False, f"「{name}」已经有人用了（本名或简称），换一个名字。"
         rid = c.execute("INSERT INTO roles(name, member_openid, created_ts, is_npc) VALUES(?,?,?,1)", (name, "", int(time.time()))).lastrowid
     from .roles import npc_bind_code

@@ -134,6 +134,37 @@ class LongtermE2E(unittest.TestCase):
         self.say("/模式 恋综", member="ADM")
         self.assertNotIn("苹果", "".join(self.say("/背包")))
 
+    def test_notes(self):
+        """条目：玩家自己加栏目、写字段，都不是必填；别人能看；只有管理员能 @ 人替别人改。"""
+        self._setup_group()
+        self.say("/注册 阿青")
+        self.say("/注册 小白", member="M2")
+        self.assertIn("还没有条目", self.say("/条目")[0])
+        out = self.say("/写条目 魔杖 木材：冬青 杖芯：凤凰羽毛")[0]
+        self.assertIn("【魔杖】", out)
+        self.assertIn("木材：冬青", out)
+        self.assertIn("杖芯：凤凰羽毛", out)
+        self.assertIn("长度：11 英寸", self.say("/写条目 魔杖\n长度：11 英寸")[0])              # 接着写、换行写
+        self.assertIn("【宠物】（还没写内容）", self.say("/写条目 宠物")[0])                  # 只加一栏
+        self.assertIn("名字：小灰", self.say("/写条目 宠物 名字 小灰")[0])                    # 不带冒号也行
+        out = self.say("/条目")[0]
+        self.assertIn("【魔杖】", out)
+        self.assertIn("【宠物】", out)
+        self.assertNotIn("【宠物】", self.say("/条目 魔杖")[0])                              # 只看一栏
+        self.assertIn("木材：冬青", self.say("/条目 阿青", member="M2")[0])                  # 别人能看
+        self.assertIn("📒 条目：魔杖、宠物", self.say("/我的")[0])
+        # 删
+        self.assertIn("已删掉「魔杖」里的「长度」", self.say("/删条目 魔杖 长度")[0])
+        self.assertIn("已删掉「宠物」这一栏", self.say("/删条目 宠物")[0])
+        self.assertIn("没有「宠物」", self.say("/删条目 宠物")[0])
+        # @ 别人改：玩家不行，管理员可以
+        at = lambda who: {"mentions": [{"scope": "single", "bot": False, "is_you": False, "id": who, "member_openid": who, "username": who}]}
+        self.assertIn("只能改自己的", self.say("/写条目 魔杖 木材：柳木", member="M2", **at("M1"))[0])
+        self.assertIn("木材：柳木", self.say("/写条目 魔杖 木材：柳木", member="ADM", **at("M1"))[0])
+        self.assertIn("木材：柳木", self.say("/条目 魔杖", member="M2", **at("M1"))[0])
+        self.assertIn("用法", self.say("/写条目")[0])
+        self.assertEqual(self.say("条目很多"), [])                                          # 聊天不当指令
+
     def test_admin_pages(self):
         self._setup_group()
         self.say("/注册 阿青\n角色：剑客")

@@ -96,7 +96,7 @@ def _room_text(room, who_from: str = "") -> str:
     elif room["kind"] in rooms.NO_DECLINE_KINDS:                         # 心愿这类也不能拒，只写改时间
         tips.append(f"修改时间 ➜ 修改时间线 R{room['id']} D{room['day']} 新时间（个人群里也能发）")
     elif room["kind"] not in rooms.NO_TIMELINE:
-        tips += [f"修改时间 ➜ 修改时间线 R{room['id']} D{room['day']} 新时间（个人群里也能发）", f"不想参加 ➜ 拒绝时间线 R{room['id']}（只能在开始写戏之前；整场取消，所有人的时间线都拿掉）"]
+        tips += [f"修改时间 ➜ 修改时间线 R{room['id']} D{room['day']} 新时间（个人群里也能发）", f"不想参加 ➜ 拒绝约会 R{room['id']}（只能在开始写戏之前；整场取消，所有人的时间线都拿掉）"]
     tips.append(f"结束互动 ➜ 在约会群里直接发「结束{room['kind']}」")
     return f"{head}\n{_slot(room)}\n参与者：{mem}\n房间号 R{room['id']}\n\n" + "\n".join(tips)
 

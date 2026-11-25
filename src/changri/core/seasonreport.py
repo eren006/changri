@@ -109,7 +109,7 @@ def build(role_id: int, d: dict | None = None) -> str:
         top = c.execute(
             "SELECT r.name AS name, SUM(n) AS n FROM ("
             " SELECT to_role_id AS other, COUNT(*) AS n FROM messages WHERE from_role_id=?1 AND status!='failed' GROUP BY to_role_id"
-            " UNION ALL SELECT from_role_id, COUNT(*) FROM messages WHERE to_role_id=?1 AND status='sent' GROUP BY from_role_id"
+            " UNION ALL SELECT from_role_id, COUNT(*) FROM messages WHERE to_role_id=?1 AND status='sent' AND sign='' GROUP BY from_role_id"   # 匿名的不算到真名头上
             " UNION ALL SELECT m2.role_id, COUNT(*) FROM room_members m1 JOIN room_members m2 ON m1.room_id=m2.room_id AND m2.role_id!=m1.role_id "
             "  JOIN rooms rm ON rm.id=m1.room_id AND rm.status='ended' WHERE m1.role_id=?1 GROUP BY m2.role_id"
             ") x JOIN roles r ON r.id=x.other GROUP BY x.other ORDER BY n DESC, r.id LIMIT 3", (role_id,)).fetchall()

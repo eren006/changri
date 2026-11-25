@@ -60,7 +60,7 @@ def register(app, login_required):
         elif src == "lovemail" and days and days > 0:
             n = msgimages_core.mail_delete_older_than(days)          # 还没派送的信的图不删
         else:
-            flash("要写清楚清理几天前的，或者选「全部删除」")
+            flash("要写清楚清理几天前的，或者选「全部删除」", "error")
             return redirect(url_for("images_page", src=src))
         flash(f"已删除 {n} 张图片")
         return redirect(url_for("images_page", src=src))

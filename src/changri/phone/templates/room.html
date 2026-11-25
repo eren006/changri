@@ -21,7 +21,7 @@
   {% if room.web %}
   <form class="compose" id="sayForm" method="post" action="{{ url_for('room_say', rid=room.id) }}">
     <input type="hidden" name="_csrf" value="{{ csrf() }}">
-    <textarea aria-label="发言" name="text" maxlength="2000" placeholder="用「角色名：正文」写戏，其余算闲聊" rows="1" required></textarea>
+    <textarea aria-label="发言" name="text" maxlength="2000" placeholder="用「角色名：正文」写戏，其余算闲聊" rows="1" required data-draft="room:{{ room.id }}"></textarea>
     <button type="submit">发送</button>
   </form>
   {% endif %}
@@ -53,9 +53,15 @@
       ev.preventDefault();
       var ta = f.querySelector('textarea'), body = new URLSearchParams(new FormData(f));
       if (!ta.value.trim()) return;
-      fetch(f.action, { method: 'POST', credentials: 'same-origin', body: body }).then(function (r) { return r.json(); }).then(function (d) {
-        if (d.ok) { ta.value = ''; poll(); } else alert(d.msg || '没发出去');
-      });
+      fetch(f.action, { method: 'POST', credentials: 'same-origin', body: body, headers: { 'X-Requested-With': 'fetch' } })
+        .then(function (r) {
+          if (r.status === 400) { alert('页面放得太久了，刷新一下再发。写的字还在。'); location.reload(); return { ok: false, quiet: true }; }
+          return r.json().catch(function () { return { ok: false }; });
+        }).then(function (d) {
+          if (d.quiet) return;
+          if (d.ok) { ta.value = ''; if (window.phoneDraft) phoneDraft.clear(ta.dataset.draft); poll(); }
+          else alert(d.msg || '没发出去，刷新页面再发一次。写的字还在。');
+        }).catch(function () { alert('网络不太好，没发出去。写的字还在，稍后再点发送。'); });
     });
   })();
   </script>

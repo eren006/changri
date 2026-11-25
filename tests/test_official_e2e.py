@@ -111,7 +111,7 @@ class OfficialE2E(unittest.TestCase):
         out = self.say("发起官约 1400-1500 后山 甲/乙")
         inv = next(o for o in out if o.startswith("[P1]") and "官约" in o)
         self.assertNotIn("修改时间线", inv)
-        self.assertNotIn("拒绝时间线", inv)
+        self.assertNotIn("拒绝约会", inv)
         self.assertIn("时间由管理员安排，来不了请联系管理员", inv)
         out = self.say("发起官电 1600-1700 甲/乙")
         inv = next(o for o in out if o.startswith("[P1]") and "官电" in o)
@@ -121,7 +121,7 @@ class OfficialE2E(unittest.TestCase):
     def test_date_invite_keeps_decline_but_wish_does_not(self):
         out = self.say("约会 1400-1500 咖啡厅 乙", member="M0", group="P0")
         inv = next(o for o in out if o.startswith("[P1]") and "向你发起了约会" in o)
-        self.assertIn("不想参加 ➜ 拒绝时间线 R1", inv)                       # 约会能拒（整场取消）
+        self.assertIn("不想参加 ➜ 拒绝约会 R1", inv)                       # 约会能拒（整场取消）
         room = rooms.get(1)
         wish = dict(room) | {"kind": "心愿"}
         text = play._room_text(wish)

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 100">
+  <!-- 芭蕾主题侧栏磨砂玻璃后面转着的舞裙：只有裙摆和一点上身，页面上会被模糊成一团转动的粉色光（作者 11-24：画出头和腿的人影太诡异） -->
+  <g fill="#e48aa0">
+    <path d="M52 18Q60 14 68 18L70 44Q60 48 50 44Z" fill-opacity=".55"/>
+    <ellipse cx="60" cy="50" rx="52" ry="13"/>
+    <ellipse cx="60" cy="56" rx="40" ry="10" fill="#f0b0c0"/>
+  </g>
+</svg>

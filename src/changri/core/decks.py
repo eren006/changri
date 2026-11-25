@@ -47,6 +47,16 @@ MAX_FILES_PER_ROLE = 10
 MAX_DECKS_PER_FILE = 50
 MAX_CARDS = 2000              # 一份文件里所有牌加起来
 MAX_RAW = 80_000              # 一份文件多少字
+
+
+def decode_upload(raw: bytes) -> str | None:
+    """上传的牌堆文件转成文字：先按 UTF-8（带不带 BOM 都行），不行再按 GBK（中文 Windows 记事本存的「ANSI」）。都不是返回 None。"""
+    for enc in ("utf-8-sig", "gb18030"):
+        try:
+            return raw.decode(enc)
+        except UnicodeDecodeError:
+            continue
+    return None
 MAX_CARD_LEN = 300
 MAX_NAME = 20
 MAX_WEIGHT = 100

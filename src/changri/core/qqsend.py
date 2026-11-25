@@ -140,12 +140,14 @@ def _note_btn_rejected(where: str, e: Exception) -> None:
         logger.warning(f"[按钮] 记报错日志失败：{err}")
 
 
-async def reply_buttons(matcher, text: str, btns, per_row: int = 3, tail: str = "👇 点下面的按钮", fallback: bool = True) -> bool:
+async def reply_buttons(matcher, text: str, btns, per_row: int = 3, tail: str = "👇 点下面的按钮", fallback: bool = True,
+                        plain: str = "") -> bool:
     """回复一段文字并在下面挂按钮（见 core/buttons.py）。
     · 关了按钮、没有按钮、连续被拒正在暂停（见 BTN_FAIL_LIMIT）：原样走 reply_long，玩家照文字提示手打指令；
     · QQ 明确拒绝：消息一定没发出去，退回纯文字；其他异常（超时、回包出错）可能已经发出去了，不补发，免得重复；
     · 正文太长：先照原来的方式发正文，再另发一条短的「tail」挂按钮（这条失败了就算了，正文里有手打的提示）。
-    返回按钮是否（可能）发出去了。fallback=False：发不了按钮时什么都不发，由调用方换别的办法（比如公知改发长图）。"""
+    返回按钮是否（可能）发出去了。fallback=False：发不了按钮时什么都不发，由调用方换别的办法（比如公知改发长图）。
+    plain：发不了按钮时改发的纯文字（选人卡片的正文写着「点名字」，退回纯文字时要换成列名字 + 照抄的格式）；不给就发 text。"""
     from nonebot.adapters.qq import Message
     from nonebot.adapters.qq.exception import ActionFailed
     from nonebot.adapters.qq.models import MessageKeyboard
@@ -155,7 +157,7 @@ async def reply_buttons(matcher, text: str, btns, per_row: int = 3, tail: str = 
     btns = [b for b in (btns or []) if b]
     if not btns or not buttons.enabled() or time.time() < _btn_off_until:
         if fallback:
-            await reply_long(matcher, text)
+            await reply_long(matcher, plain or text)
         return False
     too_long = len(_strip_img(text)) > BTN_MD_MAX or text.startswith(IMG)
     if too_long:
@@ -168,7 +170,7 @@ async def reply_buttons(matcher, text: str, btns, per_row: int = 3, tail: str = 
         logger.warning("[按钮] 被 QQ 拒绝，" + _btn_reject_note(paused) + "：" + ascii(str(e))[:200])
         _note_btn_rejected("回复指令时", e)
         if fallback and not too_long:
-            await reply_long(matcher, text)
+            await reply_long(matcher, plain or text)
         return False
     except Exception as e:  # noqa: BLE001
         logger.warning("[按钮] 发送出现异常（可能已发出，不再补发纯文字）：" + type(e).__name__ + " " + ascii(str(e))[:200])
@@ -193,11 +195,12 @@ async def finish_usage(matcher, text: str, fill: str) -> None:
 CARD_SECONDARY = ("自己写", "帮助", "别的地方", "换个人")
 
 
-async def send_card(matcher, text: str, items, per_row: int = 4) -> None:
-    """选人 / 选地点这类卡片：items = [(按钮上的字, 指令, 点了是不是直接发出)]，发完结束这条指令。底下那几个辅助按钮用灰色。"""
-    from .buttons import Btn
+async def send_card(matcher, text: str, items, plain: str = "", per_row: int | None = None) -> None:
+    """选人 / 选地点这类卡片：items = [(按钮上的字, 指令, 点了是不是直接发出)]，发完结束这条指令。底下那几个辅助按钮用灰色。
+    plain：按钮发不出去时改发的纯文字（core/datepick 的卡片都给：列全部名字 + 照抄的格式，不说「点」）。"""
+    from .buttons import CARD_PER_ROW, Btn
     await reply_buttons(matcher, text, [Btn(label, cmd, enter=send, style="secondary" if label in CARD_SECONDARY else "primary")
-                                        for label, cmd, send in items], per_row=per_row)
+                                        for label, cmd, send in items], per_row=per_row or CARD_PER_ROW, plain=plain)
     await matcher.finish()
 
 

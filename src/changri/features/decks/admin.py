@@ -30,17 +30,16 @@ def register(app, login_required):
         raw = request.form.get("raw", "")
         up = request.files.get("file")
         if up and up.filename:
-            try:
-                raw = up.read(decks.MAX_RAW * 4 + 1).decode("utf-8-sig")
-            except UnicodeDecodeError:
-                flash("文件要存成 UTF-8 编码（记事本「另存为」里能选）。")
+            raw = decks.decode_upload(up.read(decks.MAX_RAW * 4 + 1))
+            if raw is None:
+                flash("这个文件读不出文字，请确认是牌堆文件（.txt / .json），用记事本「另存为」时编码选 UTF-8 再传一次。", "error")
                 return redirect(url_for("decks_page", edit=fid) if fid else url_for("decks_page"))
         if not raw.strip():
-            flash("还没写内容，也没选文件。")
+            flash("还没写内容，也没选文件。", "error")
             return redirect(url_for("decks_page", edit=fid) if fid else url_for("decks_page"))
         title = request.form.get("title", "").strip()
         ok, msg, _ = decks.save(None, raw, file_id=fid, title=title)
-        flash(msg)
+        flash(msg, "message" if ok else "error")
         if ok:
             return redirect(url_for("decks_page"))
         return _page(fid, draft=raw, draft_title=title)        # 没存上：把刚贴的内容留在输入框里，改一改再存，不用重新贴

@@ -1,3 +1,6 @@
+import re
+
+
 CHUNK = 700  # 单条消息的字数上限，超过就拆成几条
 
 
@@ -47,3 +50,26 @@ def parse_id(text: str, prefix: str = "") -> int | None:
     if not m or (m[1] and m[1].upper() not in prefix.upper()):
         return None
     return int(m[2])
+
+
+# 时间段里的连接号：输入法常打出来的各种横线、波浪线都算「-」
+_DASHES = "-~～〜—–－﹣―‐−"
+_TIME_PUNCT = str.maketrans({"：": ":", **{c: "-" for c in _DASHES}})
+
+
+def norm_time(text: str) -> str:
+    """约时间用的写法统一成半角：全角数字 → 半角，「：」→「:」，「～ — － – ﹣」这类横线 / 波浪线 → 「-」，去掉首尾空白。
+    「１４：００～１５：００」→「14:00-15:00」。只给时间这一段用，别拿去洗角色名（名字里的全角字母要保留）。"""
+    return (text or "").strip().translate(_WIDE).translate(_TIME_PUNCT)
+
+
+_D = "[0-9０-９]"
+# 只认开头的时间段：前面最多带几个「R12」「D1」「#12」这样的编号词（修改时间线 R12 D1 1400 - 1500）。
+# 不在中间找：故事历写「3月5日 花园 …」、心愿内容里写「想 2000 - 2100 看星星」时，后面的数字原样不动。
+_RANGE_GAP = re.compile(rf"^((?:\s*[RrＲｒDdＤｄ#＃]{_D}+\s+)*)\s*({_D}{{1,2}}[:：]?{_D}{{2}})\s*(?:[{_DASHES}]+|到|至)\s*({_D}{{1,2}}[:：]?{_D}{{2}})(?=\s|$)")
+
+
+def join_time_range(text: str) -> str:
+    """指令参数按空格拆之前先调这个：把开头的「1400 - 1500」「14：00～15：00」这种中间有空格 / 全角符号的时间段并成一个词「1400-1500」，
+    不然按空格一拆，时间就被拆成三段，后面的地点、名字全错位。只动第一个时间段，别的字原样不动。"""
+    return _RANGE_GAP.sub(lambda m: f"{m[1]}{norm_time(m[2])}-{norm_time(m[3])}", text or "", count=1)

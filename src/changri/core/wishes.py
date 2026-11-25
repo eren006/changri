@@ -143,7 +143,7 @@ def post(poster_id: int, time_text: str, place: str, content: str, sign: str = "
         return False, closed_h
     hit = rooms.conflict(poster_id, day, hm[0], hm[1])          # 已有的约会（含已结束的）和自己别的心愿都算
     if hit:
-        return False, f"你在 D{day} {hm_text(hit['start_hm'], hit['end_hm'])} 已经有安排了（{hit['kind']}）。"
+        return False, f"你在 {rooms.clash_when(hit, day)} 已经有安排了（{hit['kind']}）。"
     from . import letters                       # 写信综开着、设了「挂心愿要几个写信币」时先看够不够
     why = letters.check_cost(poster_id, "wish")
     if why:
@@ -203,10 +203,10 @@ def take(wish_id: int, taker_id: int) -> tuple[bool, str, int]:
         return False, closed_h, 0
     hit = rooms.conflict(taker_id, day, w["start_hm"], w["end_hm"], ignore_wish=wish_id)
     if hit:
-        return False, f"你在 D{day} {hm_text(hit['start_hm'], hit['end_hm'])} 已经有安排了（{hit['kind']}），摘不了这条心愿。", 0
+        return False, f"你在 {rooms.clash_when(hit, day)} 已经有安排了（{hit['kind']}），摘不了这条心愿。", 0
     hit = rooms.conflict(w["poster_id"], day, w["start_hm"], w["end_hm"], locks=False, ignore_wish=wish_id)
     if hit:
-        return False, f"挂这条心愿的人在 D{day} {hm_text(hit['start_hm'], hit['end_hm'])} 已经有别的安排了，这条心愿暂时摘不了。", 0
+        return False, f"挂这条心愿的人在 {rooms.clash_when(hit, day)} 已经有别的安排了，这条心愿暂时摘不了。", 0
     ok, info, room_id = rooms.create("心愿", w["poster_id"], [taker_id], f"{w['start_hm']}-{w['end_hm']}", w["place"], w["content"],
                                      official=True, day=day, wish_id=wish_id)
     if not ok:

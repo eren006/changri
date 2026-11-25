@@ -223,6 +223,44 @@ class LongtermCore(unittest.TestCase):
         self.assertEqual(_t.strftime("%Y-%m-%d", _t.localtime(lt.kpi_start({"kpi_period": "month"}, wed))), "2026-11-01")
         self.assertEqual(lt.kpi_start({"kpi_period": "all"}, wed), 0)
 
+    def test_notes_text_box(self):
+        """后台「改条目」文本框：【栏目】或空行后不带冒号的一行是栏目名，下面一行一个字段；存了再读回来一样。"""
+        notes, err = lt.parse_notes_text("【魔杖】\n木材：冬青\n杖芯: 凤凰羽毛\n\n宠物\n名字：小灰\n种类 猫头鹰\n\n空栏")
+        self.assertEqual(err, "")
+        self.assertEqual(notes, {"魔杖": {"木材": "冬青", "杖芯": "凤凰羽毛"}, "宠物": {"名字": "小灰", "种类": "猫头鹰"}, "空栏": {}})
+        self.assertEqual(lt.parse_notes_text(lt.notes_to_text(notes))[0], notes)
+        self.assertIsNone(lt.parse_notes_text("木材：冬青")[0])                    # 没有栏目名
+        m, _ = lt.register(self.gid, "OA", "阿青")
+        lt.replace_notes(m["id"], notes)
+        self.assertEqual(list(lt.get_member(m["id"])["notes"]), ["魔杖", "宠物", "空栏"])   # 顺序不变
+        self.assertIn("长度", "".join(lt.set_note(m["id"], "魔杖", [("长度" * 7, "x")])[1:]))  # 字段名太长
+        self.assertEqual(lt.parse_note_fields("木材：冬青 杖芯：凤凰 羽毛"), [("木材", "冬青"), ("杖芯", "凤凰 羽毛")])
+
+    def test_kpi_custom_days(self):
+        import time as _t
+        day = lambda y, mo, d, h=0: _t.mktime((y, mo, d, h, 0, 0, 0, 0, -1))
+        fmt = lambda ts: _t.strftime("%Y-%m-%d", _t.localtime(ts))
+        g = {"kpi_period": "days", "kpi_days": 10, "kpi_anchor": int(day(2026, 11, 25))}
+        s, e = lt.kpi_range(g, day(2026, 11, 25, 9))                             # 第一天
+        self.assertEqual((fmt(s), fmt(e)), ("2026-11-25", "2026-12-05"))
+        self.assertEqual(lt.kpi_left_days(g, day(2026, 11, 25, 9)), 10)
+        self.assertEqual(fmt(lt.kpi_start(g, day(2026, 12, 4, 23))), "2026-11-25")  # 最后一天还是第一期
+        self.assertEqual(fmt(lt.kpi_start(g, day(2026, 12, 5, 0))), "2026-12-05")   # 到期自动进下一期
+        self.assertEqual(fmt(lt.kpi_start(g, day(2027, 1, 20, 12))), "2027-01-14")  # 跨年照样按 10 天一格
+        self.assertEqual(lt.kpi_label(g, day(2026, 12, 6)), "本期（12-05～12-14）")
+        self.assertEqual(fmt(lt.kpi_start(g, day(2026, 11, 20))), "2026-11-25")     # 还没到开始日：按第一期算
+        # 后台保存：天数要在 1–366，日期写错要报错；不填日期 = 今天
+        self.assertIn("1 到 366", lt.update_group(self.gid, kpi_period="days", kpi_days=0)[1])
+        self.assertIn("2026-11-25", lt.update_group(self.gid, kpi_period="days", kpi_days=14, kpi_anchor="11/25")[1])
+        self.assertTrue(lt.update_group(self.gid, kpi_period="days", kpi_days=14, kpi_anchor="")[0])
+        gg = lt.get_group(self.gid)
+        self.assertEqual((gg["kpi_days"], fmt(gg["kpi_anchor"])), (14, _t.strftime("%Y-%m-%d")))
+        self.assertEqual(lt.kpi_left_days(gg), 14)
+        lt.update_group(self.gid, kpi_chars=5)
+        m, _ = lt.register(self.gid, "OA", "阿青")
+        self.assertIn("本期（", lt.kpi_text(m["id"]))
+        self.assertIn("还剩 14 天", lt.kpi_text(m["id"]))
+
     def test_rename_keeps_old_name_as_alias(self):
         m, _ = lt.register(self.gid, "OA", "阿轻")                               # 名字打错了
         b, _ = lt.register(self.gid, "OB", "小白")

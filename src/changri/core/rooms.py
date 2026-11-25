@@ -6,7 +6,7 @@ import time
 
 from . import blocks, pool, rpg, season, windows
 from .db import get_conn, get_config, get_int
-from .textutil import hm_text
+from .textutil import hm_text, norm_time
 
 ROOM_KINDS_GATED = ("约会", "电话", "微信")
 KINDS = {"约会": True, "电话": False, "官约": True, "微信": False, "心愿": True, "前置电话": False, "踩点": True}   # 值：是否需要地点
@@ -26,22 +26,23 @@ def joinreq_enabled() -> bool:
     return extensions.is_enabled("joinreq")
 
 
-JOINABLE_DEFAULT = "约会,官约,心愿"
+JOINABLE_DEFAULT = "约会,心愿"
 
 
 def joinable_kinds() -> tuple[str, ...]:
-    """「申请加入」设置里填的、可以被申请加入的房间类型（电话、微信、踩点这种填了也不算）。"""
+    """「申请加入」设置里填的、可以被申请加入的房间类型（电话、微信、踩点这种填了也不算；官约由管理员排人，玩家不能申请加入，填了也不算）。"""
     raw = get_config("join_kinds", JOINABLE_DEFAULT)
-    ks = tuple(k for k in re.split(r"[,，、\s]+", raw) if k in KINDS and k not in SOLO_KINDS and KINDS[k])
+    ks = tuple(k for k in re.split(r"[,，、\s]+", raw) if k in KINDS and k not in SOLO_KINDS and KINDS[k] and k != "官约")
     return ks
 
 
 def parse_hm(text: str, day: int | None = None) -> tuple[str, str] | None:
     """「1400-1500」「14:00-15:00」→ ('14:00', '15:00')。结束早于开始 = 跨午夜（2300-0100 是当天 23 点到第二天 1 点），一样也不行。"""
     from . import storycal                  # 故事历打开（且这个 D 填了日期）时，约时间只认「3月5日」这种某一天，不认钟点
+    text = norm_time(text)                  # 全角数字、「：」「～」「—」这类输入法打出来的符号都认
     if storycal.exclusive(day):
         return storycal.parse_when(text, day)[0]
-    m = re.fullmatch(r"(\d{1,2}):?(\d{2})\s*[-~到至]\s*(\d{1,2}):?(\d{2})", text.strip())
+    m = re.fullmatch(r"(\d{1,2}):?(\d{2})\s*[-到至]\s*(\d{1,2}):?(\d{2})", text)
     if not m:
         return None
     a, b = f"{int(m[1]):02d}:{m[2]}", f"{int(m[3]):02d}:{m[4]}"
@@ -199,11 +200,17 @@ def conflict(role_id: int, day: int, a: str, b: str, ignore_room: int = 0, locks
                            (role_id, days[0], days[-1], ignore_wish, int(time.time()) - 24 * 3600)).fetchall()     # 心愿 24 小时过期，过期的不占
     for w in ws:
         if spans_overlap(day, a, b, w["day"], w["start_hm"], w["end_hm"]):
-            return {"id": 0, "kind": f"心愿 #{w['id']}，还没被摘", "start_hm": w["start_hm"], "end_hm": w["end_hm"], "status": "open"}
+            return {"id": 0, "kind": f"心愿 #{w['id']}，还没被摘", "day": w["day"], "start_hm": w["start_hm"], "end_hm": w["end_hm"], "status": "open"}
     if locks:                                              # 上帝模式的时间锁定
         from . import godmode
         return godmode.lock_hit(role_id, day, a, b)
     return None
+
+
+def clash_when(hit, day) -> str:
+    """撞上的那场的「D几 几点-几点」。跨午夜时撞上的可能是前一天或后一天那场，要写那场自己的天，不是要约的那天。"""
+    d = hit["day"] if "day" in hit.keys() and hit["day"] is not None else day
+    return f"D{d} {hm_text(hit['start_hm'], hit['end_hm'])}"
 
 
 def open_phone_count(role_id: int) -> int:
@@ -344,7 +351,7 @@ def create(kind: str, creator_id: int, target_ids: list[int], time_text: str, pl
                     _missed[creator_id] = {"role_id": rid, "kind": kind, "day": day, "start_hm": hm[0], "end_hm": hm[1]}
                 # 官约由管理员发起，creator 只是名单上的第一个人：写「你」管理员会以为是自己撞了
                 who = "你" if rid == creator_id and not official else f"「{names.get(rid, '对方')}」"
-                return False, f"{who}在 D{day} {hm_text(hit['start_hm'], hit['end_hm'])} 已经有安排（{hit['kind']}），时间撞了。", 0
+                return False, f"{who}在 {clash_when(hit, day)} 已经有安排（{hit['kind']}），时间撞了。", 0
     with get_conn() as c:
         cur = c.execute("INSERT INTO rooms(kind, creator_id, day, start_hm, end_hm, place, note, dkey, created_ts) VALUES(?,?,?,?,?,?,?,?,?)",
                         (kind, creator_id, day, hm[0], hm[1], place, note, "" if defer else season.day_key(), int(time.time())))
@@ -375,10 +382,37 @@ def has_kind(kind: str) -> bool:
     with get_conn() as c:
         return c.execute("SELECT 1 FROM rooms WHERE kind=? LIMIT 1", (kind,)).fetchone() is not None
 
+JOIN_GOD_FEATURE = {"约会": "约会", "心愿": "wish"}       # 申请加入时看上帝模式的哪个开关
+
+
+def join_problem(r, role_id: int, by_applicant: bool = True) -> str:
+    """能不能把 role_id 加进房间 r：申请时查一次，同意时（join）再查一次——等对方同意的这段时间里可能被拉黑、被关了功能。没问题返回空串。
+    by_applicant=False：同意的人看到的话（同意时才发现加不进来），不写「你」，也不说是谁拉黑的。"""
+    if is_official(r):
+        return "官约 / 官电由管理员安排人选，不能申请加入。"
+    feat = JOIN_GOD_FEATURE.get(r["kind"])
+    if feat:
+        from . import godmode
+        if godmode.check(role_id, feat):
+            fn = godmode.FEATURES[feat]
+            return (f"你的「{fn}」功能被管理员暂时关闭了，不能加入别人的{r['kind']}。" if by_applicant
+                    else f"申请人的「{fn}」功能被管理员暂时关闭了，加不进来。")
+    for m in members(r["id"]):
+        b = blocks.get_block(m["role_id"], role_id)
+        if b:
+            if not by_applicant:
+                return "申请人现在加不进这个房间（房间里有人拒绝了 TA 的联系）。"
+            return "申请失败，请稍后再试。" if b["silent"] else f"「{m['name']}」已拒绝你的联系。"
+    return ""
+
+
 def join(room_id: int, role_id: int) -> tuple[bool, str]:
     r = get(room_id)
     if not r or r["status"] != "open":
         return False, "这个房间已经结束了。"
+    bad = join_problem(r, role_id, by_applicant=False)
+    if bad:
+        return False, bad
     if r["kind"] not in NO_TIMELINE and conflict(role_id, r["day"], r["start_hm"], r["end_hm"]):
         return False, "这个时间你已经有安排了。"
     if r["kind"] in ("约会", "心愿") and date_cap_hit(role_id):          # 申请加入私约 / 心愿也算进私约 + 心愿上限
@@ -592,7 +626,7 @@ def propose_change(room_id: int, by_id: int, day: int, a: str, b: str) -> tuple[
     for m in members(room_id):
         hit = conflict(m["role_id"], day, a, b, ignore_room=room_id)
         if hit:
-            return False, f"「{m['name']}」在 D{day} {hm_text(hit['start_hm'], hit['end_hm'])} 已有安排，改不了。"
+            return False, f"「{m['name']}」在 {clash_when(hit, day)} 已有安排，改不了。"
     with get_conn() as c:
         c.execute("UPDATE rooms SET pending_change=? WHERE id=?", (json.dumps({"day": day, "a": a, "b": b, "by": by_id}), room_id))
         c.execute("UPDATE room_members SET agree=CASE WHEN role_id=? THEN 1 ELSE 0 END WHERE room_id=?", (by_id, room_id))
@@ -620,13 +654,13 @@ def vote_change(room_id: int, role_id: int, agree: bool) -> tuple[str, dict | No
         if hit:
             with get_conn() as c:
                 c.execute("UPDATE rooms SET pending_change='' WHERE id=?", (room_id,))
-            return "conflict", {**ch, "clash": f"「{m['name']}」在 D{ch['day']} {hm_text(hit['start_hm'], hit['end_hm'])} 已有安排（{hit['kind']}）"}
+            return "conflict", {**ch, "clash": f"「{m['name']}」在 {clash_when(hit, ch['day'])} 已有安排（{hit['kind']}）"}
     with get_conn() as c:
         c.execute("UPDATE rooms SET day=?, start_hm=?, end_hm=?, pending_change='' WHERE id=?", (ch["day"], ch["a"], ch["b"], room_id))
     return "applied", ch
 
 
-# ---------- 不想参加（老系统「拒绝时间线 群号」）----------
+# ---------- 不想参加：「拒绝约会」（老系统叫「拒绝时间线 群号」）----------
 
 NO_DECLINE_KINDS = {"心愿"}             # 心愿是自己挂、别人摘的，官约 / 官电是节目组排的：都不能单方面拒（老系统一样）
 
@@ -638,7 +672,7 @@ def started(room_id: int) -> bool:
 
 
 def decline_check(room, role_id: int) -> str:
-    """能不能「拒绝时间线」（不想参加 → 整场取消，作者定：多人房也整场解散、有改时间申请也一次解散）。
+    """能不能「拒绝约会」（不想参加 → 整场取消，作者定：多人房也整场解散、有改时间申请也一次解散）。
     只能在开始写戏之前；能返回空，不能返回原因。"""
     if not room or room["status"] != "open":
         return "这一场已经结束或取消了。"
@@ -656,13 +690,14 @@ def decline_check(room, role_id: int) -> str:
 # ---------- 申请加入别人正在进行的约会 ----------
 
 def find_joinable(target_id: int, start_hm: str = "") -> list:
-    """对方现在参与的、可以申请加入的房间（类型按「申请加入」设置，默认约会/官约/心愿，不含电话和微信）。"""
+    """对方现在参与的、可以申请加入的房间（类型按「申请加入」设置，默认约会/心愿，不含官约、电话和微信）。"""
     kinds = joinable_kinds()
     if not kinds:
         return []
     with get_conn() as c:
         rs = c.execute("SELECT r.* FROM rooms r JOIN room_members m ON m.room_id=r.id WHERE m.role_id=? AND r.status='open' "
                        f"AND r.kind IN ({','.join('?' * len(kinds))}) ORDER BY r.id", (target_id, *kinds)).fetchall()
+    rs = [r for r in rs if not is_official(r)]
     if start_hm:
         a = parse_hm(f"{start_hm}-23:59") if re.fullmatch(r"\d{1,2}:?\d{2}", start_hm) else None
         rs = [r for r in rs if a and r["start_hm"] == a[0]]
@@ -677,17 +712,16 @@ def request_join(room_id: int, role_id: int) -> tuple[bool, str, int]:
         return False, "这个房间已经结束了。", 0
     if any(m["role_id"] == role_id for m in members(room_id)):
         return False, "你已经在这个房间里了。", 0
-    for m in members(room_id):
-        b = blocks.get_block(m["role_id"], role_id)
-        if b:
-            return False, ("申请失败，请稍后再试。" if b["silent"] else f"「{m['name']}」已拒绝你的联系。"), 0
+    bad = join_problem(r, role_id)
+    if bad:
+        return False, bad, 0
     if r["kind"] in ("约会", "心愿"):
         hit_cap = date_cap_hit(role_id)
         if hit_cap:
             return False, hit_cap, 0
     hit = conflict(role_id, r["day"], r["start_hm"], r["end_hm"])
     if hit:
-        return False, f"你在 D{r['day']} {hm_text(hit['start_hm'], hit['end_hm'])} 已经有安排了。", 0
+        return False, f"你在 {clash_when(hit, r['day'])} 已经有安排了。", 0
     with get_conn() as c:
         old = c.execute("SELECT id FROM join_requests WHERE room_id=? AND role_id=? AND status='pending'", (room_id, role_id)).fetchone()
         if old:
