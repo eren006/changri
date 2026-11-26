@@ -2,7 +2,8 @@
 
 发出去的只有：实例编号（第一次运行时本机随机生成，和 QQ、群、服务器都没关系）、版本、系统平台、
 配了几个机器人、几个连着、上次上报以来处理了多少次指令（以及每个指令各几次，只有指令名，比如「ra 12」，
-不带指令后面写的内容；只算长日bot 自带的指令，用户自己装的扩展不算）、开着哪些官方扩展、程序连续运行了多久。
+不带指令后面写的内容；只算长日bot 自带的指令，用户自己装的扩展不算）、开着哪些官方扩展、程序连续运行了多久、小手机开没开 / 在不在运行和它的端口号
+（作者那边按这个从外面连一下，看玩家能不能打开小手机）。
 不带群号、QQ 号、角色名、聊天内容。后台「基础」设置里「匿名使用情况上报」关掉就不发。
 启动 2 分钟后发一次，之后每小时一次；连着的机器人比上次报的多了（比如刚在后台加了机器人）也补报一次。
 发不出去就留到下次，不另外重试、不影响别的。还没报出去的指令次数每几分钟存到 data/usage_pending.json，
@@ -157,7 +158,25 @@ def payload(bots: int, online: int, cmds: int, by_name: dict[str, int] | None = 
             "plat": f"{sys.platform}-{platform.machine().lower()}"[:40],
             "bots": int(bots), "online": int(online), "cmds": int(cmds),
             "by_cmd": dict(top), "exts": list(exts or []),
-            "uptime": int(time.time() - _started)}
+            "uptime": int(time.time() - _started), **phone_state()}
+
+
+def phone_state() -> dict:
+    """小手机：off = 没开（管理员关的，或还没有机器人）；down = 开着但没在运行；up = 在运行。查不了就不报。"""
+    try:
+        from . import phoneserver
+        if not phoneserver.phone_bots():
+            return {"phone": "off"}
+        out = {"phone": "up" if phoneserver.running() else "down", "phone_port": phoneserver.port()}
+        try:
+            from . import httpsproxy
+            if httpsproxy.enabled():                    # 开了 HTTPS：玩家走的是 https 端口（端口 + 1000），作者那边测这个
+                out.update(phone_port=httpsproxy.phone_https_port(out["phone_port"]), phone_tls=1)
+        except Exception:  # noqa: BLE001  查不了就按没开 HTTPS 报，小手机状态照样报
+            pass
+        return out
+    except Exception:  # noqa: BLE001
+        return {}
 
 
 def report(bots: int, online: int, url: str = DEFAULT_URL) -> bool:

@@ -17,6 +17,7 @@ def register(app, login_required):
     @login_required
     def phone_page():
         from changri.phone.themes import PHONE_COPY, PHONE_THEMES
+        from changri import config as _config
         from changri.core import phoneserver
         port = phoneserver.port() if get_config(phoneserver.PORT_KEY, "") or phoneserver.phone_bots() else phoneserver.suggest_port()   # 所有机器人共用；第一次开：建议一个没被占的
         try:
@@ -27,7 +28,7 @@ def register(app, login_required):
             theme = json.loads(get_config("phone_theme_config", "") or "{}")
         except ValueError:
             theme = {}
-        return render_template("phone.html", port=port, lights=netcheck.lights(port, last), last=last, codes=phonecodes.listing(),
+        return render_template("phone.html", port=port, admin_port=_config.admin_port(), lights=netcheck.lights(port, last), last=last, codes=phonecodes.listing(),
                                base=get_config("phone_base_url", ""), enabled=get_config("phone_enabled", "0") == "1",
                                paused=get_config("phone_paused", "0") == "1", suggest=netcheck.default_base_url() if not get_config("phone_base_url", "") else "",
                                themes=PHONE_THEMES, copies=PHONE_COPY, theme=theme,

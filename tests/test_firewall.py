@@ -120,16 +120,35 @@ class OpenFirewallTests(unittest.TestCase):
 
     def test_startup_skips_when_ports_unchanged(self):
         with mock.patch.object(service, "_is_windows", return_value=True), \
-                mock.patch.object(service, "_run", return_value=Done(0)) as run:
+                mock.patch.object(service, "_run", return_value=Done(0, "本地端口: 5091,5092")) as run:
             service.open_firewall([5091, 5092], only_if_changed=True)
             n = run.call_count
             self.assertEqual(service.open_firewall([5091, 5092], only_if_changed=True), "")
-            self.assertEqual(run.call_count, n)                     # 端口没变：不再动防火墙
+            self.assertEqual([c.args[0][3] for c in run.call_args_list[n:]], ["show"])   # 端口没变、规则还在：只看一眼，不动防火墙
+            run.return_value = Done(0)
+            n = run.call_count
             service.open_firewall([5091, 6000], only_if_changed=True)
             self.assertGreater(run.call_count, n)                   # 端口变了：重新放行
             n = run.call_count
             service.open_firewall([5091, 6000])                     # 不带 only_if_changed（改端口、开 HTTPS 时）：照样放行
             self.assertGreater(run.call_count, n)
+
+    def test_startup_puts_back_deleted_windows_rule(self):
+        """规则被人删了 / 被安全软件清掉了（以前记过「已放行」）：启动时照样补回来。"""
+        rule = {"on": True}
+
+        def run(c, check=True):
+            if c[3] == "show":
+                return Done(0, "本地端口: 5091,5092") if rule["on"] else Done(1, "没有与指定标准相匹配的规则。")
+            if c[3] == "add":
+                rule["on"] = True
+            return Done(0)
+        with mock.patch.object(service, "_is_windows", return_value=True), mock.patch.object(service, "_run", side_effect=run):
+            service.open_firewall([5091, 5092], only_if_changed=True)
+            self.assertTrue((self.tmp / "firewall_done").exists())
+            rule["on"] = False
+            self.assertIn("已放行", service.open_firewall([5091, 5092], only_if_changed=True))
+        self.assertTrue(rule["on"])
 
     def test_failure_is_retried_next_start(self):
         def run(c, check=True):

@@ -44,6 +44,19 @@ async def _sync():
             _start(adapter, cfg)
             _started[bot_id] = cfg["secret"]
             logger.info(f"[机器人] 已连接 {bot_id}")
+    # 机器人清单变了，小手机要跟着开 / 关（新装时开机那一刻还没有机器人，小手机是关着起来的）。启动最多等几秒，放线程里
+    from changri.core import phoneserver
+    try:
+        await asyncio.to_thread(phoneserver.ensure)
+        _phone_err[0] = ""
+    except Exception as e:  # noqa: BLE001
+        sig = f"{type(e).__name__}: {e}"
+        if sig != _phone_err[0]:                  # 同一个错每 5 秒都会碰上：只记第一次，变了再记
+            _phone_err[0] = sig
+            logger.exception("[机器人] 小手机启停出错")
+
+
+_phone_err = [""]
 
 
 # ---- 在线更新：新版本启动 90 秒后跑升级后检查，过了才算成功（不过就回滚）；每 6 小时悄悄查一次有没有新版本（顺便匿名上报使用情况）；

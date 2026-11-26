@@ -70,7 +70,8 @@ def _base_ok() -> bool:
         and not OFF_MARK.exists()
 
 
-_need_cache: dict = {"t": 0.0, "v": None}
+# t 从负无穷起算：time.monotonic() 是从开机算的，开机不到 5 分钟时拿 0 当「上次查的时间」会被当成刚查过，弹窗就不出来
+_need_cache: dict = {"t": float("-inf"), "v": None}
 NEED_TTL = 300
 
 
@@ -87,7 +88,7 @@ def need_popup() -> dict | None:
 
 
 def forget_need() -> None:
-    _need_cache.update(t=0.0, v=None)
+    _need_cache.update(t=float("-inf"), v=None)
 
 
 def install_from_admin(local: bool) -> str:

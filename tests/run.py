@@ -28,6 +28,10 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 
+# 只测 tools/ 里作者自用工具的测试（主站服务器上的 console / errors / wishes 服务、发版脚本）：这些东西只在 Linux 主站
+# 和作者的 Mac 上跑，不进安装包。Windows 上跳过，免得为用不到的平台改它们（文件锁、改名覆盖、sh 脚本都和 Linux 不一样）。
+POSIX_ONLY = {"test_console_service", "test_errors_service", "test_wishes_service", "test_release_fetch"}
+
 
 def run_one(path: Path) -> dict:
     env = dict(os.environ)
@@ -35,9 +39,10 @@ def run_one(path: Path) -> dict:
     env["CHANGRI_HOME"] = tempfile.mkdtemp(prefix=f"changri-{path.stem}-")   # 兜底：没自己设库的测试也碰不到真的 data/
     env["PYTHONPATH"] = os.pathsep.join([str(ROOT / "src"), str(ROOT)] + ([env["PYTHONPATH"]] if env.get("PYTHONPATH") else []))
     env["PYTHONDONTWRITEBYTECODE"] = "1"
+    env["PYTHONIOENCODING"] = "utf-8"                # 子进程的输出按 UTF-8 写、按 UTF-8 读；不然中文 Windows / CI 的控制台编码对不上，读输出就崩
     t = time.time()
     p = subprocess.run([sys.executable, "-m", "unittest", "discover", "-s", str(HERE), "-t", str(HERE), "-p", path.name],
-                       cwd=ROOT, env=env, capture_output=True, text=True)
+                       cwd=ROOT, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace")
     out = p.stdout + p.stderr
     ran = re.search(r"^Ran (\d+) tests?", out, re.M)
     counts = {k: int(v) for k, v in re.findall(r"(failures|errors|skipped)=(\d+)", out)}
@@ -72,6 +77,11 @@ def main() -> int:
     if a.dry:
         print("\n".join(f.stem for f in files))
         return 0
+    if sys.platform == "win32":
+        skipped = [f.stem for f in files if f.stem in POSIX_ONLY]
+        files = [f for f in files if f.stem not in POSIX_ONLY]
+        if skipped:
+            print(f"Windows 上跳过只测作者工具的：{'、'.join(skipped)}")
     if a.words:
         files = [f for f in files if any(w in f.stem for w in a.words)]
     if not files:

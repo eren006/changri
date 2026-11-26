@@ -41,6 +41,15 @@ a{color:inherit}
 .rail nav{display:flex;flex-direction:column;gap:30px;flex:1}
 .rail h3{margin:0 8px 6px;font-size:12px;font-weight:500;color:var(--night-mute);letter-spacing:.06em}
 .rail ul{list-style:none;margin:0;padding:0}
+/* 侧栏大类可以折叠：点标题收起/展开，记在本机浏览器里；当前所在页面的那一类总是展开 */
+.rail details.grp>summary{list-style:none;cursor:pointer;display:flex;align-items:center;border-radius:6px}
+.rail details.grp>summary::-webkit-details-marker{display:none}
+.rail details.grp>summary h3{flex:1}
+.rail details.grp>summary::after{content:"";width:6px;height:6px;margin:0 12px 6px 0;border-right:1.5px solid var(--night-mute);border-bottom:1.5px solid var(--night-mute);transform:rotate(45deg);transition:transform .15s}
+.rail details.grp:not([open])>summary::after{transform:rotate(-45deg)}
+.rail details.grp:not([open])>summary h3{margin-bottom:0}
+.rail details.grp>summary:hover h3{opacity:.8}
+.rail details.grp>summary:focus-visible{outline:2px solid var(--dusk);outline-offset:2px}
 .rail li a{display:block;padding:9px 10px 9px 14px;margin:2px 0;border-left:2px solid transparent;text-decoration:none;color:var(--night-ink);border-radius:0 6px 6px 0;font-size:14.5px}
 .rail li a:hover{background:var(--rail-hover,rgba(255,255,255,.06))}
 .rail details.more summary{cursor:pointer;list-style:none;margin:2px 8px 0 12px;padding:5px 0;font-size:12.5px;color:var(--night-mute)}
@@ -363,16 +372,16 @@ window.copyText=function(text,btn,target){
         ('长期群', [('longterm_page','长期群')] if 'longterm_page' not in disabled_nav else []),
       ] if in_bot else [] %}
       {% set extras = [('forum_page','论坛'),('rpg_page','物品与商城'),('rpg_places_page','地点'),('rewards_page','结戏奖励'),('alarm_page','群体闹钟'),('phone_page','小手机'),('giftshop_page','礼品店'),('gacha_page','抽取池'),('sighting_page','目击'),('bottles_page','漂流瓶记录'),('precall_admin','前置电话')] %}
+      {% set foldable = ('通用', '恋综', '跑团') %}
       {% for title, items in groups if items %}
-      <div>
-        {% if title %}<h3>{{ title }}</h3>{% endif %}
+      {% if title in foldable %}<details class="grp" data-k="{{ title }}" open><summary><h3>{{ title }}</h3></summary>{% else %}<div>{% endif %}
+        {% if title and title not in foldable %}<h3>{{ title }}</h3>{% endif %}
         <ul>{% for ep, label in items %}{% if ep not in disabled_nav %}<li><a href="{{ url_for(ep) }}" {% if request.endpoint == ep or (ep == 'collect_page' and request.endpoint in ('official_page', 'reviews_page', 'review_day', 'review_view')) or (ep == 'longterm_page' and request.endpoint and request.endpoint.startswith('longterm_')) %}aria-current="page"{% endif %}>{{ label }}</a></li>{% endif %}{% endfor %}</ul>
-      </div>
+      {% if title in foldable %}</details>{% else %}</div>{% endif %}
       {% endfor %}
       {% if in_bot %}
-      {# 额外：开着的永远显示在标题下面，不跟着折叠；没开的收进「更多」，点开才看到，点进去是开关所在的「功能与设置」。每一项都是一个可开关的扩展 #}
-      <div class="extra">
-        <h3>额外</h3>
+      {# 额外：整类可以和别的大类一样点标题折叠；展开时开着的显示在标题下面，没开的收进「更多」，点开才看到，点进去是开关所在的「功能与设置」。每一项都是一个可开关的扩展 #}
+      <details class="extra grp" data-k="额外" open><summary><h3>额外</h3></summary>
         <ul>{% for ep, label in extras if ep not in disabled_nav %}<li><a href="{{ url_for(ep) }}" {% if request.endpoint == ep %}aria-current="page"{% endif %}>{{ label }}</a></li>{% endfor %}</ul>
         {% if extras|selectattr(0, 'in', disabled_nav)|list %}
         <details class="more">
@@ -380,7 +389,7 @@ window.copyText=function(text,btn,target){
           <ul>{% for ep, label in extras if ep in disabled_nav %}<li><a href="{{ url_for('extensions_page') }}">{{ label }}</a></li>{% endfor %}</ul>
         </details>
         {% endif %}
-      </div>
+      </details>
       {# 附属功能：个性化模块的后台页面，只有打开了才显示（关着的不进「更多」） #}
       {% set subs = [('paidan_page','排单','paidan_')] %}
       {% if subs|rejectattr(0, 'in', disabled_nav)|list %}
@@ -390,14 +399,20 @@ window.copyText=function(text,btn,target){
       </div>
       {% endif %}
       {% endif %}
-      <div>
-        <h3>全部机器人共用</h3>
+      <details class="grp" data-k="全部机器人共用" open><summary><h3>全部机器人共用</h3></summary>
         <ul>
           <li><a href="{{ root_url('dashboard') }}?pick=1" {% if request.endpoint == 'dashboard' and not in_bot %}aria-current="page"{% endif %}>选择机器人</a></li>
           {% for ep, label in [('wizard','安装向导'),('bots_page','机器人接入'),('accounts_page','账号'),('remote_page','远程访问'),('https_page','HTTPS'),('update_page','更新')] %}{% if (ep not in ('update_page','wizard','https_page')) or is_owner %}<li><a href="{{ root_url(ep) }}" {% if request.endpoint == ep %}aria-current="page"{% endif %}>{{ label }}{% if ep == 'update_page' and update_dot %}<span class="reddot" title="有新版本 {{ update_dot }}" aria-label="有新版本 {{ update_dot }}"></span>{% endif %}</a></li>{% endif %}{% endfor %}
         </ul>
-      </div>
+      </details>
     </nav>
+    <script>
+    /* 侧栏折叠：收起过的大类下次还收着（存在本机浏览器），但当前页面所在的那一类总是展开 */
+    (function(){var K='nav-fold:';document.querySelectorAll('.rail details.grp').forEach(function(d){
+      var k=K+d.dataset.k;try{if(localStorage.getItem(k)==='0'&&!d.querySelector('[aria-current]'))d.open=false;}catch(e){}
+      d.addEventListener('toggle',function(){try{d.open?localStorage.removeItem(k):localStorage.setItem(k,'0');}catch(e){}});
+    });})();
+    </script>
     {{ th.theme_picker(admin_theme) }}
     <form class="who" method="post" action="{{ url_for('logout') }}">{{ csrf() }}<span>{{ me }}</span><button type="submit">退出</button></form>
     </div>

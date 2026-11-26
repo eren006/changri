@@ -381,10 +381,12 @@ def create_app() -> Flask:
                 n_admins = conn.execute("SELECT COUNT(*) FROM admins").fetchone()[0]
                 n_roles = conn.execute("SELECT COUNT(*) FROM roles").fetchone()[0]
                 phone_on = get_config("phone_enabled", "0") == "1"
+        from changri.core import phoneserver
         steps = [bool(acc), online, n_admins > 0, n_roles > 0, phone_on]
         cur = next((i for i, d in enumerate(steps[:4]) if not d), 4)       # 第一个没完成的必做步骤
         return render_template("wizard.html", acc=acc, bid=bid, online=online, n_admins=n_admins, n_roles=n_roles, phone_on=phone_on,
-                               steps=steps, cur=cur, ip=botconf.public_ip(), result=session.pop("bot_test", None))
+                               steps=steps, cur=cur, ip=botconf.public_ip(), result=session.pop("bot_test", None),
+                               admin_port=_config.admin_port(), phone_port=phoneserver.port())
 
     @app.route("/bots")
     @login_required
@@ -453,7 +455,9 @@ def create_app() -> Flask:
         phoneserver.stop(app_id)
         botconf.delete_account(app_id)
         gone = _db.erase_workspace(app_id)
-        flash(f"已彻底删除机器人 {app_id}" + ("和它的全部数据。" if gone else "（它本来就没有数据）。") + "这一步不能撤销。")
+        tail = {"gone": "和它的全部数据。",
+                "later": "。它的数据文件还被程序占着，下次重启长日bot 时会自动删掉。"}.get(gone, "（它本来就没有数据）。")
+        flash(f"已彻底删除机器人 {app_id}{tail}这一步不能撤销。")
         return redirect(url_for("bots_page"))
 
     @app.post("/bots/<app_id>/delete")

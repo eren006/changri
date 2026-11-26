@@ -22,6 +22,8 @@ class SupervisorTests(unittest.TestCase):
         self.patches = [mock.patch.object(supervisor, "CRASH_DELAY", 0), mock.patch.object(supervisor, "_open_browser_once", lambda: None),
                         mock.patch.object(supervisor, "_wait_for_user", lambda: None),
                         mock.patch.object(supervisor, "_already_running", lambda: None),
+                        # 在真的 Windows 上不 mock 的话会真去装开机自启、放行防火墙、等后台任务 90 秒（Mac / Linux 上这条路不会走）
+                        mock.patch.object(supervisor, "_handoff_to_task", lambda: False),
                         mock.patch.object(layout, "INSTALLED", True), mock.patch.object(layout, "CURRENT", self.tmp / "current"),
                         mock.patch.object(layout, "VERSIONS", self.tmp / "versions"),
                         mock.patch.object(updater, "confirm_healthy", lambda *a: None)]
@@ -153,6 +155,7 @@ class SupervisorTests(unittest.TestCase):
         self.addCleanup(lambda: [signal.signal(s, h) for s, h in old.items()])
         return m
 
+    @unittest.skipIf(sys.platform == "win32", "Windows 上 os.kill(自己, SIGTERM) 是直接结束进程，信号处理函数收不到，会把整个测试进程杀掉")
     def test_stop_signal_clears_marker_even_if_child_is_killed(self):
         import os
         import signal

@@ -295,3 +295,11 @@ def running() -> bool:
 
 def start_all() -> None:
     start()
+
+
+def ensure() -> None:
+    """该开没开、该关没关时，按设置启停一次（机器人同步每 5 秒调一次）。
+    起因：新装时开机那一刻还没有机器人，start() 判「小手机已关闭」；之后在向导里加了机器人，机器人几秒内自动连上，
+    小手机却一直没监听，后台还显示开着，要重启长日bot 才好。增删、停用机器人，端口被别的程序占着后又放开，都靠这里跟上。"""
+    if bool(phone_bots(fresh=True)) != running():
+        start()

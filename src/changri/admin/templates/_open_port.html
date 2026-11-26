@@ -1,0 +1,85 @@
+{# 在云服务商的安全组里放行一个端口的分步教程：安装向导、小手机页都用这一份。
+   先选是哪家云（阿里云 / 腾讯云 / 别的），只显示那家的步骤。阿里云 ECS、腾讯云轻量应用服务器按 2026-11 的控制台写（作者照截图核对过）；腾讯云 CVM、华为云暂时只有路径，界面核对过再补成分步。 #}
+{# admin_port = 设置平台端口（默认 5091），phone_port = 小手机端口（默认 5092）：两个都要放行，在一条规则里填。 #}
+{% macro open_port_steps(admin_port, phone_port) %}
+{% set adj = phone_port == admin_port + 1 %}
+<p class="note">机器人装在云服务器上的话，要在云服务器的「安全组」里放行两个端口：<code>{{ admin_port }}</code>（这个设置平台，你在外面才打得开）和 <code>{{ phone_port }}</code>（小手机，玩家要用）。这一步只能在云服务商的网页控制台里做。</p>
+<div class="portguide">
+<fieldset class="cloudpick"><legend>你的服务器是哪家的？选一下，下面出对应的步骤：</legend>
+  <label><input type="radio" name="cloudpick" value="ali">阿里云</label>
+  <label><input type="radio" name="cloudpick" value="tx">腾讯云</label>
+  <label><input type="radio" name="cloudpick" value="other">别的</label>
+</fieldset>
+<div class="cloudpane" data-cloud="ali" hidden>
+<p class="note">适用于阿里云「云服务器 ECS」。</p>
+<ol class="ipsteps">
+  <li>打开阿里云控制台，在「计算」下面点「<b>云服务器 ECS</b>」。</li>
+  <li>在实例列表里点你装机器人的那台服务器，进到它的详情页。</li>
+  <li>点上方的「<b>网络与安全组</b>」标签。</li>
+  <li>在安全组规则的「入方向」里，点「<b>＋ 添加入方向规则</b>」。</li>
+  <li>弹出的窗口照下面填：
+    <table class="portform">
+      <tr><th>授权策略</th><td>允许（默认就是，不用动）</td></tr>
+      <tr><th>优先级</th><td>1（不用动）</td></tr>
+      <tr><th>协议类型</th><td>选「<b>自定义 TCP</b>」</td></tr>
+      <tr><th>访问来源</th><td>左边保持 IPv4，右边填 <code>0.0.0.0/0</code><span class="muted">（意思是任何地方都能访问，玩家在哪儿都能打开）</span></td></tr>
+      <tr><th>访问目的</th><td>左边保持「端口」。如果里面已经有 HTTP(80) 之类的，先点 × 删掉。右边输入 <code>{{ admin_port }}</code> 按回车，再输入 <code>{{ phone_port }}</code> 按回车，<b>两个都要有</b>。{% if adj %}要是它只认范围写法，就填 <code>{{ admin_port }}/{{ phone_port }}</code>（一次放行这两个）。{% else %}要是它只认范围写法，就分两条规则添加，一条填 <code>{{ admin_port }}/{{ admin_port }}</code>，一条填 <code>{{ phone_port }}/{{ phone_port }}</code>。{% endif %}</td></tr>
+      <tr><th>描述</th><td>选填，写「长日 设置平台+小手机」方便以后认</td></tr>
+    </table>
+    最后点「<b>确定</b>」。</li>
+</ol>
+</div>
+<div class="cloudpane" data-cloud="tx" hidden>
+<p class="note">适用于腾讯云「轻量应用服务器」。买的是「云服务器 CVM」的，选「别的」。</p>
+<ol class="ipsteps">
+  <li>打开腾讯云控制台，点「<b>轻量应用服务器</b>」。</li>
+  <li>直接点你那台服务器的<b>方块</b>（点名字那块就行，<b>不要</b>点右边的「登录」）。</li>
+  <li>点上方的「<b>防火墙</b>」标签。</li>
+  <li>点蓝色的「<b>添加规则</b>」。</li>
+  <li>弹出的窗口照下面填：
+    <table class="portform">
+      <tr><th>应用类型</th><td>自定义（默认就是，不用动）</td></tr>
+      <tr><th>来源</th><td>填 <code>0.0.0.0/0</code><span class="muted">（空着也一样，默认就是所有地方都能访问）</span></td></tr>
+      <tr><th>协议</th><td>TCP（默认就是）</td></tr>
+      <tr><th>端口</th><td>填 <code>{{ admin_port }},{{ phone_port }}</code><span class="muted">（两个端口用英文逗号隔开，一条规则就够）</span></td></tr>
+      <tr><th>策略</th><td>允许（默认就是）</td></tr>
+      <tr><th>备注</th><td>选填，写「长日 设置平台+小手机」方便以后认</td></tr>
+    </table>
+    最后点「<b>确定</b>」。</li>
+</ol>
+</div>
+<div class="cloudpane" data-cloud="other" hidden>
+<ul class="note">
+  <li><b>腾讯云云服务器 CVM</b>：控制台 → 云服务器 → 点你的服务器 → 安全组 → 编辑规则 → 入站规则 → 添加规则</li>
+  <li><b>华为云</b>：控制台 → 弹性云服务器 → 安全组 → 配置规则 → 入方向规则 → 添加规则</li>
+</ul>
+<p class="note">规则内容都一样：协议 TCP，端口 {{ admin_port }} 和 {{ phone_port }}，来源 0.0.0.0/0。</p>
+</div>
+</div>
+<script>
+/* 选哪家就只显示哪家的步骤；选过的记在本机浏览器里，下次打开直接显示那家 */
+(function(){var w=document.currentScript.previousElementSibling,K='cloud-pick';
+  function show(v){w.querySelectorAll('.cloudpane').forEach(function(p){p.hidden=p.dataset.cloud!==v;});w.querySelectorAll('.cloudpick label').forEach(function(l){l.classList.toggle('on',l.querySelector('input').value===v);});}
+  w.querySelectorAll('input[name=cloudpick]').forEach(function(r){r.addEventListener('change',function(){show(r.value);try{localStorage.setItem(K,r.value);}catch(e){}});});
+  var v=null;try{v=localStorage.getItem(K);}catch(e){}
+  var r=v&&w.querySelector('input[name=cloudpick][value="'+v+'"]');if(r){r.checked=true;show(v);}
+})();
+</script>
+<style>
+.ui .ipsteps{margin:6px 0 8px;padding-left:22px;display:flex;flex-direction:column;gap:6px;line-height:1.6}
+.ui .portguide{margin:6px 0 10px}
+.ui .cloudpick{border:0;margin:0 0 10px;padding:0;display:flex;flex-wrap:wrap;gap:8px}
+.ui .cloudpick legend{padding:0;margin:0 0 8px;font-size:14px;color:var(--ink)}
+.ui .cloudpick label{display:inline-flex;align-items:center;min-height:40px;padding:0 18px;border:1px solid var(--line);border-radius:999px;background:var(--surface);cursor:pointer;font-size:14.5px;margin:0;color:var(--ink)}
+.ui .cloudpick label:hover{border-color:var(--dusk)}
+.ui .cloudpick input{position:absolute;opacity:0;pointer-events:none}
+.ui .cloudpick label.on{border-color:var(--dusk);background:var(--dusk);color:#fff}
+.ui .cloudpick label:has(input:focus-visible){outline:2px solid var(--dusk);outline-offset:2px}
+.ui .cloudpane{padding:4px 0 0}
+.ui .portform{border-collapse:collapse;margin:8px 0;font-size:14px;line-height:1.5}
+.ui .portform th{text-align:left;font-weight:600;white-space:nowrap;padding:5px 14px 5px 0;vertical-align:top;color:var(--mute)}
+.ui .portform td{padding:5px 0;vertical-align:top}
+.ui .portform tr+tr th,.ui .portform tr+tr td{border-top:1px solid var(--line)}
+.ui .portform .muted{display:block;font-size:13px}
+</style>
+{% endmacro %}

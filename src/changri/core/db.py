@@ -132,17 +132,60 @@ def per_bot(fn):
     return wrap
 
 
-def erase_workspace(app_id: str) -> bool:
-    """彻底删除这个机器人的整个工作区文件夹（不可恢复）。只用在后台「彻底删除」。"""
+ERASE_MARK = ".erase"          # 工作区里有这个文件 = 后台点过「彻底删除」但当时没删干净，下次启动时删
+
+
+def _rmtree_retry(folder: Path, tries: int = 5) -> bool:
+    """删整个文件夹。Windows 上库文件只要还有连接开着就删不掉（Mac / Linux 可以）：
+    `with get_conn() as conn` 只提交、不关连接，要等连接对象被回收，所以每次先 gc 一下，再隔一会儿重试。"""
+    import gc
+    import time
+    for i in range(tries):
+        gc.collect()
+        try:
+            shutil.rmtree(folder)
+            return True
+        except FileNotFoundError:
+            return True
+        except OSError:
+            if i < tries - 1:
+                time.sleep(0.3)
+    return not folder.exists()
+
+
+def erase_workspace(app_id: str) -> str:
+    """彻底删除这个机器人的整个工作区文件夹（不可恢复）。只用在后台「彻底删除」。
+    返回 "gone"（删掉了）、"later"（文件还被占着，做了记号，下次启动时删）、""（AppID 不对或本来就没有数据）。"""
     import re
     if not re.fullmatch(r"\d{4,24}", app_id or ""):
-        return False
+        return ""
     folder = workspace_path(app_id).parent
     _inited.discard(app_id)
     if not folder.exists():
-        return False
-    shutil.rmtree(folder)
-    return True
+        return ""
+    if _rmtree_retry(folder):
+        return "gone"
+    try:
+        (folder / ERASE_MARK).write_text(app_id, encoding="utf-8")
+    except OSError:
+        pass
+    return "later"
+
+
+def purge_erased() -> list[str]:
+    """启动时（还没打开任何机器人的库）删掉上次没删干净的工作区。删之前同一个 AppID 又接回来了的，只去掉记号、不删。"""
+    from .botconf import list_accounts
+    if not BOTS_DIR.exists():
+        return []
+    current = {a["app_id"] for a in list_accounts()}
+    done = []
+    for mark in BOTS_DIR.glob(f"*/{ERASE_MARK}"):
+        folder = mark.parent
+        if folder.name in current:
+            mark.unlink(missing_ok=True)
+        elif _rmtree_retry(folder, tries=2):
+            done.append(folder.name)
+    return done
 
 
 def get_global_conn() -> sqlite3.Connection:
@@ -278,6 +321,7 @@ def init_db() -> None:
     import_env_bots()
     forget_bots()
     migrate_to_workspaces()
+    purge_erased()                                      # 上次「彻底删除」没删干净的（Windows 上库文件被占着），趁还没打开库时删
     for app_id in list_bot_ids(only_enabled=False):     # 每个机器人的工作区建表/升级
         if app_id:
             _init_workspace(app_id, workspace_path(app_id))

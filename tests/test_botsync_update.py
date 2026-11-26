@@ -37,6 +37,22 @@ class BotsyncUpdateJobs(unittest.TestCase):
         self.assertTrue({"update_post_check", "auto_update", "update_check"} <= ids)
         self.assertNotIn("update_confirm", ids)
 
+    def test_phone_error_logged_once_per_cause(self):
+        """小手机开不起来的原因一直在时，每 5 秒一轮也只记一次（ERROR 会进报错上报），原因变了再记。"""
+        from changri.core import phoneserver
+        botsync._phone_err[0] = ""
+        with mock.patch.object(phoneserver, "ensure", side_effect=RuntimeError("坏了")), \
+                mock.patch.object(botsync.logger, "exception") as log:
+            for _ in range(3):
+                asyncio.run(botsync._sync())
+            self.assertEqual(log.call_count, 1)
+        with mock.patch.object(phoneserver, "ensure", side_effect=OSError("另一个")), mock.patch.object(botsync.logger, "exception") as log:
+            asyncio.run(botsync._sync())
+            self.assertEqual(log.call_count, 1)
+        with mock.patch.object(phoneserver, "ensure"):
+            asyncio.run(botsync._sync())
+        self.assertEqual(botsync._phone_err[0], "")                              # 好了：下次再坏照样记
+
     def test_one_shot_jobs_never_skipped(self):
         # 只跑一次的任务不能因为到点时程序正忙就被跳过（APScheduler 默认晚 1 秒就跳过）
         jobs = {j.id: j for j in scheduler.get_jobs()}

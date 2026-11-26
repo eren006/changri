@@ -85,8 +85,8 @@ def open_firewall(ports: list[int] | None = None, only_if_changed: bool = False)
         return ""
     ports = ports or _ports()
     _write_ports_file(ports)
-    if only_if_changed and _already_done(ports):
-        return ""
+    if only_if_changed and _already_done(ports) and (not _is_windows() or _win_rule_ok(ports)):
+        return ""                                       # Windows 上还要看规则真的在：被人删了、被安全软件清掉了，启动时补回来
     shown = "、".join(map(str, ports))
     try:
         if _is_windows():
@@ -127,8 +127,7 @@ def firewall_hint() -> str:
     shown = ",".join(map(str, ports))
     try:
         if _is_windows():
-            r = _run(["netsh", "advfirewall", "firewall", "show", "rule", f"name={FW_RULE}"], check=False)
-            if r.returncode == 0 and all(str(p) in r.stdout for p in ports):
+            if _win_rule_ok(ports):
                 return ""
             return ("Windows 防火墙还没放行长日bot 的端口。用管理员身份打开命令提示符，运行："
                     f"netsh advfirewall firewall add rule name={FW_RULE} dir=in action=allow protocol=TCP localport={shown}"
@@ -414,6 +413,15 @@ def repair_win_task() -> str | None:
 
 def _win_task_needs_repair(xml: str) -> bool:
     return "<Task" in (xml or "") and (_win_task_time_limited(xml) or "<Repetition>" not in xml)
+
+
+def _win_rule_ok(ports: list[int]) -> bool:
+    """Windows 防火墙里长日bot 的规则在不在、端口全不全。查不了就当不在（再放行一遍没有坏处）。"""
+    try:
+        r = _run(["netsh", "advfirewall", "firewall", "show", "rule", f"name={FW_RULE}"], check=False)
+    except Exception:  # noqa: BLE001
+        return False
+    return r.returncode == 0 and all(str(p) in r.stdout for p in ports)
 
 
 def _win_firewall(ports: list[int]) -> bool:

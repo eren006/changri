@@ -205,6 +205,12 @@ def register(app, login_required):
         from changri.core import attrs as attrs_core
         f = request.form
         name = attrs_core.norm(f.get("name", ""))
+        if f.get("act") == "del":
+            if name and attrs_core.delete_attr(role_id, name):
+                flash(f"已删除属性「{name}」")
+            else:
+                flash("没有这个属性", "error")
+            return _god_back(role_id)
         val = f.get("value", type=int)
         if not name or val is None:
             flash("要选属性、写一个整数", "error")

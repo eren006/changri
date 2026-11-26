@@ -193,7 +193,7 @@
   <div class="rowlist">{% for a in my_attrs %}
     <div class="row"><div class="nm"><b>{{ a.name }}</b> <span class="tabular">{{ a.value }}</span></div>
       <form method="post" action="{{ url_for('god_attr', role_id=role.id) }}" class="mini">{{ csrf() }}<input type="hidden" name="tab" value="bag"><input type="hidden" name="name" value="{{ a.name }}">
-        <input type="number" name="value" aria-label="数值" required><button class="btn sm ghost" name="act" value="add">加减</button><button class="btn sm ghost" name="act" value="set">设为</button></form></div>
+        <input type="number" name="value" aria-label="数值" required><button class="btn sm ghost" name="act" value="add">加减</button><button class="btn sm ghost" name="act" value="set">设为</button><button class="linkbtn" name="act" value="del" formnovalidate onclick="return confirm('删除 {{ role.name }} 的属性「{{ a.name }}」？数值会一起清掉。')">删除</button></form></div>
   {% else %}<p class="empty">还没有属性。</p>{% endfor %}</div>
   {% if attr_defs %}
   <form method="post" action="{{ url_for('god_attr', role_id=role.id) }}" class="mini addrow">{{ csrf() }}<input type="hidden" name="tab" value="bag">

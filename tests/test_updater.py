@@ -125,7 +125,7 @@ class UpdaterTests(unittest.TestCase):
         self.assertEqual((self.root / "current").read_text().strip(), "0.2.0")
         self.assertEqual((self.root / "versions" / "0.2.0" / "changri" / "VERSION").read_text(), "0.2.0")
         self.assertTrue((self.root / "versions" / "0.1.0").is_dir())                # 旧版本留着，回滚用
-        self.assertEqual(json.loads((self.data / "update_pending.json").read_text())["to"], "0.2.0")
+        self.assertEqual(json.loads((self.data / "update_pending.json").read_text(encoding="utf-8"))["to"], "0.2.0")
         bdir = Path(res["backup"])
         self.assertEqual(db_value(bdir / "changri.db"), "before")
         self.assertEqual(db_value(bdir / "bots" / "123456" / "changri.db"), "before")   # 每个机器人的库都备份了
@@ -205,7 +205,7 @@ class UpdaterTests(unittest.TestCase):
         self.assertIn("机器人没全连上", msg)
         self.assertEqual((self.root / "current").read_text().strip(), "0.1.0")
         self.assertEqual(db_value(self.data / "changri.db"), "before")
-        failed = json.loads((self.data / "update_failed.json").read_text())
+        failed = json.loads((self.data / "update_failed.json").read_text(encoding="utf-8"))
         self.assertEqual((failed["to"], failed["auto"]), ("0.2.0", True))
         self.assertIsNone(updater.rollback_now(self.data))                 # 没有待确认的更新：什么也不做
 
@@ -214,7 +214,7 @@ class UpdaterTests(unittest.TestCase):
         (self.data / "update_failed.json").write_text('{"to": "0.2.0"}')
         updater.update_now(self.data, extra={"auto": True})
         updater.confirm_healthy(self.data)
-        done = json.loads((self.data / "update_auto.json").read_text())
+        done = json.loads((self.data / "update_auto.json").read_text(encoding="utf-8"))
         self.assertEqual((done["from"], done["to"]), ("0.1.0", "0.2.0"))
         self.assertFalse((self.data / "update_failed.json").exists())
 

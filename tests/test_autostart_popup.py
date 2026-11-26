@@ -52,6 +52,13 @@ class NeedPopup(WinBase):
             winstart.need_popup()
         te.assert_called_once()                               # 5 分钟内不再查 schtasks
 
+    def test_popup_right_after_boot(self):
+        # time.monotonic() 从开机算：服务器刚开机不到 5 分钟时也要弹（以前拿 0 当「上次查的时间」，被当成刚查过）
+        with mock.patch.object(winstart.time, "monotonic", return_value=42.0), \
+                mock.patch.object(winstart, "_task_exists", return_value=False), \
+                mock.patch.object(winstart, "_is_admin", return_value=True):
+            self.assertEqual(winstart.need_popup(), {"admin": True, "port": 5091})
+
     def test_no_popup_when_installed_removed_service_or_not_windows(self):
         with mock.patch.object(winstart, "_task_exists", return_value=True):
             self.assertIsNone(winstart.need_popup())

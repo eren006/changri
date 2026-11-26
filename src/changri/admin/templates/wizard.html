@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from '_ip_whitelist.html' import ip_whitelist_steps %}
+{% from '_open_port.html' import open_port_steps %}
 {% block title %}安装向导{% endblock %}
 {% block head %}<style>
 .steps{list-style:none;margin:0;padding:0;max-width:720px}
@@ -83,6 +84,7 @@
     <div class="body">
     {% if steps[4] %}<p class="note">已开启，可在小手机页检查玩家能不能从外网打开。</p>
     {% else %}<p class="note">玩家用激活码在网页里发短信、送礼。不开也不影响群里的玩法。</p>{% endif %}
+    {% if steps[0] %}{{ open_port_steps(admin_port|default(5091), phone_port|default(5092)) }}{% endif %}
     {% if steps[0] %}<p class="note"><a href="/b/{{ bid }}/phone">{{ '打开小手机设置' if steps[4] else '去开启小手机' }}</a></p>{% endif %}
     </div></li>
 </ol>

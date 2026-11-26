@@ -419,6 +419,10 @@ class AdminMultiBot(unittest.TestCase):
         self.assertIn("×7", bag)
         self.assertIn("力量", bag)
         self.assertIn("45", bag)
+        self.assertIn('value="del"', bag)                                                    # 每条属性旁有「删除」
+        from changri.core import attrs as attrs_c
+        self.c.post(f"{base}/god/{rid}/attr", data={"name": "力量", "act": "del", "tab": "bag", "_csrf": tok})   # 删除不用填数值
+        self.assertIsNone(attrs_c.get_attr(rid, "力量"))
         self.assertNotIn("结束这场", self.c.get(f"{base}/god?role={rid}&tab=time").get_data(as_text=True))
         # 全体
         self.c.post(f"{base}/god/all/perm", data={"on": ["sms"], "_csrf": tok})
