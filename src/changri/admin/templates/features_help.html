@@ -1,0 +1,48 @@
+{% extends "base.html" %}{% block title %}功能简介{% endblock %}
+{% block head %}<style>
+.fh-toc{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 8px}
+.fh-toc a{padding:6px 14px;border:1px solid var(--card-line);border-radius:999px;text-decoration:none;color:var(--ink);font-size:14px;background:var(--surface)}
+.fh-toc a:hover{border-color:var(--dusk);color:var(--dusk)}
+.fh-grp{scroll-margin-top:24px;margin-top:28px}
+.fh-grp>.note{margin:4px 0 14px}
+.fh-jump{display:flex;flex-wrap:wrap;gap:4px 14px;margin:0 0 18px;font-size:14px}
+.fh-jump a{color:var(--mute)}
+.fh-jump a:hover{color:var(--dusk)}
+.fh{scroll-margin-top:24px;background:var(--surface);border:1px solid var(--card-line);border-radius:var(--r);padding:18px 20px;margin:0 0 14px}
+.fh h3{margin:0;font:700 18px var(--serif)}
+.fh .st{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--mute);font-weight:400;font-family:var(--sans);margin-left:10px}
+.fh>p{margin:8px 0 0}
+.fh dl{display:grid;grid-template-columns:6.5em 1fr;gap:8px 18px;margin:12px 0 0}
+.fh dt{color:var(--mute);font-size:14px}
+.fh dd{margin:0}
+.fh code{white-space:nowrap;font:500 .92em var(--sans);padding:1px 7px;margin:0 1px;border-radius:6px;background:var(--soft);color:var(--ink)}
+.fh .acts{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+@media (max-width:600px){.fh,.fh-grp{scroll-margin-top:76px}.fh{padding:16px}.fh dl{grid-template-columns:1fr;gap:2px}.fh dd{margin-bottom:8px}}
+</style>{% endblock %}
+{% block body %}
+<h1>功能简介</h1>
+<p class="lede">「功能与设置」里核心功能和辅助功能各是干嘛的、玩家在群里怎么用、管理员要做什么。每一项设置管什么，看<a href="{{ url_for('manual_page') }}">使用手册</a>；个性化模块看<a href="{{ url_for('modules_help') }}">个性化模块简介</a>。</p>
+<nav class="fh-toc" aria-label="跳到">{% for g in fh_groups %}<a href="#g-{{ g.key }}">{{ g.title }}</a>{% endfor %}<a href="{{ url_for('modules_help') }}">个性化模块</a></nav>
+
+{% for g in fh_groups %}
+<section class="fh-grp" id="g-{{ g.key }}">
+  <h2>{{ g.title }}</h2>
+  <p class="note">{{ g.lede }}</p>
+  <nav class="fh-jump" aria-label="{{ g.title }}里的功能">{% for it in g['items'] %}<a href="#f-{{ it.id }}">{{ it.name }}</a>{% endfor %}</nav>
+  {% for it in g['items'] %}
+  <article class="fh" id="f-{{ it.id }}">
+    <h3>{{ it.name }}{% if not it.core %}<span class="st"><span class="dot {{ 'ok' if it.on }}"></span>{{ '已打开' if it.on else '没打开' }}</span>{% endif %}</h3>
+    <p>{{ it.what }}</p>
+    <dl>
+      <dt>玩家</dt><dd>{{ it.player }}</dd>
+      <dt>管理员</dt><dd>{{ it.admin }}</dd>
+    </dl>
+    <div class="acts">
+      {% if it.page %}<a class="btn sm" href="{{ it.page }}">{{ it.page_label }}</a>{% endif %}
+      <a class="btn sm ghost" href="{{ url_for('extensions_page', tab=g.key) }}#x-{{ it.id }}">{{ '到「功能与设置」打开' if not it.on else '去设置' }}</a>
+    </div>
+  </article>
+  {% endfor %}
+</section>
+{% endfor %}
+{% endblock %}

@@ -702,6 +702,12 @@ def create_app() -> Flask:
         flash(("已恢复全部设置为默认" if mode == "reset" else "已补齐没设过的设置") + f"（{n} 项）；{what}。")
         return redirect(url_for("extensions_page"))
 
+    def help_ids() -> set[str]:
+        """有简介的功能：核心 / 辅助看 features/modhelp/guide.py，个性化模块看 modhelp 的 PAGES。"""
+        from changri.features.modhelp.admin import PAGES
+        from changri.features.modhelp.guide import GUIDE
+        return set(GUIDE) | set(PAGES)
+
     @app.route("/extensions")
     @login_required
     def extensions_page():
@@ -724,7 +730,7 @@ def create_app() -> Flask:
         return render_template("extensions.html", items=items, tab=tab, cur=tab if tab in ("aux", "custom") else "core", pending=ext_core.pending_restart(),
                                owner=bool(session.get("owner")), restarting=request.args.get("restarting") == "1", ai_prompt=ext_core.ai_prompt() if request.args.get("tab") == "ai" else "",
                                api_ref=ext_core.api_reference() if tab == "api" else [], ready=ext_core.ready_made() if tab == "api" else [],
-                               api_version=ext_core.API_VERSION)
+                               api_version=ext_core.API_VERSION, help_ids=help_ids())
 
     @app.route("/extensions/ready/<ext_id>.zip")
     @login_required

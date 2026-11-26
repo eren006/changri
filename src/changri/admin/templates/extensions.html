@@ -9,7 +9,7 @@
 .sw.on button{background:var(--ok)} .sw.on button::after{transform:translateX(20px)}
 .sw button:disabled{opacity:.5;cursor:not-allowed}
 .sw button:focus-visible{outline:2px solid var(--dusk);outline-offset:2px}
-.ext{border:1px solid var(--card-line);box-shadow:var(--shadow-sm);border-radius:var(--r-card);background:var(--surface);padding:20px 24px;margin:0 0 16px}
+.ext{scroll-margin-top:24px;border:1px solid var(--card-line);box-shadow:var(--shadow-sm);border-radius:var(--r-card);background:var(--surface);padding:20px 24px;margin:0 0 16px}
 .ext .head{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .ext .head h3{margin:0;font-size:16px}
 .ext .ver{color:var(--mute);font-size:13.5px}
@@ -160,9 +160,9 @@ function copyEx(b){var s=b.previousElementSibling;copyText(s.textContent,b,s);}
   <a class="btn ghost" href="{{ url_for('extensions_skeleton') }}">下载骨架 zip</a></div>
 <textarea id="aip" readonly style="width:100%;height:420px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font:13px/1.55 ui-monospace,Menlo,monospace">{{ ai_prompt }}</textarea>
 {% else %}
-{% if tab == 'aux' %}<p class="note" style="margin:0 0 12px">辅助功能可以开关：官方扩展和你自己装的扩展。关着的功能，对应的指令和后台页面都不会出现。</p>
+{% if tab == 'aux' %}<p class="note" style="margin:0 0 12px">辅助功能可以开关：官方扩展和你自己装的扩展。关着的功能，对应的指令和后台页面都不会出现。<a href="{{ url_for('features_help') }}#g-aux">看每个功能是干嘛的</a></p>
 {% elif tab == 'custom' %}<p class="note" style="margin:0 0 12px">个性化模块是别人点名要的、非常小的定制功能，平时用不上。<b>每个都默认关着</b>，点「全部恢复默认设置」时也会全部关回去；要用哪个自己打开开关，再点「重启并生效」。<a href="{{ url_for('modules_help') }}">看每个模块是干嘛的</a></p>
-{% else %}<p class="note" style="margin:0 0 12px">核心功能一直开着，不能关；点「进入设置」调这个功能的设置。</p>{% endif %}
+{% else %}<p class="note" style="margin:0 0 12px">核心功能一直开着，不能关；点「进入设置」调这个功能的设置。<a href="{{ url_for('features_help') }}#g-core">看每个功能是干嘛的</a></p>{% endif %}
 <div class="bar">
   {% if owner and cur == 'aux' %}
   <form method="post" action="{{ url_for('extensions_upload') }}" enctype="multipart/form-data" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">{{ csrf() }}
@@ -177,7 +177,7 @@ function copyEx(b){var s=b.previousElementSibling;copyText(s.textContent,b,s);}
 {% if owner %}<p class="note" style="margin:-8px 0 16px"><b style="color:var(--warn)">注意：</b>扩展是 Python 代码，装上就和主程序有同样的权限（包括能读到机器人的 AppSecret）。只安装你信得过的人写的扩展。上传的扩展默认是关闭的，要自己打开开关。</p>{% endif %}
 
 {% for it in items if it.group == cur %}
-<article class="ext" data-search="{{ it.name }} {{ it.description }} {{ it.author }}{% for f in it.fields or [] %} {{ f.label }}{% endfor %}{% for st in it.settings or [] %} {{ st.label or st.key }}{% endfor %}">
+<article class="ext" id="x-{{ it.id }}" data-search="{{ it.name }} {{ it.description }} {{ it.author }}{% for f in it.fields or [] %} {{ f.label }}{% endfor %}{% for st in it.settings or [] %} {{ st.label or st.key }}{% endfor %}">
   <div class="head">
     {% if it.kind != 'core' %}<span class="sw {{ 'on' if it.enabled }}">
       <form method="post" action="{{ url_for('extensions_toggle') }}" style="margin:0;height:100%">{{ csrf() }}
@@ -195,6 +195,7 @@ function copyEx(b){var s=b.previousElementSibling;copyText(s.textContent,b,s);}
   <div class="acts">
     {% if it.fields or it.settings %}<button class="btn sm" type="button" onclick="document.getElementById('set-{{ it.id }}').showModal()">进入设置</button>{% endif %}
     {% for ep, label in it.links %}{% if ep not in disabled_nav or it.enabled %}<a class="btn sm ghost" href="{{ url_for(ep) }}">{{ label }}</a>{% endif %}{% endfor %}
+    {% if it.id in help_ids %}<a class="btn sm ghost" href="{{ url_for('modules_help') if it.group == 'custom' else url_for('features_help') }}#{{ 'm' if it.group == 'custom' else 'f' }}-{{ it.id }}">这是干嘛的？</a>{% endif %}
   </div>
   {% if it.fields or it.settings %}
   <dialog id="set-{{ it.id }}" class="setdlg">
