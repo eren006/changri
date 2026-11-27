@@ -648,8 +648,31 @@ class PlayE2E(unittest.TestCase):
         self.assertTrue(rooms.create("微信", a, [b], "", "")[0])               # 网页多人群聊建的房间
         self.assertTrue(rooms.create("微信", a, [c], "", "")[0])
         self.assertIn("时间线还是空的", self.say("时间线")[0])
-        self.assertTrue(rooms.create("微信", a, [b], "", "")[0])               # 微信不查时间撞
-        self.assertIn("小手机", self.say("微信 乙")[0])                          # bot 端不再做，指向小手机
+        self.assertTrue(rooms.create("微信", a, [b, c], "", "")[0])            # 微信不查时间撞
+        self.assertIn("没结束的微信", rooms.create("微信", b, [a], "", "")[1])    # 同一组人只能有一个
+        self.assertIn("小手机", self.say("微信 乙")[0])                          # 「微信走 QQ 群」关着：bot 端指向小手机
+
+    def test_wechat_qq_command(self):
+        """「微信走 QQ 群」开着：群里发「微信 名字」领 QQ 群，发群号给对方。"""
+        self.add_pool(2)
+        set_config("ext:wechat", "1")
+        self.assertIn("用法", self.say("微信")[0])
+        out = self.say("微信 乙")
+        self.assertTrue(any("微信已发起" in o for o in out), out)
+        self.assertTrue(any("请申请入群" in o for o in out), out)
+        self.assertTrue(any("微信已发起" in o and "不复盘、不记弧长" in o for o in out), out)       # 开的时候就说
+        self.assertTrue(any("[P1]" in o and "不复盘、不记弧长" in o for o in out), out)           # 对方的邀请里也说
+        self.assertIn("没结束的微信", self.say("微信 乙")[0])
+        rid = rooms.open_rooms()[0]["id"]
+        gid = pool.get(rooms.get(rid)["pool_id"])["group_openid"]
+        self.say("甲：今晚月色很好", member="M0", group=gid)
+        from changri.core import arclen
+        self.assertFalse(any(w["room_id"] == rid for w in arclen.stats()["waits"]))   # 不记弧长：乙不算在等着回
+        self.assertNotIn(f"R{rid}", self.say("我的待回", member="M1", group="P1")[0])
+        set_config("room_auto_review", "1")
+        out = self.say("结束微信", member="M0", group=gid)
+        self.assertTrue(any("已经结束" in o for o in out), out)
+        self.assertFalse(any("复盘" in o or o == "<图>" for o in out), out)       # 微信不复盘
 
     def test_block_respected(self):
         from changri.core import blocks

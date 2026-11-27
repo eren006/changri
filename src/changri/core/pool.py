@@ -137,15 +137,24 @@ def link_ready(g) -> bool:
 def allocate(room_id: int):
     """领一个空群给房间。池里没有空群返回 None（调用方会撤掉这个房间，不排队）。
     QQ 号没登录（没连上）的群不分：登记在哪个 QQ 号名下，就跟着那个号走。"""
+    wset = wechat_set()
     with get_conn() as c:
+        kind = (c.execute("SELECT kind FROM rooms WHERE id=?", (room_id,)).fetchone() or {"kind": ""})["kind"]
         g = next((x for x in c.execute(                       # 已经绑成谁的个人群的不分（放进池以前就有人在里面建了角色）
             "SELECT * FROM pool_groups p WHERE in_pool=1 AND moved=0 AND state='free' AND NOT EXISTS "
-            "(SELECT 1 FROM role_groups g WHERE g.bot_id=p.bot_id AND g.group_openid=p.group_openid) ORDER BY RANDOM()") if link_ready(x)), None)
+            "(SELECT 1 FROM role_groups g WHERE g.bot_id=p.bot_id AND g.group_openid=p.group_openid) ORDER BY RANDOM()")
+            if link_ready(x) and (not wset or (x["set_name"] == wset) == (kind == "微信"))), None)   # 微信专用组：微信只用这组，别的房间不用
         if not g:
             return None
         c.execute("UPDATE pool_groups SET state='occupied', room_id=? WHERE id=?", (room_id, g["id"]))
         c.execute("UPDATE rooms SET pool_id=? WHERE id=?", (g["id"], room_id))
         return g
+
+
+def wechat_set() -> str:
+    """「微信（QQ 群）」扩展开着、填了「微信专用群组」：这一组的群只给微信用，微信也只用这一组。没开或没填返回空串（大家共用）。"""
+    from . import extensions
+    return get_config("wechat_pool_set", "").strip() if extensions.is_enabled("wechat") else ""
 
 
 def note_exhausted(kind: str) -> None:

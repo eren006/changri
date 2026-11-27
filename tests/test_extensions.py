@@ -146,11 +146,11 @@ class ExtensionCoreTests(_PatchedDir):
         E.set_enabled("paidan", True)
         E.set_enabled("longterm", True)
         self.assertEqual(E.disabled_nav(), set())
-        self.assertEqual(E.disabled_groups(), {"心愿", "混乱短信", "晚餐", "点歌", "写信综", "踩点", "申请加入", "超时提醒"})   # 这些默认关（朋友圈、目击已在上面打开）
+        self.assertEqual(E.disabled_groups(), {"心愿", "混乱短信", "晚餐", "点歌", "写信综", "踩点", "微信", "申请加入", "超时提醒"})   # 这些默认关（朋友圈、目击已在上面打开）
         E.set_enabled("lovemail", False)
         E.set_enabled("dice", False)
         self.assertIn("lovemail_page", E.disabled_nav())
-        self.assertEqual(E.disabled_groups(), {"心动信", "跑团骰子", "心愿", "混乱短信", "晚餐", "点歌", "写信综", "踩点", "申请加入", "超时提醒"})
+        self.assertEqual(E.disabled_groups(), {"心动信", "跑团骰子", "心愿", "混乱短信", "晚餐", "点歌", "写信综", "踩点", "微信", "申请加入", "超时提醒"})
         E.set_enabled("entrance", False)
         self.assertNotIn("season_page", E.disabled_nav())                      # 季度是核心，页面一直在
         self.assertNotIn("season", [e["id"] for e in E.OFFICIAL])

@@ -83,11 +83,14 @@ from changri.core.overview import group_line as _group_line, slot_text as _slot 
 RP_FORMAT_TIP = "✍️ 写戏的格式：先写角色名，再写正文，中间用冒号、空格或换行隔开都行。不按这个格式写的算闲聊，不进存档，也不算字数"
 
 
+WECHAT_TIP = "💬 微信随便聊：不复盘、不记弧长、不算字数，也没有结戏奖励"     # 作者 2026-11-27：开微信的时候就说清楚
+
+
 def _room_text(room, who_from: str = "") -> str:
     """通知的第一条：@ 本人 + 类型、时间地点、参与者 + 须知（跟长日系统一样）。群号另发第二条（_push_group）。"""
     mem = "、".join(m["name"] for m in rooms.members(room["id"]))
     head = f"💌 {who_from} 向你发起了{room['kind']}" if who_from else f"💌 {room['kind']}"
-    tips = [RP_FORMAT_TIP]
+    tips = [WECHAT_TIP if room["kind"] == "微信" else RP_FORMAT_TIP]
     gi = rooms.group_info(room)
     if gi and not gi[1].startswith(pool.QQ_PREFIX):                     # 官方机器人的群：它查不了群成员，要说过话才算到场
         tips.append("到场 ➜ 进群后随便说一句，才算到场")

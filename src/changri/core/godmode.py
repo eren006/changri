@@ -20,8 +20,11 @@ def shown_features() -> dict[str, str]:
     """上帝模式页上列出来的开关。小手机多人群聊没开时不列「多人群聊」：那时它管不到任何东西，列出来只会让人以为群里还有「微信」。
     后台保存开关时也只处理这里列出的，没列出的保持原样（不然藏起来的开关每次保存都会被当成关掉）。"""
     from . import extensions
+    from . import rooms
     out = dict(FEATURES)
-    if not extensions.is_enabled("groupchat"):
+    if rooms.wechat_qq():                         # 「微信走 QQ 群」开着：群里的「微信」指令也能用
+        out["微信"] = "微信（QQ 群）"
+    elif not extensions.is_enabled("groupchat"):
         out.pop("微信")
     else:
         out["微信"] = "多人群聊（小手机）"

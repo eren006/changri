@@ -203,6 +203,10 @@ class Extras(unittest.TestCase):
             c.execute("INSERT INTO messages(kind,from_role_id,to_role_id,created_ts,status) VALUES('sms',?,?,?,'sent')", (self.r["甲"]["id"], self.r["乙"]["id"], now))
         t = mystats.build(self.r["乙"]["id"])
         self.assertIn("累计字数：30 字", t)
+        with get_conn() as c:                                    # 微信里写的不算字数
+            wx = c.execute("INSERT INTO rooms(kind, creator_id, status, created_ts) VALUES('微信', ?, 'ended', ?)", (self.r["乙"]["id"], now)).lastrowid
+            c.execute("INSERT INTO room_lines(room_id, ts, role_id, name, text, is_rp, chars) VALUES(?,?,?,?,?,1,500)", (wx, now, self.r["乙"]["id"], "乙", "x"))
+        self.assertIn("累计字数：30 字", mystats.build(self.r["乙"]["id"]))
         self.assertIn("平均耗时：30 分钟", t)
         self.assertIn("最喜欢给你发短信", t)
         self.assertIn("1. 甲（1）", t)

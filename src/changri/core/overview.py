@@ -13,6 +13,8 @@ def slot_text(r) -> str:
 
 def group_line(room) -> str:
     gi = rooms.group_info(room)
+    if room["kind"] == "微信" and not gi:     # 没领 QQ 群的微信就是小手机多人群聊（跟「聊天室」开关无关），别落到「群池没空群」那句
+        return "这个多人群聊在小手机里进行：小手机 → 发现 → 邀约 → 点进这个群聊。"
     if not gi and not room["pool_id"] and room["status"] == "open" and rooms.web_mode():
         return "这次约会在小手机的聊天室里进行：小手机 → 发现 → 邀约 → 进入聊天室。"
     if gi:
@@ -63,6 +65,8 @@ def todo_entries(role, lingering: list | None = None, now: float | None = None) 
                                "WHERE m.role_id=? AND r.status='open' ORDER BY r.id", (role["id"],)).fetchall()
         names = {x["id"]: x["name"] for x in c.execute("SELECT id, name FROM roles")}
         for r in open_rooms:
+            if r["kind"] == "微信":                                  # 微信不记弧长，不进「待回」
+                continue
             last = c.execute("SELECT role_id, ts FROM room_lines WHERE room_id=? AND role_id IS NOT NULL AND is_rp=1 ORDER BY ts DESC, id DESC LIMIT 1",
                              (r["id"],)).fetchone()             # 只看戏文，闲聊不算回复（跟弧长一个口径）
             since = arclen.waiting(c, r["id"])[0].get(role["id"])     # 两人房从对方说第一句起算，多人房从别人最近一句起算

@@ -252,6 +252,36 @@ def web_mode() -> bool:
     return extensions.is_enabled("phone") and extensions.is_enabled("chatroom")
 
 
+def wechat_qq() -> bool:
+    """「扩展」页的「微信（QQ 群）」卡片（默认关）：开着时微信跟电话、私约一样从备用群池领 QQ 群，不看聊天室开关；
+    关着时微信只是小手机里的多人群聊（作者 2026-11-27 定：私约和微信可以分开选）。"""
+    from . import extensions
+    return extensions.is_enabled("wechat")
+
+
+def wechat_groups_in_use() -> int:
+    """现在有几个没结束的微信占着 QQ 群。"""
+    with get_conn() as c:
+        return c.execute("SELECT COUNT(*) FROM rooms WHERE kind='微信' AND status='open' AND pool_id IS NOT NULL").fetchone()[0]
+
+
+def uses_qq_group(kind: str) -> bool:
+    """新开的这种房间要不要领 QQ 群。"""
+    return wechat_qq() if kind == "微信" else not web_mode()
+
+
+def open_wechat_with(role_ids) -> int:
+    """这几个人（正好是这几个，不多不少）有没有还没结束的微信，有就返回房间号。同一组人只能有一个微信（照老系统）。"""
+    want = set(role_ids)
+    with get_conn() as c:
+        rows = c.execute("SELECT r.id, GROUP_CONCAT(m.role_id) ids FROM rooms r JOIN room_members m ON m.room_id=r.id "
+                         "WHERE r.kind='微信' AND r.status='open' GROUP BY r.id").fetchall()
+    for r in rows:
+        if {int(x) for x in r["ids"].split(",")} == want:
+            return r["id"]
+    return 0
+
+
 def create(kind: str, creator_id: int, target_ids: list[int], time_text: str, place: str = "", note: str = "",
            official: bool = False, day: int | None = None, wish_id: int = 0, defer: bool = False) -> tuple[bool, str, int]:
     """发起一个房间。返回 (成功, 提示或房间号, room_id)。
@@ -339,6 +369,13 @@ def create(kind: str, creator_id: int, target_ids: list[int], time_text: str, pl
             cap = get_int("phone_open_cap", 5)
             if cap and open_phone_count(creator_id) >= cap:
                 return False, f"你有 {cap} 个电话还没结束，先结束几个再打。", 0
+    if kind == "微信":
+        dup = open_wechat_with([creator_id] + ids)
+        if dup:
+            return False, f"你们这几个人已经有一个没结束的微信（R{dup}），直接在那里聊；想重开，先把它结束。", 0
+        cap = get_int("wechat_max_groups", 0) if uses_qq_group(kind) else 0
+        if cap and wechat_groups_in_use() >= cap:
+            return False, f"微信群已经开满了（最多同时 {cap} 个），等别人结束一个再开，或联系管理员。", 0
     if kind not in NO_TIMELINE:
         if not official:
             closed_h = blocked_hit(day, hm[0], hm[1])
@@ -359,7 +396,7 @@ def create(kind: str, creator_id: int, target_ids: list[int], time_text: str, pl
         c.execute("INSERT INTO room_members(room_id, role_id, agree) VALUES(?,?,1)", (rid_, creator_id))
         for t in ids:
             c.execute("INSERT INTO room_members(room_id, role_id) VALUES(?,?)", (rid_, t))
-    if kind != "微信" and not web_mode() and not defer:                              # 聊天室开着：约会在小手机网页里聊，不占 QQ 群
+    if uses_qq_group(kind) and not defer:                                            # 聊天室开着：约会在小手机网页里聊，不占 QQ 群；微信看自己的开关
         if not pool.allocate(rid_):                                                  # 备用群池没有空群：不排队，直接告诉玩家没开成
             with get_conn() as c:
                 c.execute("DELETE FROM rooms WHERE id=?", (rid_,))                   # 成员、发言连带删除（外键级联）

@@ -14,7 +14,9 @@ def build(role_id: int) -> str:
         me = c.execute("SELECT name FROM roles WHERE id=?", (role_id,)).fetchone()
         if not me:
             return ""
-        n_rp, chars = c.execute("SELECT COUNT(*), COALESCE(SUM(chars),0) FROM room_lines WHERE role_id=? AND is_rp=1", (role_id,)).fetchone()
+        n_rp, chars = c.execute(                     # 微信不算字数（作者 2026-11-27）
+            "SELECT COUNT(*), COALESCE(SUM(l.chars),0) FROM room_lines l JOIN rooms r ON r.id=l.room_id "
+            "WHERE l.role_id=? AND l.is_rp=1 AND r.kind!='微信'", (role_id,)).fetchone()
         sec = []
         for kind, label, out_t, in_t in (("sms", "短信", "📤 你最喜欢发短信给：", "📨 最喜欢给你发短信："), ("gift", "礼物", "🎁 你最喜欢送礼给：", "🎀 最喜欢送你礼物：")):
             to = _top(c, "SELECT r.name, COUNT(*) AS n FROM messages m JOIN roles r ON r.id=m.to_role_id WHERE m.kind=? AND m.from_role_id=? AND m.status!='failed' GROUP BY m.to_role_id ORDER BY n DESC, r.id LIMIT 3", (kind, role_id))

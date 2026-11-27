@@ -39,7 +39,9 @@ def register(app, ctx):
             others = c.execute("SELECT id, name FROM roles WHERE id!=? ORDER BY name", (role["id"],)).fetchall()
         return page("appoint.html", role=role, mode="discover", others=others, rooms=[_room_row(r) for r in rooms_core.my_open(role["id"])],
                     reqs=rooms_core.pending_requests(role["id"]), today=season.current_day(),
-                    chat_on=extensions.is_enabled("chatroom"), gc_on=extensions.is_enabled("groupchat"), join_on=rooms_core.joinreq_enabled())
+                    chat_on=extensions.is_enabled("chatroom"), gc_on=extensions.is_enabled("groupchat") and not rooms_core.wechat_qq(), wx_qq=extensions.is_enabled("groupchat") and rooms_core.wechat_qq(), join_on=rooms_core.joinreq_enabled())
+
+    WX_QQ_NOTE = "微信现在走 QQ 群：在自己的个人群发「微信 名字」开（多人用 / 隔开）。小手机里已经有的群聊照常能聊。"
 
     @app.post("/p/me/appoint/new")
     def appoint_new():
@@ -57,6 +59,9 @@ def register(app, ctx):
             return redirect(url_for("appoint_page"))
         if not extensions.is_enabled("groupchat" if kind == "微信" else "chatroom"):
             abort(404)
+        if kind == "微信" and rooms_core.wechat_qq():      # 「微信（QQ 群）」开着：小手机里不能再开新的，已有的照常聊（作者 2026-11-27）
+            flash(WX_QQ_NOTE)
+            return redirect(url_for("appoint_page"))
         why = _gate(role, "邀约", place)
         if why:
             flash(why)

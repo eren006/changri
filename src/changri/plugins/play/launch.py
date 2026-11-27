@@ -13,7 +13,7 @@ from changri.core.buttons import CARD_PER_ROW, Btn
 from changri.core.qqsend import finish_usage, make_send, reply_buttons, reply_long
 from changri.core.textutil import hm_text, join_time_range
 
-from .common import NEED_ROLE, NOT_ADMIN, _announce_in_room, _cmd, _invite, _is_admin, _me, _missed_line, _names, _push, _push_group, _qq_hint, _resolve
+from .common import NEED_ROLE, NOT_ADMIN, _announce_in_room, _cmd, _invite, _is_admin, _me, _missed_line, _names, _push, _push_group, _qq_hint, _resolve, WECHAT_TIP
 from .finish import NO_GROUP_TEXT, _ensure_clean
 
 
@@ -42,6 +42,8 @@ async def start_room(kind: str, me, targets: list, time_text: str, place: str = 
     paid = letters.pay(me["id"], "date", f"发起约会 R{room_id}") if kind == "约会" else ""
     refused = "\n".join(x for x in (refused, paid) if x)
     hint = _qq_hint(me["id"], room)
+    if kind == "微信":
+        hint = "\n" + WECHAT_TIP + hint
     if kind in rooms.SOLO_KINDS:
         return True, f"✅ {kind}已发起，房间号 R{room_id}（只有你一个人）。\n{_slot(room)}\n{_group_line(room)}\n聊完在群里发「结束{kind}」。" + hint, room_id
     return True, f"✅ {kind}已发起，房间号 R{room_id}。\n{_slot(room)}\n{_group_line(room)}\n对方已收到通知。" + (f"\n{refused}" if refused else "") + hint, room_id
@@ -154,7 +156,12 @@ wechat = _cmd("微信")
 
 @wechat.handle()
 async def _(bot: Bot, event: GroupMessageCreateEvent, args=CommandArg()):
-    await wechat.finish("多人群聊已经搬到小手机里了：小手机 → 发现 → 邀约 → 发起多人群聊（需要管理员在小手机设置里打开）。")
+    if not rooms.wechat_qq():
+        await wechat.finish("多人群聊已经搬到小手机里了：小手机 → 发现 → 邀约 → 发起多人群聊（需要管理员在小手机设置里打开）。")
+    names = args.extract_plain_text().strip()
+    if not names:
+        await finish_usage(wechat, "用法：微信 对方（多人用 / 隔开；不占时间线，不用写时间地点）\n例：微信 张三/李四", "微信 ")
+    await _start_room(wechat, bot, event, "微信", "", "", _names(names))
 
 
 _EMPTY_PLACE = {"无", "空", "-", "—"}

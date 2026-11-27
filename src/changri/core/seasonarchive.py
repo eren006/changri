@@ -54,7 +54,8 @@ def snapshot(season_id: int) -> dict:
             "relations": q("SELECT COUNT(*) FROM relations"),
             "posts": q("SELECT COUNT(*) FROM posts"),
         }
-        chars = {r["role_id"]: r["n"] for r in c.execute("SELECT role_id, SUM(chars) AS n FROM room_lines WHERE is_rp=1 AND role_id IS NOT NULL GROUP BY role_id")}
+        chars = {r["role_id"]: r["n"] for r in c.execute("SELECT l.role_id, SUM(l.chars) AS n FROM room_lines l JOIN rooms r ON r.id=l.room_id "
+                                                           "WHERE l.is_rp=1 AND l.role_id IS NOT NULL AND r.kind!='微信' GROUP BY l.role_id")}
         rooms = []
         for r in c.execute("SELECT * FROM rooms WHERE status!='cancelled' ORDER BY id").fetchall():
             mem = [m["name"] for m in c.execute("SELECT ro.name FROM room_members m JOIN roles ro ON ro.id=m.role_id WHERE m.room_id=? ORDER BY ro.id", (r["id"],))]

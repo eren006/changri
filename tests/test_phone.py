@@ -325,6 +325,26 @@ class PhoneExtras(Phone):
         self.c.post("/p/me/rel/乙/confirm", data={"_csrf": tok})
         self.assertTrue(relations.get_rel(self.a["id"], self.b["id"])["confirmed"])
 
+    def test_relation_chat_pushes_to_group(self):
+        """关系线留言（新建时的第一句、之后的留言）也发到对方个人群。"""
+        from unittest import mock
+        self._clean()
+        set_config("ext:relations", "1")
+        self.login(phonecodes.code_for_role(self.a["id"]))
+        sent = []
+
+        async def fake(bot, grp, text, **kw):
+            sent.append(text)
+            return "mid"
+        tok = self.csrf("/p/me/rel")
+        with mock.patch("changri.core.qqsend.make_send", return_value=fake):
+            self.c.post("/p/me/rel/new", data={"to": "乙", "kind": "chat", "text": "你好呀", "_csrf": tok})
+            self.c.post("/p/me/rel/乙/chat", data={"text": "晚上见", "_csrf": tok})
+        self.assertEqual(len(sent), 2, sent)
+        self.assertIn("「甲」在你们的关系线里留言", sent[0])
+        self.assertIn("你好呀", sent[0])
+        self.assertIn("晚上见", sent[1])
+
     def test_relation_unread_dot(self):
         from changri.core import relations
         self._clean()
@@ -588,6 +608,15 @@ class PhoneExtras(Phone):
         gid = rooms.my_open(self.a["id"])[0]["id"]
         self.assertIsNone(rooms.get(gid)["pool_id"])
         self.assertIn("多人群聊", self.c.get(f"/p/me/room/{gid}").get_data(True))
+        set_config("ext:wechat", "1")                     # 「微信（QQ 群）」开着：小手机里不能再建，已有的照常能进、能说
+        page_ = self.c.get("/p/me/appoint").get_data(True)
+        self.assertIn("微信现在走 QQ 群", page_)
+        self.assertNotIn("建群聊</button>", page_)
+        self.c.post("/p/me/appoint/new", data={"kind": "微信", "to": [str(self.b["id"])], "_csrf": tok})
+        self.assertEqual(len([r for r in rooms.my_open(self.a["id"]) if r["kind"] == "微信"]), 1)
+        self.assertEqual(self.c.get(f"/p/me/room/{gid}").status_code, 200)
+        self.assertTrue(self.c.post(f"/p/me/room/{gid}/say", data={"text": "还能聊", "_csrf": tok}).get_json()["ok"])
+        set_config("ext:wechat", "0")
         set_config("ext:groupchat", "0")
         self.assertEqual(self.c.get(f"/p/me/room/{rid}").status_code, 404)
         set_config("game_day", "")

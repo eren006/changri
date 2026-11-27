@@ -14,7 +14,7 @@ from . import arclen, rooms
 from .db import get_config, get_conn, set_config
 
 PHONE_KINDS = {"电话", "前置电话"}
-SKIP_KINDS = {"踩点"}
+SKIP_KINDS = {"踩点", "微信"}        # 微信不记弧长，也就没有「轮到谁回」
 _SENT_KEY = "overdue_sent"          # {"房间:角色": 这段等待的开始时间}，记着哪段等待已经提醒过
 
 

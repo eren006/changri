@@ -34,6 +34,13 @@ class RewardsTest(unittest.TestCase):
         ok, info = rewards.save_rule(None, "认真演", list(kinds), {"segs": [3, None]} if conds is None else conds, fx, pool or [], 1, True)
         self.assertTrue(ok, info)
 
+    def test_wechat_no_rewards(self):
+        """微信没有结戏奖励（规则里勾了全部类型也不发）。"""
+        self._rule()
+        with get_conn() as c:
+            c.execute("UPDATE rooms SET kind='微信' WHERE id=1")
+        self.assertEqual(rewards.settle(1), {})
+
     def test_pays_only_matching_and_once(self):
         self._rule()
         notes = rewards.settle(1)

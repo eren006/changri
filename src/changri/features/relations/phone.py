@@ -73,6 +73,10 @@ def register(app, ctx):
                     line={"system": False, "confirmed": bool(rel["confirmed"]), "initiator": names.get(rel["initiator_id"], "")}, chat_max=relations.CHAT_MAX,
                     label_max=relations.TIME_LABEL_MAX, time_max=relations.TIME_TEXT_MAX, draft=None)
 
+    def _chat_note(frm: str, text: str) -> str:
+        """关系线留言也发到对方个人群（作者 2026-11-27 定），跟细节、时间点一样。"""
+        return f"💬 「{frm}」在你们的关系线里留言：\n{text}\n\n（小手机 → 关系线 → {frm} 的「闲谈」里回）"
+
     def _rel_post(other: str, tab: str, fn):
         """关系线的写操作：登录 → 能不能写 → 违禁词 → 执行 fn(role, target) → 回到这条线。"""
         _ext_or_404("relations")
@@ -109,6 +113,8 @@ def register(app, ctx):
         if f.get("kind") == "chat":
             ok, msg = relations.add_item(role["id"], target["id"], target["name"], "chat", text)
             tab = "chat"
+            if ok:
+                _push(target["id"], _chat_note(role["name"], text))
         else:
             ok, msg = relations.add_detail(role["id"], target["id"], target["name"], text)
             tab = "detail"
@@ -122,7 +128,13 @@ def register(app, ctx):
 
     @app.post("/p/me/rel/<other>/chat")
     def rel_chat(other):
-        return _rel_post(other, "chat", lambda r, t: relations.add_item(r["id"], t["id"], t["name"], "chat", request.form.get("text", ""))[1])
+        def go(r, t):
+            text = request.form.get("text", "").strip()
+            ok, msg = relations.add_item(r["id"], t["id"], t["name"], "chat", text)
+            if ok:
+                _push(t["id"], _chat_note(r["name"], text))
+            return msg
+        return _rel_post(other, "chat", go)
 
     @app.post("/p/me/rel/<other>/detail")
     def rel_detail_add(other):

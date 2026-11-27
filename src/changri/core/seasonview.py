@@ -105,12 +105,13 @@ def _shown(kind: str) -> bool:
 
 def _room_item(r: dict) -> dict:
     rp = [x for x in r["lines"] if x.get("rp")]
+    counted = [] if r["kind"] == "微信" else rp                     # 微信不算字数、段数（作者 2026-11-27）
     label = r.get("day_label") or (f"D{r['day']}" if r.get("day") is not None else time.strftime("%m-%d", time.localtime(r["created_ts"])))
     num = r.get("day_num", r["day"] if r.get("day") is not None else 10 ** 6)
     return {"type": "room", "id": r["id"], "kind": r["kind"], "tag": KIND_TAG.get(r["kind"], "private"), "place": r.get("place") or "",
             "who": r["members"], "time": "" if r["kind"] in NO_TIME else f"{hm_text(r['start_hm'], r['end_hm'])}", "story": "",
             "ts": r["created_ts"], "ended_ts": r.get("ended_ts") or (rp[-1]["ts"] if rp else r["created_ts"]),
-            "day_num": num, "day_label": label, "rp_n": len(rp), "rp_chars": sum(_chars(x) for x in rp), "raw": r}
+            "day_num": num, "day_label": label, "rp_n": len(counted), "rp_chars": sum(_chars(x) for x in counted), "raw": r}
 
 
 def _chars(line: dict) -> int:

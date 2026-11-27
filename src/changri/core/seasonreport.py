@@ -90,7 +90,7 @@ def stats(role_id: int) -> dict:
                     d.update(peak_slot=f"{start:02d}:00–{end:02d}:00", time_title=title, time_tagline=tagline)
         # 名场面：自己戏文字数最多的那场（已结束的房间），取开头 4 句戏文；没有复盘记录就不画这块
         best = c.execute("SELECT l.room_id FROM room_lines l JOIN rooms r ON r.id=l.room_id AND r.status='ended' "
-                         "WHERE l.role_id=? AND l.is_rp=1 GROUP BY l.room_id ORDER BY SUM(l.chars) DESC, l.room_id LIMIT 1", (role_id,)).fetchone()
+                         "WHERE l.role_id=? AND l.is_rp=1 AND r.kind!='微信' GROUP BY l.room_id ORDER BY SUM(l.chars) DESC, l.room_id LIMIT 1", (role_id,)).fetchone()
         if best:
             lines = c.execute("SELECT name, text FROM room_lines WHERE room_id=? AND is_rp=1 ORDER BY ts, id LIMIT 4", (best["room_id"],)).fetchall()
             ex = [{"role": ln["name"], "text": _excerpt_text(ln["name"], ln["text"])} for ln in lines]

@@ -1,5 +1,5 @@
 """弧长：房间里「对方写完一段，你隔了多久才回」。只算戏文（首行是角色名的发言），闲聊不算；只在正式档期里计。
-两人房轮流计时，多人房各自计时（见 walk）。
+两人房轮流计时，多人房各自计时（见 walk）。微信不计（作者 2026-11-27：微信不复盘、不记弧长）。
 复盘页顶上按人给平均和最长，设了「最长弧长」后，超过的人和正在等的房间标红。NPC 不计入。"""
 import time
 
@@ -81,7 +81,7 @@ def stats(now: float | None = None) -> dict:
     with get_conn() as c:
         npcs = {r["id"] for r in c.execute("SELECT id FROM roles WHERE is_npc=1")}
         names = {r["id"]: r["name"] for r in c.execute("SELECT id, name FROM roles")}
-        for room in c.execute("SELECT id, kind, status, created_ts FROM rooms ORDER BY id").fetchall():
+        for room in c.execute("SELECT id, kind, status, created_ts FROM rooms WHERE kind!='微信' ORDER BY id").fetchall():     # 微信不记弧长
             mem = _members(c, room["id"])
             gaps, _since = walk(_room_lines(c, room["id"]), mem, npcs, win)
             for rid, h in gaps:
@@ -117,7 +117,7 @@ def report(role_id: int, now: float | None = None) -> str:
         npcs = {r["id"] for r in c.execute("SELECT id FROM roles WHERE is_npc=1")}
         names = {r["id"]: r["name"] for r in c.execute("SELECT id, name FROM roles")}
         rooms = c.execute("SELECT r.id, r.kind, r.status, r.created_ts FROM rooms r JOIN room_members m ON m.room_id=r.id "
-                          "WHERE m.role_id=? AND r.status!='cancelled' ORDER BY r.id", (role_id,)).fetchall()
+                          "WHERE m.role_id=? AND r.status!='cancelled' AND r.kind!='微信' ORDER BY r.id", (role_id,)).fetchall()
         all_gaps, played, live = [], 0, []
         for room in rooms:
             lines = _room_lines(c, room["id"])

@@ -269,7 +269,7 @@ def settle(room_id: int, only_role: int | None = None) -> dict[int, list[str]]:
     """结算一个房间：每个人每条匹配的规则发一次（已经发成功的跳过，上次失败的重试）。
     返回 {role_id: [本次新发出的奖励文字]}，用来通知玩家；没有新发的人不在里面。"""
     room = rooms.get(room_id)
-    if not room:
+    if not room or room["kind"] == "微信":            # 微信没有结戏奖励（作者 2026-11-27）
         return {}
     rs = rules(True)
     notes: dict[int, list[str]] = {}

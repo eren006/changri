@@ -25,7 +25,7 @@ def register(app, login_required):
         rid = request.args.get("room", type=int)
         rooms_ = rewards_core.recent_rooms()
         sel = rid or (rooms_[0]["id"] if rooms_ else None)
-        return render_template("rewards.html", rules=rewards_core.rules(), rewards=rewards_core, kinds=list(rooms_core.KINDS),
+        return render_template("rewards.html", rules=rewards_core.rules(), rewards=rewards_core, kinds=[k for k in rooms_core.KINDS if k != "微信"],     # 微信没有结戏奖励
                                items=[x for x in rpg_core.items()], attrs=rpg_core.attr_defs(), rooms=rooms_, sel=sel, gacha_pools=_gacha_pools(),
                                status=rewards_core.room_status(sel) if sel else [])
 

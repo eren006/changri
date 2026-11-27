@@ -27,7 +27,7 @@ async def _finish_room(room_id: int, status: str, why: str, timeout: bool = Fals
     if status != "ended":                                                # 正常结束不再往个人群发通知；取消、超时这类参与者不一定在场，才通知
         for m in mem:
             await _push(m["role_id"], f"🔚 R{room_id} {room['kind']}{verb}{why}。" + ("请退出那个群，管理员清场后才能再给别人用。" if gi else ""))
-    if status == "ended":
+    if status == "ended" and room["kind"] != "微信":                     # 微信不复盘（照老系统：微信群不走存档 / 字数那一套），不发复盘图也不发统计回执
         from changri.core import roomlog
         from changri.core.qqsend import IMG
         if get_config("room_auto_review", "0") == "1":                   # 自动复盘开着：把本场复盘画成图发给每个参与者

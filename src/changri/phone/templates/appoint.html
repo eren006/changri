@@ -41,6 +41,10 @@
     </form>
     {% endif %}
 
+    {% if wx_qq %}
+    <div class="disc-label">多人群聊</div>
+    <p style="padding:12px 20px;color:var(--mute);font-size:14px;margin:0">微信现在走 QQ 群：在自己的个人群发「微信 名字」开（多人用 / 隔开）。小手机里已经有的群聊照常能聊。</p>
+    {% endif %}
     {% if gc_on %}
     <div class="disc-label">多人群聊</div>
     <form method="post" action="{{ url_for('appoint_new') }}" style="padding:12px 20px">
